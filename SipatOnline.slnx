@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/" />
+  <Folder Name="/tests/" />
+  <Project Path="src/SipatOnline.Api/SipatOnline.Api.csproj" />
+  <Project Path="src/SipatOnline.BuildingBlocks.Application/SipatOnline.BuildingBlocks.Application.csproj" />
+  <Project Path="src/SipatOnline.BuildingBlocks.Domain/SipatOnline.BuildingBlocks.Domain.csproj" />
+  <Project Path="src/SipatOnline.Identity.Application/SipatOnline.Identity.Application.csproj" />
+  <Project Path="src/SipatOnline.Identity.Domain/SipatOnline.Identity.Domain.csproj" />
+  <Project Path="tests/SipatOnline.Application.UnitTests/SipatOnline.Application.UnitTests.csproj" />
+  <Project Path="tests/SipatOnline.ArchitectureTests/SipatOnline.ArchitectureTests.csproj" />
+  <Project Path="tests/SipatOnline.Domain.UnitTests/SipatOnline.Domain.UnitTests.csproj" />
+  <Project Path="tests/SipatOnline.IntegrationTests/SipatOnline.IntegrationTests.csproj" />
+</Solution>
