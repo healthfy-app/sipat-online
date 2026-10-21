@@ -286,6 +286,47 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("Users", "identity");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset>("EndsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset>("StartsAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "StartsAt", "Id");
+
+                    b.ToTable("SipatEvents", "sipats", t =>
+                        {
+                            t.HasCheckConstraint("CK_SipatEvents_Schedule", "\"EndsAt\" > \"StartsAt\"");
+                        });
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.TenantEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -389,6 +430,15 @@ namespace SipatOnline.Infrastructure.Migrations
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Identity.PlatformIdentityUser", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Tenancy.TenantEntity", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventEntity", b =>
                 {
                     b.HasOne("SipatOnline.Infrastructure.Tenancy.TenantEntity", null)
                         .WithMany()

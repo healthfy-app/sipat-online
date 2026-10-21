@@ -1,0 +1,12 @@
+.git
+.vs
+.env
+.env.*
+**/bin
+**/obj
+**/TestResults
+**/node_modules
+**/dist
+**/.vite
+artifacts
+coverage*

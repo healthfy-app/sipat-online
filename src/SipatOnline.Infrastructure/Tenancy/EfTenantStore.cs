@@ -13,11 +13,22 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
             .AsNoTracking()
             .SingleOrDefaultAsync(tenant => tenant.Id == tenantId.Value, cancellationToken);
 
-        if (entity is null)
-        {
-            return null;
-        }
+        return entity is null ? null : Reconstitute(entity);
+    }
 
+    public async Task<Tenant?> FindByKeyAsync(
+        TenantKey tenantKey,
+        CancellationToken cancellationToken)
+    {
+        var entity = await dbContext.Tenants
+            .AsNoTracking()
+            .SingleOrDefaultAsync(tenant => tenant.Key == tenantKey.Value, cancellationToken);
+
+        return entity is null ? null : Reconstitute(entity);
+    }
+
+    private static Tenant Reconstitute(TenantEntity entity)
+    {
         var branding = TenantBranding.Reconstitute(
             entity.LogoReference,
             entity.PrimaryColor,

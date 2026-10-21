@@ -25,6 +25,8 @@ public sealed class TenantTests
     [InlineData("empresa-", "tenant.key.invalid")]
     [InlineData("empresa xpto", "tenant.key.invalid")]
     [InlineData("empresa_xpto", "tenant.key.invalid")]
+    [InlineData("api", "tenant.key.invalid")]
+    [InlineData("www", "tenant.key.invalid")]
     public void Create_WithInvalidKey_ReturnsDomainError(string key, string expectedErrorCode)
     {
         var result = Tenant.Create(key, "Empresa XPTO", CreatedAt);

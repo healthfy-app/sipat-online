@@ -105,6 +105,52 @@ public sealed class UserApplicationServiceTests
     }
 
     [Fact]
+    public async Task ListAsync_ReturnsOnlyUsersFromCurrentTenant()
+    {
+        var tenantId = TenantId.New();
+        var store = new FakeUserAccountStore();
+        var tenantUser = CreateUser(tenantId, "Mat-001", "Ana Silva");
+        store.AddExisting(tenantUser);
+        store.AddExisting(CreateUser(TenantId.New(), "Mat-001", "Other Tenant User"));
+        var service = CreateService(tenantId, PlatformRoles.ClientAdmin, store);
+
+        var result = await service.ListAsync(new ListUsersRequest(), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(1, result.Value.TotalCount);
+        Assert.Equal(tenantUser.Id, Assert.Single(result.Value.Items).Id);
+    }
+
+    [Fact]
+    public async Task ListAsync_RejectsUnauthorizedActor()
+    {
+        var service = CreateService(
+            TenantId.New(),
+            PlatformRoles.Participant,
+            new FakeUserAccountStore());
+
+        var result = await service.ListAsync(new ListUsersRequest(), CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("identity.forbidden", result.Error.Code);
+    }
+
+    [Fact]
+    public async Task ListAsync_RejectsInvalidPageSize()
+    {
+        var service = CreateService(
+            TenantId.New(),
+            PlatformRoles.SuperAdmin,
+            new FakeUserAccountStore());
+
+        var result = await service.ListAsync(
+            new ListUsersRequest(Limit: ListUsersRequestValidator.MaximumLimit + 1),
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+    }
+
+    [Fact]
     public async Task SignInAsync_WithMissingTenant_ReturnsGenericFailureWithoutCallingProvider()
     {
         var signInService = new FakeSignInService();
@@ -133,6 +179,7 @@ public sealed class UserApplicationServiceTests
             new FakeUnitOfWork(),
             auditTrail ?? new FakeAuditTrail(),
             new ProvisionUserRequestValidator(),
+            new ListUsersRequestValidator(),
             new FakeTimeProvider(CurrentTime));
     }
 
@@ -213,6 +260,24 @@ public sealed class UserApplicationServiceTests
             UserId userId,
             CancellationToken cancellationToken) =>
             Task.FromResult(users.SingleOrDefault(user => user.TenantId == tenantId && user.Id == userId));
+
+        public Task<UserAccountPage> ListAsync(
+            TenantId tenantId,
+            int offset,
+            int limit,
+            CancellationToken cancellationToken)
+        {
+            var matchingUsers = users
+                .Where(user => user.TenantId == tenantId)
+                .OrderBy(user => user.DisplayName.Value, StringComparer.Ordinal)
+                .ThenBy(user => user.Id.Value)
+                .ToArray();
+            var page = matchingUsers
+                .Skip(offset)
+                .Take(limit)
+                .ToArray();
+            return Task.FromResult(new UserAccountPage(page, offset, limit, matchingUsers.Length));
+        }
 
         public Task<Result<User>> UpdateAsync(User user, CancellationToken cancellationToken) =>
             Task.FromResult(Result<User>.Success(user));

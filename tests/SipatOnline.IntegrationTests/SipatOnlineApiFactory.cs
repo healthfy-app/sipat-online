@@ -29,7 +29,11 @@ public sealed class SipatOnlineApiFactory : WebApplicationFactory<Program>
                     "Host=localhost;Database=sipat_online_tests;Username=postgres",
                 ["SipatOnline:Tenant:Id"] = DefaultTenantId.ToString("D"),
                 ["SipatOnline:Tenant:Key"] = "integration-test",
-                ["SipatOnline:Tenant:Name"] = "Integration Test"
+                ["SipatOnline:Tenant:Name"] = "Integration Test",
+                ["SipatOnline:Tenant:BaseDomain"] = "localhost",
+                ["SipatOnline:BootstrapAdmin:LoginIdentifier"] = "admin-root",
+                ["SipatOnline:BootstrapAdmin:DisplayName"] = "Integration Administrator",
+                ["SipatOnline:BootstrapAdmin:Password"] = "AdminPassword123"
             };
             configuration.AddInMemoryCollection(values);
         });

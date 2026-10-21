@@ -8,9 +8,11 @@ using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.Identity.Application.Users;
 using SipatOnline.Infrastructure.Auditing;
 using SipatOnline.Infrastructure.Identity;
+using SipatOnline.Infrastructure.Sipats;
 using SipatOnline.Infrastructure.Tenancy;
 using SipatOnline.Tenancy.Application.Branding;
 using SipatOnline.Tenancy.Domain.Tenants;
+using SipatOnline.Sipats.Application.Sipats;
 
 namespace SipatOnline.Infrastructure;
 
@@ -25,6 +27,10 @@ public static class InfrastructureServiceCollectionExtensions
             .Validate(options => options.Id != Guid.Empty, "A valid tenant ID must be configured.")
             .Validate(options => TenantKey.Create(options.Key).IsSuccess, "A valid tenant key must be configured.")
             .Validate(options => !string.IsNullOrWhiteSpace(options.Name), "A tenant name must be configured.")
+            .Validate(
+                options => !string.IsNullOrWhiteSpace(options.BaseDomain) &&
+                           Uri.CheckHostName(options.BaseDomain.Trim().TrimEnd('.')) == UriHostNameType.Dns,
+                "A valid tenant base domain must be configured.")
             .ValidateOnStart();
 
         services.AddOptions<BootstrapAdminOptions>()
@@ -70,6 +76,7 @@ public static class InfrastructureServiceCollectionExtensions
             })
             .AddEntityFrameworkStores<PlatformDbContext>()
             .AddDefaultTokenProviders();
+        services.AddScoped<IUserClaimsPrincipalFactory<PlatformIdentityUser>, TenantClaimsPrincipalFactory>();
 
         services.ConfigureApplicationCookie(options =>
         {
@@ -100,21 +107,31 @@ public static class InfrastructureServiceCollectionExtensions
             options.AddPolicy(
                 "ManageTenantBranding",
                 policy => policy.RequireRole(PlatformRoles.SuperAdmin, PlatformRoles.ClientAdmin));
+            options.AddPolicy(
+                "ManageTenantSipats",
+                policy => policy.RequireRole(PlatformRoles.SuperAdmin, PlatformRoles.ClientAdmin));
         });
 
         services.AddHttpContextAccessor();
         services.AddSingleton<TimeProvider>(TimeProvider.System);
-        services.AddScoped<ITenantContext, ConfiguredTenantContext>();
+        services.AddScoped<RequestTenantContext>();
+        services.AddScoped<ITenantContext>(provider => provider.GetRequiredService<RequestTenantContext>());
+        services.AddScoped<IRequestTenantContext>(provider => provider.GetRequiredService<RequestTenantContext>());
         services.AddScoped<ICurrentActor, HttpCurrentActor>();
         services.AddScoped<IUserAccountStore, EfUserAccountStore>();
         services.AddScoped<IUserSignInService, AspNetUserSignInService>();
+        services.AddScoped<ISipatEventStore, EfSipatEventStore>();
         services.AddScoped<ITenantStore, EfTenantStore>();
         services.AddScoped<IApplicationUnitOfWork, EfApplicationUnitOfWork>();
         services.AddScoped<IAuditTrail, EfAuditTrail>();
         services.AddScoped<UserApplicationService>();
+        services.AddScoped<SipatEventApplicationService>();
         services.AddScoped<TenantBrandingService>();
         services.AddScoped<DatabaseInitializer>();
         services.AddScoped<IValidator<ProvisionUserRequest>, ProvisionUserRequestValidator>();
+        services.AddScoped<IValidator<ListUsersRequest>, ListUsersRequestValidator>();
+        services.AddScoped<IValidator<SipatEventDataRequest>, SipatEventDataRequestValidator>();
+        services.AddScoped<IValidator<ListSipatEventsRequest>, ListSipatEventsRequestValidator>();
         services.AddScoped<IValidator<UpdateTenantBrandingRequest>, UpdateTenantBrandingRequestValidator>();
 
         return services;

@@ -6,6 +6,8 @@
     <ProjectReference Include="..\SipatOnline.BuildingBlocks.Domain\SipatOnline.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
     <ProjectReference Include="..\SipatOnline.Identity.Domain\SipatOnline.Identity.Domain.csproj" />
+    <ProjectReference Include="..\SipatOnline.Sipats.Application\SipatOnline.Sipats.Application.csproj" />
+    <ProjectReference Include="..\SipatOnline.Sipats.Domain\SipatOnline.Sipats.Domain.csproj" />
     <ProjectReference Include="..\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
     <ProjectReference Include="..\SipatOnline.Tenancy.Domain\SipatOnline.Tenancy.Domain.csproj" />
   </ItemGroup>

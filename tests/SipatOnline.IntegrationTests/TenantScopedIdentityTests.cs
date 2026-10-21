@@ -68,7 +68,7 @@ public sealed class TenantScopedIdentityTests
             "ValidPassword123",
             PlatformRoles.Participant,
             cancellationToken);
-        Assert.True(secondCreation.IsSuccess);
+        Assert.True(secondCreation.IsSuccess, secondCreation.IsSuccess ? null : secondCreation.Error.Code);
 
         Assert.NotNull(await userStore.FindAsync(firstTenantId, firstUser.Id, cancellationToken));
         Assert.Null(await userStore.FindAsync(secondTenantId, firstUser.Id, cancellationToken));

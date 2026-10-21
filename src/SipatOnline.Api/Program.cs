@@ -1,6 +1,9 @@
 using System.Threading.RateLimiting;
+using System.Net;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.AspNetCore.HttpOverrides;
 using Serilog;
+using SipatOnline.Api;
 using SipatOnline.Api.Endpoints;
 using SipatOnline.Infrastructure;
 
@@ -14,6 +17,22 @@ builder.Host.UseSerilog((_, loggerConfiguration) => loggerConfiguration
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    if (!builder.Environment.IsDevelopment())
+    {
+        return;
+    }
+
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+    var developmentProxyHost =
+        builder.Configuration["SipatOnline:DevelopmentProxy:Host"] ?? "localhost";
+    foreach (var address in Dns.GetHostAddresses(developmentProxyHost))
+    {
+        options.KnownProxies.Add(address);
+    }
+});
 builder.Services.AddAntiforgery(options =>
 {
     options.HeaderName = "X-CSRF-TOKEN";
@@ -54,12 +73,15 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
+app.UseForwardedHeaders();
 app.UseExceptionHandler();
 app.UseHttpsRedirection();
 app.UseSerilogRequestLogging();
 app.UseRouting();
+app.UseMiddleware<TenantResolutionMiddleware>();
 app.UseRateLimiter();
 app.UseAuthentication();
+app.UseMiddleware<TenantAuthorizationMiddleware>();
 app.UseAuthorization();
 app.UseAntiforgery();
 
@@ -67,6 +89,7 @@ app.MapHealthChecks("/health");
 app.MapIdentityEndpoints();
 app.MapUserManagementEndpoints();
 app.MapTenantEndpoints();
+app.MapSipatEventEndpoints();
 
 app.Run();
 

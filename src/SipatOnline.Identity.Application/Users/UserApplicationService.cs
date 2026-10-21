@@ -13,8 +13,41 @@ public sealed class UserApplicationService(
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
     IValidator<ProvisionUserRequest> provisionUserValidator,
+    IValidator<ListUsersRequest> listUsersValidator,
     TimeProvider timeProvider)
 {
+    public async Task<Result<UserAccountPage>> ListAsync(
+        ListUsersRequest request,
+        CancellationToken cancellationToken)
+    {
+        var validation = await listUsersValidator.ValidateAsync(request, cancellationToken);
+        if (!validation.IsValid)
+        {
+            var failure = validation.Errors[0];
+            return Result<UserAccountPage>.Failure(
+                new DomainError(failure.ErrorCode, failure.ErrorMessage));
+        }
+
+        if (!CanManageUsers())
+        {
+            return Result<UserAccountPage>.Failure(
+                new DomainError("identity.forbidden", "Você não tem permissão para consultar usuários."));
+        }
+
+        var tenantId = GetCurrentTenantId();
+        if (!tenantId.IsSuccess)
+        {
+            return Result<UserAccountPage>.Failure(tenantId.Error);
+        }
+
+        var page = await accountStore.ListAsync(
+            tenantId.Value,
+            request.Offset,
+            request.Limit,
+            cancellationToken);
+        return Result<UserAccountPage>.Success(page);
+    }
+
     public async Task<Result<User>> ProvisionAsync(
         ProvisionUserRequest request,
         CancellationToken cancellationToken)

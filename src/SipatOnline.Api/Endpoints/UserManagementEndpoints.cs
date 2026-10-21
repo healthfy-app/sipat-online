@@ -13,6 +13,29 @@ public static class UserManagementEndpoints
             .WithTags("User management")
             .RequireAuthorization("ManageTenantUsers");
 
+        group.MapGet("/", async (
+            int? offset,
+            int? limit,
+            UserApplicationService userService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await userService.ListAsync(
+                new ListUsersRequest(offset ?? 0, limit ?? 50),
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return ToProblem(result.Error);
+            }
+
+            var page = result.Value;
+            return Results.Ok(new UserListResponse(
+                page.Offset,
+                page.Limit,
+                page.TotalCount,
+                page.Items.Select(ToResponse).ToArray()));
+        })
+        .WithName("ListUsers");
+
         group.MapPost("/", async (
             ProvisionUserRequest request,
             HttpContext context,
@@ -132,3 +155,9 @@ public static class UserManagementEndpoints
 }
 
 public sealed record ChangeDisplayNameRequest(string? DisplayName);
+
+public sealed record UserListResponse(
+    int Offset,
+    int Limit,
+    int TotalCount,
+    IReadOnlyList<UserResponse> Items);

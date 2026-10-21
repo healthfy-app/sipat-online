@@ -1,8 +1,12 @@
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Identity;
+using System.Security.Claims;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Identity.Application.Users;
 using SipatOnline.Identity.Domain.Users;
+using SipatOnline.BuildingBlocks.Application;
+using SipatOnline.Infrastructure.Identity;
 
 namespace SipatOnline.Api.Endpoints;
 
@@ -20,6 +24,36 @@ public static class IdentityEndpoints
         })
         .AllowAnonymous()
         .WithName("GetAntiforgeryToken");
+
+        group.MapGet("/session", async (
+            HttpContext context,
+            UserManager<PlatformIdentityUser> userManager,
+            ITenantContext tenantContext) =>
+        {
+            context.Response.Headers.CacheControl = "no-store";
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!Guid.TryParse(userId, out var id))
+            {
+                return Results.Unauthorized();
+            }
+
+            var user = await userManager.FindByIdAsync(id.ToString("D"));
+            if (user is null ||
+                !user.IsActive ||
+                tenantContext.CurrentTenantId?.Value != user.TenantId)
+            {
+                return Results.Unauthorized();
+            }
+
+            var roles = await userManager.GetRolesAsync(user);
+            return Results.Ok(new IdentitySessionResponse(
+                user.Id,
+                user.EmployeeIdentifier,
+                user.DisplayName,
+                roles.ToArray()));
+        })
+        .RequireAuthorization()
+        .WithName("GetIdentitySession");
 
         group.MapPost("/login", async (
             LoginRequest request,
@@ -94,6 +128,12 @@ public static class IdentityEndpoints
 public sealed record LoginRequest(string? LoginIdentifier, string? Password);
 
 public sealed record AntiforgeryTokenResponse(string? RequestToken);
+
+public sealed record IdentitySessionResponse(
+    Guid Id,
+    string LoginIdentifier,
+    string DisplayName,
+    IReadOnlyList<string> Roles);
 
 public sealed record UserResponse(
     Guid Id,

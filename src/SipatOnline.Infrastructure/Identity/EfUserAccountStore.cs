@@ -53,6 +53,7 @@ public sealed class EfUserAccountStore(
                 ConstraintName: "UX_Users_Tenant_LoginIdentifier"
             })
         {
+            dbContext.Entry(identityUser).State = EntityState.Detached;
             return Result<User>.Failure(
                 new DomainError(
                     "identity.login_identifier.duplicate",
@@ -73,6 +74,30 @@ public sealed class EfUserAccountStore(
                 user => user.Id == userId.Value && user.TenantId == tenantId.Value,
                 cancellationToken);
         return identityUser is null ? null : ToDomain(identityUser);
+    }
+
+    public async Task<UserAccountPage> ListAsync(
+        TenantId tenantId,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var tenantUsers = dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.TenantId == tenantId.Value);
+        var totalCount = await tenantUsers.CountAsync(cancellationToken);
+        var users = await tenantUsers
+            .OrderBy(user => user.DisplayName)
+            .ThenBy(user => user.Id)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        return new UserAccountPage(
+            users.Select(ToDomain).ToArray(),
+            offset,
+            limit,
+            totalCount);
     }
 
     public async Task<Result<User>> UpdateAsync(User user, CancellationToken cancellationToken)

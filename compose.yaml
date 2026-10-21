@@ -1,0 +1,71 @@
+name: sipat-online
+
+x-api-environment: &api-environment
+  ASPNETCORE_ENVIRONMENT: Development
+  ConnectionStrings__SipatOnline: Host=postgres;Port=5432;Database=${POSTGRES_DB:-sipat_online};Username=${POSTGRES_USER:-sipat_online};Password=${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env file}
+  SipatOnline__Tenant__Id: ${TENANT_ID:?Set TENANT_ID in your local .env file}
+  SipatOnline__Tenant__Key: ${TENANT_KEY:?Set TENANT_KEY in your local .env file}
+  SipatOnline__Tenant__Name: ${TENANT_NAME:?Set TENANT_NAME in your local .env file}
+  SipatOnline__Tenant__BaseDomain: ${TENANT_BASE_DOMAIN:-localhost}
+  SipatOnline__DevelopmentProxy__Host: web
+  SipatOnline__BootstrapAdmin__LoginIdentifier: ${BOOTSTRAP_ADMIN_LOGIN_IDENTIFIER:-}
+  SipatOnline__BootstrapAdmin__DisplayName: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-}
+  SipatOnline__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sipat_online}
+      POSTGRES_USER: ${POSTGRES_USER:-sipat_online}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env file}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
+  db-init:
+    image: sipat-online-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["--initialize-database"]
+    environment: *api-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles: ["tools"]
+
+  api:
+    image: sipat-online-api:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment: *api-environment
+    ports:
+      - "${API_PORT:-8080}:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./src/SipatOnline.Web
+      dockerfile: Dockerfile
+    environment:
+      SIPAT_API_TARGET: http://api:8080
+    ports:
+      - "${WEB_PORT:-5173}:5173"
+    depends_on:
+      - api
+
+volumes:
+  postgres-data:

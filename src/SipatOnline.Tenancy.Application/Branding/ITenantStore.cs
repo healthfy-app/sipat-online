@@ -7,5 +7,7 @@ public interface ITenantStore
 {
     Task<Tenant?> FindAsync(TenantId tenantId, CancellationToken cancellationToken);
 
+    Task<Tenant?> FindByKeyAsync(TenantKey tenantKey, CancellationToken cancellationToken);
+
     Task SaveAsync(Tenant tenant, CancellationToken cancellationToken);
 }

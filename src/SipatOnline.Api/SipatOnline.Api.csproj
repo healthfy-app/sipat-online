@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
+    <ProjectReference Include="..\SipatOnline.Sipats.Application\SipatOnline.Sipats.Application.csproj" />
     <ProjectReference Include="..\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
     <ProjectReference Include="..\SipatOnline.Infrastructure\SipatOnline.Infrastructure.csproj" />
   </ItemGroup>

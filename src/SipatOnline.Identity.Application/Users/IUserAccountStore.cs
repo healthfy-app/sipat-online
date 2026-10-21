@@ -16,5 +16,11 @@ public interface IUserAccountStore
         UserId userId,
         CancellationToken cancellationToken);
 
+    Task<UserAccountPage> ListAsync(
+        TenantId tenantId,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken);
+
     Task<Result<User>> UpdateAsync(User user, CancellationToken cancellationToken);
 }

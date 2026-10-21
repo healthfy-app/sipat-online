@@ -5,6 +5,13 @@ namespace SipatOnline.Tenancy.Domain.Tenants;
 public sealed record TenantKey
 {
     public const int MaximumLength = 63;
+    private static readonly HashSet<string> ReservedValues = new(StringComparer.Ordinal)
+    {
+        "api",
+        "admin",
+        "app",
+        "www"
+    };
 
     private TenantKey(string value) => Value = value;
 
@@ -31,12 +38,13 @@ public sealed record TenantKey
         }
 
         if (!char.IsAsciiLetterOrDigit(normalizedValue[0]) ||
-            !char.IsAsciiLetterOrDigit(normalizedValue[^1]))
+            !char.IsAsciiLetterOrDigit(normalizedValue[^1]) ||
+            ReservedValues.Contains(normalizedValue))
         {
             return Result<TenantKey>.Failure(
                 new DomainError(
                     "tenant.key.invalid",
-                    "O identificador deve começar e terminar com uma letra ou número."));
+                    "O identificador deve começar e terminar com uma letra ou número e não pode ser reservado."));
         }
 
         return Result<TenantKey>.Success(new TenantKey(normalizedValue));

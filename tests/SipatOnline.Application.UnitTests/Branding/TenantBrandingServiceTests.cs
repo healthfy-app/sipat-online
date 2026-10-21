@@ -103,6 +103,9 @@ public sealed class TenantBrandingServiceTests
         public Task<Tenant?> FindAsync(TenantId tenantId, CancellationToken cancellationToken) =>
             Task.FromResult<Tenant?>(tenant.Id == tenantId ? tenant : null);
 
+        public Task<Tenant?> FindByKeyAsync(TenantKey tenantKey, CancellationToken cancellationToken) =>
+            Task.FromResult<Tenant?>(tenant.Key == tenantKey ? tenant : null);
+
         public Task SaveAsync(Tenant value, CancellationToken cancellationToken)
         {
             Assert.Equal(tenant.Id, value.Id);
