@@ -2,7 +2,7 @@
 
 O SIPAT Online oferece o conteúdo digital das palestras de uma SIPAT em formato EAD. A SIPAT é um evento de realização obrigatória no contexto legal e de segurança do trabalho; a plataforma é um meio para realizar esse evento e engajar os participantes com soluções de aprendizagem úteis para sua vida profissional e pessoal.
 
-O projeto está em fase inicial de desenvolvimento. A solução e os projetos-base estão criados; as funcionalidades de negócio ainda serão implementadas por camadas, começando pelo domínio.
+O projeto está em fase inicial de desenvolvimento. A primeira fatia vertical implementa configuração do tenant, identidade e autenticação: Domain, Application, Infrastructure e API, com testes unitários, de arquitetura e de integração. As próximas fatias devem evoluir a partir das regras de negócio, sem tratar SIPAT como curso.
 
 ## Objetivos
 
@@ -60,6 +60,9 @@ src/
   SipatOnline.BuildingBlocks.Domain/
   SipatOnline.Identity.Application/
   SipatOnline.Identity.Domain/
+  SipatOnline.Infrastructure/
+  SipatOnline.Tenancy.Application/
+  SipatOnline.Tenancy.Domain/
 tests/
   SipatOnline.Application.UnitTests/
   SipatOnline.ArchitectureTests/
@@ -69,10 +72,14 @@ tests/
 
 Os projetos ficam diretamente em `src/` e `tests/` para manter a estrutura enxuta. As camadas e módulos são separados por projeto, não por vários níveis de diretórios.
 
+`Domain` concentra regras e tipos do negócio sem dependência de infraestrutura. `Application` coordena casos de uso e contratos. `Infrastructure` implementa persistência e integração com ASP.NET Core Identity. `Api` expõe os endpoints HTTP. A solução segue um monólito modular; não há requisito atual para microserviços ou Azure Functions.
+
 ## Pré-requisitos
 
 - SDK do .NET 10
 - Git
+- PostgreSQL para executar a aplicação e os testes de integração
+- Docker Desktop com engine ativo para os testes de integração com PostgreSQL via Testcontainers
 
 Confira o SDK ativo na raiz do repositório:
 
@@ -92,13 +99,41 @@ dotnet build SipatOnline.slnx --no-restore
 dotnet test SipatOnline.slnx --no-build
 ```
 
-## Executar a API
+## Configurar e executar a API
+
+A API exige configuração explícita do banco e do tenant; não há valores de produção fictícios como fallback. Para desenvolvimento local, configure User Secrets no projeto da API:
+
+```powershell
+dotnet user-secrets init --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "ConnectionStrings:SipatOnline" "Host=localhost;Database=sipat_online;Username=postgres;Password=<senha-local>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Tenant:Id" "<guid-estavel-do-tenant>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Tenant:Key" "desenvolvimento" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Tenant:Name" "Empresa de desenvolvimento" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+```
+
+Para provisionar o primeiro Super Admin, configure também, usando uma senha forte e apenas para o ambiente local:
+
+```powershell
+dotnet user-secrets set "SipatOnline:BootstrapAdmin:LoginIdentifier" "<matricula>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:BootstrapAdmin:DisplayName" "<nome>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:BootstrapAdmin:Password" "<senha-forte>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+```
+
+Inicialize o banco explicitamente. O comando aplica as migrations e cria o tenant, os perfis e, se configurado, o Super Admin:
+
+```powershell
+dotnet run --project src\SipatOnline.Api\SipatOnline.Api.csproj -- --initialize-database
+```
+
+Depois, inicie a API:
 
 ```powershell
 dotnet run --project src\SipatOnline.Api\SipatOnline.Api.csproj
 ```
 
-A API fornece o endpoint `GET /health`. A especificação OpenAPI é disponibilizada em ambiente de desenvolvimento.
+A API fornece `GET /health`; a especificação OpenAPI é disponibilizada em ambiente de desenvolvimento. O tenant configurado representa o tenant da implantação atual; a resolução de múltiplos tenants em uma mesma hospedagem poderá ser adicionada sem alterar os contratos da Application.
+
+Os testes PostgreSQL usam Testcontainers. Se o Docker Engine não estiver disponível, esses testes serão ignorados; os testes unitários, de arquitetura e o teste de health continuam executando.
 
 ## Decisões de produto já definidas
 
@@ -113,8 +148,8 @@ A API fornece o endpoint `GET /health`. A especificação OpenAPI é disponibili
 
 1. Validar os critérios de participação, cálculo de carga horária e emissão de certificados com o negócio.
 2. Definir como grupos/subgrupos são organizados e como Admins do cliente recebem acesso a SIPATs.
-3. Implementar e testar as regras do domínio, começando por Identity e pelos vínculos entre empresa, usuário e SIPAT.
-4. Avançar para Application e, depois, para infraestrutura e integração com a API.
+3. Expandir os casos de uso e regras de Identity/Tenancy a partir das necessidades confirmadas do negócio.
+4. Implementar os vínculos entre empresa, usuário e SIPAT, mantendo as camadas e limites de dependência.
 5. Definir o provedor de vídeo por meio de uma prova de conceito que avalie privacidade, reprodução incorporada, bloqueio de avanço, legendas, progresso, interatividade, custos e portabilidade.
 6. Validar os formatos de exportação e os volumes de dados do sistema atual antes de detalhar a migração.
 

@@ -7,11 +7,19 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Sinks.Console" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
+    <ProjectReference Include="..\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
+    <ProjectReference Include="..\SipatOnline.Infrastructure\SipatOnline.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

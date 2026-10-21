@@ -1,5 +1,9 @@
 <Solution>
-  <Folder Name="/src/" />
+  <Folder Name="/src/">
+    <Project Path="src/SipatOnline.Infrastructure/SipatOnline.Infrastructure.csproj" />
+    <Project Path="src/SipatOnline.Tenancy.Application/SipatOnline.Tenancy.Application.csproj" />
+    <Project Path="src/SipatOnline.Tenancy.Domain/SipatOnline.Tenancy.Domain.csproj" />
+  </Folder>
   <Folder Name="/tests/" />
   <Project Path="src/SipatOnline.Api/SipatOnline.Api.csproj" />
   <Project Path="src/SipatOnline.BuildingBlocks.Application/SipatOnline.BuildingBlocks.Application.csproj" />

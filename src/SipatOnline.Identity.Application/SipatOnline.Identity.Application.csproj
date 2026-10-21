@@ -1,8 +1,12 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <ItemGroup>
+    <ProjectReference Include="..\SipatOnline.BuildingBlocks.Application\SipatOnline.BuildingBlocks.Application.csproj" />
     <ProjectReference Include="..\SipatOnline.BuildingBlocks.Domain\SipatOnline.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\SipatOnline.Identity.Domain\SipatOnline.Identity.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="FluentValidation" />
   </ItemGroup>
 
   <PropertyGroup>

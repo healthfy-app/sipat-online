@@ -22,6 +22,10 @@
     <ProjectReference Include="..\..\src\SipatOnline.BuildingBlocks.Domain\SipatOnline.BuildingBlocks.Domain.csproj" />
     <ProjectReference Include="..\..\src\SipatOnline.Identity.Domain\SipatOnline.Identity.Domain.csproj" />
     <ProjectReference Include="..\..\src\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\src\SipatOnline.Tenancy.Domain\SipatOnline.Tenancy.Domain.csproj" />
+    <ProjectReference Include="..\..\src\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
+    <ProjectReference Include="..\..\src\SipatOnline.Infrastructure\SipatOnline.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\SipatOnline.Api\SipatOnline.Api.csproj" />
   </ItemGroup>
 
 </Project>

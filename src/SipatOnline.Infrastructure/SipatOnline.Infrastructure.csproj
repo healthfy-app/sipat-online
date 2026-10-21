@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\SipatOnline.BuildingBlocks.Application\SipatOnline.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\SipatOnline.BuildingBlocks.Domain\SipatOnline.BuildingBlocks.Domain.csproj" />
+    <ProjectReference Include="..\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
+    <ProjectReference Include="..\SipatOnline.Identity.Domain\SipatOnline.Identity.Domain.csproj" />
+    <ProjectReference Include="..\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
+    <ProjectReference Include="..\SipatOnline.Tenancy.Domain\SipatOnline.Tenancy.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
