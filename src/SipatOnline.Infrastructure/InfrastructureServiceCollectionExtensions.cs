@@ -104,8 +104,15 @@ public static class InfrastructureServiceCollectionExtensions
                     "ConnectionStrings:SipatOnline must be configured with User Secrets or an environment variable.");
             }
 
+            // PostgreSQL JIT adds ~250 ms to small catalog queries with join plans.
+            var builder = new Npgsql.NpgsqlConnectionStringBuilder(connectionString);
+            if (string.IsNullOrWhiteSpace(builder.Options))
+            {
+                builder.Options = "-c jit=off";
+            }
+
             options.UseNpgsql(
-                connectionString,
+                builder.ConnectionString,
                 npgsql => npgsql.MigrationsAssembly(typeof(PlatformDbContext).Assembly.FullName));
         });
 
