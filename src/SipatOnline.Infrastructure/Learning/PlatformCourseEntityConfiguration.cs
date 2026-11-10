@@ -53,3 +53,53 @@ public sealed class PlatformCourseVideoLinkEntityConfiguration :
         builder.HasIndex(link => new { link.CourseId, link.Position });
     }
 }
+
+public sealed class GameModuleEntityConfiguration : IEntityTypeConfiguration<GameModuleEntity>
+{
+    public void Configure(EntityTypeBuilder<GameModuleEntity> builder)
+    {
+        builder.ToTable("GameModules", "learning");
+        builder.HasKey(module => module.Id);
+        builder.Property(module => module.Title).HasMaxLength(200).IsRequired();
+        builder.Property(module => module.QuestionsJson).IsRequired();
+        builder.Property(module => module.CreatedAt).IsRequired();
+    }
+}
+
+public sealed class PlatformCourseModuleLinkEntityConfiguration :
+    IEntityTypeConfiguration<PlatformCourseModuleLinkEntity>
+{
+    public void Configure(EntityTypeBuilder<PlatformCourseModuleLinkEntity> builder)
+    {
+        builder.ToTable("PlatformCourseModuleLinks", "learning");
+        builder.HasKey(link => link.Id);
+        builder.HasOne(link => link.Course)
+            .WithMany(course => course.ModuleLinks)
+            .HasForeignKey(link => link.CourseId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(link => link.Module)
+            .WithMany()
+            .HasForeignKey(link => link.ModuleId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(link => new { link.CourseId, link.Order });
+    }
+}
+
+public sealed class PlatformVideoCheckpointEntityConfiguration :
+    IEntityTypeConfiguration<PlatformVideoCheckpointEntity>
+{
+    public void Configure(EntityTypeBuilder<PlatformVideoCheckpointEntity> builder)
+    {
+        builder.ToTable("PlatformVideoCheckpoints", "learning");
+        builder.HasKey(checkpoint => checkpoint.Id);
+        builder.HasOne(checkpoint => checkpoint.Video)
+            .WithMany(video => video.Checkpoints)
+            .HasForeignKey(checkpoint => checkpoint.VideoId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne(checkpoint => checkpoint.Module)
+            .WithMany()
+            .HasForeignKey(checkpoint => checkpoint.ModuleId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(checkpoint => new { checkpoint.VideoId, checkpoint.TimeMilliseconds });
+    }
+}

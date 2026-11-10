@@ -24,6 +24,7 @@ public sealed record PlatformCourse(
     PlatformCourseStatus Status,
     bool GamificationEnabled,
     IReadOnlyList<PlatformCourseVideo> Videos,
+    IReadOnlyList<CourseModulePlacement> Modules,
     GamificationGameType GameType = GamificationGameType.Quiz);
 
 public sealed record PlatformCourseVideo(
@@ -32,7 +33,8 @@ public sealed record PlatformCourseVideo(
     string ContentType,
     long SizeBytes,
     long DurationMilliseconds,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    IReadOnlyList<VideoCheckpoint> Checkpoints);
 
 public sealed record PlatformLibraryVideo(PlatformCourseVideo Video, int CourseCount);
 

@@ -10,8 +10,10 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
     public async Task<IReadOnlyList<PlatformCourse>> ListAsync(CancellationToken cancellationToken)
     {
         var courses = await dbContext.PlatformCourses.AsNoTracking()
+            .Include(course => course.ModuleLinks)
             .Include(course => course.VideoLinks)
             .ThenInclude(link => link.Video)
+            .ThenInclude(video => video.Checkpoints)
             .OrderBy(course => course.Title)
             .ThenBy(course => course.Id)
             .ToListAsync(cancellationToken);
@@ -23,8 +25,10 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
         CancellationToken cancellationToken)
     {
         var course = await dbContext.PlatformCourses.AsNoTracking()
+            .Include(item => item.ModuleLinks)
             .Include(item => item.VideoLinks)
             .ThenInclude(link => link.Video)
+            .ThenInclude(video => video.Checkpoints)
             .SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
         return course is null ? null : ToDomain(course);
     }
@@ -34,6 +38,7 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
         CancellationToken cancellationToken)
     {
         var video = await dbContext.PlatformCourseVideos.AsNoTracking()
+            .Include(item => item.Checkpoints)
             .SingleOrDefaultAsync(item => item.Id == videoId, cancellationToken);
         return video is null ? null : ToDomain(video);
     }
@@ -42,11 +47,19 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
         CancellationToken cancellationToken)
     {
         var videos = await dbContext.PlatformCourseVideos.AsNoTracking()
+            .Include(video => video.Checkpoints)
             .OrderByDescending(video => video.CreatedAt)
             .ThenBy(video => video.Id)
-            .Select(video => new { Video = video, CourseCount = video.CourseLinks.Count })
             .ToListAsync(cancellationToken);
-        return videos.Select(item => new PlatformLibraryVideo(ToDomain(item.Video), item.CourseCount)).ToArray();
+        var courseCounts = await dbContext.PlatformCourseVideoLinks.AsNoTracking()
+            .GroupBy(link => link.VideoId)
+            .Select(group => new { VideoId = group.Key, Count = group.Count() })
+            .ToDictionaryAsync(item => item.VideoId, item => item.Count, cancellationToken);
+        return videos
+            .Select(video => new PlatformLibraryVideo(
+                ToDomain(video),
+                courseCounts.GetValueOrDefault(video.Id)))
+            .ToArray();
     }
 
     public async Task<Result<bool>> AddCourseAsync(
@@ -135,6 +148,21 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             });
         }
 
+        var sourceModules = await dbContext.PlatformCourseModuleLinks.AsNoTracking()
+            .Where(link => link.CourseId == sourceCourseId)
+            .ToListAsync(cancellationToken);
+        foreach (var link in sourceModules)
+        {
+            entity.ModuleLinks.Add(new PlatformCourseModuleLinkEntity
+            {
+                Id = Guid.NewGuid(),
+                CourseId = entity.Id,
+                ModuleId = link.ModuleId,
+                AfterVideoCount = link.AfterVideoCount,
+                Order = link.Order
+            });
+        }
+
         dbContext.PlatformCourses.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -194,6 +222,10 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
                 .OrderBy(link => link.Position)
                 .Select(link => ToDomain(link.Video))
                 .ToArray(),
+            entity.ModuleLinks
+                .OrderBy(link => link.Order)
+                .Select(link => new CourseModulePlacement(link.ModuleId, link.AfterVideoCount))
+                .ToArray(),
             (GamificationGameType)entity.GameType);
 
     private static PlatformCourseVideo ToDomain(PlatformCourseVideoEntity entity) =>
@@ -203,5 +235,9 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             entity.ContentType,
             entity.SizeBytes,
             entity.DurationMilliseconds,
-            entity.CreatedAt);
+            entity.CreatedAt,
+            entity.Checkpoints
+                .OrderBy(checkpoint => checkpoint.TimeMilliseconds)
+                .Select(checkpoint => new VideoCheckpoint(checkpoint.TimeMilliseconds, checkpoint.ModuleId))
+                .ToArray());
 }

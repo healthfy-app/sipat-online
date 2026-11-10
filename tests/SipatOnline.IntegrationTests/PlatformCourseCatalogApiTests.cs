@@ -87,6 +87,57 @@ public sealed class PlatformCourseCatalogApiTests
         Assert.False(published.GetProperty("gamificationEnabled").GetBoolean());
         Assert.Equal("Puzzle", published.GetProperty("gameType").GetString());
 
+        using var emptyQuiz = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/platform/catalog/modules",
+            new SaveGameModuleRequest("Quiz vazio", "Quiz", []));
+        Assert.Equal(HttpStatusCode.BadRequest, emptyQuiz.StatusCode);
+
+        using var moduleResponse = await SendAsync(
+            client,
+            HttpMethod.Post,
+            "/api/platform/catalog/modules",
+            new SaveGameModuleRequest(
+                "Quiz de postura",
+                "Quiz",
+                [new GameQuestionDto("Qual a postura correta?", ["Curvada", "Ereta"], 1)]));
+        Assert.Equal(HttpStatusCode.Created, moduleResponse.StatusCode);
+        var moduleId = (await ReadAsync(moduleResponse)).GetProperty("id").GetGuid();
+
+        using var placementResponse = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/platform/catalog/courses/{courseId}/modules",
+            new SetCourseModulesRequest([new CourseModulePlacementDto(moduleId, 1)]));
+        Assert.Equal(HttpStatusCode.OK, placementResponse.StatusCode);
+        var placed = (await ReadAsync(placementResponse)).GetProperty("modules");
+        Assert.Equal(1, Assert.Single(placed.EnumerateArray()).GetProperty("afterVideoCount").GetInt32());
+
+        using var farPlacement = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/platform/catalog/courses/{courseId}/modules",
+            new SetCourseModulesRequest([new CourseModulePlacementDto(moduleId, 9)]));
+        Assert.Equal(HttpStatusCode.BadRequest, farPlacement.StatusCode);
+
+        using var checkpointResponse = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/platform/catalog/videos/{firstVideo}/checkpoints",
+            new SetVideoCheckpointsRequest([new VideoCheckpointDto(30_000, moduleId)]));
+        Assert.Equal(HttpStatusCode.OK, checkpointResponse.StatusCode);
+
+        using var lateCheckpoint = await SendAsync(
+            client,
+            HttpMethod.Put,
+            $"/api/platform/catalog/videos/{firstVideo}/checkpoints",
+            new SetVideoCheckpointsRequest([new VideoCheckpointDto(120_000, moduleId)]));
+        Assert.Equal(HttpStatusCode.BadRequest, lateCheckpoint.StatusCode);
+
+        using var modulesList = await client.GetAsync("https://ops.localhost/api/platform/catalog/modules");
+        var listed = Assert.Single((await ReadAsync(modulesList)).EnumerateArray());
+        Assert.Equal(2, listed.GetProperty("usageCount").GetInt32());
         using var duplicateResponse = await SendAsync(
             client,
             HttpMethod.Post,
@@ -98,6 +149,7 @@ public sealed class PlatformCourseCatalogApiTests
         Assert.Equal("Ergonomia 2026 (cópia)", copy.GetProperty("title").GetString());
         Assert.Equal("Draft", copy.GetProperty("status").GetString());
         Assert.Equal(2, copy.GetProperty("videos").GetArrayLength());
+        Assert.Equal(1, copy.GetProperty("modules").GetArrayLength());
 
         using var libraryResponse = await client.GetAsync("https://ops.localhost/api/platform/catalog/videos");
         Assert.Equal(HttpStatusCode.OK, libraryResponse.StatusCode);

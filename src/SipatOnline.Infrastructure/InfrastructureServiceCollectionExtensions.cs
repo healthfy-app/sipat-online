@@ -187,6 +187,8 @@ public static class InfrastructureServiceCollectionExtensions
             new FilePlatformCourseVideoStorage(
                 configuration["SipatOnline:PlatformCatalog:StoragePath"],
                 provider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
+        services.AddScoped<IGameModuleStore, EfGameModuleStore>();
+        services.AddScoped<GameModuleService>();
         services.AddScoped<DevelopmentLearningSampleInitializer>();
         services.AddSingleton<DevelopmentSampleVideoProvider>();
         services.AddScoped<IVideoPlaybackProvider>(provider =>

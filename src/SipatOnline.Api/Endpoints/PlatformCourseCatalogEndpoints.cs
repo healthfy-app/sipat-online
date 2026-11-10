@@ -201,6 +201,129 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("StreamPlatformCourseVideo");
 
+        catalog.MapGet("/modules", async (
+            GameModuleService moduleService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await moduleService.ListAsync(cancellationToken);
+            return result.IsSuccess
+                ? Results.Ok(result.Value.Select(item => ToResponse(item.Module, item.UsageCount)).ToArray())
+                : ToProblem(result.Error);
+        })
+        .WithName("ListGameModules");
+
+        catalog.MapPost("/modules", async (
+            SaveGameModuleRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            GameModuleService moduleService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            if (!TryParseGameType(request.GameType, out var gameType))
+            {
+                return ToProblem(GameTypeInvalid);
+            }
+
+            var result = await moduleService.CreateAsync(
+                request.Title, gameType, ToQuestions(request.Questions), cancellationToken);
+            return result.IsSuccess
+                ? Results.Created($"/api/platform/catalog/modules/{result.Value.Id:D}", ToResponse(result.Value, 0))
+                : ToProblem(result.Error);
+        })
+        .WithName("CreateGameModule");
+
+        catalog.MapPut("/modules/{moduleId:guid}", async (
+            Guid moduleId,
+            SaveGameModuleRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            GameModuleService moduleService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            if (!TryParseGameType(request.GameType, out var gameType))
+            {
+                return ToProblem(GameTypeInvalid);
+            }
+
+            var result = await moduleService.UpdateAsync(
+                moduleId, request.Title, gameType, ToQuestions(request.Questions), cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToResponse(result.Value, 0)) : ToProblem(result.Error);
+        })
+        .WithName("UpdateGameModule");
+
+        catalog.MapDelete("/modules/{moduleId:guid}", async (
+            Guid moduleId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            GameModuleService moduleService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await moduleService.DeleteAsync(moduleId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("DeleteGameModule");
+
+        catalog.MapPut("/courses/{courseId:guid}/modules", async (
+            Guid courseId,
+            SetCourseModulesRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            GameModuleService moduleService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await moduleService.SetCourseModulesAsync(
+                courseId,
+                request.Items?.Select(item => new CourseModulePlacement(item.ModuleId, item.AfterVideoCount)).ToArray(),
+                cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("SetCourseModules");
+
+        catalog.MapPut("/videos/{videoId:guid}/checkpoints", async (
+            Guid videoId,
+            SetVideoCheckpointsRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            GameModuleService moduleService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await moduleService.SetVideoCheckpointsAsync(
+                videoId,
+                request.Items?.Select(item => new VideoCheckpoint(item.TimeMilliseconds, item.ModuleId)).ToArray(),
+                cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("SetVideoCheckpoints");
         return endpoints;
     }
 
@@ -262,7 +385,8 @@ public static class PlatformCourseCatalogEndpoints
             course.Status.ToString(),
             course.GamificationEnabled,
             course.Videos.Select(ToResponse).ToArray(),
-            course.GameType.ToString());
+            course.GameType.ToString(),
+            course.Modules.Select(item => new CourseModulePlacementDto(item.ModuleId, item.AfterVideoCount)).ToArray());
 
     private static PlatformCourseVideoResponse ToResponse(PlatformCourseVideo video) =>
         new(
@@ -272,7 +396,27 @@ public static class PlatformCourseCatalogEndpoints
             video.SizeBytes,
             video.DurationMilliseconds,
             video.CreatedAt,
-            $"/api/platform/catalog/videos/{video.Id:D}/file");
+            $"/api/platform/catalog/videos/{video.Id:D}/file",
+            video.Checkpoints.Select(item => new VideoCheckpointDto(item.TimeMilliseconds, item.ModuleId)).ToArray());
+
+    private static readonly DomainError GameTypeInvalid = new(
+        "learning.platform_course.game_type_invalid",
+        "O tipo de jogo informado é inválido.");
+
+    private static bool TryParseGameType(string? value, out GamificationGameType gameType) =>
+        Enum.TryParse(value, true, out gameType) && Enum.IsDefined(gameType);
+
+    private static IReadOnlyList<GameQuestion>? ToQuestions(IReadOnlyList<GameQuestionDto>? questions) =>
+        questions?.Select(item => new GameQuestion(item.Text ?? string.Empty, item.Options ?? [], item.CorrectIndex)).ToArray();
+
+    private static GameModuleResponse ToResponse(GameModule module, int usageCount) =>
+        new(
+            module.Id,
+            module.Title,
+            module.GameType.ToString(),
+            module.Questions.Select(item => new GameQuestionDto(item.Text, item.Options, item.CorrectIndex)).ToArray(),
+            module.CreatedAt,
+            usageCount);
 
     private static IResult ToProblem(DomainError error)
     {
@@ -280,6 +424,7 @@ public static class PlatformCourseCatalogEndpoints
         {
             "learning.platform_course.forbidden" => StatusCodes.Status403Forbidden,
             "learning.platform_course.not_found" or
+                "learning.game_module.not_found" or
                 "learning.platform_course.video_not_found" => StatusCodes.Status404NotFound,
             "learning.platform_course.storage_unconfigured" or
                 "learning.platform_course.video_file_missing" => StatusCodes.Status503ServiceUnavailable,
@@ -336,7 +481,31 @@ public sealed record PlatformCourseResponse(
     string Status,
     bool GamificationEnabled,
     IReadOnlyList<PlatformCourseVideoResponse> Videos,
-    string GameType);
+    string GameType,
+    IReadOnlyList<CourseModulePlacementDto> Modules);
+
+public sealed record CourseModulePlacementDto(Guid ModuleId, int AfterVideoCount);
+
+public sealed record VideoCheckpointDto(long TimeMilliseconds, Guid ModuleId);
+
+public sealed record GameQuestionDto(string? Text, IReadOnlyList<string>? Options, int CorrectIndex);
+
+public sealed record SaveGameModuleRequest(
+    string? Title,
+    string? GameType,
+    IReadOnlyList<GameQuestionDto>? Questions);
+
+public sealed record GameModuleResponse(
+    Guid Id,
+    string Title,
+    string GameType,
+    IReadOnlyList<GameQuestionDto> Questions,
+    DateTimeOffset CreatedAt,
+    int UsageCount);
+
+public sealed record SetCourseModulesRequest(IReadOnlyList<CourseModulePlacementDto>? Items);
+
+public sealed record SetVideoCheckpointsRequest(IReadOnlyList<VideoCheckpointDto>? Items);
 
 public sealed record PlatformCourseVideoResponse(
     Guid Id,
@@ -345,4 +514,5 @@ public sealed record PlatformCourseVideoResponse(
     long SizeBytes,
     long DurationMilliseconds,
     DateTimeOffset CreatedAt,
-    string FileUrl);
+    string FileUrl,
+    IReadOnlyList<VideoCheckpointDto> Checkpoints);

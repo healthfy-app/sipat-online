@@ -292,6 +292,32 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("Users", "identity");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.GameModuleEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("GameType")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("QuestionsJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("GameModules", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningAssignmentEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -545,6 +571,33 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("PlatformCourses", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseModuleLinkEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("AfterVideoCount")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ModuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Order")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModuleId");
+
+                    b.HasIndex("CourseId", "Order");
+
+                    b.ToTable("PlatformCourseModuleLinks", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -595,6 +648,30 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasIndex("CourseId", "Position");
 
                     b.ToTable("PlatformCourseVideoLinks", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoCheckpointEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ModuleId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("TimeMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ModuleId");
+
+                    b.HasIndex("VideoId", "TimeMilliseconds");
+
+                    b.ToTable("PlatformVideoCheckpoints", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventEntity", b =>
@@ -799,6 +876,25 @@ namespace SipatOnline.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseModuleLinkEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", "Course")
+                        .WithMany("ModuleLinks")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SipatOnline.Infrastructure.Learning.GameModuleEntity", "Module")
+                        .WithMany()
+                        .HasForeignKey("ModuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Course");
+
+                    b.Navigation("Module");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoLinkEntity", b =>
                 {
                     b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", "Course")
@@ -818,6 +914,25 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Navigation("Video");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoCheckpointEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.GameModuleEntity", "Module")
+                        .WithMany()
+                        .HasForeignKey("ModuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseVideoEntity", "Video")
+                        .WithMany("Checkpoints")
+                        .HasForeignKey("VideoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Module");
+
+                    b.Navigation("Video");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventEntity", b =>
                 {
                     b.HasOne("SipatOnline.Infrastructure.Tenancy.TenantEntity", null)
@@ -829,11 +944,15 @@ namespace SipatOnline.Infrastructure.Migrations
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", b =>
                 {
+                    b.Navigation("ModuleLinks");
+
                     b.Navigation("VideoLinks");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoEntity", b =>
                 {
+                    b.Navigation("Checkpoints");
+
                     b.Navigation("CourseLinks");
                 });
 #pragma warning restore 612, 618

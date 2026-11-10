@@ -57,6 +57,7 @@ public sealed class PlatformCourseCatalogService(
             timeProvider.GetUtcNow(),
             PlatformCourseStatus.Draft,
             gamificationEnabled,
+            [],
             []);
 
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -299,7 +300,8 @@ public sealed class PlatformCourseCatalogService(
             storageResult.Value.ContentType,
             storageResult.Value.SizeBytes,
             durationMilliseconds,
-            timeProvider.GetUtcNow());
+            timeProvider.GetUtcNow(),
+            []);
 
         var metadataPersisted = false;
         try
