@@ -40,6 +40,38 @@ export interface PlatformCourse {
   gamificationEnabled: boolean;
   gameType: GamificationGameType;
   videos: PlatformCourseVideo[];
+  modules: CourseModulePlacement[];
+}
+
+export interface CourseModulePlacement {
+  moduleId: string;
+  afterVideoCount: number;
+}
+
+export interface VideoCheckpoint {
+  timeMilliseconds: number;
+  moduleId: string;
+}
+
+export interface GameQuestion {
+  text: string;
+  options: string[];
+  correctIndex: number;
+}
+
+export interface GameModule {
+  id: string;
+  title: string;
+  gameType: GamificationGameType;
+  questions: GameQuestion[];
+  createdAt: string;
+  usageCount: number;
+}
+
+export interface GameModuleData {
+  title: string;
+  gameType: GamificationGameType;
+  questions: GameQuestion[];
 }
 
 export interface PlatformCourseVideo {
@@ -50,6 +82,7 @@ export interface PlatformCourseVideo {
   durationMilliseconds: number;
   createdAt: string;
   fileUrl: string;
+  checkpoints: VideoCheckpoint[];
 }
 
 export interface PlatformLibraryVideo {
@@ -439,6 +472,48 @@ export function uploadPlatformVideo(
       : '/api/platform/catalog/videos',
     { method: 'POST', body: formData },
   );
+}
+
+export function listGameModules(): Promise<GameModule[]> {
+  return requestJson<GameModule[]>('/api/platform/catalog/modules');
+}
+
+export function createGameModule(data: GameModuleData): Promise<GameModule> {
+  return requestJson<GameModule>('/api/platform/catalog/modules', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+}
+
+export function updateGameModule(moduleId: string, data: GameModuleData): Promise<GameModule> {
+  return requestJson<GameModule>(`/api/platform/catalog/modules/${moduleId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteGameModule(moduleId: string): Promise<void> {
+  await request(`/api/platform/catalog/modules/${moduleId}`, { method: 'DELETE' });
+}
+
+export function setPlatformCourseModules(
+  courseId: string,
+  items: CourseModulePlacement[],
+): Promise<PlatformCourse> {
+  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/modules`, {
+    method: 'PUT',
+    body: JSON.stringify({ items }),
+  });
+}
+
+export function setVideoCheckpoints(
+  videoId: string,
+  items: VideoCheckpoint[],
+): Promise<PlatformCourseVideo> {
+  return requestJson<PlatformCourseVideo>(`/api/platform/catalog/videos/${videoId}/checkpoints`, {
+    method: 'PUT',
+    body: JSON.stringify({ items }),
+  });
 }
 
 export function createPlatformCompany(data: PlatformCompanyData): Promise<PlatformCompany> {

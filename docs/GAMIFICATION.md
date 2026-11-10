@@ -10,21 +10,29 @@ Plataformas de treinamento em SST, como a Worklinic, oferecem dezenas de jogos e
 
 | Tipo | Valor na API | Como funciona | Estado atual |
 | --- | --- | --- | --- |
-| Quiz | `Quiz` | Perguntas de múltipla escolha com pontuação e feedback. | Configurável; execução é o próximo passo. |
+| Quiz | `Quiz` | Perguntas de múltipla escolha com feedback imediato, sem pontuação. | Configurável e jogável na pré-visualização. |
 | Caça aos riscos | `RiskSpotting` | O participante marca os perigos em uma imagem do ambiente de trabalho. | Apenas configurável. |
 | Quebra-cabeça | `Puzzle` | Montar uma imagem ou cartaz de segurança. | Apenas configurável. |
 | Jogo da memória | `Memory` | Associar EPIs ou sinalizações aos seus usos. | Apenas configurável. |
 | Simulador de cenários | `Scenario` | Escolher a melhor atitude diante de uma situação de risco. | Apenas configurável. |
 | Ordenação | `Ordering` | Colocar os passos de um procedimento na ordem correta. | Apenas configurável. |
 
+## Regras
+
+- Sem pontos e sem confirmação obrigatória. O jogo existe, mas nunca bloqueia o progresso nem a conclusão do curso; o participante pode pular.
+- O vídeo é enviado cru. O Operacional escolhe a minutagem em que o vídeo deve parar para exibir uma pergunta ou jogo.
+- Módulos de jogo e de perguntas também podem entrar na trilha do curso, entre os vídeos.
+
 ## O que existe hoje
 
-- O curso tem a flag `gamificationEnabled` e o tipo de jogo `gameType`, gravados no banco e expostos em `PUT /api/platform/catalog/courses/{id}`.
-- Na edição do curso há uma seleção do tipo de jogo, visível quando a gamificação está ativa.
-- Duplicar um curso copia o tipo de jogo.
+- O curso tem a flag `gamificationEnabled` e o tipo de jogo `gameType` (`PUT /api/platform/catalog/courses/{id}`).
+- Biblioteca de módulos: `GET/POST /api/platform/catalog/modules`, `PUT/DELETE /api/platform/catalog/modules/{id}`. Quiz tem de 1 a 50 perguntas com 2 a 6 alternativas.
+- Trilha do curso: `PUT /api/platform/catalog/courses/{id}/modules` (`afterVideoCount`: 0 = antes do primeiro vídeo).
+- Paradas no vídeo: `PUT /api/platform/catalog/videos/{id}/checkpoints` (`timeMilliseconds` dentro da duração).
+- No painel do Operacional, a aba "Jogos e perguntas" cadastra módulos; no detalhe do curso é possível posicionar módulos na trilha, definir paradas e pré-visualizar o vídeo parando na minutagem.
+- Duplicar um curso copia o tipo de jogo e os módulos da trilha.
 
-## Decisões a confirmar com o Rafael Palma
+## Limitações
 
-- A pontuação (pontos por acerto, nota mínima) é por curso ou global?
-- O jogo é obrigatório para concluir o curso ou apenas bônus?
-- Quais dos 5 tipos além do Quiz vêm primeiro?
+- Os cursos da plataforma ainda não chegam ao participante; a execução (Quiz) acontece na pré-visualização do Operacional.
+- Apenas o Quiz é jogável; os demais tipos só têm nome por enquanto.

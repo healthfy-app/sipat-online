@@ -2,21 +2,25 @@ import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react
 import {
   createPlatformCourse,
   duplicatePlatformCourse,
+  listGameModules,
   listPlatformCourses,
   listPlatformLibraryVideos,
   setPlatformCourseVideos,
   updatePlatformCourse,
   uploadPlatformVideo,
+  type GameModule,
   type GamificationGameType,
   type PlatformCourse,
   type PlatformCourseStatus,
   type PlatformCourseVideo,
   type PlatformLibraryVideo,
 } from './api';
+import CourseGamesSection from './CourseGamesSection';
+import GameModulesPanel from './GameModulesPanel';
 import './PlatformCourses.css';
 import { gameTypeOptions } from './gamificationGames';
 
-type Tab = 'courses' | 'library';
+type Tab = 'courses' | 'library' | 'modules';
 type StatusFilter = 'all' | PlatformCourseStatus;
 
 const emptyCourse = { title: '', description: '', gamificationEnabled: false };
@@ -29,6 +33,7 @@ const statusLabels: Record<PlatformCourseStatus, string> = {
 export default function PlatformCoursesPage() {
   const [courses, setCourses] = useState<PlatformCourse[]>([]);
   const [library, setLibrary] = useState<PlatformLibraryVideo[]>([]);
+  const [modules, setModules] = useState<GameModule[]>([]);
   const [tab, setTab] = useState<Tab>('courses');
   const [selectedCourseId, setSelectedCourseId] = useState<string | null>(null);
   const [isCreating, setIsCreating] = useState(false);
@@ -41,10 +46,12 @@ export default function PlatformCoursesPage() {
   const refresh = useCallback(async () => {
     setError('');
     try {
-      const [courseList, libraryList] = await Promise.all([
+      const [courseList, libraryList, moduleList] = await Promise.all([
         listPlatformCourses(),
         listPlatformLibraryVideos(),
+        listGameModules(),
       ]);
+      setModules(moduleList);
       setCourses(courseList);
       setLibrary(libraryList);
     } catch (loadError) {
@@ -112,7 +119,7 @@ export default function PlatformCoursesPage() {
       </div>
 
       <div aria-label="Seções de conteúdo" className="platform-tabs" role="tablist">
-        {(['courses', 'library'] as const).map((item) => (
+        {(['courses', 'library', 'modules'] as const).map((item) => (
           <button
             aria-selected={tab === item}
             className={`platform-tab${tab === item ? ' is-active' : ''}`}
@@ -124,7 +131,11 @@ export default function PlatformCoursesPage() {
             role="tab"
             type="button"
           >
-            {item === 'courses' ? `Cursos (${courses.length})` : `Biblioteca de vídeos (${library.length})`}
+            {item === 'courses'
+              ? `Cursos (${courses.length})`
+              : item === 'library'
+                ? `Biblioteca de vídeos (${library.length})`
+                : `Jogos e perguntas (${modules.length})`}
           </button>
         ))}
       </div>
@@ -134,6 +145,15 @@ export default function PlatformCoursesPage() {
 
       {isLoading ? (
         <p className="list-state" aria-live="polite">Carregando catálogo...</p>
+      ) : tab === 'modules' ? (
+        <GameModulesPanel
+          modules={modules}
+          onChanged={async (message) => {
+            await refresh();
+            report(message);
+          }}
+          onError={setError}
+        />
       ) : tab === 'library' ? (
         <LibrarySection
           library={library}
@@ -147,6 +167,7 @@ export default function PlatformCoursesPage() {
           course={selectedCourse}
           key={selectedCourse.id}
           library={library}
+          modules={modules}
           onBack={() => setSelectedCourseId(null)}
           onChanged={async (message) => {
             await refresh();
@@ -356,6 +377,7 @@ function CreateCourseForm({
 function CourseDetail({
   course,
   library,
+  modules,
   onBack,
   onChanged,
   onDuplicate,
@@ -363,6 +385,7 @@ function CourseDetail({
 }: {
   course: PlatformCourse;
   library: PlatformLibraryVideo[];
+  modules: GameModule[];
   onBack: () => void;
   onChanged: (message: string) => Promise<void>;
   onDuplicate: () => void;
@@ -595,6 +618,7 @@ function CourseDetail({
           />
         </section>
       </div>
+      <CourseGamesSection course={course} modules={modules} onChanged={onChanged} onError={onError} />
     </div>
   );
 }

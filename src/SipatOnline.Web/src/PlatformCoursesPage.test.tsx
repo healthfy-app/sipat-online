@@ -10,6 +10,7 @@ vi.mock('./api', async (importOriginal) => {
     ...original,
     createPlatformCourse: vi.fn(),
     duplicatePlatformCourse: vi.fn(),
+    listGameModules: vi.fn(),
     listPlatformCourses: vi.fn(),
     listPlatformLibraryVideos: vi.fn(),
     setPlatformCourseVideos: vi.fn(),
@@ -27,6 +28,7 @@ function makeVideo(id: string, title: string): api.PlatformCourseVideo {
     durationMilliseconds: 90000,
     createdAt: '2026-11-10T12:00:00Z',
     fileUrl: `/videos/${id}`,
+    checkpoints: [],
   };
 }
 
@@ -42,6 +44,7 @@ const ergonomics: api.PlatformCourse = {
   gamificationEnabled: true,
   gameType: 'Quiz',
   videos: [opening, closing],
+  modules: [],
 };
 
 const fire: api.PlatformCourse = {
@@ -53,9 +56,11 @@ const fire: api.PlatformCourse = {
   gamificationEnabled: false,
   gameType: 'Quiz',
   videos: [],
+  modules: [],
 };
 
 beforeEach(() => {
+  vi.mocked(api.listGameModules).mockReset().mockResolvedValue([]);
   vi.mocked(api.listPlatformCourses).mockReset().mockResolvedValue([ergonomics, fire]);
   vi.mocked(api.listPlatformLibraryVideos).mockReset().mockResolvedValue([
     { video: opening, courseCount: 1 },
