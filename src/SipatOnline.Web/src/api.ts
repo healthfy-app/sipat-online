@@ -97,7 +97,7 @@ export interface PlatformUserProvisionData {
   loginIdentifier: string;
   displayName: string;
   initialPassword: string;
-  role: 'Participant' | 'ClientAdmin';
+  role: 'Participant' | 'ClientAdmin' | 'Supervisor';
 }
 
 export interface ParticipantAccount {

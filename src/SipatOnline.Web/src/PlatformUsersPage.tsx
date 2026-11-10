@@ -211,6 +211,7 @@ export default function PlatformUsersPage() {
               >
                 <option value="Participant">Participante</option>
                 <option value="ClientAdmin">Administrador da empresa</option>
+                <option value="Supervisor">Supervisor (relatórios da empresa)</option>
               </select>
             </div>
             <div className="field">
@@ -373,6 +374,8 @@ function getRoleLabel(role: string): string {
       return 'Superadministrador da empresa';
     case 'Participant':
       return 'Participante';
+    case 'Supervisor':
+      return 'Supervisor';
     default:
       return role;
   }

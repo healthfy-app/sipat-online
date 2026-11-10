@@ -138,6 +138,24 @@ public sealed class PlatformApiTests
             antiforgeryToken);
         Assert.Equal(HttpStatusCode.Forbidden, elevatedRoleResponse.StatusCode);
 
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var supervisorCreateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Post,
+            "/api/platform/users",
+            new CreatePlatformUserRequest(
+                company.Id,
+                "acme-supervisor",
+                "Supervisor da empresa",
+                "SupervisorPass123",
+                "Supervisor"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, supervisorCreateResponse.StatusCode);
+        var supervisor = await supervisorCreateResponse.Content.ReadFromJsonAsync<PlatformUserSummary>();
+        Assert.NotNull(supervisor);
+        Assert.Equal(company.Id, supervisor.TenantId);
+
         using var tenantBrandingResponse =
             await client.GetAsync("https://acme-health.localhost/api/tenant/branding");
         Assert.Equal(HttpStatusCode.OK, tenantBrandingResponse.StatusCode);

@@ -35,7 +35,7 @@ public sealed class PlatformUserManagementService(
             return Failure<PlatformUserSummary>(failure.ErrorCode, failure.ErrorMessage);
         }
 
-        if (request.Role is not (PlatformRoles.Participant or PlatformRoles.ClientAdmin))
+        if (request.Role is not (PlatformRoles.Participant or PlatformRoles.ClientAdmin or PlatformRoles.Supervisor))
         {
             return Failure<PlatformUserSummary>(
                 "identity.platform_user.role_forbidden",

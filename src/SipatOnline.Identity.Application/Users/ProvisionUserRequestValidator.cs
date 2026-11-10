@@ -20,7 +20,7 @@ public sealed class ProvisionUserRequestValidator : AbstractValidator<ProvisionU
             .NotEmpty();
 
         RuleFor(request => request.Role)
-            .Must(role => role is PlatformRoles.Participant or PlatformRoles.ClientAdmin or PlatformRoles.SuperAdmin)
+            .Must(role => role is PlatformRoles.Participant or PlatformRoles.ClientAdmin or PlatformRoles.SuperAdmin or PlatformRoles.Supervisor)
             .WithMessage("O perfil informado não é válido.");
     }
 }

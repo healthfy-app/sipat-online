@@ -75,6 +75,7 @@ public sealed class DatabaseInitializer(
                      PlatformRoles.SuperAdmin,
                      PlatformRoles.ClientAdmin,
                      PlatformRoles.Participant,
+                     PlatformRoles.Supervisor,
                      PlatformRoles.PlatformOperator
                  })
         {
