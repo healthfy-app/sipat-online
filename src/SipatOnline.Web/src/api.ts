@@ -28,11 +28,15 @@ export interface PlatformCompanyOverview extends PlatformCompany {
   totalUserCount: number;
 }
 
+export type PlatformCourseStatus = 'Draft' | 'Published';
+
 export interface PlatformCourse {
   id: string;
   title: string;
   description: string | null;
   createdAt: string;
+  status: PlatformCourseStatus;
+  gamificationEnabled: boolean;
   videos: PlatformCourseVideo[];
 }
 
@@ -46,9 +50,19 @@ export interface PlatformCourseVideo {
   fileUrl: string;
 }
 
+export interface PlatformLibraryVideo {
+  video: PlatformCourseVideo;
+  courseCount: number;
+}
+
 export interface PlatformCourseData {
   title: string;
   description: string | null;
+  gamificationEnabled: boolean;
+}
+
+export interface PlatformCourseUpdate extends PlatformCourseData {
+  status: PlatformCourseStatus;
 }
 
 export interface PlatformCompanyData {
@@ -376,18 +390,50 @@ export function createPlatformCourse(data: PlatformCourseData): Promise<Platform
   });
 }
 
-export function uploadPlatformCourseVideo(
+export function updatePlatformCourse(
   courseId: string,
+  data: PlatformCourseUpdate,
+): Promise<PlatformCourse> {
+  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+}
+
+export function duplicatePlatformCourse(courseId: string): Promise<PlatformCourse> {
+  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/duplicate`, {
+    method: 'POST',
+  });
+}
+
+export function setPlatformCourseVideos(
+  courseId: string,
+  videoIds: string[],
+): Promise<PlatformCourse> {
+  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/videos`, {
+    method: 'PUT',
+    body: JSON.stringify({ videoIds }),
+  });
+}
+
+export function listPlatformLibraryVideos(): Promise<PlatformLibraryVideo[]> {
+  return requestJson<PlatformLibraryVideo[]>('/api/platform/catalog/videos');
+}
+
+export function uploadPlatformVideo(
   title: string,
   durationMilliseconds: number,
   file: File,
+  courseId?: string,
 ): Promise<PlatformCourseVideo> {
   const formData = new FormData();
   formData.append('title', title);
   formData.append('durationMilliseconds', String(durationMilliseconds));
   formData.append('video', file);
   return requestJson<PlatformCourseVideo>(
-    `/api/platform/catalog/courses/${courseId}/videos`,
+    courseId
+      ? `/api/platform/catalog/courses/${courseId}/videos`
+      : '/api/platform/catalog/videos',
     { method: 'POST', body: formData },
   );
 }
