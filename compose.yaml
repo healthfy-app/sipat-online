@@ -7,10 +7,18 @@ x-api-environment: &api-environment
   SipatOnline__Tenant__Key: ${TENANT_KEY:?Set TENANT_KEY in your local .env file}
   SipatOnline__Tenant__Name: ${TENANT_NAME:?Set TENANT_NAME in your local .env file}
   SipatOnline__Tenant__BaseDomain: ${TENANT_BASE_DOMAIN:-localhost}
-  SipatOnline__DevelopmentProxy__Host: web
+  SipatOnline__Tenant__PlatformHost: ${PLATFORM_HOST:-ops.localhost}
+  SipatOnline__DevelopmentProxy__Host: ${DEVELOPMENT_PROXY_HOST:-web}
+  SipatOnline__Learning__DevelopmentSampleEnabled: ${DEVELOPMENT_SAMPLE_ENABLED:-true}
+  SipatOnline__Learning__DevelopmentSampleParticipant__LoginIdentifier: ${DEVELOPMENT_SAMPLE_PARTICIPANT_LOGIN_IDENTIFIER:-}
+  SipatOnline__Learning__DevelopmentSampleParticipant__DisplayName: ${DEVELOPMENT_SAMPLE_PARTICIPANT_DISPLAY_NAME:-}
+  SipatOnline__Learning__DevelopmentSampleParticipant__Password: ${DEVELOPMENT_SAMPLE_PARTICIPANT_PASSWORD:-}
   SipatOnline__BootstrapAdmin__LoginIdentifier: ${BOOTSTRAP_ADMIN_LOGIN_IDENTIFIER:-}
   SipatOnline__BootstrapAdmin__DisplayName: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-}
   SipatOnline__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+  SipatOnline__PlatformOperator__LoginIdentifier: ${PLATFORM_OPERATOR_LOGIN_IDENTIFIER:-sipat.online.admin}
+  SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-Super Admin SIPAT Online}
+  SipatOnline__PlatformOperator__Password: ${PLATFORM_OPERATOR_PASSWORD:-}
 
 services:
   postgres:
@@ -20,7 +28,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-sipat_online}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in your local .env file}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${LOCAL_BIND_ADDRESS:-0.0.0.0}:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -32,7 +40,7 @@ services:
     restart: unless-stopped
 
   db-init:
-    image: sipat-online-api:local
+    image: ${SIPAT_API_IMAGE:-sipat-online-api:local}
     build:
       context: .
       dockerfile: Dockerfile
@@ -44,13 +52,15 @@ services:
     profiles: ["tools"]
 
   api:
-    image: sipat-online-api:local
+    image: ${SIPAT_API_IMAGE:-sipat-online-api:local}
     build:
       context: .
       dockerfile: Dockerfile
     environment: *api-environment
+    volumes:
+      - platform-course-videos:/app/platform-course-videos
     ports:
-      - "${API_PORT:-8080}:8080"
+      - "${LOCAL_BIND_ADDRESS:-0.0.0.0}:${API_PORT:-8080}:8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -63,9 +73,8 @@ services:
     environment:
       SIPAT_API_TARGET: http://api:8080
     ports:
-      - "${WEB_PORT:-5173}:5173"
-    depends_on:
-      - api
+      - "${LOCAL_BIND_ADDRESS:-0.0.0.0}:${WEB_PORT:-5173}:5173"
 
 volumes:
   postgres-data:
+  platform-course-videos:

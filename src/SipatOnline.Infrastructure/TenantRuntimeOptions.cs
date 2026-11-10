@@ -11,4 +11,6 @@ public sealed class TenantRuntimeOptions
     public string Name { get; set; } = string.Empty;
 
     public string BaseDomain { get; set; } = string.Empty;
+
+    public string PlatformHost { get; set; } = string.Empty;
 }

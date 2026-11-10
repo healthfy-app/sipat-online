@@ -2,6 +2,7 @@ import { useEffect, useState, type CSSProperties, type FormEvent } from 'react';
 import {
   BrowserRouter,
   Link,
+  NavLink,
   Navigate,
   Outlet,
   Route,
@@ -18,6 +19,14 @@ import {
   type TenantBranding,
 } from './api';
 import SipatEventsPage from './SipatEventsPage';
+import LearningPage, { type LearningSummary } from './LearningPage';
+import LearningAuthoringPage from './LearningAuthoringPage';
+import LearningManagementPage from './LearningManagementPage';
+import PlatformCompaniesPage from './PlatformCompaniesPage';
+import PlatformUsersPage from './PlatformUsersPage';
+import PlatformDashboardPage from './PlatformDashboardPage';
+import PlatformCoursesPage from './PlatformCoursesPage';
+import PlatformSettingsPage from './PlatformSettingsPage';
 
 type AppState =
   | { status: 'loading' }
@@ -35,7 +44,7 @@ export default function App() {
     async function initialize() {
       try {
         const tenant = await getTenantBranding();
-        const session = await getSession();
+        const session = await getSession(tenant.tenantKey === 'platform');
         if (active) {
           setState({ status: 'ready', tenant, session });
         }
@@ -74,6 +83,7 @@ export default function App() {
     );
   }
 
+  const isPlatformPortal = state.tenant.tenantKey === 'platform';
   const theme = {
     '--brand-primary': state.tenant.primaryColor,
     '--brand-secondary': state.tenant.secondaryColor,
@@ -83,8 +93,8 @@ export default function App() {
     loginIdentifier: string,
     password: string,
   ): Promise<IdentitySession> {
-    await signIn(loginIdentifier, password);
-    const session = await getSession();
+    await signIn(loginIdentifier, password, isPlatformPortal);
+    const session = await getSession(isPlatformPortal);
     if (!session) {
       throw new Error('A sessão não foi iniciada. Confira suas credenciais.');
     }
@@ -96,7 +106,7 @@ export default function App() {
   }
 
   async function handleSignOut() {
-    await signOut();
+    await signOut(isPlatformPortal);
     setState((current) =>
       current.status === 'ready' ? { ...current, session: null } : current,
     );
@@ -110,7 +120,7 @@ export default function App() {
             path="/"
             element={
               <Navigate
-                to={state.session ? '/admin/sipats' : '/login'}
+                to={state.session ? getLandingPage(state.session) : '/login'}
                 replace
               />
             }
@@ -145,10 +155,111 @@ export default function App() {
               }
             />
             <Route
+              path="/admin/learning"
+              element={
+                state.session && hasAdminRole(state.session) ? (
+                  <LearningManagementPage />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
+              path="/admin/content"
+              element={
+                state.session && hasAdminRole(state.session) ? (
+                  <LearningAuthoringPage />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
+              path="/learning"
+              element={
+                state.session?.roles.includes('Participant') ? (
+                  <LearningPage
+                    participantName={state.session.displayName}
+                    tenantName={state.tenant.tenantName}
+                  />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
+              path="/learning/tracks/:trackId"
+              element={
+                state.session?.roles.includes('Participant') ? (
+                  <LearningPage
+                    participantName={state.session.displayName}
+                    tenantName={state.tenant.tenantName}
+                  />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
               path="/platform"
               element={
-                state.session?.roles.includes('SuperAdmin') ? (
-                  <SuperAdminHome />
+                state.tenant.tenantKey === 'platform' &&
+                state.session?.roles.includes('PlatformOperator') ? (
+                  <PlatformDashboardPage />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
+              path="/platform/dashboard"
+              element={
+                state.tenant.tenantKey === 'platform' &&
+                state.session?.roles.includes('PlatformOperator') ? (
+                  <PlatformDashboardPage />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
+              path="/platform/companies"
+              element={
+                state.tenant.tenantKey === 'platform' &&
+                state.session?.roles.includes('PlatformOperator') ? (
+                  <PlatformCompaniesPage />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
+              path="/platform/users"
+              element={
+                state.tenant.tenantKey === 'platform' &&
+                state.session?.roles.includes('PlatformOperator') ? (
+                  <PlatformUsersPage />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
+              path="/platform/courses"
+              element={
+                state.tenant.tenantKey === 'platform' &&
+                state.session?.roles.includes('PlatformOperator') ? (
+                  <PlatformCoursesPage />
+                ) : (
+                  <AccessDenied />
+                )
+              }
+            />
+            <Route
+              path="/platform/settings"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? (
+                  <PlatformSettingsPage tenant={state.tenant} session={state.session} />
                 ) : (
                   <AccessDenied />
                 )
@@ -170,7 +281,9 @@ function LoginPage({
   onSignIn: (loginIdentifier: string, password: string) => Promise<IdentitySession>;
 }) {
   const navigate = useNavigate();
-  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState(
+    tenant.tenantKey === 'platform' ? 'sipat.online.admin' : '',
+  );
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -195,21 +308,35 @@ function LoginPage({
       <div className="login-brand-panel">
         <TenantIdentity tenant={tenant} compact={false} />
         <div className="login-intro">
-          <p className="eyebrow">SUA SIPAT, EM UM NOVO FORMATO</p>
-          <h1>Aprender também faz parte de cuidar.</h1>
-          <p>
-            Acesse os conteúdos da SIPAT da sua empresa em um espaço feito para
-            você.
-          </p>
+          {tenant.tenantKey === 'platform' ? (
+            <>
+              <p className="eyebrow">SIPAT.ONLINE.ADMIN</p>
+              <h1>Gestão segura dos clientes.</h1>
+              <p>Acesse a área de operação do SIPAT Online.</p>
+            </>
+          ) : (
+            <>
+              <p className="eyebrow">CONTEÚDOS PARA A SEMANA DA SIPAT</p>
+              <h1>Aprender também faz parte de cuidar.</h1>
+              <p>
+                Acesse os cursos e demais conteúdos que sua empresa preparou para
+                a semana da SIPAT.
+              </p>
+            </>
+          )}
         </div>
-        <span className="login-caption">Portal exclusivo da empresa</span>
+        <span className="login-caption">
+          {tenant.tenantKey === 'platform' ? 'Acesso exclusivo para operadores' : 'Ambiente de aprendizagem da empresa'}
+        </span>
       </div>
       <div className="login-form-panel">
         <form className="login-card" onSubmit={handleSubmit}>
           <p className="eyebrow">BEM-VINDO(A)</p>
-          <h2>Acesse sua SIPAT</h2>
+          <h2>{tenant.tenantKey === 'platform' ? 'Acesse a plataforma' : 'Entre na sua área de aprendizagem'}</h2>
           <p className="muted-copy">
-            Entre com a matrícula e a senha fornecidas pela sua empresa.
+            {tenant.tenantKey === 'platform'
+              ? 'Entre com suas credenciais de operação.'
+              : 'Entre com a matrícula e a senha fornecidas pela sua empresa.'}
           </p>
           <label htmlFor="login-identifier">Matrícula</label>
           <input
@@ -255,10 +382,16 @@ function ProtectedPortal({
   const navigate = useNavigate();
   const [error, setError] = useState('');
   const [isSigningOut, setIsSigningOut] = useState(false);
+  const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null);
 
   if (!session) {
     return <Navigate to="/login" replace />;
   }
+
+  const isLearnerOnly =
+    session.roles.includes('Participant') &&
+    !hasAdminRole(session) &&
+    !session.roles.includes('PlatformOperator');
 
   async function handleSignOut() {
     setError('');
@@ -274,9 +407,13 @@ function ProtectedPortal({
   }
 
   return (
-    <div className="portal-layout">
-      <header className="portal-header">
-        <Link aria-label={`${tenant.tenantName} - início`} className="brand-link" to="/admin/sipats">
+    <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}`}>
+      {!isLearnerOnly && <header className="portal-header">
+        <Link
+          aria-label={`${tenant.tenantName} - início`}
+          className="brand-link"
+          to={getLandingPage(session)}
+        >
           <TenantIdentity tenant={tenant} compact />
         </Link>
         <div className="header-actions">
@@ -290,25 +427,78 @@ function ProtectedPortal({
             {isSigningOut ? 'Saindo...' : 'Sair'}
           </button>
         </div>
-      </header>
-      <div className="portal-body">
-        <aside aria-label="Navegação principal" className="sidebar">
-          <p className="sidebar-label">GESTÃO</p>
-          <Link className="sidebar-link" to="/admin/sipats">SIPATs</Link>
-          {session.roles.includes('SuperAdmin') && (
+      </header>}
+      <div className={`portal-body${isLearnerOnly ? ' portal-body-learner' : ''}`}>
+        {isLearnerOnly && (
+          <aside aria-label="Área do aluno" className="learner-sidebar">
+            <Link aria-label={`${tenant.tenantName} - início`} className="brand-link" to="/learning">
+              <TenantIdentity tenant={tenant} compact />
+            </Link>
+            <nav aria-label="Seções da área do aluno" className="learner-sidebar-nav">
+              <NavLink className="learner-sidebar-link" to="/learning">Minha formação</NavLink>
+              <span className="learner-sidebar-unavailable">Meu certificado <small>Em breve</small></span>
+              <span className="learner-sidebar-unavailable">Fórum <small>Em breve</small></span>
+            </nav>
+            {learningSummary && (
+              <div className="learner-sidebar-progress">
+                <svg aria-hidden="true" viewBox="0 0 56 56">
+                  <circle className="ring-background" cx="28" cy="28" r="22" />
+                  <circle
+                    className="ring-value"
+                    cx="28" cy="28" r="22"
+                    strokeDasharray={2 * Math.PI * 22}
+                    strokeDashoffset={2 * Math.PI * 22 * (1 - learningSummary.percentage / 100)}
+                  />
+                </svg>
+                <div>
+                  <strong>{learningSummary.percentage}% concluído</strong>
+                  <span>{learningSummary.completed} de {learningSummary.total} aulas</span>
+                </div>
+              </div>
+            )}
+            <button
+              className="button button-outline learner-sign-out"
+              disabled={isSigningOut}
+              onClick={handleSignOut}
+              type="button"
+            >
+              {isSigningOut ? 'Saindo...' : 'Sair'}
+            </button>
+          </aside>
+        )}
+        {!isLearnerOnly && <aside aria-label="Navegação principal" className="sidebar">
+          {session.roles.includes('Participant') && (
             <>
-              <p className="sidebar-label sidebar-label-spaced">PLATAFORMA</p>
-              <Link className="sidebar-link" to="/platform">Super Admin</Link>
+              <p className="sidebar-label">APRENDIZAGEM</p>
+              <NavLink className="sidebar-link" to="/learning">Minhas trilhas</NavLink>
+            </>
+          )}
+          {hasAdminRole(session) && (
+            <>
+              <p className="sidebar-label">GESTÃO</p>
+              <NavLink className="sidebar-link" to="/admin/sipats">Programação da SIPAT</NavLink>
+              <NavLink className="sidebar-link" to="/admin/content">Trilhas e vídeos</NavLink>
+              <NavLink className="sidebar-link" to="/admin/learning">Participantes e trilhas</NavLink>
+            </>
+          )}
+          {session.roles.includes('PlatformOperator') && (
+            <>
+              <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
+              <NavLink className="sidebar-link" to="/platform" end>Visão geral</NavLink>
+              <NavLink className="sidebar-link" to="/platform/companies">Empresas clientes</NavLink>
+              <NavLink className="sidebar-link" to="/platform/users">Usuários</NavLink>
+              <NavLink className="sidebar-link" to="/platform/courses">Cursos</NavLink>
+              <NavLink className="sidebar-link" to="/platform/settings">Configurações</NavLink>
             </>
           )}
           <div className="sidebar-footer">
             <span className="tenant-indicator" />
-            <span>Portal da empresa</span>
+            <span>{tenant.tenantKey === 'platform' ? 'Operação SIPAT Online' : 'Portal da empresa'}</span>
           </div>
-        </aside>
-        <section className="portal-content">
+        </aside>}
+        <section className={`portal-content${isLearnerOnly ? ' portal-content-learner' : ''}`}>
           {error && <p className="form-error" role="alert">{error}</p>}
-          <Outlet />
+          <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />
         </section>
       </div>
     </div>
@@ -327,36 +517,9 @@ function TenantIdentity({
       {tenant.logoReference ? (
         <img alt="" className="tenant-logo" src={tenant.logoReference} />
       ) : (
-        <span aria-hidden="true" className="tenant-mark">S</span>
+        <span aria-hidden="true" className="tenant-mark">✓</span>
       )}
       <span className="tenant-name">{tenant.tenantName}</span>
-    </div>
-  );
-}
-
-function SuperAdminHome() {
-  return (
-    <div className="page-content">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">ADMINISTRAÇÃO DA PLATAFORMA</p>
-          <h1>Super Admin</h1>
-          <p className="muted-copy">
-            Área reservada à operação global do SIPAT Online.
-          </p>
-        </div>
-      </div>
-      <div className="notice-card">
-        <span className="notice-icon" aria-hidden="true">i</span>
-        <div>
-          <h2>Gestão global em preparação</h2>
-          <p>
-            As funções globais de empresas e tenants ainda não estão disponíveis.
-            Enquanto isso, a gestão de eventos SIPAT permanece no portal da empresa.
-          </p>
-          <Link className="text-link" to="/admin/sipats">Acessar gestão de SIPATs</Link>
-        </div>
-      </div>
     </div>
   );
 }
@@ -378,7 +541,15 @@ function hasAdminRole(session: IdentitySession): boolean {
 }
 
 function getLandingPage(session: IdentitySession): string {
-  return session.roles.includes('SuperAdmin') ? '/platform' : '/admin/sipats';
+  if (session.roles.includes('PlatformOperator')) {
+    return '/platform';
+  }
+
+  if (hasAdminRole(session)) {
+    return '/admin/sipats';
+  }
+
+  return session.roles.includes('Participant') ? '/learning' : '/admin/sipats';
 }
 
 function getErrorMessage(error: unknown): string {

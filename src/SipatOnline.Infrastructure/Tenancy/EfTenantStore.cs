@@ -1,4 +1,6 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Npgsql;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Tenancy.Application.Branding;
 using SipatOnline.Tenancy.Domain.Tenants;
@@ -25,6 +27,41 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
             .SingleOrDefaultAsync(tenant => tenant.Key == tenantKey.Value, cancellationToken);
 
         return entity is null ? null : Reconstitute(entity);
+    }
+
+    public async Task<IReadOnlyList<Tenant>> ListAsync(CancellationToken cancellationToken)
+    {
+        var tenants = await dbContext.Tenants
+            .AsNoTracking()
+            .OrderBy(tenant => tenant.Name)
+            .ThenBy(tenant => tenant.Id)
+            .ToListAsync(cancellationToken);
+
+        return tenants.Select(Reconstitute).ToArray();
+    }
+
+    public async Task<Result<Tenant>> AddAsync(
+        Tenant tenant,
+        CancellationToken cancellationToken)
+    {
+        var entity = ToEntity(tenant);
+        dbContext.Tenants.Add(entity);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return Result<Tenant>.Success(tenant);
+        }
+        catch (DbUpdateException exception) when (
+            exception.InnerException is PostgresException
+            {
+                SqlState: PostgresErrorCodes.UniqueViolation,
+                ConstraintName: "IX_Tenants_Key"
+            })
+        {
+            dbContext.Entry(entity).State = EntityState.Detached;
+            return Result<Tenant>.Failure(
+                new DomainError("tenant.key.duplicate", "Já existe uma empresa com esse identificador."));
+        }
     }
 
     private static Tenant Reconstitute(TenantEntity entity)
@@ -55,6 +92,20 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
 
         return tenant.Value;
     }
+
+    private static TenantEntity ToEntity(Tenant tenant) =>
+        new()
+        {
+            Id = tenant.Id.Value,
+            Key = tenant.Key.Value,
+            Name = tenant.Name.Value,
+            LogoReference = tenant.Branding.LogoReference,
+            PrimaryColor = tenant.Branding.PrimaryColor.Value,
+            SecondaryColor = tenant.Branding.SecondaryColor.Value,
+            CustomDomain = tenant.Branding.CustomDomain,
+            CreatedAt = tenant.CreatedAt,
+            IsActive = tenant.IsActive
+        };
 
     public async Task SaveAsync(Tenant tenant, CancellationToken cancellationToken)
     {

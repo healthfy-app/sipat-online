@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Antiforgery;
+using Microsoft.Extensions.Options;
 using SipatOnline.BuildingBlocks.Domain;
+using SipatOnline.Infrastructure;
 using SipatOnline.Tenancy.Application.Branding;
+using SipatOnline.Tenancy.Domain.Tenants;
 
 namespace SipatOnline.Api.Endpoints;
 
@@ -12,9 +15,26 @@ public static class TenantEndpoints
             .WithTags("Tenant");
 
         group.MapGet("/branding", async (
+            HttpContext context,
+            IOptions<TenantRuntimeOptions> tenantOptions,
             TenantBrandingService brandingService,
             CancellationToken cancellationToken) =>
         {
+            if (string.Equals(
+                    context.Request.Host.Host.TrimEnd('.'),
+                    tenantOptions.Value.PlatformHost.Trim().TrimEnd('.'),
+                    StringComparison.OrdinalIgnoreCase))
+            {
+                var branding = TenantBranding.Default;
+                return Results.Ok(new TenantBrandingResponse(
+                    "platform",
+                    "SIPAT Online",
+                    null,
+                    branding.PrimaryColor.Value,
+                    branding.SecondaryColor.Value,
+                    null));
+            }
+
             var result = await brandingService.GetAsync(cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(result.Value)

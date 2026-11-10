@@ -2,6 +2,11 @@
 .vs
 .env
 .env.*
+.docker-local-credentials.txt
+deploy
+docs
+tests
+src/SipatOnline.Web
 **/bin
 **/obj
 **/TestResults

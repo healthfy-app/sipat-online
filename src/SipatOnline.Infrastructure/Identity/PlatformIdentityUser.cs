@@ -4,7 +4,7 @@ namespace SipatOnline.Infrastructure.Identity;
 
 public sealed class PlatformIdentityUser : IdentityUser<Guid>
 {
-    public Guid TenantId { get; set; }
+    public Guid? TenantId { get; set; }
 
     public string EmployeeIdentifier { get; set; } = string.Empty;
 

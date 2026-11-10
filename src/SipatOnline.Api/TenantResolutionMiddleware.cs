@@ -26,7 +26,21 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
 
         var baseDomain = tenantOptions.Value.BaseDomain.Trim().TrimEnd('.').ToLowerInvariant();
         var host = context.Request.Host.Host.TrimEnd('.').ToLowerInvariant();
+        var platformHost = tenantOptions.Value.PlatformHost.Trim().TrimEnd('.').ToLowerInvariant();
         Tenant? tenant;
+
+        if (context.Request.Path.StartsWithSegments("/api/platform", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(host, platformHost, StringComparison.Ordinal))
+        {
+            await WriteTenantNotFoundAsync(context);
+            return;
+        }
+
+        if (string.Equals(host, platformHost, StringComparison.Ordinal))
+        {
+            await next(context);
+            return;
+        }
 
         if (string.Equals(host, baseDomain, StringComparison.Ordinal))
         {

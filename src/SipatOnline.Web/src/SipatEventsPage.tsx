@@ -106,10 +106,10 @@ export default function SipatEventsPage() {
     try {
       if (editingId) {
         await updateSipatEvent(editingId, data);
-        setNotice('SIPAT atualizada com sucesso.');
+        setNotice('Programação da SIPAT atualizada com sucesso.');
       } else {
         await createSipatEvent(data);
-        setNotice('SIPAT criada como rascunho.');
+        setNotice('Rascunho da programação criado.');
       }
       setEditingId(null);
       setFormValues(emptyForm);
@@ -138,7 +138,7 @@ export default function SipatEventsPage() {
   }
 
   async function handleCancel(event: SipatEvent) {
-    if (!window.confirm(`Deseja cancelar a SIPAT "${event.title}"? Essa ação não pode ser desfeita.`)) {
+    if (!window.confirm(`Deseja cancelar a programação "${event.title}"? Essa ação não pode ser desfeita.`)) {
       return;
     }
 
@@ -161,13 +161,13 @@ export default function SipatEventsPage() {
       <div className="page-heading">
         <div>
           <p className="eyebrow">GESTÃO DO CLIENTE</p>
-          <h1>Eventos SIPAT</h1>
+          <h1>Programação da SIPAT</h1>
           <p className="muted-copy">
-            Organize os eventos e acompanhe o que está pronto para publicação.
+            Organize o período da semana de prevenção e acompanhe os conteúdos preparados para os participantes.
           </p>
         </div>
         <button className="button button-primary" onClick={startCreate} type="button">
-          <span aria-hidden="true">＋</span> Nova SIPAT
+          <span aria-hidden="true">＋</span> Nova programação
         </button>
       </div>
 
@@ -178,13 +178,13 @@ export default function SipatEventsPage() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">{editingId ? 'EDIÇÃO' : 'NOVO EVENTO'}</p>
-            <h2 id="event-form-title">{editingId ? 'Editar SIPAT' : 'Criar SIPAT'}</h2>
+            <h2 id="event-form-title">{editingId ? 'Editar programação' : 'Cadastrar programação da SIPAT'}</h2>
           </div>
-          <span className="draft-note">Novos eventos começam como rascunho</span>
+          <span className="draft-note">Novas programações começam como rascunho</span>
         </div>
         <form className="event-form" onSubmit={handleSubmit}>
           <div className="field full-width">
-            <label htmlFor="event-title">Nome do evento</label>
+            <label htmlFor="event-title">Nome da programação</label>
             <input
               id="event-title"
               maxLength={200}
@@ -240,20 +240,20 @@ export default function SipatEventsPage() {
         <div className="section-heading">
           <div>
             <p className="eyebrow">VISÃO GERAL</p>
-            <h2 id="events-list-title">Suas SIPATs</h2>
+            <h2 id="events-list-title">Programações cadastradas</h2>
           </div>
-          {!isLoading && <span className="count-label">{totalCount} {totalCount === 1 ? 'evento' : 'eventos'}</span>}
+          {!isLoading && <span className="count-label">{totalCount} {totalCount === 1 ? 'programação' : 'programações'}</span>}
         </div>
 
         {isLoading ? (
-          <p className="list-state" aria-live="polite">Carregando eventos...</p>
+          <p className="list-state" aria-live="polite">Carregando programações...</p>
         ) : events.length === 0 ? (
           <div className="empty-state">
             <span className="empty-illustration" aria-hidden="true">✦</span>
-            <h3>Nenhuma SIPAT por aqui ainda</h3>
-            <p>Crie um evento para começar a organizar os conteúdos da sua empresa.</p>
+            <h3>Nenhuma programação cadastrada</h3>
+            <p>Cadastre a semana da SIPAT da sua empresa para organizar o período e os conteúdos dos participantes.</p>
             <button className="button button-secondary" onClick={startCreate} type="button">
-              Criar primeira SIPAT
+              Criar primeira programação
             </button>
           </div>
         ) : (
@@ -283,7 +283,7 @@ export default function SipatEventsPage() {
                   )}
                   {event.status !== 'Cancelled' && (
                     <button className="button button-danger-quiet" onClick={() => void handleCancel(event)} type="button">
-                      Cancelar SIPAT
+                      Cancelar programação
                     </button>
                   )}
                 </div>

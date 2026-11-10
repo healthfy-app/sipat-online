@@ -19,18 +19,39 @@ builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {
-    if (!builder.Environment.IsDevelopment())
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.ForwardLimit = 1;
+
+    if (builder.Environment.IsDevelopment())
     {
+        var developmentProxyHost =
+            builder.Configuration["SipatOnline:DevelopmentProxy:Host"] ?? "localhost";
+        foreach (var address in Dns.GetHostAddresses(developmentProxyHost))
+        {
+            options.KnownProxies.Add(address);
+        }
+
         return;
     }
 
-    options.ForwardedHeaders = ForwardedHeaders.XForwardedProto;
-    options.ForwardLimit = 1;
-    var developmentProxyHost =
-        builder.Configuration["SipatOnline:DevelopmentProxy:Host"] ?? "localhost";
-    foreach (var address in Dns.GetHostAddresses(developmentProxyHost))
+    var knownProxyAddresses = builder.Configuration
+        .GetSection("SipatOnline:ForwardedHeaders:KnownProxies")
+        .Get<string[]>() ?? [];
+    if (knownProxyAddresses.Length == 0)
     {
-        options.KnownProxies.Add(address);
+        throw new InvalidOperationException(
+            "At least one trusted forwarded-header proxy must be configured outside Development.");
+    }
+
+    foreach (var address in knownProxyAddresses)
+    {
+        if (!IPAddress.TryParse(address, out var proxyAddress))
+        {
+            throw new InvalidOperationException(
+                $"The trusted forwarded-header proxy address '{address}' is not a valid IP address.");
+        }
+
+        options.KnownProxies.Add(proxyAddress);
     }
 });
 builder.Services.AddAntiforgery(options =>
@@ -87,9 +108,12 @@ app.UseAntiforgery();
 
 app.MapHealthChecks("/health");
 app.MapIdentityEndpoints();
+app.MapPlatformEndpoints();
+app.MapPlatformCourseCatalogEndpoints();
 app.MapUserManagementEndpoints();
 app.MapTenantEndpoints();
 app.MapSipatEventEndpoints();
+app.MapLearningEndpoints();
 
 app.Run();
 

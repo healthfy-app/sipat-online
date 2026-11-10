@@ -106,6 +106,12 @@ public sealed class TenantBrandingServiceTests
         public Task<Tenant?> FindByKeyAsync(TenantKey tenantKey, CancellationToken cancellationToken) =>
             Task.FromResult<Tenant?>(tenant.Key == tenantKey ? tenant : null);
 
+        public Task<IReadOnlyList<Tenant>> ListAsync(CancellationToken cancellationToken) =>
+            Task.FromResult<IReadOnlyList<Tenant>>([tenant]);
+
+        public Task<Result<Tenant>> AddAsync(Tenant value, CancellationToken cancellationToken) =>
+            Task.FromResult(Result<Tenant>.Success(value));
+
         public Task SaveAsync(Tenant value, CancellationToken cancellationToken)
         {
             Assert.Equal(tenant.Id, value.Id);

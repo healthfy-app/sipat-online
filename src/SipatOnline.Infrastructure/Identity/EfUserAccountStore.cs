@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
+using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Identity.Application.Users;
 using SipatOnline.Identity.Domain.Users;
@@ -100,6 +101,41 @@ public sealed class EfUserAccountStore(
             totalCount);
     }
 
+    public async Task<UserAccountPage> ListParticipantsAsync(
+        TenantId tenantId,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken)
+    {
+        var participantRoleId = await dbContext.Roles.AsNoTracking()
+            .Where(role => role.NormalizedName == PlatformRoles.Participant.ToUpperInvariant())
+            .Select(role => (Guid?)role.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (participantRoleId is null)
+        {
+            return new UserAccountPage([], offset, limit, 0);
+        }
+
+        var participants = dbContext.Users
+            .AsNoTracking()
+            .Where(user => user.TenantId == tenantId.Value &&
+                           dbContext.UserRoles.Any(role =>
+                               role.UserId == user.Id && role.RoleId == participantRoleId.Value));
+        var totalCount = await participants.CountAsync(cancellationToken);
+        var users = await participants
+            .OrderBy(user => user.DisplayName)
+            .ThenBy(user => user.Id)
+            .Skip(offset)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
+
+        return new UserAccountPage(
+            users.Select(ToDomain).ToArray(),
+            offset,
+            limit,
+            totalCount);
+    }
+
     public async Task<Result<User>> UpdateAsync(User user, CancellationToken cancellationToken)
     {
         var identityUser = await dbContext.Users.SingleOrDefaultAsync(
@@ -144,9 +180,15 @@ public sealed class EfUserAccountStore(
 
     private static User ToDomain(PlatformIdentityUser identityUser)
     {
+        if (identityUser.TenantId is not { } tenantId)
+        {
+            throw new InvalidOperationException(
+                $"User {identityUser.Id:D} is a platform operator and cannot be loaded as a tenant account.");
+        }
+
         var result = User.Reconstitute(
             new UserId(identityUser.Id),
-            new TenantId(identityUser.TenantId),
+            new TenantId(tenantId),
             identityUser.EmployeeIdentifier,
             identityUser.DisplayName,
             identityUser.CreatedAt,

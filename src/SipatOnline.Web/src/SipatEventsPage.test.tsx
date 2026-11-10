@@ -45,7 +45,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('SIPAT event administration', () => {
+describe('SIPAT schedule administration', () => {
   it('publishes a draft and refreshes its status', async () => {
     const publishedEvent = { ...draftEvent, status: 'Published' as const };
     vi.mocked(api.listSipatEvents)
@@ -63,7 +63,7 @@ describe('SIPAT event administration', () => {
     expect(await screen.findByText('Publicada')).toBeVisible();
   });
 
-  it('creates a SIPAT after validating the period and sends UTC instants', async () => {
+  it('creates a SIPAT schedule after validating the period and sends UTC instants', async () => {
     const createdEvent = { ...draftEvent, title: 'Nova SIPAT' };
     vi.mocked(api.listSipatEvents)
       .mockResolvedValueOnce(makePage([]))
@@ -73,7 +73,7 @@ describe('SIPAT event administration', () => {
 
     render(<SipatEventsPage />);
 
-    await user.type(await screen.findByLabelText('Nome do evento'), 'Nova SIPAT');
+    await user.type(await screen.findByLabelText('Nome da programação'), 'Nova SIPAT');
     await user.type(screen.getByLabelText('Descrição (opcional)'), 'Prevenção e saúde');
     fireEvent.change(screen.getByLabelText('Início'), {
       target: { value: '2026-11-01T09:00' },
@@ -90,7 +90,7 @@ describe('SIPAT event administration', () => {
       startsAt: new Date('2026-11-01T09:00').toISOString(),
       endsAt: new Date('2026-11-01T10:30').toISOString(),
     });
-    expect(await screen.findByText('SIPAT criada como rascunho.')).toBeVisible();
+    expect(await screen.findByText('Rascunho da programação criado.')).toBeVisible();
   });
 
   it('edits an existing SIPAT and refreshes the list', async () => {
@@ -107,7 +107,7 @@ describe('SIPAT event administration', () => {
     await user.click(await screen.findByRole('button', { name: 'Editar' }));
     const startInput = screen.getByLabelText('Início') as HTMLInputElement;
     const expectedStartsAt = new Date(startInput.value).toISOString();
-    fireEvent.change(screen.getByLabelText('Nome do evento'), {
+    fireEvent.change(screen.getByLabelText('Nome da programação'), {
       target: { value: 'SIPAT revisada' },
     });
     await user.click(screen.getByRole('button', { name: 'Salvar alterações' }));
@@ -119,7 +119,7 @@ describe('SIPAT event administration', () => {
         startsAt: expectedStartsAt,
       }),
     );
-    expect(await screen.findByText('SIPAT atualizada com sucesso.')).toBeVisible();
+    expect(await screen.findByText('Programação da SIPAT atualizada com sucesso.')).toBeVisible();
     expect(await screen.findByText('SIPAT revisada')).toBeVisible();
   });
 
@@ -136,10 +136,10 @@ describe('SIPAT event administration', () => {
 
     render(<SipatEventsPage />);
 
-    await user.click(await screen.findByRole('button', { name: 'Cancelar SIPAT' }));
+    await user.click(await screen.findByRole('button', { name: 'Cancelar programação' }));
 
     expect(window.confirm).toHaveBeenCalledWith(
-      'Deseja cancelar a SIPAT "SIPAT 2026"? Essa ação não pode ser desfeita.',
+      'Deseja cancelar a programação "SIPAT 2026"? Essa ação não pode ser desfeita.',
     );
     expect(api.cancelSipatEvent).toHaveBeenCalledWith(draftEvent.id);
     expect(await screen.findByText('Cancelada')).toBeVisible();

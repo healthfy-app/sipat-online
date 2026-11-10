@@ -279,6 +279,13 @@ public sealed class UserApplicationServiceTests
             return Task.FromResult(new UserAccountPage(page, offset, limit, matchingUsers.Length));
         }
 
+        public Task<UserAccountPage> ListParticipantsAsync(
+            TenantId tenantId,
+            int offset,
+            int limit,
+            CancellationToken cancellationToken) =>
+            ListAsync(tenantId, offset, limit, cancellationToken);
+
         public Task<Result<User>> UpdateAsync(User user, CancellationToken cancellationToken) =>
             Task.FromResult(Result<User>.Success(user));
 

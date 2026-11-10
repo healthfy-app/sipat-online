@@ -1,0 +1,104 @@
+#cloud-config
+package_update: true
+packages:
+  - ca-certificates
+  - docker.io
+  - docker-compose-v2
+  - git
+  - python3-venv
+  - python3-pip
+
+write_files:
+  - path: /etc/letsencrypt/dns-azure.ini
+    owner: root:root
+    permissions: "0600"
+    content: |
+      dns_azure_msi_system_assigned = true
+      dns_azure_environment = "AzurePublicCloud"
+      dns_azure_zone1 = ${domain_name}:${dns_zone_id}
+  - path: /usr/local/bin/sipat-online-reload-nginx
+    owner: root:root
+    permissions: "0750"
+    content: |
+${indent(6, reload_script)}
+  - path: /usr/local/bin/sipat-online-backup
+    owner: root:root
+    permissions: "0750"
+    content: |
+      #!/bin/sh
+      set -eu
+
+      app_dir=/opt/sipat-online/app
+      compose_file=$app_dir/deploy/compose.production.yaml
+      environment_file=$app_dir/deploy/.env.production
+      backup_dir=/var/backups/sipat-online
+
+      if [ ! -f "$compose_file" ] || [ ! -f "$environment_file" ]; then
+          echo "SIPAT Online production deployment is not configured." >&2
+          exit 1
+      fi
+
+      install -d -m 0700 "$backup_dir"
+      backup_file="$backup_dir/postgres-$(date -u +%Y%m%dT%H%M%SZ).dump.gz"
+      docker compose --env-file "$environment_file" -f "$compose_file" exec -T postgres \
+          sh -ec 'pg_dump --format=custom --no-owner --username="$POSTGRES_USER" "$POSTGRES_DB"' \
+          | gzip > "$backup_file"
+      find "$backup_dir" -type f -name 'postgres-*.dump.gz' -mtime +14 -delete
+  - path: /etc/systemd/system/sipat-online-certbot-renew.service
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Renew SIPAT Online wildcard TLS certificate
+
+      [Service]
+      Type=oneshot
+      ExecStart=/opt/certbot/bin/certbot renew --quiet --deploy-hook /usr/local/bin/sipat-online-reload-nginx
+  - path: /etc/systemd/system/sipat-online-certbot-renew.timer
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Check SIPAT Online TLS certificate renewal daily
+
+      [Timer]
+      OnCalendar=daily
+      RandomizedDelaySec=12h
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+  - path: /etc/systemd/system/sipat-online-backup.service
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Create a local SIPAT Online PostgreSQL backup
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/sipat-online-backup
+  - path: /etc/systemd/system/sipat-online-backup.timer
+    owner: root:root
+    permissions: "0644"
+    content: |
+      [Unit]
+      Description=Run a daily SIPAT Online PostgreSQL backup
+
+      [Timer]
+      OnCalendar=daily
+      RandomizedDelaySec=2h
+      Persistent=true
+
+      [Install]
+      WantedBy=timers.target
+
+runcmd:
+  - [sh, -c, "usermod -aG docker ${admin_username}"]
+  - [sh, -c, "install -d -o ${admin_username} -g ${admin_username} -m 0750 /opt/sipat-online /opt/sipat-online/app"]
+  - [sh, -c, "python3 -m venv /opt/certbot"]
+  - [sh, -c, "/opt/certbot/bin/pip install --upgrade certbot certbot-dns-azure"]
+  - [systemctl, daemon-reload]
+  - [systemctl, enable, --now, docker]
+  - [systemctl, enable, --now, sipat-online-certbot-renew.timer]
+  - [systemctl, enable, --now, sipat-online-backup.timer]

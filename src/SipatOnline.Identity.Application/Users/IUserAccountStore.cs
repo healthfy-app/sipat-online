@@ -22,5 +22,11 @@ public interface IUserAccountStore
         int limit,
         CancellationToken cancellationToken);
 
+    Task<UserAccountPage> ListParticipantsAsync(
+        TenantId tenantId,
+        int offset,
+        int limit,
+        CancellationToken cancellationToken);
+
     Task<Result<User>> UpdateAsync(User user, CancellationToken cancellationToken);
 }

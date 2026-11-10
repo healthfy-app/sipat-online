@@ -36,6 +36,29 @@ public static class UserManagementEndpoints
         })
         .WithName("ListUsers");
 
+        group.MapGet("/participants", async (
+            int? offset,
+            int? limit,
+            UserApplicationService userService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await userService.ListParticipantsAsync(
+                new ListUsersRequest(offset ?? 0, limit ?? 50),
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return ToProblem(result.Error);
+            }
+
+            var page = result.Value;
+            return Results.Ok(new UserListResponse(
+                page.Offset,
+                page.Limit,
+                page.TotalCount,
+                page.Items.Select(ToResponse).ToArray()));
+        })
+        .WithName("ListParticipants");
+
         group.MapPost("/", async (
             ProvisionUserRequest request,
             HttpContext context,

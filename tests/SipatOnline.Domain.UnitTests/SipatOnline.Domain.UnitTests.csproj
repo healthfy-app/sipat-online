@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SipatOnline.Identity.Domain\SipatOnline.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\src\SipatOnline.Learning.Domain\SipatOnline.Learning.Domain.csproj" />
     <ProjectReference Include="..\..\src\SipatOnline.Tenancy.Domain\SipatOnline.Tenancy.Domain.csproj" />
     <ProjectReference Include="..\..\src\SipatOnline.Sipats.Domain\SipatOnline.Sipats.Domain.csproj" />
   </ItemGroup>

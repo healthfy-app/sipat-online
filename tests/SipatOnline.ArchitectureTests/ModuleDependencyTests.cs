@@ -18,6 +18,7 @@ public sealed class ModuleDependencyTests
         AssertDoesNotReference("SipatOnline.Identity.Domain", forbiddenDependencies);
         AssertDoesNotReference("SipatOnline.Tenancy.Domain", forbiddenDependencies);
         AssertDoesNotReference("SipatOnline.Sipats.Domain", forbiddenDependencies);
+        AssertDoesNotReference("SipatOnline.Learning.Domain", forbiddenDependencies);
     }
 
     [Fact]
@@ -32,6 +33,7 @@ public sealed class ModuleDependencyTests
         AssertDoesNotReference("SipatOnline.Identity.Application", forbiddenDependencies);
         AssertDoesNotReference("SipatOnline.Tenancy.Application", forbiddenDependencies);
         AssertDoesNotReference("SipatOnline.Sipats.Application", forbiddenDependencies);
+        AssertDoesNotReference("SipatOnline.Learning.Application", forbiddenDependencies);
     }
 
     [Fact]

@@ -9,5 +9,9 @@ public interface ITenantStore
 
     Task<Tenant?> FindByKeyAsync(TenantKey tenantKey, CancellationToken cancellationToken);
 
+    Task<IReadOnlyList<Tenant>> ListAsync(CancellationToken cancellationToken);
+
+    Task<Result<Tenant>> AddAsync(Tenant tenant, CancellationToken cancellationToken);
+
     Task SaveAsync(Tenant tenant, CancellationToken cancellationToken);
 }

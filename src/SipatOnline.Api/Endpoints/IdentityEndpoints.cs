@@ -40,7 +40,8 @@ public static class IdentityEndpoints
             var user = await userManager.FindByIdAsync(id.ToString("D"));
             if (user is null ||
                 !user.IsActive ||
-                tenantContext.CurrentTenantId?.Value != user.TenantId)
+                user.TenantId is not { } userTenantId ||
+                tenantContext.CurrentTenantId?.Value != userTenantId)
             {
                 return Results.Unauthorized();
             }

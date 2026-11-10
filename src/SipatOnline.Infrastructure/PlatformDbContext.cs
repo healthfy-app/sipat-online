@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using SipatOnline.Infrastructure.Auditing;
 using SipatOnline.Infrastructure.Identity;
+using SipatOnline.Infrastructure.Learning;
 using SipatOnline.Infrastructure.Tenancy;
 using SipatOnline.Infrastructure.Sipats;
 
@@ -17,6 +18,20 @@ public sealed class PlatformDbContext(
     public DbSet<AuditEntryEntity> AuditEntries => Set<AuditEntryEntity>();
 
     public DbSet<SipatEventEntity> SipatEvents => Set<SipatEventEntity>();
+
+    public DbSet<LearningTrackEntity> LearningTracks => Set<LearningTrackEntity>();
+
+    public DbSet<LearningTrackRevisionEntity> LearningTrackRevisions => Set<LearningTrackRevisionEntity>();
+
+    public DbSet<LearningLessonEntity> LearningLessons => Set<LearningLessonEntity>();
+
+    public DbSet<LearningAssignmentEntity> LearningAssignments => Set<LearningAssignmentEntity>();
+
+    public DbSet<LearningProgressEntity> LearningProgress => Set<LearningProgressEntity>();
+
+    public DbSet<PlatformCourseEntity> PlatformCourses => Set<PlatformCourseEntity>();
+
+    public DbSet<PlatformCourseVideoEntity> PlatformCourseVideos => Set<PlatformCourseVideoEntity>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

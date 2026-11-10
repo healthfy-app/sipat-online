@@ -6,6 +6,7 @@ using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Identity.Application.Users;
 using SipatOnline.Identity.Domain.Users;
 using SipatOnline.Infrastructure.Identity;
+using SipatOnline.Infrastructure.Learning;
 using SipatOnline.Infrastructure.Tenancy;
 using SipatOnline.Tenancy.Domain.Tenants;
 
@@ -17,6 +18,8 @@ public sealed class DatabaseInitializer(
     UserManager<PlatformIdentityUser> userManager,
     IOptions<TenantRuntimeOptions> tenantOptions,
     IOptions<BootstrapAdminOptions> bootstrapAdminOptions,
+    IOptions<PlatformOperatorOptions> platformOperatorOptions,
+    DevelopmentLearningSampleInitializer developmentLearningSampleInitializer,
     TimeProvider timeProvider)
 {
     public async Task InitializeAsync(CancellationToken cancellationToken)
@@ -25,6 +28,8 @@ public sealed class DatabaseInitializer(
         await SeedTenantAsync(cancellationToken);
         await SeedRolesAsync();
         await SeedBootstrapAdminAsync(cancellationToken);
+        await SeedPlatformOperatorAsync(cancellationToken);
+        await developmentLearningSampleInitializer.InitializeAsync(cancellationToken);
     }
 
     private async Task SeedTenantAsync(CancellationToken cancellationToken)
@@ -69,7 +74,8 @@ public sealed class DatabaseInitializer(
                  {
                      PlatformRoles.SuperAdmin,
                      PlatformRoles.ClientAdmin,
-                     PlatformRoles.Participant
+                     PlatformRoles.Participant,
+                     PlatformRoles.PlatformOperator
                  })
         {
             if (await roleManager.RoleExistsAsync(roleName))
@@ -153,6 +159,76 @@ public sealed class DatabaseInitializer(
         {
             throw new InvalidOperationException(
                 $"Could not grant bootstrap administrator role: {string.Join(',', addRoleResult.Errors.Select(error => error.Code))}.");
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+    }
+
+    private async Task SeedPlatformOperatorAsync(CancellationToken cancellationToken)
+    {
+        var options = platformOperatorOptions.Value;
+        if (string.IsNullOrEmpty(options.Password))
+        {
+            return;
+        }
+
+        var identifierResult = LoginIdentifier.Create(
+            string.IsNullOrWhiteSpace(options.LoginIdentifier)
+                ? "sipat.online.admin"
+                : options.LoginIdentifier);
+        var displayNameResult = DisplayName.Create(
+            string.IsNullOrWhiteSpace(options.DisplayName)
+                ? "Super Admin SIPAT Online"
+                : options.DisplayName);
+        if (!identifierResult.IsSuccess || !displayNameResult.IsSuccess)
+        {
+            throw new InvalidOperationException("The platform operator configuration is invalid.");
+        }
+
+        var existingUser = await dbContext.Users.SingleOrDefaultAsync(
+            user => user.TenantId == null &&
+                    user.NormalizedEmployeeIdentifier == identifierResult.Value.NormalizedValue,
+            cancellationToken);
+        if (existingUser is not null)
+        {
+            if (!await userManager.IsInRoleAsync(existingUser, PlatformRoles.PlatformOperator))
+            {
+                var roleResult = await userManager.AddToRoleAsync(existingUser, PlatformRoles.PlatformOperator);
+                if (!roleResult.Succeeded)
+                {
+                    throw new InvalidOperationException(
+                        $"Could not grant platform operator role: {string.Join(',', roleResult.Errors.Select(error => error.Code))}.");
+                }
+            }
+
+            return;
+        }
+
+        var identityUser = new PlatformIdentityUser
+        {
+            Id = Guid.NewGuid(),
+            UserName = $"account-{Guid.NewGuid():N}",
+            TenantId = null,
+            EmployeeIdentifier = identifierResult.Value.Value,
+            NormalizedEmployeeIdentifier = identifierResult.Value.NormalizedValue,
+            DisplayName = displayNameResult.Value.Value,
+            CreatedAt = timeProvider.GetUtcNow(),
+            IsActive = true
+        };
+
+        await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var createResult = await userManager.CreateAsync(identityUser, options.Password);
+        if (!createResult.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Could not create platform operator: {string.Join(',', createResult.Errors.Select(error => error.Code))}.");
+        }
+
+        var addRoleResult = await userManager.AddToRoleAsync(identityUser, PlatformRoles.PlatformOperator);
+        if (!addRoleResult.Succeeded)
+        {
+            throw new InvalidOperationException(
+                $"Could not grant platform operator role: {string.Join(',', addRoleResult.Errors.Select(error => error.Code))}.");
         }
 
         await transaction.CommitAsync(cancellationToken);

@@ -1,5 +1,7 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/SipatOnline.Learning.Application/SipatOnline.Learning.Application.csproj" />
+    <Project Path="src/SipatOnline.Learning.Domain/SipatOnline.Learning.Domain.csproj" />
     <Project Path="src/SipatOnline.Infrastructure/SipatOnline.Infrastructure.csproj" />
     <Project Path="src/SipatOnline.Sipats.Application/SipatOnline.Sipats.Application.csproj" />
     <Project Path="src/SipatOnline.Sipats.Domain/SipatOnline.Sipats.Domain.csproj" />

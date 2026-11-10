@@ -18,7 +18,11 @@ public sealed class TenantClaimsPrincipalFactory(
     protected override async Task<ClaimsIdentity> GenerateClaimsAsync(PlatformIdentityUser user)
     {
         var identity = await base.GenerateClaimsAsync(user);
-        identity.AddClaim(new Claim(TenantIdClaimType, user.TenantId.ToString("D")));
+        if (user.TenantId is { } tenantId)
+        {
+            identity.AddClaim(new Claim(TenantIdClaimType, tenantId.ToString("D")));
+        }
+
         return identity;
     }
 }

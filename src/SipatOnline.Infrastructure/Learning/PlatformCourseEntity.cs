@@ -1,0 +1,33 @@
+namespace SipatOnline.Infrastructure.Learning;
+
+public sealed class PlatformCourseEntity
+{
+    public Guid Id { get; set; }
+
+    public string Title { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public ICollection<PlatformCourseVideoEntity> Videos { get; set; } = [];
+}
+
+public sealed class PlatformCourseVideoEntity
+{
+    public Guid Id { get; set; }
+
+    public Guid CourseId { get; set; }
+
+    public string Title { get; set; } = string.Empty;
+
+    public string ContentType { get; set; } = string.Empty;
+
+    public long SizeBytes { get; set; }
+
+    public long DurationMilliseconds { get; set; }
+
+    public DateTimeOffset CreatedAt { get; set; }
+
+    public PlatformCourseEntity Course { get; set; } = null!;
+}

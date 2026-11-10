@@ -1,0 +1,377 @@
+using System.Net;
+using System.Net.Http.Json;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using SipatOnline.Api.Endpoints;
+using SipatOnline.Infrastructure.Auditing;
+using SipatOnline.Identity.Application.Users;
+using SipatOnline.Infrastructure;
+using SipatOnline.Infrastructure.Identity;
+using SipatOnline.Sipats.Application.Sipats;
+using SipatOnline.Tenancy.Application.Provisioning;
+using Testcontainers.PostgreSql;
+
+namespace SipatOnline.IntegrationTests;
+
+public sealed class PlatformApiTests
+{
+    [DockerFact]
+    public async Task PlatformOperator_CreatesCompanyAndInitialAdmin_OnPlatformHostOnly()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(
+            postgres.GetConnectionString(),
+            developmentSampleEnabled: true);
+        await InitializeDatabaseAsync(factory);
+        using var client = CreateClient(factory);
+
+        using var anonymousCompaniesResponse =
+            await client.GetAsync("https://ops.localhost/api/platform/companies");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousCompaniesResponse.StatusCode);
+
+        var antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var loginResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Post,
+            "/api/platform/identity/login",
+            new LoginRequest("platform-operator", "PlatformPassword123"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.NoContent, loginResponse.StatusCode);
+
+        using var usersResponse =
+            await client.GetAsync("https://ops.localhost/api/platform/users?offset=0&limit=100");
+        Assert.Equal(HttpStatusCode.OK, usersResponse.StatusCode);
+        using var usersJson = System.Text.Json.JsonDocument.Parse(
+            await usersResponse.Content.ReadAsStringAsync());
+        var usersPage = usersJson.RootElement;
+        var users = usersPage.GetProperty("items").EnumerateArray().ToArray();
+        var rootAdmin = Assert.Single(users, user =>
+            user.GetProperty("loginIdentifier").GetString() == "admin-root");
+        Assert.Equal("integration-test", rootAdmin.GetProperty("tenantKey").GetString());
+        Assert.Contains(
+            "SuperAdmin",
+            rootAdmin.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
+        Assert.DoesNotContain(users, user =>
+            user.GetProperty("loginIdentifier").GetString() == "platform-operator");
+        Assert.DoesNotContain(
+            "passwordHash",
+            usersJson.RootElement.GetRawText(),
+            StringComparison.OrdinalIgnoreCase);
+
+        using var companiesResponse =
+            await client.GetAsync("https://ops.localhost/api/platform/companies");
+        Assert.Equal(HttpStatusCode.OK, companiesResponse.StatusCode);
+        var existingCompanies = await companiesResponse.Content.ReadFromJsonAsync<TenantSummary[]>();
+        Assert.NotNull(existingCompanies);
+        Assert.Contains(existingCompanies, company => company.Key == "integration-test");
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var createResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Post,
+            "/api/platform/companies",
+            new CreateTenantRequest(
+                "acme-health",
+                "Acme Health",
+                "acme-admin",
+                "Acme Administrator",
+                "ClientAdminPass123"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
+        var company = await createResponse.Content.ReadFromJsonAsync<TenantSummary>();
+        Assert.NotNull(company);
+        Assert.Equal("acme-health", company.Key);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var participantCreateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Post,
+            "/api/platform/users",
+            new CreatePlatformUserRequest(
+                company.Id,
+                "acme-participant",
+                "Participante de demonstração",
+                "DemoParticipantPass123",
+                "Participant"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, participantCreateResponse.StatusCode);
+        var participant = await participantCreateResponse.Content.ReadFromJsonAsync<PlatformUserSummary>();
+        Assert.NotNull(participant);
+        Assert.Equal(company.Id, participant.TenantId);
+
+        using var filteredUsersResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/users?offset=0&limit=1&tenantId={company.Id:D}");
+        Assert.Equal(HttpStatusCode.OK, filteredUsersResponse.StatusCode);
+        var filteredUsersPage =
+            await filteredUsersResponse.Content.ReadFromJsonAsync<PlatformUserDirectoryPage>();
+        Assert.NotNull(filteredUsersPage);
+        Assert.Equal(2, filteredUsersPage.TotalCount);
+        Assert.Equal("acme-admin", Assert.Single(filteredUsersPage.Items).LoginIdentifier);
+
+        using var filteredUsersBeyondPageResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/users?offset=1&limit=1&tenantId={company.Id:D}");
+        Assert.Equal(HttpStatusCode.OK, filteredUsersBeyondPageResponse.StatusCode);
+        var filteredUsersBeyondPage =
+            await filteredUsersBeyondPageResponse.Content.ReadFromJsonAsync<PlatformUserDirectoryPage>();
+        Assert.NotNull(filteredUsersBeyondPage);
+        Assert.Equal(2, filteredUsersBeyondPage.TotalCount);
+        Assert.Equal(
+            "acme-participant",
+            Assert.Single(filteredUsersBeyondPage.Items).LoginIdentifier);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var elevatedRoleResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Post,
+            "/api/platform/users",
+            new CreatePlatformUserRequest(
+                company.Id,
+                "acme-superadmin",
+                "Tentativa de elevação",
+                "DemoParticipantPass123",
+                "SuperAdmin"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Forbidden, elevatedRoleResponse.StatusCode);
+
+        using var tenantBrandingResponse =
+            await client.GetAsync("https://acme-health.localhost/api/tenant/branding");
+        Assert.Equal(HttpStatusCode.OK, tenantBrandingResponse.StatusCode);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var clientAdminLoginResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            "/api/identity/login",
+            new LoginRequest("acme-admin", "ClientAdminPass123"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.NoContent, clientAdminLoginResponse.StatusCode);
+
+        using var adminSessionResponse =
+            await client.GetAsync("https://acme-health.localhost/api/identity/session");
+        Assert.Equal(HttpStatusCode.OK, adminSessionResponse.StatusCode);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        var now = DateTimeOffset.UtcNow;
+        using var sipatCreateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            "/api/admin/sipats",
+            new SipatEventDataRequest(
+                "SIPAT de demonstração",
+                "Programação de demonstração do portal.",
+                now,
+                now.AddDays(7)),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, sipatCreateResponse.StatusCode);
+        using var sipatJson = System.Text.Json.JsonDocument.Parse(
+            await sipatCreateResponse.Content.ReadAsStringAsync());
+        var sipatId = sipatJson.RootElement.GetProperty("id").GetGuid();
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var trackCreateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/admin/sipats/{sipatId:D}/tracks",
+            new { title = "Trilha de demonstração", description = "Conteúdo para a demo." },
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, trackCreateResponse.StatusCode);
+        using var trackJson = System.Text.Json.JsonDocument.Parse(
+            await trackCreateResponse.Content.ReadAsStringAsync());
+        var trackId = trackJson.RootElement.GetProperty("id").GetGuid();
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var lessonCreateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/admin/learning/tracks/{trackId:D}/lessons",
+            new
+            {
+                title = "Vídeo técnico de demonstração",
+                description = "Amostra CC0 da MDN, não pertencente ao catálogo comercial.",
+                providerAssetReference = "development:mdn-flower-demo",
+                durationMilliseconds = 5055
+            },
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, lessonCreateResponse.StatusCode);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var trackPublishResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/admin/learning/tracks/{trackId:D}/publish",
+            new { },
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.OK, trackPublishResponse.StatusCode);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var assignmentResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/admin/learning/tracks/{trackId:D}/assignments",
+            new AssignLearningTrackRequest(participant.Id),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, assignmentResponse.StatusCode);
+
+        using var participantClient = CreateClient(factory);
+        antiforgeryToken = await GetAntiforgeryTokenAsync(participantClient, "acme-health.localhost");
+        using var participantLoginResponse = await SendJsonWithAntiforgeryAsync(
+            participantClient,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            "/api/identity/login",
+            new LoginRequest("acme-participant", "DemoParticipantPass123"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.NoContent, participantLoginResponse.StatusCode);
+
+        using var assignedTracksResponse =
+            await participantClient.GetAsync("https://acme-health.localhost/api/learning/tracks");
+        Assert.Equal(HttpStatusCode.OK, assignedTracksResponse.StatusCode);
+        using var assignedTracksJson = System.Text.Json.JsonDocument.Parse(
+            await assignedTracksResponse.Content.ReadAsStringAsync());
+        var assignedTrack = Assert.Single(assignedTracksJson.RootElement.EnumerateArray());
+        Assert.Equal("Trilha de demonstração", assignedTrack.GetProperty("title").GetString());
+        Assert.Equal(0, assignedTrack.GetProperty("progressPercentage").GetInt32());
+
+        using var experienceResponse = await participantClient.GetAsync(
+            $"https://acme-health.localhost/api/learning/tracks/{trackId:D}");
+        Assert.Equal(HttpStatusCode.OK, experienceResponse.StatusCode);
+        using var experienceJson = System.Text.Json.JsonDocument.Parse(
+            await experienceResponse.Content.ReadAsStringAsync());
+        var lesson = Assert.Single(experienceJson.RootElement.GetProperty("lessons").EnumerateArray());
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(participantClient, "acme-health.localhost");
+        using var playbackResponse = await SendJsonWithAntiforgeryAsync(
+            participantClient,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/learning/tracks/{trackId:D}/lessons/{lesson.GetProperty("id").GetGuid():D}/playback",
+            new { },
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.OK, playbackResponse.StatusCode);
+        using var playbackJson = System.Text.Json.JsonDocument.Parse(
+            await playbackResponse.Content.ReadAsStringAsync());
+        Assert.True(playbackJson.RootElement.GetProperty("isDevelopmentDemo").GetBoolean());
+        Assert.Equal(
+            "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4",
+            playbackJson.RootElement.GetProperty("url").GetString());
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var tenantAdmin = await dbContext.Users.SingleAsync(
+            user => user.TenantId == company.Id && user.EmployeeIdentifier == "acme-admin");
+        Assert.Equal("acme-admin", tenantAdmin.EmployeeIdentifier);
+        Assert.True(tenantAdmin.IsActive);
+        var participantAudit = await dbContext.AuditEntries.SingleAsync(
+            audit => audit.Action == "identity.platform_user.provisioned" &&
+                     audit.SubjectId == participant.Id.ToString("D"));
+        Assert.Equal(company.Id, participantAudit.TenantId);
+    }
+
+    [DockerFact]
+    public async Task TenantSuperAdmin_CannotUsePlatformCompanyProvisioning()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+        using var client = CreateClient(factory);
+
+        var antiforgeryToken = await GetAntiforgeryTokenAsync(client, "localhost");
+        using var loginResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "localhost",
+            HttpMethod.Post,
+            "/api/identity/login",
+            new LoginRequest("admin-root", "AdminPassword123"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.NoContent, loginResponse.StatusCode);
+
+        var authCookie = Assert.Single(
+            loginResponse.Headers.GetValues("Set-Cookie"),
+            value => value.StartsWith("__Host-SipatOnline.Auth=", StringComparison.Ordinal))
+            .Split(';', 2)[0];
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "https://ops.localhost/api/platform/companies");
+        request.Headers.Add("Cookie", authCookie);
+
+        using var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+
+        using var directoryRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            "https://ops.localhost/api/platform/users");
+        directoryRequest.Headers.Add("Cookie", authCookie);
+        using var directoryResponse = await client.SendAsync(directoryRequest);
+
+        Assert.Equal(HttpStatusCode.Forbidden, directoryResponse.StatusCode);
+
+        using var provisionRequest = new HttpRequestMessage(
+            HttpMethod.Post,
+            "https://ops.localhost/api/platform/users")
+        {
+            Content = JsonContent.Create(new CreatePlatformUserRequest(
+                Guid.NewGuid(),
+                "forbidden-user",
+                "Conta não autorizada",
+                "DemoParticipantPass123",
+                "Participant"))
+        };
+        provisionRequest.Headers.Add("Cookie", authCookie);
+        using var provisionResponse = await client.SendAsync(provisionRequest);
+
+        Assert.Equal(HttpStatusCode.Forbidden, provisionResponse.StatusCode);
+    }
+
+    private static HttpClient CreateClient(SipatOnlineApiFactory factory) =>
+        factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://localhost"),
+            AllowAutoRedirect = false
+        });
+
+    private static async Task InitializeDatabaseAsync(SipatOnlineApiFactory factory)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        await scope.ServiceProvider
+            .GetRequiredService<DatabaseInitializer>()
+            .InitializeAsync(CancellationToken.None);
+    }
+
+    private static async Task<string> GetAntiforgeryTokenAsync(HttpClient client, string host)
+    {
+        using var response = await client.GetAsync($"https://{host}/api/identity/antiforgery");
+        response.EnsureSuccessStatusCode();
+        var token = await response.Content.ReadFromJsonAsync<AntiforgeryTokenResponse>();
+        Assert.NotNull(token?.RequestToken);
+        return token.RequestToken;
+    }
+
+    private static async Task<HttpResponseMessage> SendJsonWithAntiforgeryAsync<TRequest>(
+        HttpClient client,
+        string host,
+        HttpMethod method,
+        string path,
+        TRequest requestBody,
+        string token)
+    {
+        using var request = new HttpRequestMessage(method, $"https://{host}{path}")
+        {
+            Content = JsonContent.Create(requestBody)
+        };
+        request.Headers.Add("X-CSRF-TOKEN", token);
+        return await client.SendAsync(request);
+    }
+}
