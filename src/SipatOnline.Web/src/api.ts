@@ -29,6 +29,7 @@ export interface PlatformCompanyOverview extends PlatformCompany {
 }
 
 export type PlatformCourseStatus = 'Draft' | 'Published';
+export type GamificationGameType = 'Quiz' | 'RiskSpotting' | 'Puzzle' | 'Memory' | 'Scenario' | 'Ordering';
 
 export interface PlatformCourse {
   id: string;
@@ -37,6 +38,7 @@ export interface PlatformCourse {
   createdAt: string;
   status: PlatformCourseStatus;
   gamificationEnabled: boolean;
+  gameType: GamificationGameType;
   videos: PlatformCourseVideo[];
 }
 
@@ -63,6 +65,7 @@ export interface PlatformCourseData {
 
 export interface PlatformCourseUpdate extends PlatformCourseData {
   status: PlatformCourseStatus;
+  gameType: GamificationGameType;
 }
 
 export interface PlatformCompanyData {

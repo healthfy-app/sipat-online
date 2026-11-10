@@ -74,12 +74,27 @@ public static class PlatformCourseCatalogEndpoints
                     "O status do curso é inválido."));
             }
 
+            GamificationGameType? gameType = null;
+            if (!string.IsNullOrWhiteSpace(request.GameType))
+            {
+                if (!Enum.TryParse<GamificationGameType>(request.GameType, true, out var parsedType) ||
+                    !Enum.IsDefined(parsedType))
+                {
+                    return ToProblem(new DomainError(
+                        "learning.platform_course.game_type_invalid",
+                        "O tipo de jogo informado é inválido."));
+                }
+
+                gameType = parsedType;
+            }
+
             var result = await catalogService.UpdateAsync(
                 courseId,
                 request.Title,
                 request.Description,
                 status,
                 request.GamificationEnabled,
+                gameType,
                 cancellationToken);
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
         })
@@ -246,7 +261,8 @@ public static class PlatformCourseCatalogEndpoints
             course.CreatedAt,
             course.Status.ToString(),
             course.GamificationEnabled,
-            course.Videos.Select(ToResponse).ToArray());
+            course.Videos.Select(ToResponse).ToArray(),
+            course.GameType.ToString());
 
     private static PlatformCourseVideoResponse ToResponse(PlatformCourseVideo video) =>
         new(
@@ -305,7 +321,8 @@ public sealed record UpdatePlatformCourseRequest(
     string? Title,
     string? Description,
     string? Status,
-    bool GamificationEnabled);
+    bool GamificationEnabled,
+    string? GameType = null);
 
 public sealed record SetPlatformCourseVideosRequest(IReadOnlyList<Guid>? VideoIds);
 
@@ -318,7 +335,8 @@ public sealed record PlatformCourseResponse(
     DateTimeOffset CreatedAt,
     string Status,
     bool GamificationEnabled,
-    IReadOnlyList<PlatformCourseVideoResponse> Videos);
+    IReadOnlyList<PlatformCourseVideoResponse> Videos,
+    string GameType);
 
 public sealed record PlatformCourseVideoResponse(
     Guid Id,

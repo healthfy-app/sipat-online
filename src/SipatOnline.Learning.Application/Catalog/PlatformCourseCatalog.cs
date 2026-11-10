@@ -6,6 +6,16 @@ public enum PlatformCourseStatus
     Published = 1
 }
 
+public enum GamificationGameType
+{
+    Quiz = 0,
+    RiskSpotting = 1,
+    Puzzle = 2,
+    Memory = 3,
+    Scenario = 4,
+    Ordering = 5
+}
+
 public sealed record PlatformCourse(
     Guid Id,
     string Title,
@@ -13,7 +23,8 @@ public sealed record PlatformCourse(
     DateTimeOffset CreatedAt,
     PlatformCourseStatus Status,
     bool GamificationEnabled,
-    IReadOnlyList<PlatformCourseVideo> Videos);
+    IReadOnlyList<PlatformCourseVideo> Videos,
+    GamificationGameType GameType = GamificationGameType.Quiz);
 
 public sealed record PlatformCourseVideo(
     Guid Id,

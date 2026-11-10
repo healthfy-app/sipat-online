@@ -7,12 +7,14 @@ import {
   setPlatformCourseVideos,
   updatePlatformCourse,
   uploadPlatformVideo,
+  type GamificationGameType,
   type PlatformCourse,
   type PlatformCourseStatus,
   type PlatformCourseVideo,
   type PlatformLibraryVideo,
 } from './api';
 import './PlatformCourses.css';
+import { gameTypeOptions } from './gamificationGames';
 
 type Tab = 'courses' | 'library';
 type StatusFilter = 'all' | PlatformCourseStatus;
@@ -370,6 +372,7 @@ function CourseDetail({
   const [description, setDescription] = useState(course.description ?? '');
   const [status, setStatus] = useState<PlatformCourseStatus>(course.status);
   const [gamificationEnabled, setGamificationEnabled] = useState(course.gamificationEnabled);
+  const [gameType, setGameType] = useState<GamificationGameType>(course.gameType);
   const [isSaving, setIsSaving] = useState(false);
   const [videoToLink, setVideoToLink] = useState('');
   const linkedIds = course.videos.map((video) => video.id);
@@ -385,6 +388,7 @@ function CourseDetail({
         description: description.trim() || null,
         status,
         gamificationEnabled,
+        gameType,
       });
       await onChanged('As alterações do curso foram salvas.');
     } catch (saveError) {
@@ -471,6 +475,27 @@ function CourseDetail({
                 <small>Ative ou desative a experiência de jogo deste curso.</small>
               </span>
             </label>
+            {gamificationEnabled && (
+              <fieldset className="platform-game-types">
+                <legend>Tipo de jogo</legend>
+                {gameTypeOptions.map((option) => (
+                  <label className="platform-game-option" key={option.value}>
+                    <input
+                      checked={gameType === option.value}
+                      name="course-game-type"
+                      onChange={() => setGameType(option.value)}
+                      type="radio"
+                      value={option.value}
+                    />
+                    <span>
+                      <strong>{option.label}</strong>
+                      <small>{option.description}</small>
+                      {!option.playable && <em>Configurável agora · jogável em breve</em>}
+                    </span>
+                  </label>
+                ))}
+              </fieldset>
+            )}
             <button className="button button-primary" disabled={isSaving} type="submit">
               {isSaving ? 'Salvando...' : 'Salvar alterações'}
             </button>

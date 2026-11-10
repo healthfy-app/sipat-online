@@ -80,11 +80,12 @@ public sealed class PlatformCourseCatalogApiTests
             client,
             HttpMethod.Put,
             $"/api/platform/catalog/courses/{courseId}",
-            new UpdatePlatformCourseRequest("Ergonomia 2026", "Postura", "Published", false));
+            new UpdatePlatformCourseRequest("Ergonomia 2026", "Postura", "Published", false, "Puzzle"));
         Assert.Equal(HttpStatusCode.OK, publishResponse.StatusCode);
         var published = await ReadAsync(publishResponse);
         Assert.Equal("Published", published.GetProperty("status").GetString());
         Assert.False(published.GetProperty("gamificationEnabled").GetBoolean());
+        Assert.Equal("Puzzle", published.GetProperty("gameType").GetString());
 
         using var duplicateResponse = await SendAsync(
             client,

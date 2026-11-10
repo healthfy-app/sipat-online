@@ -96,6 +96,7 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
         string? description,
         PlatformCourseStatus status,
         bool gamificationEnabled,
+        GamificationGameType gameType,
         CancellationToken cancellationToken)
     {
         var course = await dbContext.PlatformCourses
@@ -109,6 +110,7 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
         course.Description = description;
         course.Status = (int)status;
         course.GamificationEnabled = gamificationEnabled;
+        course.GameType = (int)gameType;
         await dbContext.SaveChangesAsync(cancellationToken);
         return true;
     }
@@ -176,7 +178,8 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             Description = course.Description,
             CreatedAt = course.CreatedAt,
             Status = (int)course.Status,
-            GamificationEnabled = course.GamificationEnabled
+            GamificationEnabled = course.GamificationEnabled,
+            GameType = (int)course.GameType
         };
 
     private static PlatformCourse ToDomain(PlatformCourseEntity entity) =>
@@ -190,7 +193,8 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             entity.VideoLinks
                 .OrderBy(link => link.Position)
                 .Select(link => ToDomain(link.Video))
-                .ToArray());
+                .ToArray(),
+            (GamificationGameType)entity.GameType);
 
     private static PlatformCourseVideo ToDomain(PlatformCourseVideoEntity entity) =>
         new(

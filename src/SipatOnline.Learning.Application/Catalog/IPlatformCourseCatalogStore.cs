@@ -25,6 +25,7 @@ public interface IPlatformCourseCatalogStore
         string? description,
         PlatformCourseStatus status,
         bool gamificationEnabled,
+        GamificationGameType gameType,
         CancellationToken cancellationToken);
 
     Task DuplicateCourseAsync(

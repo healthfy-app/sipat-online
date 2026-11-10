@@ -14,6 +14,7 @@ public sealed class PlatformCourseEntityConfiguration : IEntityTypeConfiguration
         builder.Property(course => course.CreatedAt).IsRequired();
         builder.Property(course => course.Status).HasDefaultValue(0).IsRequired();
         builder.Property(course => course.GamificationEnabled).HasDefaultValue(false).IsRequired();
+        builder.Property(course => course.GameType).HasDefaultValue(0).IsRequired();
         builder.HasIndex(course => course.CreatedAt);
     }
 }

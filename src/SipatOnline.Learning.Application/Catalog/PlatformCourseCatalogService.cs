@@ -77,6 +77,7 @@ public sealed class PlatformCourseCatalogService(
         string? description,
         PlatformCourseStatus status,
         bool gamificationEnabled,
+        GamificationGameType? gameType,
         CancellationToken cancellationToken)
     {
         var permission = EnsurePlatformOperator();
@@ -104,6 +105,14 @@ public sealed class PlatformCourseCatalogService(
                 "O status do curso é inválido.");
         }
 
+        if (gameType is { } requestedType && !Enum.IsDefined(requestedType))
+        {
+            return Failure<PlatformCourse>(
+                "learning.platform_course.game_type_invalid",
+                "O tipo de jogo informado é inválido.");
+        }
+
+        var resolvedGameType = gameType ?? course.GameType;
         if (status == PlatformCourseStatus.Published && course.Videos.Count == 0)
         {
             return Failure<PlatformCourse>(
@@ -118,6 +127,7 @@ public sealed class PlatformCourseCatalogService(
             details.Value.Description,
             status,
             gamificationEnabled,
+            resolvedGameType,
             cancellationToken);
         if (!updated)
         {
@@ -131,7 +141,8 @@ public sealed class PlatformCourseCatalogService(
             Title = details.Value.Title,
             Description = details.Value.Description,
             Status = status,
-            GamificationEnabled = gamificationEnabled
+            GamificationEnabled = gamificationEnabled,
+            GameType = resolvedGameType
         });
     }
 

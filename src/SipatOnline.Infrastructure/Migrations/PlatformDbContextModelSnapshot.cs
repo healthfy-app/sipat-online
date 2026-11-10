@@ -518,6 +518,11 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<int>("GameType")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<bool>("GamificationEnabled")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

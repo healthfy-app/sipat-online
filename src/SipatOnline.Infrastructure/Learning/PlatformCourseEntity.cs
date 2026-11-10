@@ -14,6 +14,8 @@ public sealed class PlatformCourseEntity
 
     public bool GamificationEnabled { get; set; }
 
+    public int GameType { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 }
 

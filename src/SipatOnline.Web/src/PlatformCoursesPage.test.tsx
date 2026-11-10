@@ -40,6 +40,7 @@ const ergonomics: api.PlatformCourse = {
   createdAt: '2026-11-02T12:00:00Z',
   status: 'Published',
   gamificationEnabled: true,
+  gameType: 'Quiz',
   videos: [opening, closing],
 };
 
@@ -50,6 +51,7 @@ const fire: api.PlatformCourse = {
   createdAt: '2026-11-03T12:00:00Z',
   status: 'Draft',
   gamificationEnabled: false,
+  gameType: 'Quiz',
   videos: [],
 };
 
@@ -145,6 +147,7 @@ describe('Platform course catalog', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Abrir curso Combate a incêndio' }));
     await user.click(screen.getByLabelText(/Gamificação após os vídeos/));
+    await user.click(screen.getByLabelText(/Quebra-cabeça/));
     await user.click(screen.getByRole('button', { name: 'Salvar alterações' }));
 
     expect(api.updatePlatformCourse).toHaveBeenCalledWith('c-2', {
@@ -152,6 +155,7 @@ describe('Platform course catalog', () => {
       description: null,
       status: 'Draft',
       gamificationEnabled: true,
+      gameType: 'Puzzle',
     });
   });
 });
