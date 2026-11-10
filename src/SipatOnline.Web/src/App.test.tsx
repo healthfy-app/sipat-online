@@ -269,6 +269,7 @@ describe('tenant portal', () => {
           roles: ['PlatformOperator'],
         }),
       )
+      .mockResolvedValueOnce(Response.json([]))
       .mockResolvedValueOnce(Response.json([]));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
@@ -280,9 +281,9 @@ describe('tenant portal', () => {
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
-    expect(await screen.findByRole('heading', { name: 'Visão geral dos clientes' })).toBeVisible();
-    expect(screen.getAllByRole('link', { name: 'Cadastrar empresa' })
-      .every((link) => link.getAttribute('href') === '/platform/companies')).toBe(true);
+    expect(await screen.findByRole('heading', { name: 'Operação' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Gerenciar empresas' })).toHaveAttribute('href', '/platform/companies');
+    expect(screen.getByRole('link', { name: 'Painel' })).toHaveAttribute('href', '/platform/dashboard');
     expect(screen.getByRole('link', { name: 'Usuários' })).toHaveAttribute('href', '/platform/users');
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(

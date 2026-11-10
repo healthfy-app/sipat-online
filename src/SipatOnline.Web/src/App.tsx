@@ -25,6 +25,7 @@ import LearningManagementPage from './LearningManagementPage';
 import PlatformCompaniesPage from './PlatformCompaniesPage';
 import PlatformUsersPage from './PlatformUsersPage';
 import PlatformDashboardPage from './PlatformDashboardPage';
+import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import PlatformSettingsPage from './PlatformSettingsPage';
 
@@ -205,7 +206,7 @@ export default function App() {
               element={
                 state.tenant.tenantKey === 'platform' &&
                 state.session?.roles.includes('PlatformOperator') ? (
-                  <PlatformDashboardPage />
+                  <PlatformHomePage />
                 ) : (
                   <AccessDenied />
                 )
@@ -484,7 +485,8 @@ function ProtectedPortal({
           {session.roles.includes('PlatformOperator') && (
             <>
               <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
-              <NavLink className="sidebar-link" to="/platform" end>Visão geral</NavLink>
+              <NavLink className="sidebar-link" to="/platform" end>Operação</NavLink>
+              <NavLink className="sidebar-link" to="/platform/dashboard">Painel</NavLink>
               <NavLink className="sidebar-link" to="/platform/companies">Empresas clientes</NavLink>
               <NavLink className="sidebar-link" to="/platform/users">Usuários</NavLink>
               <NavLink className="sidebar-link" to="/platform/courses">Cursos</NavLink>
