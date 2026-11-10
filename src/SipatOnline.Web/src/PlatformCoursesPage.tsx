@@ -67,6 +67,7 @@ export default function PlatformCoursesPage() {
 
   async function handleUpload(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = event.currentTarget;
     if (!selectedCourseId || !videoFile) {
       return;
     }
@@ -84,7 +85,7 @@ export default function PlatformCoursesPage() {
       setVideoTitle('');
       setVideoDuration('');
       setVideoFile(null);
-      event.currentTarget.reset();
+      form.reset();
       setNotice(`O vídeo "${video.title}" foi enviado ao catálogo.`);
       await loadCourses();
     } catch (uploadError) {
