@@ -12,5 +12,29 @@ public interface IPlatformCourseCatalogStore
 
     Task<Result<bool>> AddCourseAsync(PlatformCourse course, CancellationToken cancellationToken);
 
-    Task AddVideoAsync(PlatformCourseVideo video, CancellationToken cancellationToken);
+    Task<IReadOnlyList<PlatformLibraryVideo>> ListVideosAsync(CancellationToken cancellationToken);
+
+    Task AddVideoAsync(
+        PlatformCourseVideo video,
+        Guid? courseId,
+        CancellationToken cancellationToken);
+
+    Task<bool> UpdateCourseAsync(
+        Guid courseId,
+        string title,
+        string? description,
+        PlatformCourseStatus status,
+        bool gamificationEnabled,
+        CancellationToken cancellationToken);
+
+    Task DuplicateCourseAsync(
+        Guid sourceCourseId,
+        PlatformCourse copy,
+        CancellationToken cancellationToken);
+
+    /// <summary>Replaces the ordered video links of a course; returns false when a video does not exist.</summary>
+    Task<bool> SetCourseVideosAsync(
+        Guid courseId,
+        IReadOnlyList<Guid> videoIds,
+        CancellationToken cancellationToken);
 }

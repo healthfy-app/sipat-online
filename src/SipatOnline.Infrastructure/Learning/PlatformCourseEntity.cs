@@ -10,14 +10,16 @@ public sealed class PlatformCourseEntity
 
     public DateTimeOffset CreatedAt { get; set; }
 
-    public ICollection<PlatformCourseVideoEntity> Videos { get; set; } = [];
+    public int Status { get; set; }
+
+    public bool GamificationEnabled { get; set; }
+
+    public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 }
 
 public sealed class PlatformCourseVideoEntity
 {
     public Guid Id { get; set; }
-
-    public Guid CourseId { get; set; }
 
     public string Title { get; set; } = string.Empty;
 
@@ -29,5 +31,18 @@ public sealed class PlatformCourseVideoEntity
 
     public DateTimeOffset CreatedAt { get; set; }
 
+    public ICollection<PlatformCourseVideoLinkEntity> CourseLinks { get; set; } = [];
+}
+
+public sealed class PlatformCourseVideoLinkEntity
+{
+    public Guid CourseId { get; set; }
+
+    public Guid VideoId { get; set; }
+
+    public int Position { get; set; }
+
     public PlatformCourseEntity Course { get; set; } = null!;
+
+    public PlatformCourseVideoEntity Video { get; set; } = null!;
 }

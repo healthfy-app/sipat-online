@@ -518,6 +518,16 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
+                    b.Property<bool>("GamificationEnabled")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<int>("Status")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0);
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -541,9 +551,6 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<Guid>("CourseId")
-                        .HasColumnType("uuid");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -560,9 +567,29 @@ namespace SipatOnline.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("CourseId", "CreatedAt");
+                    b.HasIndex("CreatedAt");
 
                     b.ToTable("PlatformCourseVideos", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoLinkEntity", b =>
+                {
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.HasKey("CourseId", "VideoId");
+
+                    b.HasIndex("VideoId");
+
+                    b.HasIndex("CourseId", "Position");
+
+                    b.ToTable("PlatformCourseVideoLinks", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventEntity", b =>
@@ -767,15 +794,23 @@ namespace SipatOnline.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoEntity", b =>
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoLinkEntity", b =>
                 {
                     b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", "Course")
-                        .WithMany("Videos")
+                        .WithMany("VideoLinks")
                         .HasForeignKey("CourseId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
+                    b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseVideoEntity", "Video")
+                        .WithMany("CourseLinks")
+                        .HasForeignKey("VideoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
                     b.Navigation("Course");
+
+                    b.Navigation("Video");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventEntity", b =>
@@ -789,7 +824,12 @@ namespace SipatOnline.Infrastructure.Migrations
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", b =>
                 {
-                    b.Navigation("Videos");
+                    b.Navigation("VideoLinks");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoEntity", b =>
+                {
+                    b.Navigation("CourseLinks");
                 });
 #pragma warning restore 612, 618
         }
