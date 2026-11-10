@@ -17,7 +17,8 @@ O projeto está em fase inicial de desenvolvimento. As fatias verticais atuais i
 
 | Perfil | Capacidades previstas |
 | --- | --- |
-| Super Admin da plataforma (`PlatformOperator`, identidade global) | Acesso global às funcionalidades administrativas: gerir usuários e empresas e consultar relatórios de participação por SIPAT, incluindo visões individuais e por grupos/subgrupos. Já provisiona empresas e consulta um diretório paginado de usuários de todos os tenants; edição de contas e relatórios globais ainda faltam. |
+| Operacional / Super Admin da plataforma (`PlatformOperator`, identidade global) | Gestor máximo ("dono"): vê todas as empresas e todas as SIPATs, gere usuários e empresas, cria e mantém cursos (criar ou duplicar), sobe vídeos para uma biblioteca reutilizável, vincula vídeos aos cursos, ativa ou desativa a gamificação do curso e consulta relatórios globais. Já provisiona empresas e consulta um diretório paginado de usuários de todos os tenants; edição de contas, relatórios globais, biblioteca de vídeos e gamificação ainda faltam. |
+| Supervisor (planejado) | Um ou mais usuários designados pela empresa contratante para cada SIPAT, com acesso somente aos relatórios da empresa e da SIPAT a que estão associados. Ainda não implementado. |
 | Admin do cliente (`ClientAdmin`) | Gestão dos usuários da própria empresa e acesso aos relatórios das SIPATs sob sua responsabilidade. Pode consultar participação individual e por subgrupos, avançar/retroceder a reprodução para acompanhamento e moderar comentários. O acesso continua limitado ao tenant e às SIPATs autorizadas. |
 | Super Admin legado (`SuperAdmin`) | Papel administrativo existente, ainda tenant-bound. Não equivale ao Super Admin global descrito pelo PO; alinhar/migrar esse papel sem ampliar acesso entre empresas por acidente. |
 | Participante | Consulta seu próprio relatório de conteúdos assistidos e progresso, pode retroceder mas não avançar para trechos não assistidos, comentar nos vídeos e emitir certificado quando cumprir os critérios. |
@@ -49,6 +50,9 @@ O domínio de aprendizagem é um módulo separado (`Learning`); trilhas, mídias
 - **Conteúdo/Palestra:** material de aprendizagem disponibilizado durante a SIPAT.
 - **Participação:** realização dos conteúdos e carga horária computados para uma pessoa em uma SIPAT.
 - **Grupo/Subgrupo:** agrupamento organizacional usado para segmentar participantes e relatórios.
+- **Operacional:** nome de produto do perfil do dono da plataforma (`PlatformOperator`); sua visão inicial é a lista de empresas e a lista de treinamentos (cujos nomes costumam incluir a empresa), e o dashboard fica em página separada.
+- **Supervisor:** usuário da empresa contratante com acesso apenas aos relatórios da sua SIPAT.
+- **Curso (catálogo):** conjunto reutilizável de vídeos mantido pelo Operacional; pode ser duplicado e tem gamificação opcional, definida ao criar o curso. Fluxo: curso, vídeos, gamificação.
 
 ## Tecnologias
 
