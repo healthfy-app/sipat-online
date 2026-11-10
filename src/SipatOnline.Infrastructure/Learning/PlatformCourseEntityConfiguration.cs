@@ -15,7 +15,23 @@ public sealed class PlatformCourseEntityConfiguration : IEntityTypeConfiguration
         builder.Property(course => course.Status).HasDefaultValue(0).IsRequired();
         builder.Property(course => course.GamificationEnabled).HasDefaultValue(false).IsRequired();
         builder.Property(course => course.GameType).HasDefaultValue(0).IsRequired();
+        builder.Property(course => course.CoverContentType).HasMaxLength(50);
         builder.HasIndex(course => course.CreatedAt);
+    }
+}
+
+public sealed class PlatformCourseCoverEntityConfiguration :
+    IEntityTypeConfiguration<PlatformCourseCoverEntity>
+{
+    public void Configure(EntityTypeBuilder<PlatformCourseCoverEntity> builder)
+    {
+        builder.ToTable("PlatformCourseCovers", "learning");
+        builder.HasKey(cover => cover.CourseId);
+        builder.Property(cover => cover.Data).IsRequired();
+        builder.HasOne<PlatformCourseEntity>()
+            .WithOne()
+            .HasForeignKey<PlatformCourseCoverEntity>(cover => cover.CourseId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }
 

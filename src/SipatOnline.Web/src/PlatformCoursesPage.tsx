@@ -5,6 +5,8 @@ import {
   listGameModules,
   listPlatformCourses,
   listPlatformLibraryVideos,
+  removePlatformCourseCover,
+  setPlatformCourseCover,
   setPlatformCourseVideos,
   updatePlatformCourse,
   uploadPlatformVideo,
@@ -16,6 +18,7 @@ import {
   type PlatformLibraryVideo,
 } from './api';
 import CourseGamesSection from './CourseGamesSection';
+import FilePicker from './FilePicker';
 import GameModulesPanel from './GameModulesPanel';
 import './PlatformCourses.css';
 import { gameTypeOptions } from './gamificationGames';
@@ -25,6 +28,7 @@ type StatusFilter = 'all' | PlatformCourseStatus;
 
 const emptyCourse = { title: '', description: '', gamificationEnabled: false };
 const maxVideoBytes = 250 * 1024 * 1024;
+const maxCoverBytes = 2 * 1024 * 1024;
 const statusLabels: Record<PlatformCourseStatus, string> = {
   Draft: 'Rascunho',
   Published: 'Publicado',
@@ -258,6 +262,11 @@ function CourseCard({
   const totalMilliseconds = course.videos.reduce((sum, video) => sum + video.durationMilliseconds, 0);
   return (
     <article className="platform-course-card">
+      {course.coverUrl ? (
+        <img alt="" className="platform-course-cover" loading="lazy" src={course.coverUrl} />
+      ) : (
+        <div aria-hidden="true" className="platform-course-cover platform-course-cover-empty">Sem foto</div>
+      )}
       <div className="platform-course-card-top">
         <span className={`status-badge status-${course.status.toLowerCase()}`}>
           {statusLabels[course.status]}
@@ -523,6 +532,7 @@ function CourseDetail({
               {isSaving ? 'Salvando...' : 'Salvar alterações'}
             </button>
           </form>
+          <CourseCoverEditor course={course} onChanged={onChanged} onError={onError} />
         </section>
 
         <section aria-labelledby="course-videos-title" className="form-card">
@@ -664,6 +674,71 @@ function LibrarySection({
   );
 }
 
+function CourseCoverEditor({
+  course,
+  onChanged,
+  onError,
+}: {
+  course: PlatformCourse;
+  onChanged: (message: string) => Promise<void>;
+  onError: (message: string) => void;
+}) {
+  const [isBusy, setIsBusy] = useState(false);
+
+  async function run(action: () => Promise<unknown>, message: string) {
+    onError('');
+    setIsBusy(true);
+    try {
+      await action();
+      await onChanged(message);
+    } catch (coverError) {
+      onError(getErrorMessage(coverError));
+    } finally {
+      setIsBusy(false);
+    }
+  }
+
+  function handlePick(file: File | null) {
+    if (!file) return;
+    if (file.size > maxCoverBytes) {
+      onError('A foto excede o limite de 2 MB.');
+      return;
+    }
+    void run(() => setPlatformCourseCover(course.id, file), 'A foto do curso foi atualizada.');
+  }
+
+  return (
+    <div className="platform-cover-editor">
+      <h3 className="platform-subheading">Foto do curso</h3>
+      {course.coverUrl ? (
+        <img alt="Foto atual do curso" className="platform-cover-preview" src={course.coverUrl} />
+      ) : (
+        <p className="compact-empty">Este curso ainda não tem foto.</p>
+      )}
+      <div className="platform-course-card-actions">
+        <FilePicker
+          accept="image/png,image/jpeg,image/webp"
+          buttonLabel={course.coverUrl ? 'Trocar foto' : 'Escolher foto'}
+          disabled={isBusy}
+          id="platform-course-cover-file"
+          onChange={handlePick}
+        />
+        {course.coverUrl && (
+          <button
+            className="button button-quiet"
+            disabled={isBusy}
+            onClick={() => void run(() => removePlatformCourseCover(course.id), 'A foto do curso foi removida.')}
+            type="button"
+          >
+            Remover foto
+          </button>
+        )}
+      </div>
+      <span className="field-hint">PNG, JPEG ou WebP; até 2 MB. Formato 16:9 recomendado.</span>
+    </div>
+  );
+}
+
 function VideoUploadForm({
   courseId,
   onError,
@@ -733,12 +808,13 @@ function VideoUploadForm({
       </div>
       <div className="field">
         <label htmlFor={`platform-video-file-${courseId ?? 'library'}`}>Arquivo de vídeo</label>
-        <input
+        <FilePicker
           accept="video/mp4,video/webm,.mp4,.webm"
+          buttonLabel="Escolher vídeo"
+          file={file}
           id={`platform-video-file-${courseId ?? 'library'}`}
-          onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+          onChange={setFile}
           required
-          type="file"
         />
         <span className="field-hint">MP4 ou WebM; tamanho máximo 250 MB.</span>
       </div>

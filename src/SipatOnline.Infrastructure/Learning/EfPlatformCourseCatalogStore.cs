@@ -165,6 +165,80 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
 
         dbContext.PlatformCourses.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
+
+        var sourceCover = await dbContext.PlatformCourseCovers.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.CourseId == sourceCourseId, cancellationToken);
+        if (sourceCover is not null)
+        {
+            dbContext.PlatformCourseCovers.Add(
+                new PlatformCourseCoverEntity { CourseId = entity.Id, Data = sourceCover.Data });
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+    }
+
+    public async Task<bool> SetCoverAsync(
+        Guid courseId,
+        string contentType,
+        byte[] data,
+        DateTimeOffset updatedAt,
+        CancellationToken cancellationToken)
+    {
+        var course = await dbContext.PlatformCourses
+            .SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
+        if (course is null)
+        {
+            return false;
+        }
+
+        var cover = await dbContext.PlatformCourseCovers
+            .SingleOrDefaultAsync(item => item.CourseId == courseId, cancellationToken);
+        if (cover is null)
+        {
+            dbContext.PlatformCourseCovers.Add(new PlatformCourseCoverEntity { CourseId = courseId, Data = data });
+        }
+        else
+        {
+            cover.Data = data;
+        }
+
+        course.CoverContentType = contentType;
+        course.CoverUpdatedAt = updatedAt;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<bool> RemoveCoverAsync(Guid courseId, CancellationToken cancellationToken)
+    {
+        var course = await dbContext.PlatformCourses
+            .SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
+        if (course is null)
+        {
+            return false;
+        }
+
+        await dbContext.PlatformCourseCovers
+            .Where(item => item.CourseId == courseId)
+            .ExecuteDeleteAsync(cancellationToken);
+        course.CoverContentType = null;
+        course.CoverUpdatedAt = null;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<PlatformCourseCover?> GetCoverAsync(Guid courseId, CancellationToken cancellationToken)
+    {
+        var course = await dbContext.PlatformCourses.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
+        if (course?.CoverContentType is null)
+        {
+            return null;
+        }
+
+        var data = await dbContext.PlatformCourseCovers.AsNoTracking()
+            .Where(item => item.CourseId == courseId)
+            .Select(item => item.Data)
+            .SingleOrDefaultAsync(cancellationToken);
+        return data is null ? null : new PlatformCourseCover(course.CoverContentType, data);
     }
 
     public async Task<bool> SetCourseVideosAsync(
@@ -207,7 +281,9 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             CreatedAt = course.CreatedAt,
             Status = (int)course.Status,
             GamificationEnabled = course.GamificationEnabled,
-            GameType = (int)course.GameType
+            GameType = (int)course.GameType,
+            CoverContentType = course.CoverContentType,
+            CoverUpdatedAt = course.CoverUpdatedAt
         };
 
     private static PlatformCourse ToDomain(PlatformCourseEntity entity) =>
@@ -226,7 +302,9 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
                 .OrderBy(link => link.Order)
                 .Select(link => new CourseModulePlacement(link.ModuleId, link.AfterVideoCount))
                 .ToArray(),
-            (GamificationGameType)entity.GameType);
+            (GamificationGameType)entity.GameType,
+            entity.CoverContentType,
+            entity.CoverUpdatedAt);
 
     private static PlatformCourseVideo ToDomain(PlatformCourseVideoEntity entity) =>
         new(

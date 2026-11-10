@@ -141,6 +141,70 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("SetPlatformCourseVideos");
 
+        catalog.MapPut("/courses/{courseId:guid}/cover", async (
+            Guid courseId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var form = await context.Request.ReadFormAsync(cancellationToken);
+            var file = form.Files.GetFile("cover");
+            if (file is null)
+            {
+                return Results.Problem(
+                    statusCode: StatusCodes.Status400BadRequest,
+                    title: "Selecione uma foto para o curso.");
+            }
+
+            await using var stream = file.OpenReadStream();
+            var result = await catalogService.SetCoverAsync(
+                courseId, file.ContentType, stream, file.Length, cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
+        })
+        .WithMetadata(new RequestSizeLimitAttribute(PlatformCourseCatalogService.MaximumCoverSizeBytes + 1_048_576))
+        .WithMetadata(new RequestFormLimitsAttribute
+        {
+            MultipartBodyLengthLimit = PlatformCourseCatalogService.MaximumCoverSizeBytes + 1_048_576
+        })
+        .WithName("SetPlatformCourseCover");
+
+        catalog.MapDelete("/courses/{courseId:guid}/cover", async (
+            Guid courseId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await catalogService.RemoveCoverAsync(courseId, cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("RemovePlatformCourseCover");
+
+        catalog.MapGet("/courses/{courseId:guid}/cover", async (
+            Guid courseId,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.GetCoverAsync(courseId, cancellationToken);
+            return result.IsSuccess
+                ? Results.File(result.Value.Data, result.Value.ContentType)
+                : ToProblem(result.Error);
+        })
+        .WithName("GetPlatformCourseCover");
+
         catalog.MapGet("/videos", async (
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
@@ -386,7 +450,10 @@ public static class PlatformCourseCatalogEndpoints
             course.GamificationEnabled,
             course.Videos.Select(ToResponse).ToArray(),
             course.GameType.ToString(),
-            course.Modules.Select(item => new CourseModulePlacementDto(item.ModuleId, item.AfterVideoCount)).ToArray());
+            course.Modules.Select(item => new CourseModulePlacementDto(item.ModuleId, item.AfterVideoCount)).ToArray(),
+            course.CoverContentType is null
+                ? null
+                : $"/api/platform/catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}");
 
     private static PlatformCourseVideoResponse ToResponse(PlatformCourseVideo video) =>
         new(
@@ -425,6 +492,7 @@ public static class PlatformCourseCatalogEndpoints
             "learning.platform_course.forbidden" => StatusCodes.Status403Forbidden,
             "learning.platform_course.not_found" or
                 "learning.game_module.not_found" or
+                "learning.platform_course.cover_not_found" or
                 "learning.platform_course.video_not_found" => StatusCodes.Status404NotFound,
             "learning.platform_course.storage_unconfigured" or
                 "learning.platform_course.video_file_missing" => StatusCodes.Status503ServiceUnavailable,
@@ -482,7 +550,8 @@ public sealed record PlatformCourseResponse(
     bool GamificationEnabled,
     IReadOnlyList<PlatformCourseVideoResponse> Videos,
     string GameType,
-    IReadOnlyList<CourseModulePlacementDto> Modules);
+    IReadOnlyList<CourseModulePlacementDto> Modules,
+    string? CoverUrl);
 
 public sealed record CourseModulePlacementDto(Guid ModuleId, int AfterVideoCount);
 

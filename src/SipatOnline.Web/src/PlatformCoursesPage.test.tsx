@@ -13,6 +13,7 @@ vi.mock('./api', async (importOriginal) => {
     listGameModules: vi.fn(),
     listPlatformCourses: vi.fn(),
     listPlatformLibraryVideos: vi.fn(),
+    setPlatformCourseCover: vi.fn(),
     setPlatformCourseVideos: vi.fn(),
     updatePlatformCourse: vi.fn(),
     uploadPlatformVideo: vi.fn(),
@@ -45,6 +46,7 @@ const ergonomics: api.PlatformCourse = {
   gameType: 'Quiz',
   videos: [opening, closing],
   modules: [],
+  coverUrl: null,
 };
 
 const fire: api.PlatformCourse = {
@@ -57,6 +59,7 @@ const fire: api.PlatformCourse = {
   gameType: 'Quiz',
   videos: [],
   modules: [],
+  coverUrl: null,
 };
 
 beforeEach(() => {
@@ -128,6 +131,19 @@ describe('Platform course catalog', () => {
     expect(api.duplicatePlatformCourse).toHaveBeenCalledWith('c-1');
     expect(await screen.findByRole('heading', { name: 'Ergonomia (cópia)' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent('foi criado como rascunho');
+  });
+
+  it('uploads a course cover as soon as a photo is chosen', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.setPlatformCourseCover).mockResolvedValue({ ...ergonomics, coverUrl: '/cover?v=1' });
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
+    const photo = new File(['img'], 'capa.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Escolher foto'), photo);
+
+    expect(api.setPlatformCourseCover).toHaveBeenCalledWith('c-1', photo);
+    expect(await screen.findByRole('status')).toHaveTextContent('A foto do curso foi atualizada.');
   });
 
   it('reorders the videos of a course', async () => {

@@ -41,6 +41,7 @@ export interface PlatformCourse {
   gameType: GamificationGameType;
   videos: PlatformCourseVideo[];
   modules: CourseModulePlacement[];
+  coverUrl: string | null;
 }
 
 export interface CourseModulePlacement {
@@ -472,6 +473,21 @@ export function uploadPlatformVideo(
       : '/api/platform/catalog/videos',
     { method: 'POST', body: formData },
   );
+}
+
+export function setPlatformCourseCover(courseId: string, file: File): Promise<PlatformCourse> {
+  const formData = new FormData();
+  formData.append('cover', file);
+  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/cover`, {
+    method: 'PUT',
+    body: formData,
+  });
+}
+
+export function removePlatformCourseCover(courseId: string): Promise<PlatformCourse> {
+  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/cover`, {
+    method: 'DELETE',
+  });
 }
 
 export function listGameModules(): Promise<GameModule[]> {

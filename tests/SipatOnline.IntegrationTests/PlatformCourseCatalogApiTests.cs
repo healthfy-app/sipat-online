@@ -138,6 +138,16 @@ public sealed class PlatformCourseCatalogApiTests
         using var modulesList = await client.GetAsync("https://ops.localhost/api/platform/catalog/modules");
         var listed = Assert.Single((await ReadAsync(modulesList)).EnumerateArray());
         Assert.Equal(2, listed.GetProperty("usageCount").GetInt32());
+        using var fakeCover = await SendCoverAsync(client, courseId, [1, 2, 3, 4], "image/png");
+        Assert.Equal(HttpStatusCode.BadRequest, fakeCover.StatusCode);
+        byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        using var coverResponse = await SendCoverAsync(client, courseId, png, "image/png");
+        Assert.Equal(HttpStatusCode.OK, coverResponse.StatusCode);
+        Assert.Contains("/cover?v=", (await ReadAsync(coverResponse)).GetProperty("coverUrl").GetString());
+        using var coverFile = await client.GetAsync($"https://{Host}/api/platform/catalog/courses/{courseId}/cover");
+        Assert.Equal("image/png", coverFile.Content.Headers.ContentType?.MediaType);
+        Assert.Equal(png, await coverFile.Content.ReadAsByteArrayAsync());
+
         using var duplicateResponse = await SendAsync(
             client,
             HttpMethod.Post,
@@ -150,6 +160,7 @@ public sealed class PlatformCourseCatalogApiTests
         Assert.Equal("Draft", copy.GetProperty("status").GetString());
         Assert.Equal(2, copy.GetProperty("videos").GetArrayLength());
         Assert.Equal(1, copy.GetProperty("modules").GetArrayLength());
+        Assert.NotNull(copy.GetProperty("coverUrl").GetString());
 
         using var libraryResponse = await client.GetAsync("https://ops.localhost/api/platform/catalog/videos");
         Assert.Equal(HttpStatusCode.OK, libraryResponse.StatusCode);
@@ -175,6 +186,25 @@ public sealed class PlatformCourseCatalogApiTests
         dbContext.PlatformCourseVideos.Add(video);
         await dbContext.SaveChangesAsync();
         return video.Id;
+    }
+
+    private static async Task<HttpResponseMessage> SendCoverAsync(
+        HttpClient client,
+        Guid courseId,
+        byte[] bytes,
+        string contentType)
+    {
+        using var tokenResponse = await client.GetAsync($"https://{Host}/api/identity/antiforgery");
+        var token = await tokenResponse.Content.ReadFromJsonAsync<AntiforgeryTokenResponse>();
+        using var content = new MultipartFormDataContent();
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        content.Add(file, "cover", "capa");
+        using var request = new HttpRequestMessage(
+            HttpMethod.Put,
+            $"https://{Host}/api/platform/catalog/courses/{courseId}/cover") { Content = content };
+        request.Headers.Add("X-CSRF-TOKEN", token!.RequestToken);
+        return await client.SendAsync(request);
     }
 
     private static async Task<JsonElement> ReadAsync(HttpResponseMessage response) =>

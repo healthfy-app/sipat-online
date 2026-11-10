@@ -25,7 +25,11 @@ public sealed record PlatformCourse(
     bool GamificationEnabled,
     IReadOnlyList<PlatformCourseVideo> Videos,
     IReadOnlyList<CourseModulePlacement> Modules,
-    GamificationGameType GameType = GamificationGameType.Quiz);
+    GamificationGameType GameType = GamificationGameType.Quiz,
+    string? CoverContentType = null,
+    DateTimeOffset? CoverUpdatedAt = null);
+
+public sealed record PlatformCourseCover(string ContentType, byte[] Data);
 
 public sealed record PlatformCourseVideo(
     Guid Id,

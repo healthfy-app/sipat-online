@@ -20,8 +20,8 @@ describe('Platform home', () => {
       { id: 't2', key: 'beta', name: 'Beta', isActive: false, employeeCount: 3, administratorCount: 1, totalUserCount: 4 },
     ] as api.PlatformCompanyOverview[]);
     vi.mocked(api.listPlatformCourses).mockResolvedValue([
-      { id: 'c1', title: 'SIPAT Acme 2026', description: null, createdAt: '', status: 'Published', gamificationEnabled: true, gameType: 'Quiz', videos: [], modules: [] },
-      { id: 'c2', title: 'SIPAT Beta 2026', description: null, createdAt: '', status: 'Draft', gamificationEnabled: false, gameType: 'Quiz', videos: [], modules: [] },
+      { id: 'c1', title: 'SIPAT Acme 2026', description: null, createdAt: '', status: 'Published', gamificationEnabled: true, gameType: 'Quiz', videos: [], modules: [], coverUrl: null },
+      { id: 'c2', title: 'SIPAT Beta 2026', description: null, createdAt: '', status: 'Draft', gamificationEnabled: false, gameType: 'Quiz', videos: [], modules: [], coverUrl: null },
     ]);
     const user = userEvent.setup();
     render(<MemoryRouter><PlatformHomePage /></MemoryRouter>);

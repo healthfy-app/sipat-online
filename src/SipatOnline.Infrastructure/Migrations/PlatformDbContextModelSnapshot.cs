@@ -531,11 +531,32 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("LearningTrackRevisions", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseCoverEntity", b =>
+                {
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.HasKey("CourseId");
+
+                    b.ToTable("PlatformCourseCovers", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("CoverContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("CoverUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -873,6 +894,15 @@ namespace SipatOnline.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("TrackId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseCoverEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", null)
+                        .WithOne()
+                        .HasForeignKey("SipatOnline.Infrastructure.Learning.PlatformCourseCoverEntity", "CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

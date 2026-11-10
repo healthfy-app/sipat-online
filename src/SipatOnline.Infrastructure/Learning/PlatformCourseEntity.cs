@@ -16,6 +16,10 @@ public sealed class PlatformCourseEntity
 
     public int GameType { get; set; }
 
+    public string? CoverContentType { get; set; }
+
+    public DateTimeOffset? CoverUpdatedAt { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 
     public ICollection<PlatformCourseModuleLinkEntity> ModuleLinks { get; set; } = [];
@@ -38,6 +42,13 @@ public sealed class PlatformCourseVideoEntity
     public ICollection<PlatformCourseVideoLinkEntity> CourseLinks { get; set; } = [];
 
     public ICollection<PlatformVideoCheckpointEntity> Checkpoints { get; set; } = [];
+}
+
+public sealed class PlatformCourseCoverEntity
+{
+    public Guid CourseId { get; set; }
+
+    public byte[] Data { get; set; } = [];
 }
 
 public sealed class GameModuleEntity

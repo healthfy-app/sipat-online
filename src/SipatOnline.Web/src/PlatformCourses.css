@@ -296,3 +296,14 @@
 .game-question-editor { border: 1px solid #e5ebe7; border-radius: 12px; padding: .75rem; }
 .platform-checkpoint-editor { margin-top: 1rem; }
 
+
+.file-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.file-picker-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); }
+.file-picker-input:focus-visible + label { outline: 3px solid var(--brand-primary, #20a66a); outline-offset: 2px; }
+.file-picker label.is-disabled { cursor: not-allowed; opacity: 0.55; }
+.file-picker-name { color: var(--muted); font-size: 0.9rem; overflow-wrap: anywhere; }
+.platform-course-cover { display: block; width: calc(100% + 36px); aspect-ratio: 16 / 9; margin: -18px -18px 4px; border-radius: 14px 14px 0 0; object-fit: cover; background: var(--surface-soft); }
+.platform-course-cover-empty { display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 0.85rem; }
+.platform-cover-editor { display: flex; flex-direction: column; gap: 12px; }
+.platform-cover-preview { width: 100%; max-width: 420px; aspect-ratio: 16 / 9; border-radius: 12px; object-fit: cover; background: var(--surface-soft); border: 1px solid var(--line); }
+

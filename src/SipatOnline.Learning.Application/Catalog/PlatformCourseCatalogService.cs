@@ -13,6 +13,7 @@ public sealed class PlatformCourseCatalogService(
     TimeProvider timeProvider)
 {
     public const long MaximumVideoSizeBytes = 250 * 1024 * 1024;
+    public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
 
     public async Task<Result<IReadOnlyList<PlatformCourse>>> ListAsync(
@@ -391,6 +392,111 @@ public sealed class PlatformCourseCatalogService(
                 "A descrição deve ter no máximo 2.000 caracteres.")
             : Result<(string Title, string? Description)>.Success((normalizedTitle, normalizedDescription));
     }
+
+    public async Task<Result<PlatformCourse>> SetCoverAsync(
+        Guid courseId,
+        string contentType,
+        Stream content,
+        long declaredSize,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<PlatformCourse>.Failure(permission.Error);
+        }
+
+        if (declaredSize is < 1 or > MaximumCoverSizeBytes)
+        {
+            return Failure<PlatformCourse>(
+                "learning.platform_course.cover_size_invalid",
+                "A foto deve ter entre 1 byte e 2 MB.");
+        }
+
+        var buffer = new byte[declaredSize];
+        var read = 0;
+        while (read < buffer.Length)
+        {
+            var count = await content.ReadAsync(buffer.AsMemory(read), cancellationToken);
+            if (count == 0)
+            {
+                break;
+            }
+
+            read += count;
+        }
+
+        if (read != declaredSize ||
+            await content.ReadAsync(new byte[1], cancellationToken) != 0 ||
+            !HasCoverSignature(buffer, contentType))
+        {
+            return Failure<PlatformCourse>(
+                "learning.platform_course.cover_content_invalid",
+                "Envie uma foto PNG, JPEG ou WebP válida.");
+        }
+
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        var saved = await catalogStore.SetCoverAsync(
+            courseId, contentType, buffer, timeProvider.GetUtcNow(), cancellationToken);
+        if (!saved)
+        {
+            return CourseNotFound<PlatformCourse>();
+        }
+
+        await WriteAuditAsync("learning.platform_course.cover_set", "platform_course", courseId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        var course = await catalogStore.FindCourseAsync(courseId, cancellationToken);
+        return course is null ? CourseNotFound<PlatformCourse>() : Result<PlatformCourse>.Success(course);
+    }
+
+    public async Task<Result<PlatformCourse>> RemoveCoverAsync(
+        Guid courseId,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<PlatformCourse>.Failure(permission.Error);
+        }
+
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        if (!await catalogStore.RemoveCoverAsync(courseId, cancellationToken))
+        {
+            return CourseNotFound<PlatformCourse>();
+        }
+
+        await WriteAuditAsync("learning.platform_course.cover_removed", "platform_course", courseId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        var course = await catalogStore.FindCourseAsync(courseId, cancellationToken);
+        return course is null ? CourseNotFound<PlatformCourse>() : Result<PlatformCourse>.Success(course);
+    }
+
+    public async Task<Result<PlatformCourseCover>> GetCoverAsync(
+        Guid courseId,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<PlatformCourseCover>.Failure(permission.Error);
+        }
+
+        var cover = await catalogStore.GetCoverAsync(courseId, cancellationToken);
+        return cover is null
+            ? Failure<PlatformCourseCover>("learning.platform_course.cover_not_found", "O curso não tem foto.")
+            : Result<PlatformCourseCover>.Success(cover);
+    }
+
+    private static bool HasCoverSignature(byte[] data, string contentType) =>
+        contentType switch
+        {
+            "image/png" => data.AsSpan().StartsWith(new byte[] { 0x89, 0x50, 0x4E, 0x47 }),
+            "image/jpeg" => data.AsSpan().StartsWith(new byte[] { 0xFF, 0xD8, 0xFF }),
+            "image/webp" => data.Length >= 12 &&
+                              data.AsSpan(0, 4).SequenceEqual("RIFF"u8) &&
+                              data.AsSpan(8, 4).SequenceEqual("WEBP"u8),
+            _ => false
+        };
 
     private static Result<T> CourseNotFound<T>()
         where T : notnull =>
