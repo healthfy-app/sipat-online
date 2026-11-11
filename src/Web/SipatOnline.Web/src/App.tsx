@@ -38,7 +38,6 @@ import TenantAppearancePage from './TenantAppearancePage';
 import { BrandThemeContext, tenantTheme } from './branding';
 import LoadingState from './LoadingState';
 import './AdminDesign.css';
-import './LoginPage.css';
 
 type AppState =
   | { status: 'loading' }
