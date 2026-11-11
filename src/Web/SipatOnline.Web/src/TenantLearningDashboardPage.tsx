@@ -15,15 +15,15 @@ const statusLabels: Record<ParticipantProgressStatus, string> = {
   'in-progress': 'Em andamento',
   'not-started': 'Ainda não iniciaram',
   'no-tracks': 'Sem trilhas atribuídas',
-  inactive: 'Contas inativas',
+  inactive: 'Participantes inativos',
 };
 
 const statusColors: Record<ParticipantProgressStatus, string> = {
-  completed: '#176b52',
-  'in-progress': '#55a982',
-  'not-started': '#d29c28',
-  'no-tracks': '#aebbb6',
-  inactive: '#56645f',
+  completed: 'var(--admin-success)',
+  'in-progress': 'var(--admin-warning)',
+  'not-started': 'var(--admin-muted)',
+  'no-tracks': 'var(--admin-muted)',
+  inactive: 'var(--admin-muted)',
 };
 
 export default function TenantLearningDashboardPage({ readOnly = false }: { readOnly?: boolean }) {
@@ -63,7 +63,7 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
           <p className="eyebrow">GESTÃO DA EMPRESA</p>
           <h1>Visão geral</h1>
           <p className="muted-copy">
-            Acompanhe o progresso das pessoas e das trilhas da sua empresa.
+            Acompanhe o progresso dos participantes e das trilhas da sua empresa.
           </p>
         </div>
         <div className="tenant-dashboard-actions">
@@ -87,7 +87,6 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
             <SummaryCard
               label="Participantes ativos"
               value={overview.activeParticipantCount.toLocaleString('pt-BR')}
-              note={`${overview.participantCount.toLocaleString('pt-BR')} contas no total`}
             />
             <SummaryCard
               label="Atribuições de trilhas"
@@ -98,6 +97,7 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
               label="Aulas concluídas"
               value={`${overview.completedLessonCount.toLocaleString('pt-BR')} / ${overview.lessonCount.toLocaleString('pt-BR')}`}
               note={`${overview.overallProgressPercentage}% do total atribuído`}
+              progress={overview.overallProgressPercentage}
             />
           </section>
 
@@ -107,18 +107,18 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                 <p className="eyebrow">PRÓXIMO PASSO</p>
                 <h2 id="tenant-dashboard-next-step">
                   {noTracksCount > 0
-                    ? `Libere trilhas para ${noTracksCount} ${noTracksCount === 1 ? 'pessoa' : 'pessoas'}`
-                    : `Acompanhe ${notStartedCount} ${notStartedCount === 1 ? 'pessoa' : 'pessoas'} sem início`}
+                    ? `Libere trilhas para ${noTracksCount} ${noTracksCount === 1 ? 'participante' : 'participantes'}`
+                    : `Acompanhe ${notStartedCount} ${notStartedCount === 1 ? 'participante' : 'participantes'} sem início`}
                 </h2>
                 <p>
                   {noTracksCount > 0
-                    ? 'Essas pessoas ainda não têm uma trilha atribuída.'
+                    ? 'Esses participantes ainda não têm uma trilha atribuída.'
                     : 'Veja quem já tem trilhas liberadas e ainda não iniciou.'}
                 </p>
               </div>
               <Link className="button button-primary" to={`/admin/learning?status=${nextStepStatus}`}>
                 {noTracksCount > 0
-                  ? readOnly ? 'Ver pessoas sem trilhas' : 'Escolher participantes'
+                  ? readOnly ? 'Ver participantes sem trilhas' : 'Escolher participantes'
                   : readOnly ? 'Ver acompanhamento' : 'Acompanhar progresso'}
                 <span aria-hidden="true"> →</span>
               </Link>
@@ -129,15 +129,15 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
             <article aria-labelledby="participant-distribution-title" className="tenant-dashboard-panel">
               <div className="tenant-dashboard-panel-heading">
                 <div>
-                  <h2 id="participant-distribution-title">Situação das pessoas</h2>
+                  <h2 id="participant-distribution-title">Situação dos participantes</h2>
                 </div>
-                <span className="count-label">{overview.participantCount} pessoas</span>
+                <span className="count-label">{overview.participantCount} participantes</span>
               </div>
               {overview.participantCount === 0 ? (
                 <div className="tenant-dashboard-empty-chart">
                   <div className="empty-state compact-empty">
                     <h3>Ainda não há participantes</h3>
-                    <p>Cadastre ou importe pessoas para acompanhar o progresso da empresa.</p>
+                    <p>Cadastre ou importe participantes para acompanhar o progresso da empresa.</p>
                     <Link className="button button-secondary" to="/admin/learning">
                       {readOnly ? 'Ver acompanhamento' : 'Adicionar participantes'}
                     </Link>
@@ -162,11 +162,14 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                 </div>
               ) : (
                 <ul className="tenant-dashboard-track-list">
-                  {overview.trackProgress.map((track) => (
+                  {[...overview.trackProgress]
+                    .sort((first, second) => first.averageProgressPercentage - second.averageProgressPercentage)
+                    .slice(0, 5)
+                    .map((track) => (
                     <li key={track.trackId}>
                       <div className="tenant-dashboard-track-heading">
                         <strong>{track.trackTitle}</strong>
-                        <span>{track.completedParticipantCount}/{track.participantCount} concluíram</span>
+                        <span>{track.completedParticipantCount}/{track.participantCount} concluíram · {track.averageProgressPercentage}%</span>
                       </div>
                       <div className="tenant-dashboard-track-progress">
                         <progress
@@ -179,6 +182,9 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                   ))}
                 </ul>
               )}
+              {overview.trackProgress.length > 5 && (
+                <Link className="button button-quiet" to="/admin/learning">Ver todas as trilhas</Link>
+              )}
             </article>
           </section>
         </>
@@ -190,6 +196,7 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
 function DistributionOverview({ overview }: { overview: CompanyLearningOverview }) {
   const visibleStatuses = overview.participantDistribution.filter(({ count }) => count > 0);
   const hasMultipleStatuses = visibleStatuses.length > 1;
+  const total = overview.participantCount;
 
   return (
     <div className={`tenant-dashboard-donut-layout${hasMultipleStatuses ? '' : ' is-single-status'}`}>
@@ -198,7 +205,11 @@ function DistributionOverview({ overview }: { overview: CompanyLearningOverview 
       ) : (
         <div className="tenant-dashboard-single-status">
           <strong>{visibleStatuses[0]?.count ?? 0}</strong>
-          <span>{visibleStatuses[0] ? statusLabels[visibleStatuses[0].status] : 'Sem participantes ativos'}</span>
+          <span>
+            {visibleStatuses[0]
+              ? `${statusLabels[visibleStatuses[0].status]} · ${visibleStatuses[0].count} (${total > 0 ? Math.round(visibleStatuses[0].count / total * 100) : 0}%)`
+              : 'Sem participantes ativos'}
+          </span>
         </div>
       )}
       <ul aria-label="Legenda do progresso" className="tenant-dashboard-legend">
@@ -206,7 +217,7 @@ function DistributionOverview({ overview }: { overview: CompanyLearningOverview 
           <li key={status}>
             <span aria-hidden="true" className="tenant-dashboard-legend-dot" style={{ backgroundColor: statusColors[status] }} />
             <span>{statusLabels[status]}</span>
-            <strong>{count}</strong>
+            <strong>{count} ({total > 0 ? Math.round(count / total * 100) : 0}%)</strong>
           </li>
         ))}
       </ul>
@@ -252,18 +263,23 @@ function DonutChart({ overview }: { overview: CompanyLearningOverview }) {
         {total}
       </text>
       <text aria-hidden="true" className="tenant-dashboard-donut-caption" textAnchor="middle" x="60" y="72">
-        pessoas
+        participantes
       </text>
     </svg>
   );
 }
 
-function SummaryCard({ label, value, note }: { label: string; value: string; note: string }) {
+function SummaryCard({ label, value, note, progress }: {
+  label: string; value: string; note?: string; progress?: number;
+}) {
   return (
     <article className="platform-summary-card">
       <span>{label}</span>
       <strong>{value}</strong>
-      <small>{note}</small>
+      {progress !== undefined && (
+        <progress aria-label={`${label}: ${progress}%`} max={100} value={progress} />
+      )}
+      {note && <small>{note}</small>}
     </article>
   );
 }

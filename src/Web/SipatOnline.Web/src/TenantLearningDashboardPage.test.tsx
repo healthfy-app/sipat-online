@@ -45,13 +45,13 @@ describe('tenant learning dashboard', () => {
 
     expect(await screen.findByRole('img', { name: 'Distribuição do progresso de 3 participantes' })).toBeVisible();
     expect(screen.getByText('Participantes ativos')).toBeVisible();
-    expect(screen.getByText('3 contas no total')).toBeVisible();
+    expect(screen.queryByText(/contas no total/)).not.toBeInTheDocument();
     expect(screen.getByText('1 trilha distinta · 1 atribuição concluída')).toBeVisible();
     expect(screen.getByText('Concluíram todas as trilhas')).toBeVisible();
     expect(screen.getByText('Em andamento')).toBeVisible();
-    expect(screen.getByText('Contas inativas')).toBeVisible();
+    expect(screen.getByText('Participantes inativos')).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Ergonomia: 70% de progresso médio' })).toHaveValue(70);
-    expect(screen.getByText('1/2 concluíram')).toBeVisible();
+    expect(screen.getByText('1/2 concluíram · 70%')).toBeVisible();
   });
 
   it('replaces a single-slice donut with a useful summary and a filtered next step', async () => {
@@ -73,7 +73,7 @@ describe('tenant learning dashboard', () => {
 
     render(<MemoryRouter><TenantLearningDashboardPage /></MemoryRouter>);
 
-    expect(await screen.findByText('2 contas no total')).toBeVisible();
+    expect(await screen.findByText('Participantes ativos')).toBeVisible();
     expect(screen.queryByRole('img', { name: 'Distribuição do progresso de 2 participantes' })).not.toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Legenda do progresso' }))
       .getByText('Sem trilhas atribuídas')).toBeVisible();

@@ -22,6 +22,26 @@
   font-variant-numeric: tabular-nums;
 }
 
+.tenant-dashboard-summary .platform-summary-card progress {
+  width: 100%;
+  height: 8px;
+  accent-color: var(--admin-success);
+}
+
+.tenant-dashboard-summary .platform-summary-card progress::-webkit-progress-bar,
+.tenant-dashboard-track-progress progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--admin-progress-track);
+}
+
+.tenant-dashboard-summary .platform-summary-card progress::-webkit-progress-value,
+.tenant-dashboard-track-progress progress::-webkit-progress-value,
+.tenant-dashboard-summary .platform-summary-card progress::-moz-progress-bar,
+.tenant-dashboard-track-progress progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--admin-success);
+}
+
 .tenant-dashboard-next-step {
   display: flex;
   align-items: center;
@@ -239,8 +259,8 @@
 
 .tenant-dashboard-track-progress progress {
   width: 100%;
-  height: 0.5rem;
-  accent-color: var(--green);
+  height: 8px;
+  accent-color: var(--admin-success);
 }
 
 .tenant-dashboard-panel .compact-empty {
