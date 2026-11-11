@@ -109,9 +109,15 @@ describe('learning experience', () => {
     listAssignedTracks.mockResolvedValue([{ ...trackCard, lessonCount: 5, completedLessonCount: 5, progressPercentage: coverage }]);
     renderAt('/learning', onSummary);
 
-    expect(await screen.findByText('1 de 1 cursos concluídos', { exact: false })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Formação concluída' })).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Progresso de Segurança no trabalho' })).toHaveAttribute('aria-valuenow', '100');
-    expect(screen.getByText('1/1 cursos concluídos · Formação completa')).toBeVisible();
+    expect(screen.getByText('Sua trilha')).toBeVisible();
+    expect(screen.getByText('Passo 1 de 1')).toBeVisible();
+    expect(screen.getByRole('progressbar', {
+      name: 'Progresso da formação: 1 de 1 cursos concluídos',
+    })).toHaveAttribute('aria-valuenow', '100');
+    expect(screen.queryByText('Formação concluída. Parabéns por chegar até aqui!')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Sua trilha' })).not.toBeInTheDocument();
     expect(screen.queryByRole('progressbar', { name: 'Progresso da trilha' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver certificado de Segurança no trabalho' }))
       .toHaveAttribute('href', '/learning/certificates');

@@ -333,9 +333,18 @@ function LearningHomePage({ participantName, setSummary }: {
         {startedAnyCourse && !resumeTrack && (
           <section aria-label="Formação concluída" className="learning-resume-hero learning-resume-complete">
             <div className="learning-resume-content">
-              <p className="learning-catalog-eyebrow">Parabéns</p>
-              <h2>Você concluiu sua formação</h2>
-              <p>{completedCourses} de {tracks.length} cursos concluídos.</p>
+              <p className="learning-catalog-eyebrow">Sua trilha</p>
+              <h2>Formação concluída</h2>
+              <div className="learning-completion-progress">
+                <div className="learning-completion-progress-heading">
+                  <span>Passo {currentStepNumber} de {tracks.length}</span>
+                  <strong>{overallProgress}% da formação</strong>
+                </div>
+                <ProgressBar
+                  label={`Progresso da formação: ${completedCourses} de ${tracks.length} cursos concluídos`}
+                  value={overallProgress}
+                />
+              </div>
               <Link className="learning-catalog-feature-action" to="/learning/certificates">
                 Ver certificados <span aria-hidden="true">→</span>
               </Link>
@@ -352,21 +361,15 @@ function LearningHomePage({ participantName, setSummary }: {
           </section>
         )}
 
-        {startedAnyCourse && (
+        {startedAnyCourse && overallProgress < 100 && (
           <>
             <section aria-labelledby="learning-journey-title" className="learning-journey-card">
               <div className="learning-journey-heading">
                 <h2 id="learning-journey-title">Sua trilha</h2>
                 <span>Passo {currentStepNumber} de {tracks.length} · {overallProgress}% da formação</span>
               </div>
-              {overallProgress === 100 ? (
-                <p className="learning-journey-complete-summary">
-                  {completedCourses}/{tracks.length} cursos concluídos · Formação completa
-                </p>
-              ) : (
-                <>
-                  <ProgressBar label="Progresso da trilha" value={overallProgress} />
-                  <ol aria-label="Etapas da formação" className="learning-journey-steps">
+              <ProgressBar label="Progresso da trilha" value={overallProgress} />
+              <ol aria-label="Etapas da formação" className="learning-journey-steps">
                 {tracks.map((track, index) => {
                   const percentage = getTrackProgress(track);
                   const isComplete = percentage === 100;
@@ -388,19 +391,15 @@ function LearningHomePage({ participantName, setSummary }: {
                     </li>
                   );
                 })}
-                  </ol>
-                </>
-              )}
+              </ol>
             </section>
-            {shownMilestone !== null && (
+            {shownMilestone !== null && shownMilestone < 100 && (
               <p className="learning-milestone" role="status">
                 {shownMilestone === 25
                   ? completedCourses > 0
                     ? `Você concluiu ${completedCourses} ${completedCourses === 1 ? 'curso' : 'cursos'}. Falta pouco para a metade da formação.`
                     : 'Você já avançou na formação. Continue no seu ritmo.'
-                  : shownMilestone === 50
-                    ? 'Você chegou à metade da formação. Continue no seu ritmo.'
-                    : 'Formação concluída. Parabéns por chegar até aqui!'}
+                  : 'Você chegou à metade da formação. Continue no seu ritmo.'}
               </p>
             )}
           </>
