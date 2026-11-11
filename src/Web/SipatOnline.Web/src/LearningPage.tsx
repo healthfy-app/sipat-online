@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useOutletContext, useParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { Link, useNavigate, useOutletContext, useParams, useSearchParams } from 'react-router-dom';
 import './LearningCatalog.css';
 import { getCourseCover } from './courseCover';
 import LearningActivitiesPanel from './LearningActivitiesPanel';
@@ -25,18 +25,17 @@ export interface LearningSummary {
 
 export default function LearningPage({
   participantName,
-  tenantName,
 }: {
   participantName?: string;
   tenantName?: string;
 }) {
   const { trackId } = useParams();
+  const [searchParams] = useSearchParams();
   const setSummary = useOutletContext<((summary: LearningSummary | null) => void) | undefined>();
   return trackId ? (
     <LearningTrackPage
-      participantName={participantName}
+      resumeLessonId={searchParams.get('lesson')}
       setSummary={setSummary}
-      tenantName={tenantName}
       trackId={trackId}
     />
   ) : (
@@ -49,32 +48,76 @@ function LearningHomePage({ participantName, setSummary }: {
   setSummary?: (summary: LearningSummary | null) => void;
 }) {
   const [tracks, setTracks] = useState<LearningTrackCard[]>([]);
+  const [resumeExperience, setResumeExperience] = useState<LearningExperience | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingResume, setIsLoadingResume] = useState(false);
   const [error, setError] = useState('');
+  const [resumeError, setResumeError] = useState('');
   const [retry, setRetry] = useState(0);
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'started' | 'completed'>('all');
+  const [category, setCategory] = useState<CourseCategory>('all');
+  const [sortMode, setSortMode] = useState<CourseSort>('recommended');
+  const [shownMilestone, setShownMilestone] = useState<number | null>(null);
 
-  const nextTrack = getNextTrack(tracks);
   const overallProgress = getOverallProgress(tracks);
   const completedCourses = tracks.filter(track => getTrackProgress(track) === 100).length;
-  const visibleTracks = tracks.filter(track => (
-    (filter === 'all' || (filter === 'started' ? getTrackProgress(track) > 0 && getTrackProgress(track) < 100 : getTrackProgress(track) === 100)) &&
-    `${track.title} ${track.description ?? ''}`.toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR'))
+  const totalLessons = tracks.reduce((total, track) => total + track.lessonCount, 0);
+  const startedAnyCourse = tracks.some(track => getTrackProgress(track) > 0);
+  const resumeTrack = tracks.find(track => getTrackProgress(track) > 0 && getTrackProgress(track) < 100) ?? null;
+  const recommendedTrack = tracks.find(track => getTrackProgress(track) < 100) ?? null;
+  const resumeLesson = resumeExperience
+    ? getResumeLesson(resumeExperience.lessons)
+    : null;
+  const currentStepIndex = tracks.findIndex(track => getTrackProgress(track) > 0 && getTrackProgress(track) < 100);
+  const activeStepIndex = currentStepIndex >= 0
+    ? currentStepIndex
+    : tracks.findIndex(track => getTrackProgress(track) < 100);
+  const currentStepNumber = activeStepIndex >= 0 ? activeStepIndex + 1 : tracks.length;
+  const milestone = overallProgress >= 100 ? 100 : overallProgress >= 50 ? 50 : overallProgress >= 25 ? 25 : null;
+  const statusCounts = {
+    all: tracks.length,
+    started: tracks.filter(track => getTrackProgress(track) > 0 && getTrackProgress(track) < 100).length,
+    completed: completedCourses,
+  };
+  const sortOptions: { value: CourseSort; label: string }[] = [{ value: 'recommended', label: 'Recomendados' }];
+  if (tracks.length > 0 && tracks.every(track => getTrackDate(track) !== null)) {
+    sortOptions.push({ value: 'newest', label: 'Mais recentes' });
+  }
+  if (tracks.length > 0 && tracks.every(track => getTrackDuration(track) !== null)) {
+    sortOptions.push({ value: 'shortest', label: 'Menor duração' });
+  }
+  const orderedTracks = [...tracks];
+  if (sortMode === 'newest' && sortOptions.some(option => option.value === 'newest')) {
+    orderedTracks.sort((first, second) => (getTrackDate(second) ?? 0) - (getTrackDate(first) ?? 0));
+  } else if (sortMode === 'shortest' && sortOptions.some(option => option.value === 'shortest')) {
+    orderedTracks.sort((first, second) => (getTrackDuration(first) ?? 0) - (getTrackDuration(second) ?? 0));
+  } else if (recommendedTrack) {
+    orderedTracks.sort((first, second) =>
+      Number(second.id === recommendedTrack.id) - Number(first.id === recommendedTrack.id));
+  }
+  const normalizedSearch = search.trim().toLocaleLowerCase('pt-BR');
+  const visibleTracks = orderedTracks.filter(track => (
+    (filter === 'all' || (filter === 'started'
+      ? getTrackProgress(track) > 0 && getTrackProgress(track) < 100
+      : getTrackProgress(track) === 100)) &&
+    (category === 'all' || getCourseCategory(track) === category) &&
+    `${track.title} ${track.description ?? ''}`.toLocaleLowerCase('pt-BR').includes(normalizedSearch)
   ));
 
   useEffect(() => {
     setSummary?.(!isLoading && !error ? {
       percentage: overallProgress,
-      completed: tracks.reduce((total, track) => total + track.completedLessonCount, 0),
-      total: tracks.reduce((total, track) => total + track.lessonCount, 0),
+      completed: completedCourses,
+      total: tracks.length,
     } : null);
-  }, [setSummary, tracks, isLoading, error, overallProgress]);
+  }, [setSummary, tracks, isLoading, error, overallProgress, completedCourses]);
 
   useEffect(() => {
     let active = true;
     setIsLoading(true);
     setError('');
+    setTracks([]);
 
     listAssignedLearningTracks()
       .then((items) => {
@@ -98,13 +141,92 @@ function LearningHomePage({ participantName, setSummary }: {
     };
   }, [retry]);
 
+  useEffect(() => {
+    if (!resumeTrack) {
+      setResumeExperience(null);
+      setResumeError('');
+      setIsLoadingResume(false);
+      return;
+    }
+
+    let active = true;
+    setResumeExperience(null);
+    setResumeError('');
+    setIsLoadingResume(true);
+    getAssignedLearningTrack(resumeTrack.id)
+      .then(experience => {
+        if (active) {
+          setResumeExperience(experience);
+        }
+      })
+      .catch((loadError: unknown) => {
+        if (active) {
+          setResumeError(getLearningErrorMessage(loadError));
+        }
+      })
+      .finally(() => {
+        if (active) {
+          setIsLoadingResume(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [resumeTrack?.id]);
+
+  useEffect(() => {
+    if (milestone === null || sessionStorage.getItem(`sipat-learning-milestone:${milestone}`)) {
+      return;
+    }
+    sessionStorage.setItem(`sipat-learning-milestone:${milestone}`, 'shown');
+    setShownMilestone(milestone);
+  }, [milestone]);
+
+  const handleStatusTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const nextIndex = event.key === 'ArrowRight'
+      ? (index + 1) % 3
+      : event.key === 'ArrowLeft'
+        ? (index + 2) % 3
+        : event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? 2
+            : -1;
+    if (nextIndex < 0) {
+      return;
+    }
+    event.preventDefault();
+    const nextFilter = (['all', 'started', 'completed'] as const)[nextIndex];
+    setFilter(nextFilter);
+    event.currentTarget.parentElement
+      ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]
+      ?.focus();
+  };
+
+  const resumePath = resumeTrack
+    ? `${getTrackPath(resumeTrack, tracks)}${resumeLesson ? `?lesson=${encodeURIComponent(resumeLesson.id)}` : ''}`
+    : '';
+  const resumePercentage = resumeLesson
+    ? getLessonResumePercentage(resumeLesson)
+    : 0;
+  const remainingCourseMinutes = resumeExperience && resumeLesson
+    ? getRemainingCourseMinutes(resumeExperience.lessons, resumeLesson)
+    : null;
+  const categoryOptions = [
+    { value: 'all', label: 'Todas as categorias' },
+    ...courseCategories.map(value => ({ value, label: value })),
+  ] as const;
+
   return (
-    <main className="learning-page learning-catalog">
+    <main className={`learning-page learning-catalog${startedAnyCourse ? ' is-returning' : ''}`}>
       <header className="learning-page-heading">
         {participantName && <p className="learning-catalog-greeting">Olá, {participantName.split(' ')[0]}.</p>}
-        <h1>Seus cursos. Seu próximo passo.</h1>
+        <h1>{startedAnyCourse ? 'Bom te ver de volta.' : 'Seus cursos. Seu próximo passo.'}</h1>
         <p className="muted-copy">
-          Explore os cursos da sua SIPAT e acompanhe cada conquista, no seu ritmo.
+          {startedAnyCourse
+            ? 'Continue de onde parou e avance no seu ritmo.'
+            : 'Explore os cursos da sua SIPAT e acompanhe cada conquista, no seu ritmo.'}
         </p>
       </header>
 
@@ -127,57 +249,242 @@ function LearningHomePage({ participantName, setSummary }: {
         </section>
       )}
       {!isLoading && !error && tracks.length > 0 && <>
-        <section className="learning-catalog-overview" aria-label="Sua formação">
-          <div className="learning-catalog-progress">
-            <h2>Sua formação está em movimento</h2>
-            <p>{completedCourses} de {tracks.length} cursos concluídos <span aria-hidden="true">·</span> {overallProgress}% da formação</p>
-            <ProgressBar value={overallProgress} label="Progresso geral da formação" />
-          </div>
-          {nextTrack && <Link className="button button-primary" to={getTrackPath(nextTrack, tracks)}>
-            {getTrackProgress(nextTrack) === 100 ? 'Rever um curso' : getTrackProgress(nextTrack) > 0 ? 'Continuar aprendendo' : 'Começar a aprender'} <span aria-hidden="true">→</span>
-          </Link>}
-        </section>
-        <section aria-labelledby="learning-catalog-title">
-          <div className="learning-catalog-toolbar">
+        {!startedAnyCourse && recommendedTrack && (
+          <section aria-label="Comece sua formação" className="learning-catalog-first-hero">
+            <div className="learning-catalog-first-progress">
+              <div
+                aria-label={`Progresso da formação: ${overallProgress}% concluído`}
+                aria-valuemax={100}
+                aria-valuemin={0}
+                aria-valuenow={overallProgress}
+                aria-valuetext={`${overallProgress}% concluído`}
+                className="learning-catalog-overview-ring"
+                role="progressbar"
+                style={{ background: `conic-gradient(var(--learner-highlight) ${overallProgress}%, var(--learner-progress-track) 0)` }}
+              >
+                <span>{overallProgress}%</span>
+              </div>
+              <div className="learning-catalog-progress">
+                <h2>Sua formação</h2>
+                <p>{completedCourses} de {tracks.length} cursos concluídos · {totalLessons} aulas</p>
+                <p className="learning-catalog-first-note">
+                  Dê o primeiro passo. Cada aula é curta e você pode pausar quando quiser.
+                </p>
+              </div>
+            </div>
+            <div className="learning-catalog-first-next">
+              <p className="learning-catalog-eyebrow">Comece por aqui</p>
+              <h2>{recommendedTrack.title}</h2>
+              <p>{getTrackMetadata(recommendedTrack)}</p>
+              <Link className="learning-catalog-feature-action" to={getTrackPath(recommendedTrack, tracks)}>
+                Começar agora <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {startedAnyCourse && resumeTrack && (
+          <section aria-label="Continue seu curso" className="learning-resume-hero">
+            <div className="learning-resume-cover">
+              <img alt="" src={resumeTrack.coverUrl ?? getCourseCover(resumeTrack.title)} />
+              <span aria-hidden="true" className="learning-resume-play">▶</span>
+              {resumeLesson && (
+                <ProgressBar
+                  label={`Progresso da aula ${resumeLesson.position}`}
+                  value={resumePercentage}
+                />
+              )}
+            </div>
+            <div className="learning-resume-content">
+              <p className="learning-catalog-eyebrow">Continue de onde parou</p>
+              {resumeLesson
+                ? <h2>Aula {resumeLesson.position} · {resumeTrack.title}</h2>
+                : <h2>{resumeTrack.title}</h2>}
+              {resumeLesson
+                ? <p>
+                    Você parou em {formatDuration(resumeLesson.lastPlaybackPositionMilliseconds)}
+                    {remainingCourseMinutes !== null && ` · faltam ${remainingCourseMinutes} min para terminar o curso`}
+                  </p>
+                : isLoadingResume
+                  ? <p role="status">Carregando o ponto em que você parou...</p>
+                  : resumeError
+                    ? <p role="status">{resumeError} Abra o curso para continuar.</p>
+                    : <p>Continue seu curso no seu ritmo.</p>}
+              <Link className="learning-catalog-feature-action" to={resumePath}>
+                Continuar aula <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {startedAnyCourse && !resumeTrack && (
+          <section aria-label="Formação concluída" className="learning-resume-hero learning-resume-complete">
+            <div className="learning-resume-content">
+              <p className="learning-catalog-eyebrow">Parabéns</p>
+              <h2>Você concluiu sua formação</h2>
+              <p>{completedCourses} de {tracks.length} cursos concluídos.</p>
+              <Link className="learning-catalog-feature-action" to="/learning/certificates">
+                Ver certificados <span aria-hidden="true">→</span>
+              </Link>
+            </div>
+          </section>
+        )}
+
+        {startedAnyCourse && (
+          <>
+            <section aria-labelledby="learning-journey-title" className="learning-journey-card">
+              <div className="learning-journey-heading">
+                <h2 id="learning-journey-title">Sua trilha</h2>
+                <span>Passo {currentStepNumber} de {tracks.length} · {overallProgress}% da formação</span>
+              </div>
+              <ProgressBar label="Progresso da trilha" value={overallProgress} />
+              <ol aria-label="Etapas da formação" className="learning-journey-steps">
+                {tracks.map((track, index) => {
+                  const percentage = getTrackProgress(track);
+                  const isComplete = percentage === 100;
+                  const isCurrent = index === activeStepIndex && !isComplete;
+                  return (
+                    <li className={`learning-journey-step${isComplete ? ' is-complete' : ''}${isCurrent ? ' is-current' : ''}`} key={track.id}>
+                      <Link
+                        aria-current={isCurrent ? 'step' : undefined}
+                        to={getTrackPath(track, tracks)}
+                      >
+                        <strong>{index + 1} · {track.title}</strong>
+                        <span>{isComplete
+                          ? 'Concluído'
+                          : isCurrent
+                            ? `Em andamento · ${track.completedLessonCount} de ${track.lessonCount} aulas`
+                            : 'A seguir'}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ol>
+            </section>
+            {shownMilestone !== null && (
+              <p className="learning-milestone" role="status">
+                {shownMilestone === 25
+                  ? completedCourses > 0
+                    ? `Você concluiu ${completedCourses} ${completedCourses === 1 ? 'curso' : 'cursos'}. Falta pouco para a metade da formação.`
+                    : 'Você já avançou na formação. Continue no seu ritmo.'
+                  : shownMilestone === 50
+                    ? 'Você chegou à metade da formação. Continue no seu ritmo.'
+                    : 'Formação concluída. Parabéns por chegar até aqui!'}
+              </p>
+            )}
+          </>
+        )}
+
+        <section aria-labelledby="learning-catalog-title" className="learning-catalog-list-section">
+          <div className="learning-catalog-list-heading">
             <h2 id="learning-catalog-title">Meus cursos <span>{tracks.length}</span></h2>
-            <label className="learning-catalog-search">Buscar curso
-              <input onChange={event => setSearch(event.target.value)} placeholder="O que você quer aprender?" type="search" value={search} />
+          </div>
+          <div className="learning-catalog-toolbar">
+            <div aria-label="Filtrar por situação" className="learning-catalog-filters" role="tablist">
+              {([
+                ['all', 'Todos'], ['started', 'Em andamento'], ['completed', 'Concluídos'],
+              ] as const).map(([value, label], index) => (
+                <button
+                  aria-selected={filter === value}
+                  aria-controls="learning-status-panel"
+                  id={`learning-status-tab-${value}`}
+                  key={value}
+                  onClick={() => setFilter(value)}
+                  onKeyDown={event => handleStatusTabKeyDown(event, index)}
+                  role="tab"
+                  tabIndex={filter === value ? 0 : -1}
+                  type="button"
+                >
+                  {label} <span>{statusCounts[value]}</span>
+                </button>
+              ))}
+            </div>
+            <label className="learning-catalog-search" htmlFor="learning-course-search">
+              Buscar curso
+              <span className="learning-catalog-search-control">
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <circle cx="10.8" cy="10.8" r="6.8" />
+                  <path d="m16 16 4.5 4.5" />
+                </svg>
+                <input
+                  id="learning-course-search"
+                  onChange={event => setSearch(event.target.value)}
+                  placeholder="O que você quer aprender?"
+                  type="search"
+                  value={search}
+                />
+              </span>
             </label>
           </div>
-          <div className="learning-catalog-filters" aria-label="Filtrar cursos">
-            {([
-              ['all', 'Todos'], ['started', 'Em andamento'], ['completed', 'Concluídos'],
-            ] as const).map(([value, label]) => <button aria-pressed={filter === value} key={value}
-              onClick={() => setFilter(value)} type="button">{label}</button>)}
+          <div className="learning-catalog-category-toolbar">
+            <div aria-label="Categorias de cursos" className="learning-catalog-category-list">
+              {categoryOptions.map(option => (
+                <button
+                  aria-pressed={category === option.value}
+                  className={`learning-catalog-category-chip${category === option.value ? ' is-active' : ''}`}
+                  key={option.value}
+                  onClick={() => setCategory(option.value)}
+                  type="button"
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            {sortOptions.length > 1
+              ? <label className="learning-catalog-sort">Ordenar
+                  <select onChange={event => setSortMode(event.target.value as CourseSort)} value={sortMode}>
+                    {sortOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+              : <p className="learning-catalog-sort-note">Ordenar: Recomendados</p>}
           </div>
-          {visibleTracks.length === 0 ? <p className="learning-state" role="status">Nenhum curso corresponde à sua busca ou filtro.</p> :
-            <div className="learning-catalog-grid">
-              {visibleTracks.map(track => {
-                const percentage = getTrackProgress(track);
-                const completed = percentage === 100;
-                const started = percentage > 0;
-                return <article className="learning-catalog-course" key={track.id}>
-                  <div className="learning-catalog-artwork" data-artwork={getTrackArtwork(track.title)} aria-hidden="true">
-                    <img alt="" decoding="async" loading="lazy" src={track.coverUrl ?? getCourseCover(track.title)} />
-                    <span>{completed ? '✓ Concluído' : started ? 'Em andamento' : 'Pronto para começar'}</span>
-                  </div>
-                  <div className="learning-catalog-course-content">
-                    <p className="learning-catalog-course-count">{track.lessonCount} {track.lessonCount === 1 ? 'vídeo' : 'vídeos'}</p>
-                    <h3><Link to={getTrackPath(track, tracks)}>{track.title}</Link></h3>
-                    <p className="learning-catalog-description">{track.description || 'Um novo aprendizado para levar ao seu dia a dia.'}</p>
-                    <div className="learning-catalog-course-progress">
-                      <span>{track.completedLessonCount} de {track.lessonCount} concluídos</span>
-                      <strong>{percentage}%</strong>
-                    </div>
-                    <ProgressBar value={percentage} label={`Progresso de ${track.title}`} />
-                    <Link aria-label={`${completed ? 'Rever' : started ? 'Continuar' : 'Começar'} curso ${track.title}`}
-                      className="learning-catalog-course-link" to={getTrackPath(track, tracks)}>
-                      {completed ? 'Rever curso' : started ? 'Continuar curso' : 'Começar curso'} <span aria-hidden="true">↗</span>
-                    </Link>
-                  </div>
-                </article>;
-              })}
-            </div>}
+          <div
+            aria-labelledby={`learning-status-tab-${filter}`}
+            className="learning-catalog-tab-panel"
+            id="learning-status-panel"
+            role="tabpanel"
+            tabIndex={0}
+          >
+            {visibleTracks.length === 0
+              ? <p className="learning-state" role="status">Nenhum curso corresponde à sua busca ou filtro.</p>
+              : <div className="learning-catalog-grid">
+                  {visibleTracks.map(track => {
+                    const percentage = getTrackProgress(track);
+                    const completed = percentage === 100;
+                    const started = percentage > 0;
+                    const isRecommended = !startedAnyCourse && track.id === recommendedTrack?.id;
+                    const categoryLabel = getCourseCategory(track);
+                    return <article className="learning-catalog-course" key={track.id}>
+                      <div className={`learning-catalog-artwork${isRecommended ? ' is-recommended' : ''}`} data-artwork={getTrackArtwork(track.title)}>
+                        <img alt="" decoding="async" loading="lazy" src={track.coverUrl ?? getCourseCover(track.title)} />
+                        <span className={completed ? 'is-complete' : started ? 'is-started' : isRecommended ? 'is-recommended' : ''}>
+                          {completed ? 'Concluído' : started ? 'Em andamento' : isRecommended ? 'Comece por aqui' : 'Pronto para começar'}
+                        </span>
+                      </div>
+                      <div className="learning-catalog-course-content">
+                        <div className="learning-catalog-course-metadata">
+                          {categoryLabel && <span>{categoryLabel}</span>}
+                          <span>{getTrackMetadata(track)}</span>
+                        </div>
+                        <h3><Link to={getTrackPath(track, tracks)}>{track.title}</Link></h3>
+                        <p className="learning-catalog-description">{track.description || 'Um novo aprendizado para levar ao seu dia a dia.'}</p>
+                        <div className="learning-catalog-course-progress">
+                          <span>{track.completedLessonCount} de {track.lessonCount} aulas{started && !completed ? ` · ${percentage}%` : ''}</span>
+                        </div>
+                        <ProgressBar value={percentage} label={`Progresso de ${track.title}`} />
+                        <Link
+                          aria-label={`${completed ? 'Ver certificado de' : started ? 'Continuar curso' : 'Começar curso'} ${track.title}`}
+                          className={`learning-catalog-course-action${isRecommended && !started ? ' is-primary' : ''}${completed ? ' is-complete' : ''}`}
+                          to={completed ? '/learning/certificates' : getTrackPath(track, tracks)}
+                        >
+                          {completed ? 'Ver certificado' : started ? 'Continuar de onde parou' : 'Começar curso'}
+                          <span aria-hidden="true">→</span>
+                        </Link>
+                      </div>
+                    </article>;
+                  })}
+                </div>}
+          </div>
         </section>
       </>}
     </main>
@@ -185,14 +492,12 @@ function LearningHomePage({ participantName, setSummary }: {
 }
 
 function LearningTrackPage({
-  participantName,
+  resumeLessonId,
   setSummary,
-  tenantName,
   trackId,
 }: {
-  participantName?: string;
+  resumeLessonId: string | null;
   setSummary?: (summary: LearningSummary | null) => void;
-  tenantName?: string;
   trackId: string;
 }) {
   const navigate = useNavigate();
@@ -209,6 +514,7 @@ function LearningTrackPage({
   const [retry, setRetry] = useState(0);
   const [playbackRetry, setPlaybackRetry] = useState(0);
   const [playbackRate, setPlaybackRate] = useState('1');
+  const [activeLessonTab, setActiveLessonTab] = useState<'about' | 'notes' | 'materials'>('about');
   const [isSaving, setIsSaving] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const rangeStartRef = useRef<number | null>(null);
@@ -217,6 +523,7 @@ function LearningTrackPage({
   const saveInFlightRef = useRef(false);
   const pendingSaveRef = useRef<Promise<boolean> | null>(null);
   const playbackIdentityRef = useRef('');
+  const advanceAfterCompletionRef = useRef(false);
   const switchingLessonRef = useRef(false);
   const [switchingLesson, setSwitchingLesson] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
@@ -248,7 +555,9 @@ function LearningTrackPage({
           setSelectedLessonId((current) =>
             data.lessons.some((lesson) => lesson.id === current)
               ? current
-              : getNextLesson(data.lessons)?.id ?? null,
+              : data.lessons.find((lesson) => lesson.id === resumeLessonId)?.id
+                ?? getNextLesson(data.lessons)?.id
+                ?? null,
           );
         }
       })
@@ -266,12 +575,17 @@ function LearningTrackPage({
     return () => {
       active = false;
     };
-  }, [trackId, retry]);
+  }, [trackId, retry, resumeLessonId]);
 
   const selectedLesson = useMemo(
     () => experience?.lessons.find((lesson) => lesson.id === selectedLessonId) ?? null,
     [experience, selectedLessonId],
   );
+  const experienceRef = useRef(experience);
+  const selectedLessonRef = useRef(selectedLesson);
+  const completedLessonIdsRef = useRef(new Set<string>());
+  experienceRef.current = experience;
+  selectedLessonRef.current = selectedLesson;
 
   const journeyTracks = useMemo(
     () => experience
@@ -300,8 +614,8 @@ function LearningTrackPage({
     }
     setSummary({
       percentage: overallProgress,
-      completed: journeyTracks.reduce((total, track) => total + track.completedLessonCount, 0),
-      total: journeyTracks.reduce((total, track) => total + track.lessonCount, 0),
+      completed: journeyTracks.filter(track => getTrackProgress(track) === 100).length,
+      total: journeyTracks.length,
     });
   }, [setSummary, experience, journeyTracks, overallProgress]);
 
@@ -346,6 +660,9 @@ function LearningTrackPage({
   }, [apiTrackId, selectedLesson?.id, playbackRetry]);
 
   const applyProgress = useCallback((progress: LearningProgress) => {
+    if (progress.isCompleted) {
+      completedLessonIdsRef.current.add(progress.lessonId);
+    }
     setExperience((current) => {
       if (!current) {
         return current;
@@ -434,11 +751,13 @@ function LearningTrackPage({
           positionMilliseconds,
         );
         applyProgress(progress);
+        advanceToNextLessonIfCompleted(progress);
         if (playbackIdentityRef.current === identity && rangeStartRef.current === rangeStart)
           rangeStartRef.current = positionMilliseconds;
       } else {
         const progress = await saveLearningPosition(assignedTrackId, lesson.id, positionMilliseconds);
         applyProgress(progress);
+        advanceToNextLessonIfCompleted(progress);
       }
       if (playbackIdentityRef.current === identity) {
         lastSavePositionRef.current = positionMilliseconds;
@@ -457,7 +776,7 @@ function LearningTrackPage({
       saveInFlightRef.current = false;
       setIsSaving(false);
     }
-  }, [apiTrackId, applyProgress, playbackSession, selectedLesson]);
+  }, [apiTrackId, applyProgress, experience, playbackSession, selectedLesson]);
 
   useEffect(() => {
     if (!playbackSession || !selectedLesson) {
@@ -574,6 +893,45 @@ function LearningTrackPage({
     } finally { switchingLessonRef.current = false; setSwitchingLesson(false); }
   }
 
+  function advanceToNextLessonIfCompleted(progress: LearningProgress) {
+    if (!progress.isCompleted || !advanceAfterCompletionRef.current || !selectedLesson) {
+      return;
+    }
+    advanceAfterCompletionRef.current = false;
+    moveToNextIncompleteLesson(selectedLesson.id);
+  }
+
+  function moveToNextIncompleteLesson(lessonId: string) {
+    const currentLesson = experienceRef.current?.lessons.find(lesson => lesson.id === lessonId)
+      ?? selectedLessonRef.current;
+    const next = currentLesson && experienceRef.current?.lessons.find(
+      lesson => lesson.position > currentLesson.position && !lesson.isCompleted,
+    );
+    if (next) {
+      setSelectedLessonId(next.id);
+    }
+  }
+
+  async function handleVideoEnded() {
+    const endedLessonId = selectedLesson?.id;
+    if (!endedLessonId) {
+      return;
+    }
+    advanceAfterCompletionRef.current = true;
+    const saved = await persistPlayback(true);
+    if (!saved) {
+      advanceAfterCompletionRef.current = false;
+      return;
+    }
+    if (advanceAfterCompletionRef.current && (
+      completedLessonIdsRef.current.has(endedLessonId) ||
+      (selectedLessonRef.current?.id === endedLessonId && selectedLessonRef.current.isCompleted)
+    )) {
+      moveToNextIncompleteLesson(endedLessonId);
+    }
+    advanceAfterCompletionRef.current = false;
+  }
+
   if (isLoading) {
     return <LoadingState className="learning-state">Carregando a trilha...</LoadingState>;
   }
@@ -598,30 +956,55 @@ function LearningTrackPage({
   const currentIndex = experience.lessons.findIndex((lesson) => lesson.id === selectedLesson?.id);
   const previousLesson = currentIndex > 0 ? experience.lessons[currentIndex - 1] : null;
   const nextLesson = currentIndex >= 0 ? experience.lessons[currentIndex + 1] ?? null : null;
+  const completedLessons = experience.lessons.filter(lesson => lesson.isCompleted).length;
+  const isTrackComplete = completedLessons === experience.lessons.length && experience.lessons.length > 0;
+  const lessonTabs = [
+    { id: 'about', label: 'Sobre a aula' },
+    { id: 'notes', label: 'Minhas anotações' },
+    { id: 'materials', label: 'Materiais' },
+  ] as const;
+  const handleLessonTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const nextIndex = event.key === 'ArrowRight'
+      ? (index + 1) % lessonTabs.length
+      : event.key === 'ArrowLeft'
+        ? (index + lessonTabs.length - 1) % lessonTabs.length
+        : event.key === 'Home'
+          ? 0
+          : event.key === 'End'
+            ? lessonTabs.length - 1
+            : -1;
+    if (nextIndex < 0) {
+      return;
+    }
+    event.preventDefault();
+    setActiveLessonTab(lessonTabs[nextIndex].id);
+    event.currentTarget.parentElement
+      ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]
+      ?.focus();
+  };
 
   return (
-    <main className="learning-page">
-      <Link className="learning-back-to-courses" to="/learning">← Meus cursos</Link>
-      <header className="learning-student-heading">
-        <div>
-          <p className="learning-breadcrumb">
-            {[tenantName, participantName, experience.track.title].filter(Boolean).join(' · ')}
-          </p>
-          <h1>{selectedLesson?.title ?? 'Minha formação'}</h1>
-          <p className="muted-copy">{experience.track.title}
-            {selectedLesson && ` · Vídeo ${selectedLesson.position} de ${experience.lessons.length}`}
-          </p>
-        </div>
-        <div className="learning-student-progress">
-          <strong>{getTrackProgress(experience.track)}% concluído</strong>
+    <main className="learning-page learning-track-page">
+      <header className="learning-course-header">
+        <Link className="learning-back-to-courses" to="/learning">← Minha formação</Link>
+        <div className="learning-course-header-progress">
+          <div className="learning-course-header-copy">
+            <h1>{experience.track.title}</h1>
+            <span>{completedLessons} de {experience.lessons.length} aulas · {getTrackProgress(experience.track)}%</span>
+          </div>
           <ProgressBar value={getTrackProgress(experience.track)} label="Progresso do curso" />
         </div>
       </header>
 
       <div className="learning-experience-layout">
         <section className="learning-main-column">
+          {selectedLesson && (
+            <header className="learning-active-lesson-heading">
+              <p className="eyebrow">AULA {selectedLesson.position} DE {experience.lessons.length}</p>
+              <h2>{selectedLesson.title}</h2>
+            </header>
+          )}
           <div className="learning-player-frame">
-            <span className="learning-video-track-label">{experience.track.title}</span>
             {playbackSession ? (
               <>
                 <video
@@ -633,7 +1016,7 @@ function LearningTrackPage({
                     setPlaybackSession(null);
                     setPlaybackError('Não foi possível carregar o vídeo. Verifique sua conexão e tente novamente.');
                   }}
-                  onEnded={() => void persistPlayback(true)}
+                  onEnded={() => void handleVideoEnded()}
                   onLoadedMetadata={handleLoadedMetadata}
                   onPause={() => void persistPlayback(true)}
                   onPlaying={handlePlaying}
@@ -707,25 +1090,7 @@ function LearningTrackPage({
             lessonPosition={selectedLesson?.position ?? 1} playbackKey={playbackSession?.sessionId} videoRef={videoRef} />
 
           {selectedLesson && (
-            <section aria-labelledby="learning-lesson-title" className="learning-lesson-details">
-              <div className="learning-lesson-heading">
-                <div>
-                  <p className="eyebrow">VÍDEO {selectedLesson.position}</p>
-                  <h2 id="learning-lesson-title">Sobre esta aula</h2>
-                </div>
-                <span className={`learning-status${selectedLesson.isCompleted ? ' is-complete' : ''}`}>
-                  <span aria-hidden="true">{selectedLesson.isCompleted ? '✓' : '○'}</span>
-                  {selectedLesson.isCompleted ? 'Concluído' : selectedLesson.watchedPercentage > 0 ? 'Em andamento' : 'Não iniciado'}
-                </span>
-              </div>
-              {selectedLesson.description && <p className="learning-lesson-description">{selectedLesson.description}</p>}
-              <div className="learning-lesson-footer">
-                <span>{formatDuration(selectedLesson.durationMilliseconds)}</span>
-                <span>{selectedLesson.watchedPercentage}% assistido</span>
-                {selectedLesson.lastPlaybackPositionMilliseconds > 0 && (
-                  <span>Retomada em {formatDuration(selectedLesson.lastPlaybackPositionMilliseconds)}</span>
-                )}
-              </div>
+            <>
               <div className="learning-lesson-navigation">
                 <button
                   className="button button-quiet"
@@ -733,29 +1098,87 @@ function LearningTrackPage({
                   onClick={() => previousLesson && selectLesson(previousLesson)}
                   type="button"
                 >
-                  ← Vídeo anterior
+                  ← Aula anterior
                 </button>
+                <span className={`learning-status${selectedLesson.isCompleted ? ' is-complete' : ''}`}>
+                  <span aria-hidden="true">{selectedLesson.isCompleted ? '✓' : '○'}</span>
+                  {selectedLesson.isCompleted
+                    ? 'Concluída'
+                    : selectedLesson.watchedPercentage > 0
+                      ? 'Em andamento'
+                      : 'Conclusão verificada ao assistir'}
+                </span>
                 <button
                   className="button button-primary"
                   disabled={!nextLesson || switchingLesson}
                   onClick={() => nextLesson && selectLesson(nextLesson)}
                   type="button"
                 >
-                  Próximo vídeo <span aria-hidden="true">→</span>
+                  Próxima aula <span aria-hidden="true">→</span>
                 </button>
               </div>
-            </section>
+              <section aria-label="Informações da aula" className="learning-lesson-details">
+                <div aria-label="Informações e recursos da aula" className="learning-lesson-tabs" role="tablist">
+                  {lessonTabs.map((tab, index) => (
+                    <button
+                      aria-controls="learning-lesson-tab-panel"
+                      aria-selected={activeLessonTab === tab.id}
+                      id={`learning-lesson-tab-${tab.id}`}
+                      key={tab.id}
+                      onClick={() => setActiveLessonTab(tab.id)}
+                      onKeyDown={event => handleLessonTabKeyDown(event, index)}
+                      role="tab"
+                      tabIndex={activeLessonTab === tab.id ? 0 : -1}
+                      type="button"
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <div
+                  aria-labelledby={`learning-lesson-tab-${activeLessonTab}`}
+                  className="learning-lesson-tab-panel"
+                  id="learning-lesson-tab-panel"
+                  role="tabpanel"
+                  tabIndex={0}
+                >
+                  {activeLessonTab === 'about' && (
+                    <>
+                      <div className="learning-lesson-heading">
+                        <h3>Sobre a aula</h3>
+                        <span className={`learning-status${selectedLesson.isCompleted ? ' is-complete' : ''}`}>
+                          <span aria-hidden="true">{selectedLesson.isCompleted ? '✓' : '○'}</span>
+                          {selectedLesson.isCompleted ? 'Concluída' : selectedLesson.watchedPercentage > 0 ? 'Em andamento' : 'Não iniciada'}
+                        </span>
+                      </div>
+                      {selectedLesson.description && <p className="learning-lesson-description">{selectedLesson.description}</p>}
+                      <div className="learning-lesson-footer">
+                        <span>{formatDuration(selectedLesson.durationMilliseconds)}</span>
+                        <span>{selectedLesson.watchedPercentage}% assistido</span>
+                        {selectedLesson.lastPlaybackPositionMilliseconds > 0 && (
+                          <span>Retomada em {formatDuration(selectedLesson.lastPlaybackPositionMilliseconds)}</span>
+                        )}
+                      </div>
+                    </>
+                  )}
+                  {activeLessonTab === 'notes' && (
+                    <p className="learning-resource-unavailable">Anotações ainda não estão disponíveis para esta aula.</p>
+                  )}
+                  {activeLessonTab === 'materials' && (
+                    <p className="learning-resource-unavailable">Materiais ainda não estão disponíveis para esta aula.</p>
+                  )}
+                </div>
+              </section>
+            </>
           )}
         </section>
 
-        <aside aria-label="Conteúdo da trilha" className="learning-curriculum">
-          <details className="learning-curriculum-details" open>
-            <summary>
-              <span>Aulas</span>
-              <span className="learning-curriculum-count">
-                {experience.track.completedLessonCount}/{experience.track.lessonCount}
-              </span>
-            </summary>
+        <aside aria-label="Conteúdo e avaliação do curso" className="learning-course-sidebar">
+          <section aria-labelledby="learning-curriculum-title" className="learning-curriculum-card">
+            <div className="learning-curriculum-heading">
+              <h2 id="learning-curriculum-title">Conteúdo do curso</h2>
+              <span className="learning-curriculum-count">{completedLessons}/{experience.lessons.length}</span>
+            </div>
             <ol className="learning-lesson-list">
               {experience.lessons.map((lesson) => {
                 const isCurrent = lesson.id === selectedLesson?.id;
@@ -788,10 +1211,16 @@ function LearningTrackPage({
                 );
               })}
             </ol>
-          </details>
-          <p className="learning-order-note">
-            Você pode assistir aos vídeos na ordem que preferir.
-          </p>
+          </section>
+          <section aria-labelledby="learning-final-quiz-title" className="learning-quiz-card">
+            <h2 id="learning-final-quiz-title">Quiz final</h2>
+            <p>{isTrackComplete
+              ? 'O quiz ainda não está disponível para este curso.'
+              : 'Conclua todas as aulas para liberar o quiz final.'}</p>
+            <button className="button button-secondary" disabled type="button">
+              {isTrackComplete ? 'Quiz indisponível' : 'Libera ao concluir as aulas'}
+            </button>
+          </section>
         </aside>
       </div>
     </main>
@@ -808,6 +1237,108 @@ function getTrackArtwork(title: string) {
   return 'course';
 }
 
+const courseCategories = [
+  'Saúde física',
+  'Alimentação',
+  'Segurança',
+  'Bem-estar mental',
+] as const;
+
+type CourseCategory = 'all' | typeof courseCategories[number];
+type CourseSort = 'recommended' | 'newest' | 'shortest';
+type TrackWithOptionalCatalogMetadata = LearningTrackCard & {
+  assignedAt?: string | null;
+  category?: string | null;
+  durationMilliseconds?: number | null;
+  level?: string | null;
+  totalDurationMilliseconds?: number | null;
+};
+
+function getCourseCategory(track: TrackWithOptionalCatalogMetadata): CourseCategory | null {
+  const explicitCategory = track.category?.trim().toLocaleLowerCase('pt-BR');
+  const explicitMatch = courseCategories.find(
+    value => value.toLocaleLowerCase('pt-BR') === explicitCategory,
+  );
+  if (explicitMatch) {
+    return explicitMatch;
+  }
+
+  const title = track.title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
+  if (/alimentacao|nutricao/.test(title)) return 'Alimentação';
+  if (/seguranca|prevencao|primeiros socorros/.test(title)) return 'Segurança';
+  if (/bem-estar|saude mental|ansiedade|estresse|emocional/.test(title)) return 'Bem-estar mental';
+  if (/saude|ergonomia|atividade fisica|postura/.test(title)) return 'Saúde física';
+  return null;
+}
+
+function getTrackDuration(track: TrackWithOptionalCatalogMetadata): number | null {
+  const duration = track.totalDurationMilliseconds ?? track.durationMilliseconds;
+  return typeof duration === 'number' && Number.isFinite(duration) && duration > 0
+    ? duration
+    : null;
+}
+
+function getTrackDate(track: TrackWithOptionalCatalogMetadata): number | null {
+  if (!track.assignedAt) {
+    return null;
+  }
+  const date = Date.parse(track.assignedAt);
+  return Number.isFinite(date) ? date : null;
+}
+
+function getTrackMetadata(track: TrackWithOptionalCatalogMetadata): string {
+  const videoLabel = `${track.lessonCount} ${track.lessonCount === 1 ? 'vídeo' : 'vídeos'}`;
+  const duration = getTrackDuration(track);
+  const level = track.level?.trim();
+  return [videoLabel, duration ? formatCourseDuration(duration) : null, level || null]
+    .filter(Boolean)
+    .join(' · ');
+}
+
+function formatCourseDuration(milliseconds: number): string {
+  const minutes = Math.ceil(milliseconds / 60_000);
+  if (minutes >= 60) {
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours} h ${remainingMinutes} min` : `${hours} h`;
+  }
+  return `${minutes} min`;
+}
+
+function getResumeLesson(lessons: LearningLessonProgress[]): LearningLessonProgress | null {
+  return lessons.find(lesson => !lesson.isCompleted &&
+    (lesson.lastPlaybackPositionMilliseconds > 0 || lesson.watchedPercentage > 0))
+    ?? lessons.find(lesson => !lesson.isCompleted)
+    ?? null;
+}
+
+function getLessonResumePercentage(lesson: LearningLessonProgress): number {
+  if (lesson.durationMilliseconds > 0 && lesson.lastPlaybackPositionMilliseconds > 0) {
+    return Math.min(100, Math.floor(
+      lesson.lastPlaybackPositionMilliseconds * 100 / lesson.durationMilliseconds,
+    ));
+  }
+  return Math.min(100, Math.max(0, lesson.watchedPercentage));
+}
+
+function getRemainingCourseMinutes(
+  lessons: LearningLessonProgress[],
+  currentLesson: LearningLessonProgress,
+): number | null {
+  const remainingMilliseconds = lessons.reduce((total, lesson) => {
+    if (lesson.isCompleted) {
+      return total;
+    }
+    return total + Math.max(
+      0,
+      lesson.durationMilliseconds - (lesson.id === currentLesson.id
+        ? lesson.lastPlaybackPositionMilliseconds
+        : 0),
+    );
+  }, 0);
+  return remainingMilliseconds > 0 ? Math.ceil(remainingMilliseconds / 60_000) : null;
+}
+
 function ProgressBar({ value, label }: { value: number; label: string }) {
   const clampedValue = Math.min(100, Math.max(0, value));
   return (
@@ -816,6 +1347,7 @@ function ProgressBar({ value, label }: { value: number; label: string }) {
       aria-valuemax={100}
       aria-valuemin={0}
       aria-valuenow={clampedValue}
+      aria-valuetext={`${clampedValue}%`}
       className="learning-progress-track"
       role="progressbar"
     >
@@ -839,13 +1371,6 @@ function getTrackProgress(track: LearningTrackCard): number {
   return track.completedLessonCount === track.lessonCount
     ? 100
     : Math.min(99, Math.max(0, track.progressPercentage));
-}
-
-function getNextTrack(tracks: LearningTrackCard[]): LearningTrackCard | null {
-  return tracks.find((track) => getTrackProgress(track) > 0 && getTrackProgress(track) < 100)
-    ?? tracks.find((track) => getTrackProgress(track) < 100)
-    ?? tracks[0]
-    ?? null;
 }
 
 function getNextLesson(lessons: LearningLessonProgress[]): LearningLessonProgress | null {

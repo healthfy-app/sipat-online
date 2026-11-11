@@ -28,6 +28,7 @@ vi.mock('./api', () => ({
 
 afterEach(() => {
   cleanup();
+  sessionStorage.clear();
   vi.restoreAllMocks();
   vi.clearAllMocks();
 });
@@ -108,27 +109,43 @@ describe('learning experience', () => {
     listAssignedTracks.mockResolvedValue([{ ...trackCard, lessonCount: 5, completedLessonCount: 5, progressPercentage: coverage }]);
     renderAt('/learning', onSummary);
 
-    expect(await screen.findByText('1 de 1 cursos concluídos', { exact: false })).toHaveTextContent('100% da formação');
+    expect(await screen.findByText('1 de 1 cursos concluídos', { exact: false })).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Progresso de Segurança no trabalho' })).toHaveAttribute('aria-valuenow', '100');
-    expect(screen.getByRole('progressbar', { name: 'Progresso geral da formação' })).toHaveAttribute('aria-valuenow', '100');
-    expect(screen.getByRole('link', { name: /Rever um curso/ })).toHaveAttribute('href', '/learning/tracks/seguranca-no-trabalho');
-    expect(onSummary).toHaveBeenLastCalledWith({ percentage: 100, completed: 5, total: 5 });
-    await user.click(screen.getByRole('button', { name: 'Em andamento' }));
+    const overallProgress = screen.getByRole('progressbar', { name: 'Progresso da trilha' });
+    expect(overallProgress).toHaveAttribute('aria-valuenow', '100');
+    expect(overallProgress).toHaveAttribute('aria-valuetext', '100%');
+    expect(screen.getByRole('link', { name: 'Ver certificado de Segurança no trabalho' }))
+      .toHaveAttribute('href', '/learning/certificates');
+    await waitFor(() => expect(onSummary).toHaveBeenLastCalledWith({
+      percentage: 100,
+      completed: 1,
+      total: 1,
+    }));
+    await user.click(screen.getByRole('tab', { name: /Em andamento/ }));
     expect(screen.queryByRole('article')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Concluídos' }));
-    expect(screen.getByRole('link', { name: 'Rever curso Segurança no trabalho' })).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: /Concluídos/ }));
+    expect(screen.getByRole('link', { name: 'Ver certificado de Segurança no trabalho' })).toBeVisible();
   });
 
   it('continues an unfinished course instead of a completed course with 99 percent raw coverage', async () => {
     const user = userEvent.setup();
+    const unfinishedTrack = { ...trackCard, id: 'track-2', title: 'Ergonomia', lessonCount: 5, progressPercentage: 40 };
     listAssignedTracks.mockResolvedValue([
       { ...trackCard, lessonCount: 5, completedLessonCount: 5, progressPercentage: 99 },
-      { ...trackCard, id: 'track-2', title: 'Ergonomia', lessonCount: 5, progressPercentage: 40 },
+      unfinishedTrack,
     ]);
+    getAssignedTrack.mockResolvedValue({
+      track: unfinishedTrack,
+      lessons: [{ ...lesson, lastPlaybackPositionMilliseconds: 1500, watchedPercentage: 30 }],
+    });
     renderAt('/learning');
-    expect(await screen.findByRole('link', { name: /Continuar aprendendo/ })).toHaveAttribute('href', '/learning/tracks/ergonomia');
-    expect(screen.getByText('1 de 2 cursos concluídos', { exact: false })).toHaveTextContent('70% da formação');
-    await user.click(screen.getByRole('button', { name: 'Em andamento' }));
+    expect(await screen.findByRole('link', { name: /Continuar aula/ }))
+      .toBeVisible();
+    await waitFor(() => expect(screen.getByRole('link', { name: /Continuar aula/ }))
+      .toHaveAttribute('href', '/learning/tracks/ergonomia?lesson=lesson-1'));
+    expect(screen.getByText('Passo 2 de 2 · 70% da formação')).toBeVisible();
+    expect(screen.getByRole('progressbar', { name: 'Progresso da trilha' })).toHaveAttribute('aria-valuenow', '70');
+    await user.click(screen.getByRole('tab', { name: /Em andamento/ }));
     expect(screen.getAllByRole('article')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Continuar curso Ergonomia' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Segurança no trabalho' })).not.toBeInTheDocument();
@@ -139,10 +156,11 @@ describe('learning experience', () => {
     { label: 'empty', lessonCount: 0, raw: 100, expected: 0 },
   ])('does not mark an $label course complete from its percentage alone', async ({ lessonCount, raw, expected }) => {
     listAssignedTracks.mockResolvedValue([{ ...trackCard, lessonCount, progressPercentage: raw }]);
+    getAssignedTrack.mockResolvedValue({ track: trackCard, lessons: [lesson] });
     renderAt('/learning');
-    expect(await screen.findByText('0 de 1 cursos concluídos', { exact: false })).toBeVisible();
+    expect(await screen.findByRole('article')).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Progresso de Segurança no trabalho' })).toHaveAttribute('aria-valuenow', String(expected));
-    expect(screen.queryByRole('link', { name: 'Rever curso Segurança no trabalho' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ver certificado de Segurança no trabalho' })).not.toBeInTheDocument();
   });
 
   it('shows 100 course completion at the accepted threshold without changing watched coverage', async () => {
@@ -152,8 +170,23 @@ describe('learning experience', () => {
     atTime(video, 4.5); fireEvent.pause(video);
     await waitFor(() => expect(screen.getByRole('progressbar', { name: 'Progresso do curso' })).toHaveAttribute('aria-valuenow', '100'));
     expect(screen.getByText('90% assistido')).toBeVisible();
-    expect(screen.getByText('100% concluído')).toBeVisible();
+    expect(screen.getByText('1 de 1 aulas · 100%')).toBeVisible();
     expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 4500, 4500);
+  });
+
+  it('advances to the next lesson only after the backend confirms completion', async () => {
+    const secondLesson = { ...lesson, id: 'lesson-2', title: 'Próximos passos', position: 2 };
+    const { video, container } = await playableCourse([lesson, secondLesson]);
+    recordRange.mockResolvedValue(progress(5000, 90));
+    atTime(video, 0);
+    fireEvent.playing(video);
+    atTime(video, 5);
+    fireEvent.ended(video);
+
+    await waitFor(() => expect(container.querySelector('video'))
+      .toHaveAttribute('src', 'https://media.example.test/lesson-2.mp4'));
+    expect(screen.getByRole('heading', { name: 'Próximos passos' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Marcar como concluída/ })).not.toBeInTheDocument();
   });
 
   it('restores saved position and preserves the chosen playback speed', async () => {
@@ -179,9 +212,9 @@ describe('learning experience', () => {
     atTime(video, 2); fireEvent.pause(video);
     expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 2000, 2000);
     atTime(video, 3.9); fireEvent.ended(video);
-    await user.click(screen.getByRole('button', { name: /Próximo vídeo/ }));
+    await user.click(screen.getByRole('button', { name: /Próxima aula/ }));
     expect(startPlayback).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: /Próximo vídeo/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Próxima aula/ })).toBeDisabled();
     finish(progress(2000));
     await waitFor(() => expect(container.querySelector('video')).toHaveAttribute('src', 'https://media.example.test/lesson-2.mp4'));
     expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 3900, 3900);
@@ -210,13 +243,13 @@ describe('learning experience', () => {
     recordRange.mockRejectedValue(new Error('Não foi possível salvar. Tente novamente.'));
     atTime(video, 0); fireEvent.playing(video);
     atTime(video, 2);
-    await user.click(screen.getByRole('link', { name: /Meus cursos/ }));
+    await user.click(screen.getByRole('link', { name: /Minha formação/ }));
     expect(await screen.findByText('Não foi possível salvar. Tente novamente.')).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).not.toBeInTheDocument();
     recordRange.mockResolvedValue(progress(2000));
     await user.click(screen.getByRole('button', { name: 'Tentar salvar progresso' }));
     expect(await screen.findByText('Progresso salvo')).toBeVisible();
-    await user.click(screen.getByRole('link', { name: /Meus cursos/ }));
+    await user.click(screen.getByRole('link', { name: /Minha formação/ }));
     expect(await screen.findByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).toBeVisible();
   });
 
@@ -265,27 +298,65 @@ describe('learning experience', () => {
 
   it('filters assigned courses by status and search and restores the full catalog', async () => {
     const user = userEvent.setup();
+    const activeTrack = { ...trackCard, id: 'track-2', title: 'Ergonomia', lessonCount: 3, completedLessonCount: 1, progressPercentage: 50 };
     listAssignedTracks.mockResolvedValue([
       trackCard,
-      { ...trackCard, id: 'track-2', title: 'Ergonomia', lessonCount: 3, completedLessonCount: 1, progressPercentage: 50 },
+      activeTrack,
       { ...trackCard, id: 'track-3', title: 'Primeiros socorros', completedLessonCount: 1, progressPercentage: 100 },
     ]);
+    getAssignedTrack.mockResolvedValue({
+      track: activeTrack,
+      lessons: [{ ...lesson, lastPlaybackPositionMilliseconds: 1500, watchedPercentage: 30 }],
+    });
     renderAt('/learning');
-    expect(await screen.findByRole('progressbar', { name: 'Progresso geral da formação' })).toHaveAttribute('aria-valuenow', '50');
-    expect(screen.getByText('1 de 3 cursos concluídos', { exact: false })).toBeVisible();
-    expect(screen.getByRole('link', { name: /Continuar aprendendo/ })).toHaveAttribute('href', '/learning/tracks/ergonomia');
-    await user.click(screen.getByRole('button', { name: 'Em andamento' }));
+    expect(await screen.findByRole('progressbar', { name: 'Progresso da trilha' })).toHaveAttribute('aria-valuenow', '50');
+    expect(screen.getByText('Passo 2 de 3 · 50% da formação')).toBeVisible();
+    await waitFor(() => expect(screen.getByRole('link', { name: /Continuar aula/ }))
+      .toHaveAttribute('href', '/learning/tracks/ergonomia?lesson=lesson-1'));
+    await user.click(screen.getByRole('tab', { name: /Em andamento/ }));
     expect(screen.getByRole('link', { name: 'Continuar curso Ergonomia' })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Começar curso Segurança no trabalho' })).not.toBeInTheDocument();
     await user.type(screen.getByRole('searchbox', { name: 'Buscar curso' }), 'ausente');
-    expect(screen.getByRole('status')).toHaveTextContent('Nenhum curso corresponde');
+    expect(screen.getByText('Nenhum curso corresponde à sua busca ou filtro.')).toBeVisible();
     await user.clear(screen.getByRole('searchbox', { name: 'Buscar curso' }));
-    await user.click(screen.getByRole('button', { name: 'Concluídos' }));
-    expect(screen.getByRole('link', { name: 'Rever curso Primeiros socorros' })).toBeVisible();
+    await user.click(screen.getByRole('tab', { name: /Concluídos/ }));
+    expect(screen.getByRole('link', { name: 'Ver certificado de Primeiros socorros' })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Continuar curso Ergonomia' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Todos' }));
+    await user.click(screen.getByRole('tab', { name: /Todos/ }));
     expect(screen.getAllByRole('article')).toHaveLength(3);
     expect(startPlayback).not.toHaveBeenCalled();
+  });
+
+  it('combines status, category, and search filters and supports keyboard tabs', async () => {
+    const user = userEvent.setup();
+    const nutritionTrack = {
+      ...trackCard,
+      id: 'track-2',
+      title: 'Alimentação saudável',
+      progressPercentage: 25,
+    };
+    listAssignedTracks.mockResolvedValue([
+      { ...trackCard, progressPercentage: 40 },
+      nutritionTrack,
+    ]);
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({
+      track: trackId === nutritionTrack.id ? nutritionTrack : trackCard,
+      lessons: [{ ...lesson, lastPlaybackPositionMilliseconds: 1500, watchedPercentage: 30 }],
+    }));
+
+    renderAt('/learning');
+    const allTab = await screen.findByRole('tab', { name: /Todos/ });
+    allTab.focus();
+    fireEvent.keyDown(allTab, { key: 'ArrowRight' });
+    expect(screen.getByRole('tab', { name: /Em andamento/ })).toHaveAttribute('aria-selected', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Segurança' }));
+    expect(screen.getAllByRole('article')).toHaveLength(1);
+    expect(screen.getByRole('heading', { name: 'Segurança no trabalho' })).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Alimentação saudável' })).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar curso' }), 'ausente');
+    expect(screen.getByText('Nenhum curso corresponde à sua busca ou filtro.')).toBeVisible();
   });
 
   it('shows a loading state then a retryable failure without presenting an empty catalog', async () => {
@@ -311,7 +382,7 @@ describe('learning experience', () => {
     expect(screen.getByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).toBeVisible();
     expect(getAssignedTrack).not.toHaveBeenCalled();
     expect(startPlayback).not.toHaveBeenCalled();
-    expect(screen.getByRole('progressbar', { name: 'Progresso geral da formação' }))
+    expect(screen.getByRole('progressbar', { name: 'Progresso da formação: 0% concluído' }))
       .toHaveAttribute('aria-valuenow', '0');
   });
 
@@ -363,7 +434,7 @@ describe('learning experience', () => {
     expect(screen.queryByRole('navigation', { name: 'Trilhas da SIPAT' })).not.toBeInTheDocument();
     expect(screen.queryByText('Ergonomia')).not.toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Progresso do curso' })).toHaveAttribute('aria-valuenow', '0');
-    await user.click(screen.getByRole('link', { name: '← Meus cursos' }));
+    await user.click(screen.getByRole('link', { name: '← Minha formação' }));
     await user.click(await screen.findByRole('link', { name: 'Continuar curso Ergonomia' }));
 
     expect(await screen.findByRole('heading', { name: 'Postura no computador' })).toBeVisible();
@@ -395,14 +466,15 @@ describe('learning experience', () => {
     ] as const;
 
     for (const [label, artwork] of artworkByTrack) {
-      const card = screen.getByRole('heading', { name: label }).closest('article')!;
+      const card = Array.from(container.querySelectorAll<HTMLElement>('.learning-catalog-course'))
+        .find(article => article.querySelector('h3')?.textContent === label)!;
       expect(card.querySelector('.learning-catalog-artwork')).toHaveAttribute('data-artwork', artwork);
       expect(card.querySelector('img')).toHaveAttribute('alt', '');
       expect(card.querySelector('img')).toHaveAttribute('loading', 'lazy');
       expect(card.querySelector('img')?.getAttribute('src')).toMatch(/^\/course-covers\/.+\.jpg$/);
     }
 
-    expect(screen.getByRole('link', { name: 'Rever curso Comportamento seguro' })).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Ver certificado de Comportamento seguro' })).toBeVisible();
     expect(container.querySelectorAll('.learning-catalog-course')).toHaveLength(5);
   });
 
