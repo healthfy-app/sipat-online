@@ -223,6 +223,8 @@ describe('tenant portal', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Entre na sua área de aprendizagem' })).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Acesso ao portal da empresa' })).toBeVisible();
+    expect(screen.getByText('Pequenos passos. Rotinas mais seguras.')).toBeInTheDocument();
     expect(screen.getByText('Acme Segurança')).toBeVisible();
     expect(screen.getByLabelText('Matrícula')).toBeVisible();
   });
@@ -451,6 +453,8 @@ describe('tenant portal', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Acesse a plataforma' })).toBeVisible();
+    expect(screen.getByRole('region', { name: 'Acesso à plataforma' })).toBeVisible();
+    expect(screen.getByText('Acesso exclusivo para a equipe de operação.')).toBeVisible();
     await user.type(screen.getByLabelText('Matrícula'), 'operator');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));

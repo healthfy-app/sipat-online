@@ -38,6 +38,7 @@ import TenantAppearancePage from './TenantAppearancePage';
 import { BrandThemeContext, tenantTheme } from './branding';
 import LoadingState from './LoadingState';
 import './AdminDesign.css';
+import './LoginPage.css';
 
 type AppState =
   | { status: 'loading' }
@@ -372,7 +373,10 @@ function LoginPage({
   }
 
   return (
-    <section className="login-layout">
+    <section
+      aria-label={tenant.tenantKey === 'platform' ? 'Acesso à plataforma' : 'Acesso ao portal da empresa'}
+      className="login-layout"
+    >
       <div className="login-brand-panel">
         <TenantIdentity tenant={tenant} compact={false} />
         <div className="login-intro">
@@ -393,18 +397,53 @@ function LoginPage({
             </>
           )}
         </div>
+        <div aria-hidden="true" className="login-brand-art">
+          <span className="login-brand-orbit login-brand-orbit-large" />
+          <span className="login-brand-orbit login-brand-orbit-small" />
+          <div className="login-brand-card">
+            <span className="login-brand-symbol">
+              <svg viewBox="0 0 24 24">
+                <path d="M12 3 19 6v5c0 4.7-2.9 8.3-7 10-4.1-1.7-7-5.3-7-10V6l7-3Z" />
+                <path d="m9 12 2 2 4-4" />
+              </svg>
+            </span>
+            <span className="login-brand-card-copy">
+              <span>{tenant.tenantKey === 'platform' ? 'OPERAÇÃO DA PLATAFORMA' : 'FORMAÇÃO DA EQUIPE'}</span>
+              <strong>
+                {tenant.tenantKey === 'platform'
+                  ? 'Clareza para cuidar da operação.'
+                  : 'Pequenos passos. Rotinas mais seguras.'}
+              </strong>
+            </span>
+            <span className="login-brand-card-check">✓</span>
+          </div>
+          <span className="login-brand-art-label">SIPAT <span>ONLINE</span></span>
+        </div>
         <span className="login-caption">
           {tenant.tenantKey === 'platform' ? 'Acesso exclusivo para operadores' : 'Ambiente de aprendizagem da empresa'}
         </span>
       </div>
       <div className="login-form-panel" id="app-content" tabIndex={-1}>
-        <form className="login-card" onSubmit={handleSubmit}>
-          <p className="eyebrow">BEM-VINDO(A)</p>
-          <h2>{tenant.tenantKey === 'platform' ? 'Acesse a plataforma' : 'Entre na sua área de aprendizagem'}</h2>
+        <form aria-labelledby="login-form-title" className="login-card" onSubmit={handleSubmit}>
+          <div className="login-form-heading">
+            <span aria-hidden="true" className="login-form-symbol">
+              <svg viewBox="0 0 24 24">
+                <rect height="10" rx="2" width="14" x="5" y="11" />
+                <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+                <path d="M12 15v2" />
+              </svg>
+            </span>
+            <div>
+              <p className="eyebrow">ACESSO SEGURO</p>
+              <h2 id="login-form-title">
+                {tenant.tenantKey === 'platform' ? 'Acesse a plataforma' : 'Entre na sua área de aprendizagem'}
+              </h2>
+            </div>
+          </div>
           <p className="muted-copy">
             {tenant.tenantKey === 'platform'
               ? 'Entre com suas credenciais de operação.'
-              : 'Entre com a matrícula e a senha fornecidas pela sua empresa.'}
+              : 'Use a matrícula e a senha fornecidas pela sua empresa.'}
           </p>
           <label htmlFor="login-identifier">Matrícula</label>
           <input
@@ -438,10 +477,12 @@ function LoginPage({
           </div>
           {error && <p className="form-error" role="alert">{error}</p>}
           <button className="button button-primary button-wide" aria-busy={isSubmitting} disabled={isSubmitting}>
-            {isSubmitting ? 'Entrando...' : 'Entrar no portal'}
+            {isSubmitting ? 'Entrando...' : <>Entrar no portal <span aria-hidden="true">→</span></>}
           </button>
           <p className="login-help">
-            Precisa de ajuda? Fale com o administrador da sua empresa.
+            {tenant.tenantKey === 'platform'
+              ? 'Acesso exclusivo para a equipe de operação.'
+              : 'Precisa de ajuda? Fale com o administrador da sua empresa.'}
           </p>
         </form>
       </div>
