@@ -386,8 +386,13 @@ describe('Platform course catalog', () => {
 
   it('shows existing courses directly without opening a popup', async () => {
     render(<PlatformCoursesPage />);
+    expect(await screen.findByRole('heading', { name: 'Cursos', level: 1 })).toBeVisible();
+    expect(screen.getByText('2 cursos no catálogo da plataforma')).toBeVisible();
     expect(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Abrir curso Combate a incêndio' })).toBeVisible();
+    expect(screen.getByText('2 vídeos · 3:00')).toBeVisible();
+    expect(screen.queryByText('Postura')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Todas as opções' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('region', { name: 'Como deseja começar?' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });

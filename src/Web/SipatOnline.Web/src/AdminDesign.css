@@ -686,6 +686,25 @@
   gap: var(--admin-space-4);
 }
 
+.platform-course-filter-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 0.6fr) auto;
+  align-items: end;
+  gap: var(--admin-space-3);
+  margin-bottom: var(--admin-space-4);
+}
+
+.platform-course-filter-row .field {
+  min-width: 0;
+  margin: 0;
+}
+
+.platform-course-filter-row .course-option-filters {
+  min-width: 0;
+  margin: 0;
+  flex-wrap: nowrap;
+}
+
 .platform-course-card {
   min-height: 0;
   gap: 0;
@@ -829,6 +848,16 @@
   .platform-user-filters {
     grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
   }
+
+  .platform-course-filter-row {
+    grid-template-columns: minmax(0, 1fr) minmax(10rem, 0.8fr);
+  }
+
+  .platform-course-filter-row .course-option-filters {
+    grid-column: 1 / -1;
+    overflow-x: auto;
+    padding-block: 2px;
+  }
 }
 
 @media (max-width: 600px) {
@@ -847,6 +876,14 @@
   .company-context-banner {
     align-items: flex-start;
     padding-inline: var(--admin-space-4);
+  }
+
+  .platform-course-filter-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .platform-course-filter-row .course-option-filters {
+    grid-column: auto;
   }
 
   .company-context-return {
