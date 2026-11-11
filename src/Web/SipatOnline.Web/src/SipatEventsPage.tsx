@@ -9,6 +9,7 @@ import {
   type SipatEvent,
   type SipatEventData,
 } from './api';
+import { Drawer } from './AdminComponents';
 
 interface EventFormValues {
   title: string;
@@ -36,6 +37,7 @@ export default function SipatEventsPage() {
   const [formValues, setFormValues] = useState<EventFormValues>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
 
   const loadEvents = useCallback(async (nextOffset: number) => {
     setIsLoading(true);
@@ -61,6 +63,7 @@ export default function SipatEventsPage() {
     setFormValues(emptyForm);
     setError('');
     setNotice('');
+    setIsFormOpen(true);
   }
 
   function startEdit(event: SipatEvent) {
@@ -73,6 +76,7 @@ export default function SipatEventsPage() {
     });
     setError('');
     setNotice('');
+    setIsFormOpen(true);
   }
 
   function updateField(field: keyof EventFormValues, value: string) {
@@ -113,6 +117,7 @@ export default function SipatEventsPage() {
       }
       setEditingId(null);
       setFormValues(emptyForm);
+      setIsFormOpen(false);
       if (!editingId && offset !== 0) {
         setOffset(0);
       } else {
@@ -174,14 +179,14 @@ export default function SipatEventsPage() {
       {notice && <p className="success-message" role="status">{notice}</p>}
       {error && <p className="form-error page-error" role="alert">{error}</p>}
 
-      <section aria-labelledby="event-form-title" className="form-card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">{editingId ? 'EDIÇÃO' : 'NOVO EVENTO'}</p>
-            <h2 id="event-form-title">{editingId ? 'Editar programação' : 'Cadastrar programação da SIPAT'}</h2>
-          </div>
-          <span className="draft-note">Novas programações começam como rascunho</span>
-        </div>
+      {isFormOpen && <Drawer
+        busy={isSaving}
+        onClose={() => {
+          setIsFormOpen(false);
+          setError('');
+        }}
+        title={editingId ? 'Editar programação' : 'Nova programação'}
+      >
         <form className="event-form" onSubmit={handleSubmit}>
           <div className="field full-width">
             <label htmlFor="event-title">Nome da programação</label>
@@ -223,6 +228,11 @@ export default function SipatEventsPage() {
               value={formValues.endsAt}
             />
           </div>
+          {formValues.startsAt && formValues.endsAt && new Date(formValues.endsAt) > new Date(formValues.startsAt) && (
+            <p className="field-hint full-width">
+              Duração: {formatDuration(new Date(formValues.endsAt).getTime() - new Date(formValues.startsAt).getTime())}
+            </p>
+          )}
           <div className="form-actions full-width">
             <button className="button button-primary" disabled={isSaving} type="submit">
               {isSaving ? 'Salvando...' : editingId ? 'Salvar alterações' : 'Criar rascunho'}
@@ -234,7 +244,7 @@ export default function SipatEventsPage() {
             )}
           </div>
         </form>
-      </section>
+      </Drawer>}
 
       <section aria-labelledby="events-list-title" className="list-section">
         <div className="section-heading">
@@ -282,9 +292,12 @@ export default function SipatEventsPage() {
                     </button>
                   )}
                   {event.status !== 'Cancelled' && (
-                    <button className="button button-danger-quiet" onClick={() => void handleCancel(event)} type="button">
-                      Cancelar programação
-                    </button>
+                    <details className="event-more-actions">
+                      <summary>Mais ações</summary>
+                      <button className="button button-danger-quiet" onClick={() => void handleCancel(event)} type="button">
+                        Cancelar programação
+                      </button>
+                    </details>
                   )}
                 </div>
               </article>
@@ -341,6 +354,18 @@ function formatDateTime(value: string): string {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value));
+}
+
+function formatDuration(milliseconds: number): string {
+  const minutes = Math.round(milliseconds / 60_000);
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const remainder = minutes % 60;
+  return [
+    days > 0 ? `${days} ${days === 1 ? 'dia' : 'dias'}` : '',
+    hours > 0 ? `${hours} h` : '',
+    remainder > 0 ? `${remainder} min` : '',
+  ].filter(Boolean).join(' ') || 'menos de 1 min';
 }
 
 function getErrorMessage(error: unknown): string {

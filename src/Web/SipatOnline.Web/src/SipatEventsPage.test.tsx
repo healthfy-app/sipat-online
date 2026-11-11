@@ -73,6 +73,7 @@ describe('SIPAT schedule administration', () => {
 
     render(<SipatEventsPage />);
 
+    await user.click(screen.getByRole('button', { name: /Nova programação/ }));
     await user.type(await screen.findByLabelText('Nome da programação'), 'Nova SIPAT');
     await user.type(screen.getByLabelText('Descrição (opcional)'), 'Prevenção e saúde');
     fireEvent.change(screen.getByLabelText('Início'), {
@@ -81,6 +82,7 @@ describe('SIPAT schedule administration', () => {
     fireEvent.change(screen.getByLabelText('Término'), {
       target: { value: '2026-11-01T10:30' },
     });
+    expect(screen.getByText('Duração: 1 h 30 min')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Criar rascunho' }));
 
     await waitFor(() => expect(api.createSipatEvent).toHaveBeenCalledOnce());
@@ -136,7 +138,9 @@ describe('SIPAT schedule administration', () => {
 
     render(<SipatEventsPage />);
 
-    await user.click(await screen.findByRole('button', { name: 'Cancelar programação' }));
+    await screen.findByText('SIPAT 2026');
+    await user.click(screen.getByText('Mais ações'));
+    await user.click(screen.getByRole('button', { name: 'Cancelar programação' }));
 
     expect(window.confirm).toHaveBeenCalledWith(
       'Deseja cancelar a programação "SIPAT 2026"? Essa ação não pode ser desfeita.',

@@ -89,13 +89,30 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
           <div className="appearance-logo-sample">
             <img src={previewLogo ?? '/favicon.svg'} alt="Prévia da logo da empresa" />
           </div>
-          <div className="field">
-            <label htmlFor="appearance-logo">Enviar logo (PNG)</label>
-            <input id="appearance-logo" key={fileVersion} type="file" accept=".png,image/png"
-              disabled={busy || reading} aria-describedby="appearance-logo-help"
-              onChange={event => void readLogo(event.target.files?.[0])} />
-            <p className="field-hint" id="appearance-logo-help">Até 256 KB e 2000 × 2000 pixels. Prefira um PNG com fundo transparente.</p>
-          </div>
+          <label
+            className="appearance-upload-dropzone"
+            htmlFor="appearance-logo"
+            onDragOver={event => event.preventDefault()}
+            onDrop={event => {
+              event.preventDefault();
+              void readLogo(event.dataTransfer.files[0]);
+            }}
+          >
+            <strong>Selecionar logo PNG</strong>
+            <span>Arraste o arquivo até aqui ou clique para procurar · até 256 KB</span>
+            <input
+              aria-label="Selecionar logo PNG"
+              aria-describedby="appearance-logo-help"
+              accept=".png,image/png"
+              className="appearance-file-input"
+              disabled={busy || reading}
+              id="appearance-logo"
+              key={fileVersion}
+              onChange={event => void readLogo(event.target.files?.[0])}
+              type="file"
+            />
+          </label>
+          <p className="field-hint" id="appearance-logo-help">Até 2000 × 2000 pixels. Prefira um PNG com fundo transparente.</p>
           {fileName && <p className="muted-copy">{fileName} · pronto para salvar</p>}
           {(previewLogo || logoBase64) && <button className="button button-quiet" type="button" disabled={busy || reading}
             onClick={() => { setRemoveLogo(true); setLogoBase64(null); setFileName(''); setFileVersion(value => value + 1); setNotice(''); }}>
@@ -108,7 +125,9 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
           <ColorField label="Cor principal" value={primary} fallback={tenant.primaryColor} onChange={setPrimary} disabled={busy} id="primary" />
           <ColorField label="Cor do texto dos botões" value={secondary} fallback={tenant.secondaryColor} onChange={setSecondary} disabled={busy} id="secondary" />
           <p className={`appearance-contrast${colorsValid && contrast >= 4.5 ? '' : ' appearance-contrast-warning'}`} role="status">
-            {colorsValid ? `Contraste ${contrast.toFixed(2).replace('.', ',')}:1 · ${contrast >= 4.5 ? 'Texto legível' : 'Ajuste as cores para atingir 4,5:1'}` : 'Use cores no formato #RRGGBB.'}
+            {colorsValid
+              ? `${contrast >= 4.5 ? '✓' : '!'} Contraste ${contrast.toFixed(2).replace('.', ',')}:1 · ${contrast >= 4.5 ? 'Texto legível' : 'Ajuste as cores para atingir 4,5:1'}`
+              : 'Use cores no formato #RRGGBB.'}
           </p>
         </section>
         <div className="appearance-save">

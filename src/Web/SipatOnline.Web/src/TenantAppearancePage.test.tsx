@@ -47,7 +47,7 @@ describe('company identity settings', () => {
     vi.mocked(saveTenantAppearance).mockResolvedValue(saved);
     render(<TenantAppearancePage tenant={tenant} onSaved={onSaved} />);
     const user = userEvent.setup();
-    await user.upload(screen.getByLabelText('Enviar logo (PNG)'), logo);
+    await user.upload(screen.getByLabelText('Selecionar logo PNG'), logo);
     await screen.findByText('company.png · pronto para salvar');
     fireEvent.change(screen.getByLabelText('Selecionar cor principal'), { target: { value: '#234567' } });
     expect(onSaved).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('company identity settings', () => {
 
   it('rejects oversized uploads while preserving the published logo', async () => {
     render(<TenantAppearancePage tenant={tenant} onSaved={vi.fn()} />);
-    await userEvent.setup().upload(screen.getByLabelText('Enviar logo (PNG)'),
+    await userEvent.setup().upload(screen.getByLabelText('Selecionar logo PNG'),
       new File([new Uint8Array(262145)], 'large.png', { type: 'image/png' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Selecione uma logo PNG de até 256 KB.');
     expect(screen.getByRole('img', { name: 'Prévia da logo da empresa' })).toHaveAttribute('src', '/logo.png');
