@@ -3,7 +3,8 @@ export function getCourseCover(title: string): string {
   const subject = /alimentacao|nutricao/.test(normalized) ? 'nutrition'
     : /ergonomia|atividade fisica/.test(normalized) ? 'ergonomics'
     : /seguranca|comportamento seguro|prevencao/.test(normalized) ? 'safety'
-    : /higiene mental|habitos|saude|sono/.test(normalized) ? 'wellbeing'
+    : /habitos|qualidade de vida/.test(normalized) ? 'workplace'
+    : /higiene mental|saude|sono/.test(normalized) ? 'wellbeing'
     : /lideranca/.test(normalized) ? 'leadership'
     : 'workplace';
   return `/course-covers/${subject}.jpg`;

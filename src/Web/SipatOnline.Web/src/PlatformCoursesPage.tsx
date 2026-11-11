@@ -801,12 +801,22 @@ function CourseDetail({
         </div>
         <div className="form-card">
           <h3>Publicação no catálogo</h3>
-          <p>Publique agora para disponibilizar o curso no catálogo operacional. Os vínculos e o progresso das empresas existentes são preservados.</p>
+          <p>Publique agora para disponibilizar o curso no catálogo de cursos. Os vínculos e o progresso das empresas existentes são preservados.</p>
+          <ul aria-label="Checklist de publicação" className="course-publish-checklist">
+            <li className={title.trim() ? 'is-ready' : ''}>Nome do curso</li>
+            <li className={description.trim() ? 'is-ready' : ''}>Descrição</li>
+            <li className={course.videos.length > 0 ? 'is-ready' : ''}>Vídeo</li>
+            <li className={course.coverUrl ? 'is-ready' : 'is-optional'}>Foto do curso · opcional</li>
+          </ul>
           {course.videos.length === 0 && <p className="form-error">Adicione ao menos um vídeo antes de publicar.</p>}
-          <button className="button course-primary" disabled={isSaving || isMediaBusy || course.videos.length === 0 || !title.trim()}
+          <button className="button course-primary" disabled={isSaving || isMediaBusy || course.videos.length === 0 || !title.trim() || !description.trim()}
             onClick={() => void saveCourse('Published')} type="button">{status === 'Published' ? 'Publicar alterações' : 'Publicar agora'}</button>
           {status === 'Published' && <button className="button button-secondary" disabled={isSaving || isMediaBusy}
-            onClick={() => void saveCourse('Draft')} type="button">Voltar a rascunho</button>}
+            onClick={() => {
+              if (window.confirm('Voltar este curso para rascunho? Ele deixará de aparecer no catálogo.')) {
+                void saveCourse('Draft');
+              }
+            }} type="button">Voltar a rascunho</button>}
         </div>
       </section>}
       {activeDialog === 'video' && (
