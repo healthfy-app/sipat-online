@@ -37,6 +37,7 @@ import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
 import { BrandThemeContext, tenantTheme } from './branding';
 import LoadingState from './LoadingState';
+import './AdminDesign.css';
 
 type AppState =
   | { status: 'loading' }
@@ -471,6 +472,8 @@ function ProtectedPortal({
     session.roles.includes('Participant') &&
     !hasAdminRole(session) &&
     !session.roles.includes('PlatformOperator');
+  const isPlatformOperator = session.roles.includes('PlatformOperator');
+  const isPlatformCompanyContext = isPlatformOperator && Boolean(getCompanyAdministrationId());
 
   async function handleSignOut() {
     setError('');
@@ -486,7 +489,7 @@ function ProtectedPortal({
   }
 
   return (
-    <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
+    <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
       {!isLearnerOnly && <header className="portal-header">
         <Link
           aria-label={`${tenant.tenantName} - início`}
@@ -496,13 +499,16 @@ function ProtectedPortal({
           <TenantIdentity tenant={tenant} compact />
         </Link>
         <div className="header-actions">
-          {session.roles.includes('PlatformOperator') && getCompanyAdministrationId() && (
-            <div className="company-context-banner">
-              <span><strong>Administrando: {tenant.tenantName}</strong> · Dono da plataforma</span>
-              <a className="button button-quiet" href="/platform" onClick={clearCompanyAdministration}>
-                Sair da empresa
+          {isPlatformCompanyContext && (
+            <aside aria-label="Modo de administração da empresa" className="company-context-banner">
+              <span>
+                <strong>Administrando como dono</strong>
+                <span>{tenant.tenantName} · Dono da plataforma</span>
+              </span>
+              <a className="button button-secondary" href="/platform" onClick={clearCompanyAdministration}>
+                Voltar à plataforma
               </a>
-            </div>
+            </aside>
           )}
           <span className="user-name">{session.displayName}</span>
           <button
@@ -511,7 +517,7 @@ function ProtectedPortal({
             onClick={handleSignOut}
             type="button"
           >
-            {isSigningOut ? 'Saindo...' : 'Sair'}
+            {isSigningOut ? 'Saindo...' : 'Sair da conta'}
           </button>
         </div>
       </header>}
@@ -524,10 +530,32 @@ function ProtectedPortal({
             <nav aria-label="Seções da área do aluno" className="learner-sidebar-nav">
               <Link aria-current={location.pathname === '/learning' || location.pathname.startsWith('/learning/tracks/') ? 'page' : undefined}
                 className={`learner-sidebar-link${location.pathname === '/learning' || location.pathname.startsWith('/learning/tracks/') ? ' active' : ''}`}
-                to="/learning">Minha formação</Link>
-              <NavLink className="learner-sidebar-link" to="/learning/certificates">Meus certificados</NavLink>
-              <span className="learner-sidebar-unavailable">Fórum <small>Em breve</small></span>
+                aria-label="Minha formação"
+                to="/learning">
+                <span className="learner-nav-desktop-label">Minha formação</span>
+                <span aria-hidden="true" className="learner-nav-mobile-label">Formação</span>
+              </Link>
+              <NavLink
+                aria-label="Meus certificados"
+                className={({ isActive }) => `learner-sidebar-link${isActive ? ' active' : ''}`}
+                to="/learning/certificates">
+                <span className="learner-nav-desktop-label">Meus certificados</span>
+                <span aria-hidden="true" className="learner-nav-mobile-label">Certificados</span>
+              </NavLink>
             </nav>
+            {location.pathname === '/learning' && (
+              <button
+                aria-label="Buscar cursos"
+                className="learner-mobile-search"
+                onClick={() => document.getElementById('learning-course-search')?.focus()}
+                type="button"
+              >
+                <svg aria-hidden="true" viewBox="0 0 24 24">
+                  <circle cx="10.8" cy="10.8" r="6.8" />
+                  <path d="m16 16 4.5 4.5" />
+                </svg>
+              </button>
+            )}
             {learningSummary && (
               <div className="learner-sidebar-progress">
                 <svg aria-hidden="true" viewBox="0 0 56 56">
@@ -541,7 +569,7 @@ function ProtectedPortal({
                 </svg>
                 <div>
                   <strong>{learningSummary.percentage}% concluído</strong>
-                  <span>{learningSummary.completed} de {learningSummary.total} aulas</span>
+                  <span>{learningSummary.completed} de {learningSummary.total} cursos</span>
                 </div>
               </div>
             )}
@@ -556,35 +584,34 @@ function ProtectedPortal({
           </aside>
         )}
         {!isLearnerOnly && <aside aria-label="Navegação principal" className="sidebar">
-          {session.roles.includes('Participant') && (
+          {session.roles.includes('Participant') && !isPlatformCompanyContext && (
             <>
               <p className="sidebar-label">APRENDIZAGEM</p>
-              <NavLink className="sidebar-link" to="/learning">Minhas trilhas</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/learning">Minhas trilhas</NavLink>
             </>
           )}
-          {canViewCompany(session) && (
+          {canViewCompany(session) && (!isPlatformOperator || isPlatformCompanyContext) && (
             <>
-              <p className="sidebar-label">GESTÃO</p>
-              <NavLink className="sidebar-link" to="/admin/dashboard">Visão geral</NavLink>
+              <p className="sidebar-label">GESTÃO DA EMPRESA</p>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
               {hasAdminRole(session) && <>
-                <NavLink className="sidebar-link" to="/admin/sipats">Programação da SIPAT</NavLink>
-                <NavLink className="sidebar-link" to="/admin/content">Trilhas e vídeos</NavLink>
-                <NavLink className="sidebar-link" to="/admin/appearance">Identidade visual</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">Programação da SIPAT</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/content">Trilhas e vídeos</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>
               </>}
-              <NavLink className="sidebar-link" to="/admin/learning">
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
                 {hasAdminRole(session) ? 'Participantes e trilhas' : 'Acompanhamento'}
               </NavLink>
             </>
           )}
-          {session.roles.includes('PlatformOperator') && (
+          {isPlatformOperator && !isPlatformCompanyContext && (
             <>
-              <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
-              <NavLink className="sidebar-link" to="/platform" end>Empresas</NavLink>
-              <NavLink className="sidebar-link" to="/platform/dashboard">Dashboard</NavLink>
-              <NavLink className="sidebar-link" to="/platform/companies">Cadastrar empresa</NavLink>
-              <NavLink className="sidebar-link" to="/platform/users">Usuários</NavLink>
-              <NavLink className="sidebar-link" to="/platform/courses">Cursos</NavLink>
-              <NavLink className="sidebar-link" to="/platform/settings">Configurações</NavLink>
+              <p className="sidebar-label">PLATAFORMA</p>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/dashboard">Dashboard</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/users">Usuários</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Cursos</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
             </>
           )}
           <div className="sidebar-footer">

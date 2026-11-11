@@ -10,7 +10,8 @@ describe('loading feedback', () => {
     render(<LoadingState>Carregando participantes...</LoadingState>);
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('Carregando participantes...');
-    expect(status.querySelector('.loading-brand-gear')).toHaveAttribute('src', '/favicon.svg');
+    expect(status.querySelector('.loading-state-mark')).toHaveAttribute('aria-hidden', 'true');
+    expect(status.querySelector('.loading-brand-gear')).not.toBeInTheDocument();
     expect(status).toHaveAttribute('data-motion-paused', 'false');
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
     visibility.mockReturnValue('hidden');

@@ -17,8 +17,12 @@ export default function LoadingState({ children, className = '' }: { children: R
   }, []);
   return <div ref={element} className={`loading-state ${className}`} data-motion-paused={paused} role="status" aria-live="polite">
     <span className="loading-state-mark" aria-hidden="true">
-      <img className="loading-brand-gear" src="/favicon.svg" alt="" width="48" height="48" />
+      <span className="loading-state-skeleton">
+        <span />
+        <span />
+        <span />
+      </span>
     </span>
-    <span>{children}</span>
+    <span className="loading-state-message">{children}</span>
   </div>;
 }
