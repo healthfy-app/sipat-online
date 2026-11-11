@@ -1,4 +1,5 @@
 import type { IdentitySession, TenantBranding } from './api';
+import { PageHeader } from './AdminComponents';
 
 export default function PlatformSettingsPage({
   tenant,
@@ -9,13 +10,11 @@ export default function PlatformSettingsPage({
 }) {
   return (
     <div className="page-content">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">OPERAÇÃO DA PLATAFORMA</p>
-          <h1>Configurações</h1>
-          <p className="muted-copy">Informações gerais da operação e da conta administrativa.</p>
-        </div>
-      </div>
+      <PageHeader
+        description="Informações gerais da operação e da conta administrativa."
+        eyebrow="PLATAFORMA"
+        title="Configurações"
+      />
 
       <section aria-labelledby="platform-settings-account" className="settings-section">
         <div className="section-heading">
