@@ -97,13 +97,13 @@ describe('Platform company employees', () => {
 
     await user.type(screen.getByLabelText('Buscar por nome ou matrícula'), 'MAT-002');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
-    expect(await screen.findByText('Nenhum colaborador encontrado para essa busca.')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhum participante encontrado. Tente outro nome ou identificador.')).toBeInTheDocument();
     expect(api.getPlatformCompanyEmployees).toHaveBeenLastCalledWith(
       'company-1',
       { offset: 0, limit: 50, search: 'MAT-002', includeInactive: false },
     );
 
-    await user.click(screen.getByLabelText('Incluir colaboradores inativos'));
+    await user.click(screen.getByLabelText('Incluir participantes inativos'));
     expect(await screen.findByText('Bruno Lima')).toBeInTheDocument();
     await waitFor(() => expect(api.getPlatformCompanyEmployees).toHaveBeenLastCalledWith(
       'company-1',

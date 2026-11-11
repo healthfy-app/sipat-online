@@ -56,7 +56,7 @@ export default function PlatformCompanyEmployeesPage() {
       .catch((loadError) => {
         if (!isCurrent) return;
         setPage(null);
-        setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar os colaboradores.');
+        setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar os participantes.');
       })
       .finally(() => {
         if (isCurrent) setIsLoading(false);
@@ -101,14 +101,14 @@ export default function PlatformCompanyEmployeesPage() {
             {companyOverview.isActive ? 'Ativa' : 'Inativa'}
           </StatusChip>
         )}
-        title={page?.companyName ?? (isLoading ? 'Carregando empresa...' : 'Colaboradores')}
+        title={page?.companyName ?? (isLoading ? 'Carregando empresa...' : 'Participantes')}
       />
 
       {summaryError && <p className="form-error page-error" role="alert">{summaryError}</p>}
       {(page || companyOverview) && (
         <section aria-label="Resumo da empresa" className="company-summary-grid">
           <article className="company-summary-card">
-            <span>Colaboradores</span>
+            <span>Participantes</span>
             <strong>{(companyOverview?.employeeCount ?? page?.totalCount ?? 0).toLocaleString('pt-BR')}</strong>
             <small>{companyOverview ? 'Ativos' : 'Na listagem atual'}</small>
           </article>
@@ -124,7 +124,7 @@ export default function PlatformCompanyEmployeesPage() {
 
       {error && <p className="form-error page-error" role="alert">{error}</p>}
 
-      <section aria-label="Filtros de colaboradores" className="company-employee-filters">
+      <section aria-label="Filtros de participantes" className="company-employee-filters">
         <form className="company-employee-search" onSubmit={handleSearch}>
           <div className="field">
             <label htmlFor="employee-search">Buscar por nome ou matrícula</label>
@@ -147,22 +147,22 @@ export default function PlatformCompanyEmployeesPage() {
             }}
             type="checkbox"
           />
-          Incluir colaboradores inativos
+          Incluir participantes inativos
         </label>
       </section>
 
       <section aria-labelledby="company-employees-heading" className="list-section">
         <div className="section-heading">
-          <h2 id="company-employees-heading">Colaboradores</h2>
+          <h2 id="company-employees-heading">Participantes</h2>
           <span className="count-label">
             {(page?.totalCount ?? 0).toLocaleString('pt-BR')} resultados
           </span>
         </div>
         {isLoading ? (
-          <LoadingState className="list-state">Carregando colaboradores...</LoadingState>
+          <LoadingState className="list-state">Carregando participantes...</LoadingState>
         ) : page && page.items.length > 0 ? (
           <>
-            <DataTable className="company-employee-table" label="Colaboradores da empresa">
+            <DataTable className="company-employee-table" label="Participantes da empresa">
               <thead>
                 <tr>
                   <th scope="col">Nome</th>
@@ -202,7 +202,7 @@ export default function PlatformCompanyEmployeesPage() {
                 ))}
               </tbody>
             </DataTable>
-            <div aria-label="Paginação de colaboradores" className="company-employee-pagination">
+            <div aria-label="Paginação de participantes" className="company-employee-pagination">
               <span>
                 Página {currentPage} de {pageCount} · {page.totalCount.toLocaleString('pt-BR')} resultados
               </span>
@@ -228,7 +228,9 @@ export default function PlatformCompanyEmployeesPage() {
           </>
         ) : (
           <p className="compact-empty">
-            {search ? 'Nenhum colaborador encontrado para essa busca.' : 'Nenhum colaborador para exibir.'}
+            {search
+              ? 'Nenhum participante encontrado. Tente outro nome ou identificador.'
+              : 'Nenhum participante para exibir.'}
           </p>
         )}
       </section>

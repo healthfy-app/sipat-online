@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPlatformDashboard, type PlatformCompanyOverview } from './api';
-import { DataTable, PageHeader, StatusChip } from './AdminComponents';
-import LoadingState from './LoadingState';
 
 export default function PlatformDashboardPage() {
   const [companies, setCompanies] = useState<PlatformCompanyOverview[]>([]);
@@ -26,33 +24,40 @@ export default function PlatformDashboardPage() {
   }, [loadDashboard]);
 
   const totalEmployees = companies.reduce((sum, company) => sum + company.employeeCount, 0);
-  const activeCompanies = companies.filter((company) => company.isActive).length;
+  const companiesWithoutAdmin = companies.filter((company) => company.administratorCount === 0);
 
   return (
     <div className="page-content platform-dashboard">
-      <PageHeader
-        actions={<button className="button button-quiet" onClick={() => void loadDashboard()} type="button">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">SIPAT.ONLINE.ADMIN</p>
+          <h1>Visão geral</h1>
+          <p className="muted-copy">Acompanhe o tamanho de cada cliente e quem ainda precisa de um administrador.</p>
+        </div>
+        <button className="button button-quiet" onClick={() => void loadDashboard()} type="button">
           Atualizar
-        </button>}
-        description="Empresas organizadas pela quantidade de participantes ativos cadastrados."
-        eyebrow="PLATAFORMA"
-        title="Visão geral dos clientes"
-      />
+        </button>
+      </div>
 
       {error && <p className="form-error page-error" role="alert">{error}</p>}
 
       <section aria-label="Resumo da plataforma" className="platform-summary-grid">
-        <SummaryCard label="Empresas ativas" value={isLoading ? '—' : activeCompanies.toLocaleString('pt-BR')} />
-        <SummaryCard label="Participantes ativos" value={isLoading ? '—' : totalEmployees.toLocaleString('pt-BR')} />
-        <SummaryCard label="Contratos comerciais" value="Não disponíveis" note="O módulo de contratos ainda não existe" />
+        <SummaryCard label="Empresas" value={isLoading ? '—' : companies.length.toLocaleString('pt-BR')} />
+        <SummaryCard label="Participantes" value={isLoading ? '—' : totalEmployees.toLocaleString('pt-BR')} />
+        <SummaryCard
+          href="/platform?sem-admin=1"
+          label="Empresas sem administrador"
+          note="Ver quais"
+          value={isLoading ? '—' : companiesWithoutAdmin.length.toLocaleString('pt-BR')}
+        />
       </section>
 
       <section aria-labelledby="platform-clients-heading" className="list-section">
         <div className="section-heading">
           <div>
-            <h2 id="platform-clients-heading">Empresas por número de participantes</h2>
+            <h2 id="platform-clients-heading">Empresas por participantes</h2>
           </div>
-          <Link className="button button-secondary" to="/platform">Ver empresas</Link>
+          <Link className="button button-secondary" to="/platform/companies">Nova empresa</Link>
         </div>
 
         {isLoading ? (
@@ -61,64 +66,61 @@ export default function PlatformDashboardPage() {
           <div className="empty-state">
             <h3>Nenhuma empresa cadastrada ainda</h3>
             <p>Cadastre o primeiro cliente para começar a operação da plataforma.</p>
-            <Link className="button button-primary" to="/platform/companies">Cadastrar empresa</Link>
+            <Link className="button button-primary" to="/platform/companies">Nova empresa</Link>
           </div>
         ) : (
-          <DataTable label="Empresas por número de participantes">
-            <thead>
-              <tr>
-                <th scope="col">Empresa</th>
-                <th scope="col">Participantes ativos</th>
-                <th scope="col">Admins ativos</th>
-                <th scope="col">Contas</th>
-                <th scope="col">Status</th>
-                <th scope="col"><span className="visually-hidden">Ação</span></th>
-              </tr>
-            </thead>
-            <tbody>
-              {companies.map((company) => (
-                <tr key={company.id}>
-                  <td>
-                    <strong>{company.name}</strong>
-                    <small className="admin-table-secondary">{company.key}</small>
-                  </td>
-                  <td>{company.employeeCount.toLocaleString('pt-BR')}</td>
-                  <td>{company.administratorCount.toLocaleString('pt-BR')}</td>
-                  <td>{company.totalUserCount.toLocaleString('pt-BR')}</td>
-                  <td>
-                    <StatusChip variant={company.isActive ? 'success' : 'neutral'}>
-                      {company.isActive ? 'Ativa' : 'Inativa'}
-                    </StatusChip>
-                  </td>
-                  <td className="admin-table-action">
-                    <Link
-                      aria-label={`Ver usuários de ${company.name}`}
-                      className="button button-quiet"
-                      to={`/platform/users?tenant=${company.id}`}
-                    >
-                      Ver usuários <span aria-hidden="true">→</span>
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </DataTable>
+          <div className="platform-company-grid">
+            {companies.map((company) => (
+              <Link
+                aria-label={`Ver participantes de ${company.name}`}
+                className="platform-company-card-link"
+                key={company.id}
+                to={`/platform/users?tenant=${company.id}&role=Participant`}
+              >
+                <article className="platform-company-card">
+                  <div className="platform-company-card-top">
+                    <div className="platform-company-heading">
+                      <h3>{company.name}</h3>
+                      <span className="platform-company-key">{company.key}</span>
+                    </div>
+                    {!company.isActive && <span className="admin-status-chip admin-status-neutral">Inativa</span>}
+                  </div>
+                  <p className="platform-company-participant-count">
+                    <strong>{company.employeeCount.toLocaleString('pt-BR')}</strong>
+                    <span>participantes</span>
+                  </p>
+                  {company.administratorCount === 0 ? (
+                    <span className="platform-company-no-admin">Sem administrador</span>
+                  ) : (
+                    <span className="platform-company-admin-count">
+                      {company.administratorCount.toLocaleString('pt-BR')}{' '}
+                      {company.administratorCount === 1 ? 'administrador' : 'administradores'}
+                    </span>
+                  )}
+                </article>
+              </Link>
+            ))}
+          </div>
         )}
       </section>
-      <p className="platform-data-note">
-        “Participantes ativos” conta usuários ativos com o perfil Participante. A plataforma ainda não
-        armazena contratos, produtos vendidos ou limites contratados de funcionários.
-      </p>
     </div>
   );
 }
 
-function SummaryCard({ label, value, note }: { label: string; value: string; note?: string }) {
+function SummaryCard({ label, value, note, href }: { label: string; value: string; note?: string; href?: string }) {
+  const content = <>
+    <span>{label}</span>
+    <strong>{value}</strong>
+    {note && <small>{note} <span aria-hidden="true">→</span></small>}
+  </>;
+
+  if (href) {
+    return <Link className="platform-summary-card platform-summary-card-link" to={href}>{content}</Link>;
+  }
+
   return (
     <article className="platform-summary-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-      {note && <small>{note}</small>}
+      {content}
     </article>
   );
 }
@@ -126,3 +128,4 @@ function SummaryCard({ label, value, note }: { label: string; value: string; not
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Não foi possível carregar o painel.';
 }
+import LoadingState from './LoadingState';

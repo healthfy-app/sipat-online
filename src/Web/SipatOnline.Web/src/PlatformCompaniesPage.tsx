@@ -1,10 +1,10 @@
-import { useState, type FormEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import {
   createPlatformCompany,
+  listPlatformCompanies,
+  type PlatformCompany,
   type PlatformCompanyData,
 } from './api';
-import { PageHeader } from './AdminComponents';
 
 const emptyForm: PlatformCompanyData = {
   key: '',
@@ -15,10 +15,28 @@ const emptyForm: PlatformCompanyData = {
 };
 
 export default function PlatformCompaniesPage() {
+  const [companies, setCompanies] = useState<PlatformCompany[]>([]);
   const [form, setForm] = useState(emptyForm);
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
+  const loadCompanies = useCallback(async () => {
+    setIsLoading(true);
+    setError('');
+    try {
+      setCompanies(await listPlatformCompanies());
+    } catch (loadError) {
+      setError(getErrorMessage(loadError));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadCompanies();
+  }, [loadCompanies]);
 
   function updateField(field: keyof PlatformCompanyData, value: string) {
     setForm((current) => ({ ...current, [field]: value }));
@@ -40,6 +58,7 @@ export default function PlatformCompaniesPage() {
       });
       setForm(emptyForm);
       setNotice(`${company.name} foi cadastrada e o administrador inicial foi criado.`);
+      await loadCompanies();
     } catch (saveError) {
       setError(getErrorMessage(saveError));
     } finally {
@@ -48,13 +67,19 @@ export default function PlatformCompaniesPage() {
   }
 
   return (
-    <div className="page-content platform-admin-page">
-      <PageHeader
-        actions={<Link className="button button-secondary" to="/platform">← Empresas</Link>}
-        description="Cadastre a empresa e entregue o acesso inicial ao administrador."
-        eyebrow="NOVA EMPRESA"
-        title="Cadastrar empresa"
-      />
+    <div className="page-content">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">OPERAÇÃO DA PLATAFORMA</p>
+          <h1>Empresas clientes</h1>
+          <p className="muted-copy">
+            Após a contratação do SIPAT Online, cadastre a empresa e entregue o acesso inicial ao administrador.
+          </p>
+        </div>
+        <span className="count-label">
+          {companies.length} {companies.length === 1 ? 'empresa' : 'empresas'}
+        </span>
+      </div>
 
       {notice && <p className="success-message" role="status">{notice}</p>}
       {error && <p className="form-error page-error" role="alert">{error}</p>}
@@ -62,9 +87,10 @@ export default function PlatformCompaniesPage() {
       <section aria-labelledby="company-form-title" className="form-card">
         <div className="section-heading">
           <div>
-            <h2 id="company-form-title">Dados da empresa e do primeiro administrador</h2>
+            <p className="eyebrow">NOVO CLIENTE</p>
+            <h2 id="company-form-title">Cadastrar empresa</h2>
           </div>
-          <span className="draft-note">O identificador define o subdomínio.</span>
+          <span className="draft-note">O identificador define o subdomínio</span>
         </div>
         <form className="event-form" onSubmit={handleSubmit}>
           <div className="field">
@@ -137,6 +163,41 @@ export default function PlatformCompaniesPage() {
           </div>
         </form>
       </section>
+
+      <section aria-labelledby="companies-list-title" className="list-section">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">CLIENTES</p>
+            <h2 id="companies-list-title">Empresas cadastradas</h2>
+          </div>
+        </div>
+        {isLoading ? (
+          <LoadingState className="list-state">Carregando empresas...</LoadingState>
+        ) : companies.length === 0 ? (
+          <div className="empty-state">
+            <h3>Nenhuma empresa cadastrada</h3>
+            <p>As empresas cadastradas após a contratação aparecerão aqui.</p>
+          </div>
+        ) : (
+          <div className="company-list">
+            {companies.map((company) => (
+              <article className="company-card" key={company.id}>
+                <div>
+                  <p className="eyebrow">{company.key}</p>
+                  <h3>{company.name}</h3>
+                  <p className="muted-copy">
+                    Cadastrada em {new Intl.DateTimeFormat('pt-BR', { dateStyle: 'medium' })
+                      .format(new Date(company.createdAt))}
+                  </p>
+                </div>
+                <span className={`status-pill${company.isActive ? ' status-active' : ''}`}>
+                  {company.isActive ? 'Ativa' : 'Inativa'}
+                </span>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
@@ -146,3 +207,4 @@ function getErrorMessage(error: unknown): string {
     ? error.message
     : 'Ocorreu um erro inesperado. Tente novamente.';
 }
+import LoadingState from './LoadingState';

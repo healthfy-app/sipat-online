@@ -1,15 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { getPlatformDashboard, type PlatformCompanyOverview } from './api';
 import { DataTable, FilterBar, PageHeader, StatusChip } from './AdminComponents';
 import LoadingState from './LoadingState';
 
 type CompanyStatusFilter = 'all' | 'active' | 'inactive';
+type CompanySortKey = 'name' | 'participants' | 'administrators' | 'status';
+type SortDirection = 'ascending' | 'descending';
+const pageSize = 10;
 
 export default function PlatformHomePage() {
   const [companies, setCompanies] = useState<PlatformCompanyOverview[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<CompanyStatusFilter>('all');
+  const [sortKey, setSortKey] = useState<CompanySortKey>('name');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('ascending');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const showCompaniesWithoutAdmin = searchParams.get('sem-admin') === '1';
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -38,13 +46,42 @@ export default function PlatformHomePage() {
       const matchesSearch = `${company.name} ${company.key}`.toLocaleLowerCase('pt-BR').includes(term);
       const matchesStatus = statusFilter === 'all'
         || (statusFilter === 'active' ? company.isActive : !company.isActive);
-      return matchesSearch && matchesStatus;
+      const matchesAdmin = !showCompaniesWithoutAdmin || company.administratorCount === 0;
+      return matchesSearch && matchesStatus && matchesAdmin;
     }),
-    [companies, statusFilter, term],
+    [companies, showCompaniesWithoutAdmin, statusFilter, term],
   );
+  const sortedCompanies = useMemo(() => [...visibleCompanies].sort((a, b) => {
+    let comparison = 0;
+    switch (sortKey) {
+      case 'participants':
+        comparison = a.employeeCount - b.employeeCount;
+        break;
+      case 'administrators':
+        comparison = a.administratorCount - b.administratorCount;
+        break;
+      case 'status':
+        comparison = Number(a.isActive) - Number(b.isActive);
+        break;
+      default:
+        comparison = a.name.localeCompare(b.name, 'pt-BR');
+    }
+    return sortDirection === 'ascending' ? comparison : -comparison;
+  }), [sortDirection, sortKey, visibleCompanies]);
+  const pageCount = Math.max(1, Math.ceil(sortedCompanies.length / pageSize));
+  const pageCompanies = sortedCompanies.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+  const firstItem = sortedCompanies.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const lastItem = Math.min(currentPage * pageSize, sortedCompanies.length);
   const activeEmployeeCount = companies
     .filter((company) => company.isActive)
     .reduce((total, company) => total + company.employeeCount, 0);
+  const companiesWithoutAdminCount = companies.filter((company) => company.administratorCount === 0).length;
+  const hasActiveFilters = Boolean(term) || statusFilter !== 'all' || showCompaniesWithoutAdmin;
+  function updateSort(nextKey: CompanySortKey) {
+    setSortDirection(sortKey === nextKey && sortDirection === 'ascending' ? 'descending' : 'ascending');
+    setSortKey(nextKey);
+    setCurrentPage(1);
+  }
 
   return (
     <div className="page-content platform-home">
@@ -52,11 +89,38 @@ export default function PlatformHomePage() {
         actions={<Link className="button button-primary" to="/platform/companies">+ Nova empresa</Link>}
         description={isLoading
           ? 'Carregando indicadores das empresas...'
-          : `${companies.length.toLocaleString('pt-BR')} ${companies.length === 1 ? 'empresa' : 'empresas'} · ${activeEmployeeCount.toLocaleString('pt-BR')} colaboradores ativos`}
+          : `${companies.length.toLocaleString('pt-BR')} ${companies.length === 1 ? 'empresa' : 'empresas'} · ${activeEmployeeCount.toLocaleString('pt-BR')} participantes ativos`}
         eyebrow="SIPAT.ONLINE.ADMIN"
         title="Empresas"
-        meta={<span className="count-label">{visibleCompanies.length.toLocaleString('pt-BR')} exibidas</span>}
+        meta={hasActiveFilters && (
+          <span className="count-label">
+            {visibleCompanies.length.toLocaleString('pt-BR')} de {companies.length.toLocaleString('pt-BR')} exibidas
+          </span>
+        )}
       />
+
+      {!isLoading && !error && companiesWithoutAdminCount > 0 && (
+        <aside aria-label="Empresas sem administrador" className="platform-company-admin-alert" role="status">
+          <p>
+            <strong>{companiesWithoutAdminCount.toLocaleString('pt-BR')} {companiesWithoutAdminCount === 1 ? 'empresa' : 'empresas'}</strong>
+            {' '}sem administrador
+          </p>
+          <button
+            aria-pressed={showCompaniesWithoutAdmin}
+            className="button button-secondary"
+            onClick={() => setSearchParams((current) => {
+              const next = new URLSearchParams(current);
+              if (showCompaniesWithoutAdmin) next.delete('sem-admin');
+              else next.set('sem-admin', '1');
+              setCurrentPage(1);
+              return next;
+            })}
+            type="button"
+          >
+            {showCompaniesWithoutAdmin ? 'Mostrar todas' : 'Ver quais'}
+          </button>
+        </aside>
+      )}
 
       {error && <p className="form-error page-error" role="alert">{error}</p>}
 
@@ -65,7 +129,10 @@ export default function PlatformHomePage() {
           <label htmlFor="platform-home-search">Buscar empresa</label>
           <input
             id="platform-home-search"
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setCurrentPage(1);
+            }}
             placeholder="Nome ou identificador"
             type="search"
             value={search}
@@ -75,7 +142,10 @@ export default function PlatformHomePage() {
           <label htmlFor="platform-company-status">Status</label>
           <select
             id="platform-company-status"
-            onChange={(event) => setStatusFilter(event.target.value as CompanyStatusFilter)}
+            onChange={(event) => {
+              setStatusFilter(event.target.value as CompanyStatusFilter);
+              setCurrentPage(1);
+            }}
             value={statusFilter}
           >
             <option value="all">Todos</option>
@@ -91,21 +161,33 @@ export default function PlatformHomePage() {
         </div>
         {isLoading ? (
           <LoadingState className="list-state">Carregando empresas...</LoadingState>
-        ) : visibleCompanies.length === 0 ? (
-          <p className="compact-empty">Nenhuma empresa encontrada.</p>
+        ) : sortedCompanies.length === 0 ? (
+          <p className="compact-empty">Nenhuma empresa encontrada. Tente outro nome ou identificador.</p>
         ) : (
           <DataTable className="platform-company-table" label="Diretório de empresas">
             <thead>
               <tr>
-                <th scope="col">Empresa</th>
-                <th scope="col">Colaboradores</th>
-                <th scope="col">Admins</th>
-                <th scope="col">Status</th>
+                <th aria-sort={sortKey === 'name' ? sortDirection : 'none'} scope="col">
+                  <SortButton label="Empresa" active={sortKey === 'name'} direction={sortDirection}
+                    onClick={() => updateSort('name')} />
+                </th>
+                <th aria-sort={sortKey === 'participants' ? sortDirection : 'none'} scope="col">
+                  <SortButton label="Participantes" active={sortKey === 'participants'} direction={sortDirection}
+                    onClick={() => updateSort('participants')} />
+                </th>
+                <th aria-sort={sortKey === 'administrators' ? sortDirection : 'none'} scope="col">
+                  <SortButton label="Administradores" active={sortKey === 'administrators'} direction={sortDirection}
+                    onClick={() => updateSort('administrators')} />
+                </th>
+                <th aria-sort={sortKey === 'status' ? sortDirection : 'none'} scope="col">
+                  <SortButton label="Status" active={sortKey === 'status'} direction={sortDirection}
+                    onClick={() => updateSort('status')} />
+                </th>
                 <th scope="col">Ação</th>
               </tr>
             </thead>
             <tbody>
-              {visibleCompanies.map((company) => (
+              {pageCompanies.map((company) => (
                 <tr key={company.id}>
                   <td>
                     <strong>{company.name}</strong>
@@ -114,9 +196,14 @@ export default function PlatformHomePage() {
                   <td>{company.employeeCount.toLocaleString('pt-BR')}</td>
                   <td>
                     {company.administratorCount === 0 ? (
-                      <StatusChip variant="warning">Sem admin</StatusChip>
+                      <Link
+                        className="platform-admin-assignment-link"
+                        to={`/platform/users?tenant=${company.id}&role=ClientAdmin`}
+                      >
+                        Atribuir administrador
+                      </Link>
                     ) : (
-                      company.administratorCount.toLocaleString('pt-BR')
+                      `${company.administratorCount.toLocaleString('pt-BR')} ${company.administratorCount === 1 ? 'administrador' : 'administradores'}`
                     )}
                   </td>
                   <td>
@@ -125,8 +212,12 @@ export default function PlatformHomePage() {
                     </StatusChip>
                   </td>
                   <td>
-                    <Link className="admin-link" to={`/platform/companies/${company.id}`}>
-                      Ver colaboradores <span aria-hidden="true">→</span>
+                    <Link
+                      aria-label={`Ver participantes de ${company.name}`}
+                      className="platform-company-row-action"
+                      to={`/platform/companies/${company.id}`}
+                    >
+                      <span aria-hidden="true">›</span>
                     </Link>
                   </td>
                 </tr>
@@ -134,7 +225,44 @@ export default function PlatformHomePage() {
             </tbody>
           </DataTable>
         )}
+        {sortedCompanies.length > pageSize && (
+          <nav aria-label="Paginação de empresas" className="platform-company-pagination">
+            <span>Exibindo {firstItem}–{lastItem} de {sortedCompanies.length} empresas</span>
+            <div>
+              <button className="button button-quiet" disabled={currentPage === 1}
+                onClick={() => setCurrentPage((page) => page - 1)} type="button">Anterior</button>
+              <span aria-current="page">Página {currentPage} de {pageCount}</span>
+              <button className="button button-quiet" disabled={currentPage === pageCount}
+                onClick={() => setCurrentPage((page) => page + 1)} type="button">Próxima</button>
+            </div>
+          </nav>
+        )}
       </section>
     </div>
+  );
+}
+
+function SortButton({
+  label,
+  active,
+  direction,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  direction: SortDirection;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-label={`Ordenar por ${label.toLocaleLowerCase('pt-BR')}`}
+      aria-pressed={active}
+      className="platform-sort-button"
+      onClick={onClick}
+      type="button"
+    >
+      {label}
+      <span aria-hidden="true">{active ? (direction === 'ascending' ? ' ↑' : ' ↓') : ' ↕'}</span>
+    </button>
   );
 }
