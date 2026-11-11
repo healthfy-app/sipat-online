@@ -59,7 +59,7 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
     expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Programação da SIPAT' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Programação' })).not.toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('link', { name: 'Acompanhamento' }));
     expect(await screen.findByText(/Modo de consulta/)).toBeVisible();
@@ -227,6 +227,7 @@ describe('tenant portal', () => {
     expect(screen.getByText('Pequenos passos. Rotinas mais seguras.')).toBeInTheDocument();
     expect(screen.getByText('Acme Segurança')).toBeVisible();
     expect(screen.getByLabelText('Matrícula')).toBeVisible();
+    expect(screen.getByLabelText('Senha')).toHaveAttribute('placeholder', 'Digite sua senha');
   });
 
   it('toggles password visibility without changing the entered value', async () => {
@@ -301,7 +302,7 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
-    expect(screen.getByRole('link', { name: 'Programação da SIPAT' })).toHaveAttribute('href', '/admin/sipats');
+    expect(screen.getByRole('link', { name: 'Programação' })).toHaveAttribute('href', '/admin/sipats');
     expect(screen.getByRole('link', { name: 'Trilhas e vídeos' })).toHaveAttribute('href', '/admin/content');
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
   });

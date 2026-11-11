@@ -66,6 +66,8 @@ function LearningHomePage({ participantName, setSummary }: {
   const startedAnyCourse = tracks.some(track => getTrackProgress(track) > 0);
   const resumeTrack = tracks.find(track => getTrackProgress(track) > 0 && getTrackProgress(track) < 100) ?? null;
   const recommendedTrack = tracks.find(track => getTrackProgress(track) < 100) ?? null;
+  const resumeTitleParts = resumeTrack ? getTrackTitleParts(resumeTrack.title) : null;
+  const recommendedTitleParts = recommendedTrack ? getTrackTitleParts(recommendedTrack.title) : null;
   const resumeLesson = resumeExperience
     ? getResumeLesson(resumeExperience.lessons)
     : null;
@@ -80,6 +82,11 @@ function LearningHomePage({ participantName, setSummary }: {
     started: tracks.filter(track => getTrackProgress(track) > 0 && getTrackProgress(track) < 100).length,
     completed: completedCourses,
   };
+  const statusFilterOptions = [
+    { value: 'all' as const, label: 'Todos' },
+    ...(statusCounts.started > 0 ? [{ value: 'started' as const, label: 'Em andamento' }] : []),
+    ...(statusCounts.completed > 0 ? [{ value: 'completed' as const, label: 'Concluídos' }] : []),
+  ];
   const sortOptions: { value: CourseSort; label: string }[] = [{ value: 'recommended', label: 'Recomendados' }];
   if (tracks.length > 0 && tracks.every(track => getTrackDate(track) !== null)) {
     sortOptions.push({ value: 'newest', label: 'Mais recentes' });
@@ -185,19 +192,19 @@ function LearningHomePage({ participantName, setSummary }: {
 
   const handleStatusTabKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
     const nextIndex = event.key === 'ArrowRight'
-      ? (index + 1) % 3
+      ? (index + 1) % statusFilterOptions.length
       : event.key === 'ArrowLeft'
-        ? (index + 2) % 3
+        ? (index + statusFilterOptions.length - 1) % statusFilterOptions.length
         : event.key === 'Home'
           ? 0
           : event.key === 'End'
-            ? 2
+            ? statusFilterOptions.length - 1
             : -1;
     if (nextIndex < 0) {
       return;
     }
     event.preventDefault();
-    const nextFilter = (['all', 'started', 'completed'] as const)[nextIndex];
+    const nextFilter = statusFilterOptions[nextIndex].value;
     setFilter(nextFilter);
     event.currentTarget.parentElement
       ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[nextIndex]
@@ -274,7 +281,10 @@ function LearningHomePage({ participantName, setSummary }: {
             </div>
             <div className="learning-catalog-first-next">
               <p className="learning-catalog-eyebrow">Comece por aqui</p>
-              <h2>{recommendedTrack.title}</h2>
+              {recommendedTitleParts?.optionLabel && (
+                <span className="learning-catalog-option-label">{recommendedTitleParts.optionLabel}</span>
+              )}
+              <h2>{recommendedTitleParts?.title ?? recommendedTrack.title}</h2>
               <p>{getTrackMetadata(recommendedTrack)}</p>
               <Link className="learning-catalog-feature-action" to={getTrackPath(recommendedTrack, tracks)}>
                 Começar agora <span aria-hidden="true">→</span>
@@ -297,9 +307,12 @@ function LearningHomePage({ participantName, setSummary }: {
             </div>
             <div className="learning-resume-content">
               <p className="learning-catalog-eyebrow">Continue de onde parou</p>
+              {resumeTitleParts?.optionLabel && (
+                <span className="learning-catalog-option-label">{resumeTitleParts.optionLabel}</span>
+              )}
               {resumeLesson
-                ? <h2>Aula {resumeLesson.position} · {resumeTrack.title}</h2>
-                : <h2>{resumeTrack.title}</h2>}
+                ? <h2>Aula {resumeLesson.position} · {resumeTitleParts?.title ?? resumeTrack.title}</h2>
+                : <h2>{resumeTitleParts?.title ?? resumeTrack.title}</h2>}
               {resumeLesson
                 ? <p>
                     Você parou em {formatDuration(resumeLesson.lastPlaybackPositionMilliseconds)}
@@ -327,6 +340,15 @@ function LearningHomePage({ participantName, setSummary }: {
                 Ver certificados <span aria-hidden="true">→</span>
               </Link>
             </div>
+            <div aria-hidden="true" className="learning-completion-illustration">
+              <svg viewBox="0 0 140 140">
+                <circle cx="70" cy="70" r="62" fill="rgb(127 224 166 / 10%)" stroke="rgb(127 224 166 / 24%)" />
+                <path d="M48 30h44v24c0 18-9 29-22 29S48 72 48 54V30Z" fill="#7fe0a6" />
+                <path d="M48 39H32v11c0 14 8 22 21 23M92 39h16v11c0 14-8 22-21 23" fill="none" stroke="#7fe0a6" strokeLinecap="round" strokeWidth="7" />
+                <path d="M70 84v17M51 108h38" fill="none" stroke="#7fe0a6" strokeLinecap="round" strokeWidth="7" />
+                <path d="m70 42 3.5 7 7.5 1-5.5 5.2 1.3 7.3-6.8-3.6-6.8 3.6 1.3-7.3-5.5-5.2 7.5-1L70 42Z" fill="#12332c" />
+              </svg>
+            </div>
           </section>
         )}
 
@@ -337,19 +359,26 @@ function LearningHomePage({ participantName, setSummary }: {
                 <h2 id="learning-journey-title">Sua trilha</h2>
                 <span>Passo {currentStepNumber} de {tracks.length} · {overallProgress}% da formação</span>
               </div>
-              <ProgressBar label="Progresso da trilha" value={overallProgress} />
-              <ol aria-label="Etapas da formação" className="learning-journey-steps">
+              {overallProgress === 100 ? (
+                <p className="learning-journey-complete-summary">
+                  {completedCourses}/{tracks.length} cursos concluídos · Formação completa
+                </p>
+              ) : (
+                <>
+                  <ProgressBar label="Progresso da trilha" value={overallProgress} />
+                  <ol aria-label="Etapas da formação" className="learning-journey-steps">
                 {tracks.map((track, index) => {
                   const percentage = getTrackProgress(track);
                   const isComplete = percentage === 100;
                   const isCurrent = index === activeStepIndex && !isComplete;
+                  const titleParts = getTrackTitleParts(track.title);
                   return (
                     <li className={`learning-journey-step${isComplete ? ' is-complete' : ''}${isCurrent ? ' is-current' : ''}`} key={track.id}>
                       <Link
                         aria-current={isCurrent ? 'step' : undefined}
                         to={getTrackPath(track, tracks)}
                       >
-                        <strong>{index + 1} · {track.title}</strong>
+                        <strong>{index + 1} · {titleParts.title}</strong>
                         <span>{isComplete
                           ? 'Concluído'
                           : isCurrent
@@ -359,7 +388,9 @@ function LearningHomePage({ participantName, setSummary }: {
                     </li>
                   );
                 })}
-              </ol>
+                  </ol>
+                </>
+              )}
             </section>
             {shownMilestone !== null && (
               <p className="learning-milestone" role="status">
@@ -381,9 +412,7 @@ function LearningHomePage({ participantName, setSummary }: {
           </div>
           <div className="learning-catalog-toolbar">
             <div aria-label="Filtrar por situação" className="learning-catalog-filters" role="tablist">
-              {([
-                ['all', 'Todos'], ['started', 'Em andamento'], ['completed', 'Concluídos'],
-              ] as const).map(([value, label], index) => (
+              {statusFilterOptions.map(({ value, label }, index) => (
                 <button
                   aria-selected={filter === value}
                   aria-controls="learning-status-panel"
@@ -454,6 +483,7 @@ function LearningHomePage({ participantName, setSummary }: {
                     const started = percentage > 0;
                     const isRecommended = !startedAnyCourse && track.id === recommendedTrack?.id;
                     const categoryLabel = getCourseCategory(track);
+                    const titleParts = getTrackTitleParts(track.title);
                     return <article className="learning-catalog-course" key={track.id}>
                       <div className={`learning-catalog-artwork${isRecommended ? ' is-recommended' : ''}`} data-artwork={getTrackArtwork(track.title)}>
                         <img alt="" decoding="async" loading="lazy" src={track.coverUrl ?? getCourseCover(track.title)} />
@@ -466,14 +496,19 @@ function LearningHomePage({ participantName, setSummary }: {
                           {categoryLabel && <span>{categoryLabel}</span>}
                           <span>{getTrackMetadata(track)}</span>
                         </div>
-                        <h3><Link to={getTrackPath(track, tracks)}>{track.title}</Link></h3>
+                        <h3>
+                          {titleParts.optionLabel && (
+                            <span className="learning-catalog-option-label">{titleParts.optionLabel}</span>
+                          )}
+                          <Link to={getTrackPath(track, tracks)}>{titleParts.title}</Link>
+                        </h3>
                         <p className="learning-catalog-description">{track.description || 'Um novo aprendizado para levar ao seu dia a dia.'}</p>
                         <div className="learning-catalog-course-progress">
                           <span>{track.completedLessonCount} de {track.lessonCount} aulas{started && !completed ? ` · ${percentage}%` : ''}</span>
                         </div>
-                        <ProgressBar value={percentage} label={`Progresso de ${track.title}`} />
+                        <ProgressBar value={percentage} label={`Progresso de ${titleParts.title}`} />
                         <Link
-                          aria-label={`${completed ? 'Ver certificado de' : started ? 'Continuar curso' : 'Começar curso'} ${track.title}`}
+                          aria-label={`${completed ? 'Ver certificado de' : started ? 'Continuar curso' : 'Começar curso'} ${titleParts.title}`}
                           className={`learning-catalog-course-action${isRecommended && !started ? ' is-primary' : ''}${completed ? ' is-complete' : ''}`}
                           to={completed ? '/learning/certificates' : getTrackPath(track, tracks)}
                         >
@@ -983,13 +1018,18 @@ function LearningTrackPage({
       ?.focus();
   };
 
+  const trackTitleParts = getTrackTitleParts(experience.track.title);
+
   return (
     <main className="learning-page learning-track-page">
       <header className="learning-course-header">
         <Link className="learning-back-to-courses" to="/learning">← Minha formação</Link>
         <div className="learning-course-header-progress">
           <div className="learning-course-header-copy">
-            <h1>{experience.track.title}</h1>
+            {trackTitleParts.optionLabel && (
+              <span className="learning-catalog-option-label">{trackTitleParts.optionLabel}</span>
+            )}
+            <h1>{trackTitleParts.title}</h1>
             <span>{completedLessons} de {experience.lessons.length} aulas · {getTrackProgress(experience.track)}%</span>
           </div>
           <ProgressBar value={getTrackProgress(experience.track)} label="Progresso do curso" />
@@ -1227,12 +1267,22 @@ function LearningTrackPage({
   );
 }
 
+function getTrackTitleParts(title: string): { optionLabel: string | null; title: string } {
+  const match = title.match(/^\s*Opção\s+([1-3])\s*·\s*(.+)$/iu);
+  return match
+    ? { optionLabel: `Opção ${match[1]}`, title: match[2].trim() }
+    : { optionLabel: null, title };
+}
+
 function getTrackArtwork(title: string) {
   const normalizedTitle = title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   if (/ergonomia|atividade fisica/.test(normalizedTitle)) return 'ergonomics';
   if (/alimentacao|nutricao/.test(normalizedTitle)) return 'nutrition';
-  if (/primeiros socorros|saude/.test(normalizedTitle)) return 'first-aid';
   if (/seguranca|comportamento seguro|prevencao/.test(normalizedTitle)) return 'safety';
+  if (/higiene mental|saude mental|qualidade do sono/.test(normalizedTitle)) return 'wellbeing';
+  if (/habitos de vida|qualidade de vida/.test(normalizedTitle)) return 'habits';
+  if (/primeiros socorros|saude/.test(normalizedTitle)) return 'first-aid';
+  if (/lideranca/.test(normalizedTitle)) return 'leadership';
   if (/demonstracao|pratica|tecnica/.test(normalizedTitle)) return 'practice';
   return 'course';
 }

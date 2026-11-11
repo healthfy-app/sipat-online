@@ -111,18 +111,12 @@ describe('learning experience', () => {
 
     expect(await screen.findByText('1 de 1 cursos concluídos', { exact: false })).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Progresso de Segurança no trabalho' })).toHaveAttribute('aria-valuenow', '100');
-    const overallProgress = screen.getByRole('progressbar', { name: 'Progresso da trilha' });
-    expect(overallProgress).toHaveAttribute('aria-valuenow', '100');
-    expect(overallProgress).toHaveAttribute('aria-valuetext', '100%');
+    expect(screen.getByText('1/1 cursos concluídos · Formação completa')).toBeVisible();
+    expect(screen.queryByRole('progressbar', { name: 'Progresso da trilha' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver certificado de Segurança no trabalho' }))
       .toHaveAttribute('href', '/learning/certificates');
-    await waitFor(() => expect(onSummary).toHaveBeenLastCalledWith({
-      percentage: 100,
-      completed: 1,
-      total: 1,
-    }));
-    await user.click(screen.getByRole('tab', { name: /Em andamento/ }));
-    expect(screen.queryByRole('article')).not.toBeInTheDocument();
+    expect(onSummary).toHaveBeenLastCalledWith({ percentage: 100, completed: 1, total: 1 });
+    expect(screen.queryByRole('tab', { name: /Em andamento/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: /Concluídos/ }));
     expect(screen.getByRole('link', { name: 'Ver certificado de Segurança no trabalho' })).toBeVisible();
   });
@@ -476,6 +470,27 @@ describe('learning experience', () => {
 
     expect(screen.getByRole('link', { name: 'Ver certificado de Comportamento seguro' })).toBeVisible();
     expect(container.querySelectorAll('.learning-catalog-course')).toHaveLength(5);
+  });
+
+  it('moves demo option prefixes into badges and gives adjacent wellness courses distinct covers', async () => {
+    const habitsTrack = { ...trackCard, id: 'track-4', title: 'Opção 1 · Hábitos de vida' };
+    const mentalHealthTrack = { ...trackCard, id: 'track-5', title: 'Opção 1 · Higiene Mental' };
+    listAssignedTracks.mockResolvedValue([habitsTrack, mentalHealthTrack]);
+    startPlayback.mockRejectedValue(new Error('A reprodução não está configurada.'));
+
+    const { container } = renderAt('/learning');
+
+    await screen.findByRole('heading', { name: 'Meus cursos 2' });
+    const cardFor = (title: string) => Array.from(
+      container.querySelectorAll<HTMLElement>('.learning-catalog-course'),
+    ).find(card => card.querySelector('h3 a')?.textContent === title)!;
+    const habitsCard = cardFor('Hábitos de vida');
+    const mentalHealthCard = cardFor('Higiene Mental');
+
+    expect(habitsCard.querySelector('.learning-catalog-option-label')).toHaveTextContent('Opção 1');
+    expect(mentalHealthCard.querySelector('.learning-catalog-option-label')).toHaveTextContent('Opção 1');
+    expect(habitsCard.querySelector('img')).toHaveAttribute('src', '/course-covers/workplace.jpg');
+    expect(mentalHealthCard.querySelector('img')).toHaveAttribute('src', '/course-covers/wellbeing.jpg');
   });
 
   it('renders the native player and playback speed selector from a real session response', async () => {

@@ -519,7 +519,27 @@
 }
 
 .portal-layout-learner .learning-resume-complete {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(10rem, 0.35fr);
+}
+
+.portal-layout-learner .learning-completion-illustration {
+  display: grid;
+  min-height: 9rem;
+  place-items: center;
+  color: var(--learner-highlight);
+}
+
+.portal-layout-learner .learning-completion-illustration svg {
+  width: min(100%, 10rem);
+  height: auto;
+  overflow: visible;
+  filter: drop-shadow(0 10px 24px rgb(0 0 0 / 18%));
+}
+
+.portal-layout-learner .learner-sidebar-progress-complete-mark {
+  fill: var(--learner-forest);
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .portal-layout-learner .learning-journey-card {
@@ -547,6 +567,16 @@
 .portal-layout-learner .learning-journey-heading > span {
   color: var(--learner-text-secondary);
   font-size: 0.82rem;
+}
+
+.portal-layout-learner .learning-journey-complete-summary {
+  margin: 0;
+  padding: 0.875rem 1rem;
+  border-radius: 12px;
+  color: var(--learner-complete-text);
+  background: var(--learner-complete-bg);
+  font-size: 0.9rem;
+  font-weight: 750;
 }
 
 .portal-layout-learner .learning-journey-steps {
@@ -786,6 +816,10 @@
   height: 9.5rem;
 }
 
+.portal-layout-learner .learning-catalog-artwork[data-artwork="wellbeing"] { color: #375d51; background: #dcece4; }
+.portal-layout-learner .learning-catalog-artwork[data-artwork="habits"] { color: #765d0a; background: #f3edcf; }
+.portal-layout-learner .learning-catalog-artwork[data-artwork="leadership"] { color: #315d81; background: #dfeaf2; }
+
 .portal-layout-learner .learning-catalog-artwork > span {
   min-height: 30px;
   display: inline-flex;
@@ -828,14 +862,37 @@
 }
 
 .portal-layout-learner .learning-catalog-course h3 {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
   color: var(--learner-forest);
   font-size: 1rem;
+  line-height: 1.4;
 }
 
 .portal-layout-learner .learning-catalog-course h3 a {
-  display: inline-flex;
+  display: flex;
+  max-width: 100%;
   min-height: 44px;
   align-items: center;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.portal-layout-learner .learning-catalog-option-label {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--learner-border);
+  border-radius: 999px;
+  color: var(--learner-forest);
+  background: var(--learner-canvas);
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1.2;
 }
 
 .portal-layout-learner .learning-catalog-description {
@@ -852,7 +909,7 @@
 
 .portal-layout-learner .learning-catalog-course .learning-progress-track {
   width: 100%;
-  height: 7px;
+  height: 8px;
   margin-top: -0.2rem;
   background: var(--learner-progress-track);
 }
@@ -940,7 +997,7 @@
 
 .portal-layout-learner .learning-course-header .learning-progress-track {
   width: 100%;
-  height: 7px;
+  height: 8px;
   background: var(--learner-progress-track);
 }
 
@@ -1254,6 +1311,10 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .portal-layout-learner .learning-completion-illustration {
+    display: none;
+  }
+
   .portal-layout-learner .learning-resume-cover {
     width: 100%;
   }
@@ -1266,6 +1327,11 @@
 
   .portal-layout-learner .learning-catalog-filters {
     overflow-x: auto;
+  }
+
+  .portal-layout-learner .learner-sidebar-link:not(.active):hover {
+    color: var(--learner-text-secondary);
+    background: transparent;
   }
 
   .portal-layout-learner .learning-catalog-filters button {

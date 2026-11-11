@@ -123,7 +123,7 @@
 .login-brand-art {
   position: relative;
   display: flex;
-  width: min(100%, 34rem);
+  width: min(100%, 29rem);
   min-height: 9.5rem;
   align-items: flex-end;
   margin-top: auto;
@@ -268,10 +268,10 @@
 .login-card::before {
   position: absolute;
   top: -1px;
-  left: 3rem;
-  width: 3.5rem;
-  height: 0.25rem;
-  border-radius: 0 0 999px 999px;
+  right: -1px;
+  left: -1px;
+  height: 4px;
+  border-radius: 1.5rem 1.5rem 0 0;
   background: var(--green);
   content: "";
 }
