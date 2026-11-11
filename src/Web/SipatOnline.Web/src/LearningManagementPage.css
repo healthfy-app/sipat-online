@@ -128,6 +128,24 @@
   accent-color: var(--green);
 }
 
+.participant-directory-progress progress::-webkit-progress-bar,
+.participant-detail-track-progress progress::-webkit-progress-bar {
+  border-radius: 999px;
+  background: var(--admin-progress-track, #e3e9e6);
+}
+
+.participant-directory-progress progress::-webkit-progress-value,
+.participant-detail-track-progress progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--admin-success, #14683a);
+}
+
+.participant-directory-progress progress::-moz-progress-bar,
+.participant-detail-track-progress progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--admin-success, #14683a);
+}
+
 .participant-directory-secondary {
   display: block;
   margin-top: 0.3rem;
@@ -137,14 +155,19 @@
   white-space: nowrap;
 }
 
+.participant-status-completed {
+  color: var(--admin-success, #14683a);
+  background: var(--admin-success-bg, #e2f1e7);
+}
+
 .participant-status-in-progress {
-  color: #155e46;
-  background: #e2f1e9;
+  color: var(--admin-warning, #7a4a00);
+  background: var(--admin-warning-bg, #fff1d6);
 }
 
 .participant-status-not-started {
-  color: #795512;
-  background: #f8efd8;
+  color: var(--admin-muted, #4e6258);
+  background: var(--admin-neutral-chip, #edf2ef);
 }
 
 .participant-status-no-tracks {

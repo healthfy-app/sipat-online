@@ -132,7 +132,7 @@ describe('company participant management', () => {
       name: 'Maria José Oliveira: 2 de 6 aulas concluídas (33%)',
     })).toHaveValue(33);
 
-    const search = screen.getByRole('searchbox', { name: 'Buscar por nome ou matrícula' });
+    const search = screen.getByRole('searchbox', { name: 'Buscar por nome ou usuário' });
     await user.type(search, 'jose');
     expect(within(table).getAllByRole('row')).toHaveLength(2);
     expect(within(table).getByText('Maria José Oliveira')).toBeVisible();
@@ -144,7 +144,7 @@ describe('company participant management', () => {
     expect(within(table).getByText('Carlos Souza')).toBeVisible();
 
     await user.clear(search);
-    await user.selectOptions(screen.getByLabelText('Progresso'), 'no-tracks');
+    await user.selectOptions(screen.getByLabelText('Situação'), 'no-tracks');
     expect(within(table).getAllByRole('row')).toHaveLength(2);
     expect(within(table).getByText('Carlos Souza')).toBeVisible();
     expect(within(table).queryByText('Maria José Oliveira')).not.toBeInTheDocument();
@@ -155,7 +155,7 @@ describe('company participant management', () => {
 
     renderPage('/admin/learning?status=not-started');
 
-    expect(await screen.findByLabelText('Progresso')).toHaveValue('not-started');
+    expect(await screen.findByLabelText('Situação')).toHaveValue('not-started');
   });
 
   it('drills into all assigned tracks and keeps assignment scoped to the selected participant', async () => {

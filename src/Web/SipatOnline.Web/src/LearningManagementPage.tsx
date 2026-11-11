@@ -48,7 +48,7 @@ const statusLabels: Record<ParticipantProgressStatus, string> = {
 };
 
 const filterOptions: { value: ParticipantProgressFilter; label: string }[] = [
-  { value: 'all', label: 'Todos os status' },
+  { value: 'all', label: 'Todas' },
   { value: 'in-progress', label: 'Em andamento' },
   { value: 'completed', label: 'Concluiu todas as trilhas' },
   { value: 'not-started', label: 'Não iniciou' },
@@ -67,6 +67,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
   const [selectedParticipantId, setSelectedParticipantId] = useState('');
   const [selectedTrackId, setSelectedTrackId] = useState('');
   const [search, setSearch] = useState('');
+  const [sortMode, setSortMode] = useState<'name' | 'progress'>('name');
   const [statusFilter, setStatusFilter] = useState<ParticipantProgressFilter>(
     () => getParticipantProgressFilter(searchParams.get('status')),
   );
@@ -91,8 +92,12 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
     [participants, participation],
   );
   const visibleParticipants = useMemo(
-    () => filterParticipantProgress(summaries, search, statusFilter),
-    [summaries, search, statusFilter],
+    () => filterParticipantProgress(summaries, search, statusFilter).sort((first, second) => (
+      sortMode === 'name'
+        ? first.participant.displayName.localeCompare(second.participant.displayName, 'pt-BR')
+        : second.overallProgressPercentage - first.overallProgressPercentage
+    )),
+    [summaries, search, sortMode, statusFilter],
   );
   const publishedTracks = useMemo(() => tracks.filter((track) => track.isPublished), [tracks]);
   const selectedSummary = summaries.find((summary) => summary.participant.id === selectedParticipantId);
@@ -303,7 +308,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
           </p>
         </div>
         <div className="participant-heading-actions">
-          {!isLoading && <span className="count-label">
+          {!isLoading && (search || statusFilter !== 'all') && <span className="count-label">
             {visibleParticipants.length} de {participants.length} participantes
           </span>}
           {!readOnly && <button className="button button-primary" onClick={openAddDialog} type="button">
@@ -319,25 +324,24 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
       <section aria-labelledby="participant-list-title" className="participant-directory">
         <div className="participant-directory-heading">
           <div>
-            <p className="eyebrow">CONTAS DA EMPRESA</p>
+            <p className="eyebrow">ACOMPANHAMENTO</p>
             <h2 id="participant-list-title">Progresso por participante</h2>
           </div>
-          {!isLoading && <span className="count-label">{participants.length} contas</span>}
         </div>
         <div className="participant-directory-filters">
           <div className="field participant-search-field">
-            <label htmlFor="participant-search">Buscar por nome ou matrícula</label>
+            <label htmlFor="participant-search">Buscar por nome ou usuário</label>
             <input
               autoComplete="off"
               id="participant-search"
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Ex.: Maria ou MAT-102"
+              placeholder="Ex.: Maria ou jose.maria"
               type="search"
               value={search}
             />
           </div>
           <div className="field participant-status-field">
-            <label htmlFor="participant-status-filter">Progresso</label>
+            <label htmlFor="participant-status-filter">Situação</label>
             <select
               id="participant-status-filter"
               onChange={(event) => setStatusFilter(event.target.value as ParticipantProgressFilter)}
@@ -346,6 +350,17 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
               {filterOptions.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="participant-sort">Ordenar por</label>
+            <select
+              id="participant-sort"
+              onChange={event => setSortMode(event.target.value as 'name' | 'progress')}
+              value={sortMode}
+            >
+              <option value="name">Nome</option>
+              <option value="progress">Progresso</option>
             </select>
           </div>
           {(search || statusFilter !== 'all') && (
@@ -372,7 +387,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
         ) : visibleParticipants.length === 0 ? (
           <div className="empty-state compact-empty" role="status">
             <h3>Nenhum participante encontrado</h3>
-            <p>Altere o nome, a matrícula ou o filtro de progresso.</p>
+            <p>Altere o nome, o usuário ou o filtro de situação.</p>
           </div>
         ) : (
           <div className="table-scroll participant-directory-table">
@@ -702,7 +717,7 @@ function ParticipantRow({
           </span>
           <span>
             <strong>{summary.participant.displayName}</strong>
-            <small>Matrícula {summary.participant.loginIdentifier}</small>
+            <small>Usuário {summary.participant.loginIdentifier}</small>
           </span>
         </div>
       </td>
