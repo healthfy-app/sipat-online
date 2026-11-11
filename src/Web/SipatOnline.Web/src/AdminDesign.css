@@ -127,6 +127,8 @@
 }
 
 .portal-layout:not(.portal-layout-learner) .page-content {
+  display: grid;
+  align-content: start;
   width: min(100%, 1600px);
   max-width: 1600px;
   gap: var(--admin-space-6);
