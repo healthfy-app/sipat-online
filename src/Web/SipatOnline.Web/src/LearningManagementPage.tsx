@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import CourseDialog from './CourseDialog';
 import LoadingState from './LoadingState';
 import ParticipantOutcomesPanel from './ParticipantOutcomesPanel';
@@ -58,6 +59,7 @@ const filterOptions: { value: ParticipantProgressFilter; label: string }[] = [
 type AddParticipantMode = 'single' | 'csv';
 
 export default function LearningManagementPage({ readOnly = false }: { readOnly?: boolean }) {
+  const [searchParams] = useSearchParams();
   const [participants, setParticipants] = useState<ParticipantAccount[]>([]);
   const [tracks, setTracks] = useState<LearningTrackSummary[]>([]);
   const [participation, setParticipation] = useState<LearningParticipantProgress[]>([]);
@@ -65,7 +67,9 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
   const [selectedParticipantId, setSelectedParticipantId] = useState('');
   const [selectedTrackId, setSelectedTrackId] = useState('');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<ParticipantProgressFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<ParticipantProgressFilter>(
+    () => getParticipantProgressFilter(searchParams.get('status')),
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isSavingParticipant, setIsSavingParticipant] = useState(false);
   const [isAssigning, setIsAssigning] = useState(false);
@@ -779,4 +783,8 @@ function readCsvFile(file: File): Promise<string> {
 
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Ocorreu um erro inesperado. Tente novamente.';
+}
+
+function getParticipantProgressFilter(value: string | null): ParticipantProgressFilter {
+  return filterOptions.find((option) => option.value === value)?.value ?? 'all';
 }

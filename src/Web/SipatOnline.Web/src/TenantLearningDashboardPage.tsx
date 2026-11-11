@@ -9,7 +9,6 @@ import {
 } from './participantProgress';
 import './TenantLearningDashboardPage.css';
 import LoadingState from './LoadingState';
-import { PageHeader } from './AdminComponents';
 
 const statusLabels: Record<ParticipantProgressStatus, string> = {
   completed: 'Concluíram todas as trilhas',
@@ -52,22 +51,28 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
     void loadOverview();
   }, [loadOverview]);
 
-  const hasMultipleDistributionStatuses = (overview?.participantDistribution
-    .filter(({ count }) => count > 0).length ?? 0) > 1;
+  const noTracksCount = overview?.participantDistribution.find(({ status }) => status === 'no-tracks')?.count ?? 0;
+  const notStartedCount = overview?.participantDistribution.find(({ status }) => status === 'not-started')?.count ?? 0;
+  const nextStepStatus = noTracksCount > 0 ? 'no-tracks' : 'not-started';
+  const nextStepCount = noTracksCount > 0 ? noTracksCount : notStartedCount;
 
   return (
     <div className="page-content tenant-learning-dashboard">
-      <PageHeader
-        actions={<div className="tenant-dashboard-actions">
+      <div className="page-heading">
+        <div>
+          <p className="eyebrow">GESTÃO DA EMPRESA</p>
+          <h1>Visão geral</h1>
+          <p className="muted-copy">
+            Acompanhe o progresso das pessoas e das trilhas da sua empresa.
+          </p>
+        </div>
+        <div className="tenant-dashboard-actions">
           <button className="button button-quiet" disabled={isLoading} onClick={() => void loadOverview()} type="button">
             Atualizar
           </button>
           <Link className="button button-primary" to="/admin/learning">Ver participantes</Link>
-        </div>}
-        description="Acompanhe o progresso das pessoas e das trilhas da sua empresa."
-        eyebrow="GESTÃO DA EMPRESA"
-        title="Visão geral"
-      />
+        </div>
+      </div>
 
       {error && <div className="form-error page-error" role="alert">
         <p>{error}</p>
@@ -85,9 +90,9 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
               note={`${overview.participantCount.toLocaleString('pt-BR')} contas no total`}
             />
             <SummaryCard
-              label="Atribuições de trilha"
+              label="Atribuições de trilhas"
               value={overview.assignedTrackCount.toLocaleString('pt-BR')}
-              note={`${overview.completedTrackCount.toLocaleString('pt-BR')} concluídas entre participantes`}
+              note={`${overview.trackProgress.length.toLocaleString('pt-BR')} ${overview.trackProgress.length === 1 ? 'trilha distinta' : 'trilhas distintas'} · ${overview.completedTrackCount.toLocaleString('pt-BR')} ${overview.completedTrackCount === 1 ? 'atribuição concluída' : 'atribuições concluídas'}`}
             />
             <SummaryCard
               label="Aulas concluídas"
@@ -96,17 +101,40 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
             />
           </section>
 
+          {nextStepCount > 0 && (
+            <section aria-labelledby="tenant-dashboard-next-step" className="tenant-dashboard-next-step">
+              <div>
+                <p className="eyebrow">PRÓXIMO PASSO</p>
+                <h2 id="tenant-dashboard-next-step">
+                  {noTracksCount > 0
+                    ? `Libere trilhas para ${noTracksCount} ${noTracksCount === 1 ? 'pessoa' : 'pessoas'}`
+                    : `Acompanhe ${notStartedCount} ${notStartedCount === 1 ? 'pessoa' : 'pessoas'} sem início`}
+                </h2>
+                <p>
+                  {noTracksCount > 0
+                    ? 'Essas pessoas ainda não têm uma trilha atribuída.'
+                    : 'Veja quem já tem trilhas liberadas e ainda não iniciou.'}
+                </p>
+              </div>
+              <Link className="button button-primary" to={`/admin/learning?status=${nextStepStatus}`}>
+                {noTracksCount > 0
+                  ? readOnly ? 'Ver pessoas sem trilhas' : 'Escolher participantes'
+                  : readOnly ? 'Ver acompanhamento' : 'Acompanhar progresso'}
+                <span aria-hidden="true"> →</span>
+              </Link>
+            </section>
+          )}
+
           <section aria-label="Progresso de todos os participantes" className="tenant-dashboard-chart-grid">
             <article aria-labelledby="participant-distribution-title" className="tenant-dashboard-panel">
               <div className="tenant-dashboard-panel-heading">
                 <div>
-                  <h2 id="participant-distribution-title">Progresso da empresa</h2>
+                  <h2 id="participant-distribution-title">Situação das pessoas</h2>
                 </div>
                 <span className="count-label">{overview.participantCount} pessoas</span>
               </div>
               {overview.participantCount === 0 ? (
                 <div className="tenant-dashboard-empty-chart">
-                  <DonutChart overview={overview} />
                   <div className="empty-state compact-empty">
                     <h3>Ainda não há participantes</h3>
                     <p>Cadastre ou importe pessoas para acompanhar o progresso da empresa.</p>
@@ -116,23 +144,7 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                   </div>
                 </div>
               ) : (
-                <div className={`tenant-dashboard-donut-layout${hasMultipleDistributionStatuses ? '' : ' is-single-status'}`}>
-                  {hasMultipleDistributionStatuses && <DonutChart overview={overview} />}
-                  <ul aria-label="Legenda do progresso" className="tenant-dashboard-legend">
-                    {overview.participantDistribution.map(({ status, count }) => (
-                      <li key={status}>
-                        <span aria-hidden="true" className="tenant-dashboard-legend-dot" style={{ backgroundColor: statusColors[status] }} />
-                        <span>{statusLabels[status]}</span>
-                        <strong>{count}</strong>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              {overview.participantCount > 0 && (
-                <p className="tenant-dashboard-chart-note">
-                  Cada pessoa aparece uma vez. Contas inativas ficam separadas; participantes sem trilhas também entram no total.
-                </p>
+                <DistributionOverview overview={overview} />
               )}
             </article>
 
@@ -162,7 +174,6 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                           max={100}
                           value={track.averageProgressPercentage}
                         />
-                        <strong>{track.averageProgressPercentage}%</strong>
                       </div>
                     </li>
                   ))}
@@ -172,6 +183,33 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
           </section>
         </>
       )}
+    </div>
+  );
+}
+
+function DistributionOverview({ overview }: { overview: CompanyLearningOverview }) {
+  const visibleStatuses = overview.participantDistribution.filter(({ count }) => count > 0);
+  const hasMultipleStatuses = visibleStatuses.length > 1;
+
+  return (
+    <div className={`tenant-dashboard-donut-layout${hasMultipleStatuses ? '' : ' is-single-status'}`}>
+      {hasMultipleStatuses ? (
+        <DonutChart overview={overview} />
+      ) : (
+        <div className="tenant-dashboard-single-status">
+          <strong>{visibleStatuses[0]?.count ?? 0}</strong>
+          <span>{visibleStatuses[0] ? statusLabels[visibleStatuses[0].status] : 'Sem participantes ativos'}</span>
+        </div>
+      )}
+      <ul aria-label="Legenda do progresso" className="tenant-dashboard-legend">
+        {visibleStatuses.map(({ status, count }) => (
+          <li key={status}>
+            <span aria-hidden="true" className="tenant-dashboard-legend-dot" style={{ backgroundColor: statusColors[status] }} />
+            <span>{statusLabels[status]}</span>
+            <strong>{count}</strong>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

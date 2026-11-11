@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, within } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import userEvent from '@testing-library/user-event';
 import LearningManagementPage from './LearningManagementPage';
 
@@ -8,6 +9,14 @@ afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
+
+function renderPage(path = '/admin/learning', readOnly = false) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <LearningManagementPage readOnly={readOnly} />
+    </MemoryRouter>,
+  );
+}
 
 function setupApi() {
   const participants = [
@@ -96,7 +105,7 @@ describe('company participant management', () => {
   it('keeps supervisor drill-down available while hiding participant creation and track assignment', async () => {
     const { fetchMock } = setupApi();
     const user = userEvent.setup();
-    render(<LearningManagementPage readOnly />);
+    renderPage('/admin/learning', true);
     const table = await screen.findByRole('table');
     expect(screen.queryByRole('button', { name: 'Adicionar participantes' })).not.toBeInTheDocument();
     const row = within(table).getByRole('row', { name: /Maria José Oliveira/ });
@@ -113,7 +122,7 @@ describe('company participant management', () => {
     setupApi();
     const user = userEvent.setup();
 
-    render(<LearningManagementPage />);
+    renderPage();
 
     const table = await screen.findByRole('table', { name: 'Participantes da empresa e progresso geral' });
     expect(within(table).getAllByRole('row')).toHaveLength(3);
@@ -141,11 +150,19 @@ describe('company participant management', () => {
     expect(within(table).queryByText('Maria José Oliveira')).not.toBeInTheDocument();
   });
 
+  it('applies the progress filter from a dashboard link', async () => {
+    setupApi();
+
+    renderPage('/admin/learning?status=not-started');
+
+    expect(await screen.findByLabelText('Progresso')).toHaveValue('not-started');
+  });
+
   it('drills into all assigned tracks and keeps assignment scoped to the selected participant', async () => {
     const { fetchMock } = setupApi();
     const user = userEvent.setup();
 
-    render(<LearningManagementPage />);
+    renderPage();
 
     const mariaRow = await screen.findByRole('row', { name: /Maria José Oliveira/ });
     await user.click(within(mariaRow).getByRole('button', { name: 'Ver trilhas' }));
@@ -171,7 +188,7 @@ describe('company participant management', () => {
     const { createRequests } = setupApi();
     const user = userEvent.setup();
 
-    render(<LearningManagementPage />);
+    renderPage();
     await user.click(await screen.findByRole('button', { name: 'Adicionar participantes' }));
 
     const dialog = screen.getByRole('dialog', { name: 'Adicionar participantes' });
@@ -201,7 +218,7 @@ describe('company participant management', () => {
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL }));
     const user = userEvent.setup();
 
-    render(<LearningManagementPage />);
+    renderPage();
     await user.click(await screen.findByRole('button', { name: 'Adicionar participantes' }));
     await user.click(screen.getByRole('button', { name: 'Importar CSV' }));
     const csv = new File([
@@ -237,7 +254,7 @@ describe('company participant management', () => {
     const { createRequests } = setupApi();
     const user = userEvent.setup();
 
-    render(<LearningManagementPage />);
+    renderPage();
     await user.click(await screen.findByRole('button', { name: 'Adicionar participantes' }));
     await user.click(screen.getByRole('button', { name: 'Importar CSV' }));
     const csv = new File(['nome;setor\nAna;Operação\n'], 'invalido.csv', { type: 'text/csv' });
