@@ -9,6 +9,7 @@ import {
 } from './participantProgress';
 import './TenantLearningDashboardPage.css';
 import LoadingState from './LoadingState';
+import { PageHeader } from './AdminComponents';
 
 const statusLabels: Record<ParticipantProgressStatus, string> = {
   completed: 'Concluíram todas as trilhas',
@@ -51,23 +52,22 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
     void loadOverview();
   }, [loadOverview]);
 
+  const hasMultipleDistributionStatuses = (overview?.participantDistribution
+    .filter(({ count }) => count > 0).length ?? 0) > 1;
+
   return (
     <div className="page-content tenant-learning-dashboard">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">GESTÃO DA EMPRESA</p>
-          <h1>Visão geral</h1>
-          <p className="muted-copy">
-            Acompanhe o progresso das pessoas e das trilhas da sua empresa.
-          </p>
-        </div>
-        <div className="tenant-dashboard-actions">
+      <PageHeader
+        actions={<div className="tenant-dashboard-actions">
           <button className="button button-quiet" disabled={isLoading} onClick={() => void loadOverview()} type="button">
             Atualizar
           </button>
           <Link className="button button-primary" to="/admin/learning">Ver participantes</Link>
-        </div>
-      </div>
+        </div>}
+        description="Acompanhe o progresso das pessoas e das trilhas da sua empresa."
+        eyebrow="GESTÃO DA EMPRESA"
+        title="Visão geral"
+      />
 
       {error && <div className="form-error page-error" role="alert">
         <p>{error}</p>
@@ -85,9 +85,9 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
               note={`${overview.participantCount.toLocaleString('pt-BR')} contas no total`}
             />
             <SummaryCard
-              label="Trilhas liberadas"
+              label="Atribuições de trilha"
               value={overview.assignedTrackCount.toLocaleString('pt-BR')}
-              note={`${overview.completedTrackCount.toLocaleString('pt-BR')} concluídas`}
+              note={`${overview.completedTrackCount.toLocaleString('pt-BR')} concluídas entre participantes`}
             />
             <SummaryCard
               label="Aulas concluídas"
@@ -100,7 +100,6 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
             <article aria-labelledby="participant-distribution-title" className="tenant-dashboard-panel">
               <div className="tenant-dashboard-panel-heading">
                 <div>
-                  <p className="eyebrow">PARTICIPANTES</p>
                   <h2 id="participant-distribution-title">Progresso da empresa</h2>
                 </div>
                 <span className="count-label">{overview.participantCount} pessoas</span>
@@ -117,8 +116,8 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                   </div>
                 </div>
               ) : (
-                <div className="tenant-dashboard-donut-layout">
-                  <DonutChart overview={overview} />
+                <div className={`tenant-dashboard-donut-layout${hasMultipleDistributionStatuses ? '' : ' is-single-status'}`}>
+                  {hasMultipleDistributionStatuses && <DonutChart overview={overview} />}
                   <ul aria-label="Legenda do progresso" className="tenant-dashboard-legend">
                     {overview.participantDistribution.map(({ status, count }) => (
                       <li key={status}>
@@ -140,7 +139,6 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
             <article aria-labelledby="track-progress-title" className="tenant-dashboard-panel">
               <div className="tenant-dashboard-panel-heading">
                 <div>
-                  <p className="eyebrow">TRILHAS DA EMPRESA</p>
                   <h2 id="track-progress-title">Conclusão média por trilha</h2>
                 </div>
                 <span className="count-label">{overview.trackProgress.length} trilhas</span>

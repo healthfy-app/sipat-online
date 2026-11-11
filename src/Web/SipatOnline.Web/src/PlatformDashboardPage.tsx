@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getPlatformDashboard, type PlatformCompanyOverview } from './api';
+import { DataTable, PageHeader, StatusChip } from './AdminComponents';
+import LoadingState from './LoadingState';
 
 export default function PlatformDashboardPage() {
   const [companies, setCompanies] = useState<PlatformCompanyOverview[]>([]);
@@ -28,18 +30,14 @@ export default function PlatformDashboardPage() {
 
   return (
     <div className="page-content platform-dashboard">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">SIPAT.ONLINE.ADMIN</p>
-          <h1>Visão geral dos clientes</h1>
-          <p className="muted-copy">
-            Empresas organizadas pela quantidade de participantes ativos cadastrados.
-          </p>
-        </div>
-        <button className="button button-quiet" onClick={() => void loadDashboard()} type="button">
+      <PageHeader
+        actions={<button className="button button-quiet" onClick={() => void loadDashboard()} type="button">
           Atualizar
-        </button>
-      </div>
+        </button>}
+        description="Empresas organizadas pela quantidade de participantes ativos cadastrados."
+        eyebrow="PLATAFORMA"
+        title="Visão geral dos clientes"
+      />
 
       {error && <p className="form-error page-error" role="alert">{error}</p>}
 
@@ -52,10 +50,9 @@ export default function PlatformDashboardPage() {
       <section aria-labelledby="platform-clients-heading" className="list-section">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">CLIENTES</p>
             <h2 id="platform-clients-heading">Empresas por número de participantes</h2>
           </div>
-          <Link className="button button-secondary" to="/platform/companies">Cadastrar empresa</Link>
+          <Link className="button button-secondary" to="/platform">Ver empresas</Link>
         </div>
 
         {isLoading ? (
@@ -67,31 +64,45 @@ export default function PlatformDashboardPage() {
             <Link className="button button-primary" to="/platform/companies">Cadastrar empresa</Link>
           </div>
         ) : (
-          <div className="platform-company-grid">
-            {companies.map((company, index) => (
-              <article className="platform-company-card" key={company.id}>
-                <div className="platform-company-card-top">
-                  <span className="platform-rank">#{index + 1}</span>
-                  <span className={`status-pill${company.isActive ? ' status-active' : ''}`}>
-                    {company.isActive ? 'Ativa' : 'Inativa'}
-                  </span>
-                </div>
-                <p className="eyebrow">{company.key}</p>
-                <h3>{company.name}</h3>
-                <strong className="platform-company-count">
-                  {company.employeeCount.toLocaleString('pt-BR')}
-                </strong>
-                <span className="muted-copy">participantes ativos</span>
-                <div className="platform-company-meta">
-                  <span>{company.administratorCount} admins ativos</span>
-                  <span>{company.totalUserCount} contas</span>
-                </div>
-                <Link className="learning-open-link" to={`/platform/users?tenant=${company.id}`}>
-                  Ver usuários <span aria-hidden="true">→</span>
-                </Link>
-              </article>
-            ))}
-          </div>
+          <DataTable label="Empresas por número de participantes">
+            <thead>
+              <tr>
+                <th scope="col">Empresa</th>
+                <th scope="col">Participantes ativos</th>
+                <th scope="col">Admins ativos</th>
+                <th scope="col">Contas</th>
+                <th scope="col">Status</th>
+                <th scope="col"><span className="visually-hidden">Ação</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {companies.map((company) => (
+                <tr key={company.id}>
+                  <td>
+                    <strong>{company.name}</strong>
+                    <small className="admin-table-secondary">{company.key}</small>
+                  </td>
+                  <td>{company.employeeCount.toLocaleString('pt-BR')}</td>
+                  <td>{company.administratorCount.toLocaleString('pt-BR')}</td>
+                  <td>{company.totalUserCount.toLocaleString('pt-BR')}</td>
+                  <td>
+                    <StatusChip variant={company.isActive ? 'success' : 'neutral'}>
+                      {company.isActive ? 'Ativa' : 'Inativa'}
+                    </StatusChip>
+                  </td>
+                  <td className="admin-table-action">
+                    <Link
+                      aria-label={`Ver usuários de ${company.name}`}
+                      className="button button-quiet"
+                      to={`/platform/users?tenant=${company.id}`}
+                    >
+                      Ver usuários <span aria-hidden="true">→</span>
+                    </Link>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </DataTable>
         )}
       </section>
       <p className="platform-data-note">
@@ -115,4 +126,3 @@ function SummaryCard({ label, value, note }: { label: string; value: string; not
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Não foi possível carregar o painel.';
 }
-import LoadingState from './LoadingState';

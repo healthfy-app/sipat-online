@@ -46,11 +46,33 @@ describe('tenant learning dashboard', () => {
     expect(await screen.findByRole('img', { name: 'Distribuição do progresso de 3 participantes' })).toBeVisible();
     expect(screen.getByText('Participantes ativos')).toBeVisible();
     expect(screen.getByText('3 contas no total')).toBeVisible();
+    expect(screen.getByText('Atribuições de trilha')).toBeVisible();
     expect(screen.getByText('Concluíram todas as trilhas')).toBeVisible();
     expect(screen.getByText('Em andamento')).toBeVisible();
     expect(screen.getByText('Contas inativas')).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Ergonomia: 70% de progresso médio' })).toHaveValue(70);
     expect(screen.getByText('1/2 concluíram')).toBeVisible();
+  });
+
+  it('omits a single-slice chart when all participants share one progress status', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/admin/users/participants?offset=0&limit=100') {
+        return Response.json({
+          offset: 0,
+          limit: 100,
+          totalCount: 1,
+          items: [{ id: 'p1', displayName: 'Ana Costa', loginIdentifier: 'MAT-001', isActive: true }],
+        });
+      }
+      if (url === '/api/admin/learning/participation') return Response.json([]);
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+
+    render(<MemoryRouter><TenantLearningDashboardPage /></MemoryRouter>);
+
+    expect(await screen.findByText('Sem trilhas atribuídas')).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Distribuição do progresso de 1 participantes' }))
+      .not.toBeInTheDocument();
   });
 
   it('shows an explicit empty state and zero-valued chart for a company with no participants', async () => {
