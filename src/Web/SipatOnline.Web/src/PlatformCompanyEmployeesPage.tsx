@@ -1,21 +1,51 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { getPlatformCompanyEmployees, type PlatformCompanyEmployeePage } from './api';
+import {
+  getPlatformCompanyEmployees,
+  getPlatformDashboard,
+  type PlatformCompanyEmployeePage,
+  type PlatformCompanyOverview,
+} from './api';
 import CompanyLearningPanel from './CompanyLearningPanel';
 import ParticipantOutcomesPanel from './ParticipantOutcomesPanel';
 import CompanyCertificateLogoPanel from './CompanyCertificateLogoPanel';
+import { DataTable, FilterBar, PageHeader, StatusChip } from './AdminComponents';
+import LoadingState from './LoadingState';
 
 const pageSize = 50;
 
 export default function PlatformCompanyEmployeesPage() {
   const { companyId = '' } = useParams<{ companyId: string }>();
   const [page, setPage] = useState<PlatformCompanyEmployeePage | null>(null);
+  const [company, setCompany] = useState<PlatformCompanyOverview | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [includeInactive, setIncludeInactive] = useState(false);
   const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [summaryError, setSummaryError] = useState('');
+
+  useEffect(() => {
+    let isCurrent = true;
+    setCompany(null);
+    setSummaryError('');
+    getPlatformDashboard()
+      .then((companies) => {
+        if (!isCurrent) return;
+        const foundCompany = companies.find((item) => item.id === companyId);
+        setCompany(foundCompany ?? null);
+        if (!foundCompany) setSummaryError('Resumo da empresa indisponível.');
+      })
+      .catch((loadError) => {
+        if (isCurrent) {
+          setSummaryError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar o resumo da empresa.');
+        }
+      });
+    return () => {
+      isCurrent = false;
+    };
+  }, [companyId]);
 
   useEffect(() => {
     let isCurrent = true;
@@ -49,25 +79,44 @@ export default function PlatformCompanyEmployeesPage() {
 
   return (
     <div className="page-content platform-company-employees">
-      <div className="page-heading">
-        <div>
-          <Link className="learning-open-link" to="/platform">← Empresas</Link>
-          <p className="eyebrow">DETALHE DA EMPRESA</p>
-          <h1>{page?.companyName ?? (isLoading ? 'Carregando empresa...' : 'Colaboradores')}</h1>
-          {page && <p className="muted-copy">{page.companyKey}</p>}
-          {page && <a className="button button-primary"
-            href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}>Administrar empresa</a>}
-        </div>
-        <CompanyLearningPanel companyId={companyId} />
-        <CompanyCertificateLogoPanel companyId={companyId} />
-        <span className="count-label">
-          {(page?.totalCount ?? 0).toLocaleString('pt-BR')} colaboradores
-        </span>
-      </div>
+      <nav aria-label="Breadcrumb" className="admin-breadcrumb">
+        <Link to="/platform">Empresas</Link>
+        <span aria-hidden="true">/</span>
+        <span>{page?.companyName ?? 'Empresa'}</span>
+      </nav>
+      <PageHeader
+        actions={<>
+          <CompanyLearningPanel companyId={companyId} />
+          <CompanyCertificateLogoPanel companyId={companyId} />
+          <a className="button button-primary" href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}>
+            Administrar empresa
+          </a>
+        </>}
+        description={page?.companyKey}
+        eyebrow="DETALHE DA EMPRESA"
+        meta={company && <StatusChip variant={company.isActive ? 'success' : 'neutral'}>
+          {company.isActive ? 'Ativa' : 'Inativa'}
+        </StatusChip>}
+        title={page?.companyName ?? (isLoading ? 'Carregando empresa...' : 'Colaboradores')}
+      />
 
       {error && <p className="form-error page-error" role="alert">{error}</p>}
+      {summaryError && <p className="form-error page-error" role="status">{summaryError}</p>}
 
-      <section aria-label="Filtros de colaboradores" className="company-employee-filters">
+      {company && (
+        <section aria-label="Resumo da empresa" className="company-summary-grid">
+          <article className="company-summary-card">
+            <span>Colaboradores</span>
+            <strong>{company.employeeCount.toLocaleString('pt-BR')}</strong>
+          </article>
+          <article className="company-summary-card">
+            <span>Administradores</span>
+            <strong>{company.administratorCount.toLocaleString('pt-BR')}</strong>
+          </article>
+        </section>
+      )}
+
+      <FilterBar className="company-employee-filters" label="Filtros de colaboradores">
         <form className="company-employee-search" onSubmit={handleSearch}>
           <div className="field">
             <label htmlFor="employee-search">Buscar por nome ou matrícula</label>
@@ -92,7 +141,7 @@ export default function PlatformCompanyEmployeesPage() {
           />
           Incluir colaboradores inativos
         </label>
-      </section>
+      </FilterBar>
 
       <section aria-labelledby="company-employees-heading" className="list-section">
         <div className="section-heading">
@@ -102,48 +151,46 @@ export default function PlatformCompanyEmployeesPage() {
           <LoadingState className="list-state">Carregando colaboradores...</LoadingState>
         ) : page && page.items.length > 0 ? (
           <>
-            <div className="table-scroll">
-              <table className="data-table company-employee-table">
-                <thead>
-                  <tr>
-                    <th scope="col">Nome</th>
-                    <th scope="col">Matrícula</th>
-                    <th scope="col">Conclusão</th>
-                    <th scope="col">Status</th>
-                    <th scope="col">Resultados</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {page.items.map((employee) => (
-                    <tr key={employee.id}>
-                      <td>{employee.displayName}</td>
-                      <td>{employee.loginIdentifier}</td>
-                      <td>
-                        <div
-                          aria-label={`${employee.progressPercentage}% concluído; ${employee.completedLessonCount} de ${employee.lessonCount} aulas`}
-                          className="employee-progress"
-                          aria-valuemax={100}
-                          aria-valuemin={0}
-                          aria-valuenow={employee.progressPercentage}
-                          role="progressbar"
-                        >
-                          <span aria-hidden="true" className="employee-progress-track">
-                            <span style={{ width: `${employee.progressPercentage}%` }} />
-                          </span>
-                          <strong>{employee.progressPercentage}%</strong>
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`status-pill${employee.isActive ? ' status-active' : ''}`}>
-                          {employee.isActive ? 'Ativo' : 'Inativo'}
+            <DataTable className="company-employee-table" label="Colaboradores da empresa">
+              <thead>
+                <tr>
+                  <th scope="col">Nome</th>
+                  <th scope="col">Matrícula</th>
+                  <th scope="col">Conclusão</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Atividades e certificados</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.items.map((employee) => (
+                  <tr key={employee.id}>
+                    <td>{employee.displayName}</td>
+                    <td>{employee.loginIdentifier}</td>
+                    <td>
+                      <div
+                        aria-label={`${employee.progressPercentage}% concluído; ${employee.completedLessonCount} de ${employee.lessonCount} aulas`}
+                        className="employee-progress"
+                        aria-valuemax={100}
+                        aria-valuemin={0}
+                        aria-valuenow={employee.progressPercentage}
+                        role="progressbar"
+                      >
+                        <span aria-hidden="true" className="employee-progress-track">
+                          <span style={{ width: `${employee.progressPercentage}%` }} />
                         </span>
-                      </td>
-                      <td><ParticipantOutcomesPanel participantId={employee.id} companyId={companyId} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                        <strong>{employee.progressPercentage}%</strong>
+                      </div>
+                    </td>
+                    <td>
+                      <StatusChip variant={employee.isActive ? 'success' : 'neutral'}>
+                        {employee.isActive ? 'Ativo' : 'Inativo'}
+                      </StatusChip>
+                    </td>
+                    <td><ParticipantOutcomesPanel participantId={employee.id} companyId={companyId} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
             <div aria-label="Paginação de colaboradores" className="company-employee-pagination">
               <span>
                 Página {currentPage} de {pageCount} · {page.totalCount.toLocaleString('pt-BR')} resultados
@@ -177,4 +224,3 @@ export default function PlatformCompanyEmployeesPage() {
     </div>
   );
 }
-import LoadingState from './LoadingState';

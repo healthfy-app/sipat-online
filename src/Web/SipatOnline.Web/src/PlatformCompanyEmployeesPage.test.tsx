@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -8,9 +8,23 @@ import * as api from './api';
 vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
   getPlatformCompanyEmployees: vi.fn(),
+  getPlatformDashboard: vi.fn(),
 }));
 
 afterEach(cleanup);
+
+beforeEach(() => {
+  vi.mocked(api.getPlatformDashboard).mockResolvedValue([{
+    id: 'company-1',
+    key: 'acme',
+    name: 'Acme',
+    createdAt: '2025-01-01T00:00:00Z',
+    isActive: true,
+    employeeCount: 2,
+    administratorCount: 1,
+    totalUserCount: 3,
+  }]);
+});
 
 function renderPage() {
   return render(
@@ -54,6 +68,9 @@ describe('Platform company employees', () => {
     expect(screen.getByRole('progressbar', { name: /50% concluído; 1 de 2 aulas/ }))
       .toHaveAttribute('aria-valuenow', '50');
     expect(screen.getByText('Ativo')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Resumo da empresa' }))
+      .toHaveTextContent('Colaboradores2Administradores1');
+    expect(screen.queryByText('Conclusão média')).not.toBeInTheDocument();
   });
 
   it('searches by name or registration and requests inactive employees only when opted in', async () => {
