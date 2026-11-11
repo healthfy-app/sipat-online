@@ -37,7 +37,6 @@ import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
 import { BrandThemeContext, tenantTheme } from './branding';
 import LoadingState from './LoadingState';
-import './AdminDesign.css';
 
 type AppState =
   | { status: 'loading' }
@@ -410,7 +409,7 @@ function LoginPage({
               <span>{tenant.tenantKey === 'platform' ? 'OPERAÇÃO DA PLATAFORMA' : 'FORMAÇÃO DA EQUIPE'}</span>
               <strong>
                 {tenant.tenantKey === 'platform'
-                  ? 'Clareza para cuidar da operação.'
+                  ? 'Empresas, cursos e usuários em um só lugar.'
                   : 'Pequenos passos. Rotinas mais seguras.'}
               </strong>
             </span>
@@ -460,6 +459,7 @@ function LoginPage({
               id="login-password"
               name="password"
               onChange={(event) => setPassword(event.target.value)}
+              placeholder="Digite sua senha"
               required
               type={showPassword ? 'text' : 'password'}
               value={password}
@@ -611,6 +611,17 @@ function ProtectedPortal({
                     strokeDasharray={2 * Math.PI * 22}
                     strokeDashoffset={2 * Math.PI * 22 * (1 - learningSummary.percentage / 100)}
                   />
+                  {learningSummary.percentage === 100 && (
+                    <text
+                      className="learner-sidebar-progress-complete-mark"
+                      dominantBaseline="central"
+                      textAnchor="middle"
+                      x="28"
+                      y="28"
+                    >
+                      ✓
+                    </text>
+                  )}
                 </svg>
                 <div>
                   <strong>{learningSummary.percentage}% concluído</strong>
@@ -642,7 +653,7 @@ function ProtectedPortal({
               <p className="sidebar-label">GESTÃO DA EMPRESA</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
               {hasAdminRole(session) && <>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">Programação da SIPAT</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">Programação</NavLink>
                 <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/content">Trilhas e vídeos</NavLink>
                 <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>
               </>}
@@ -655,7 +666,7 @@ function ProtectedPortal({
             <>
               <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/dashboard">Dashboard</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/dashboard">Visão geral</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/users">Usuários</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Cursos</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
