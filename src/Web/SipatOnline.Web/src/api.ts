@@ -228,6 +228,8 @@ export interface PlatformUserProvisionData {
   role: 'Participant' | 'ClientAdmin' | 'Supervisor';
 }
 
+export type PlatformUserRoleFilter = PlatformUserProvisionData['role'] | 'SuperAdmin';
+
 export interface ParticipantAccount {
   id: string;
   loginIdentifier: string;
@@ -687,10 +689,15 @@ export function listPlatformUsers(
   offset = 0,
   limit = 50,
   tenantId?: string,
+  search?: string,
+  role?: PlatformUserRoleFilter,
 ): Promise<PlatformUserDirectoryPage> {
-  const tenantFilter = tenantId ? `&tenantId=${encodeURIComponent(tenantId)}` : '';
+  const query = new URLSearchParams({ offset: String(offset), limit: String(limit) });
+  if (tenantId) query.set('tenantId', tenantId);
+  if (search?.trim()) query.set('search', search.trim());
+  if (role) query.set('role', role);
   return requestJson<PlatformUserDirectoryPage>(
-    `/api/platform/users?offset=${offset}&limit=${limit}${tenantFilter}`,
+    `/api/platform/users?${query.toString()}`,
   );
 }
 

@@ -76,6 +76,12 @@ public sealed class PlatformApiTests
             "passwordHash",
             usersJson.RootElement.GetRawText(),
             StringComparison.OrdinalIgnoreCase);
+        using var oversizedUsersSearchResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/users?search={new string('a', 129)}");
+        Assert.Equal(HttpStatusCode.BadRequest, oversizedUsersSearchResponse.StatusCode);
+        using var invalidUsersRoleResponse =
+            await client.GetAsync("https://ops.localhost/api/platform/users?role=PlatformOperator");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidUsersRoleResponse.StatusCode);
 
         using var companiesResponse =
             await client.GetAsync("https://ops.localhost/api/platform/companies");
@@ -166,6 +172,15 @@ public sealed class PlatformApiTests
         Assert.Equal(
             "acme-participant",
             Assert.Single(filteredUsersBeyondPage.Items).LoginIdentifier);
+
+        using var filteredUsersBySearchAndRoleResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/users?offset=0&limit=50&tenantId={company.Id:D}&search=acme-participant&role=participant");
+        Assert.Equal(HttpStatusCode.OK, filteredUsersBySearchAndRoleResponse.StatusCode);
+        var filteredUsersBySearchAndRolePage =
+            await filteredUsersBySearchAndRoleResponse.Content.ReadFromJsonAsync<PlatformUserDirectoryPage>();
+        Assert.NotNull(filteredUsersBySearchAndRolePage);
+        Assert.Equal(1, filteredUsersBySearchAndRolePage.TotalCount);
+        Assert.Equal("acme-participant", Assert.Single(filteredUsersBySearchAndRolePage.Items).LoginIdentifier);
 
         antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
         using var elevatedRoleResponse = await SendJsonWithAntiforgeryAsync(

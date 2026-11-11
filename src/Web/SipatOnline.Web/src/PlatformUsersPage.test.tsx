@@ -82,36 +82,44 @@ describe('platform user directory', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByText('Alex Participante')).toBeVisible();
-    expect(screen.getByRole('region', { name: 'Empresa selecionada' })).toHaveTextContent(
-      'Acme Segurança',
-    );
-    expect(screen.getByRole('cell', { name: 'employee-100' })).toBeVisible();
+    expect(await screen.findByRole('row', { name: /Alex Participante/ })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: 'Matrícula' })).toBeVisible();
+    expect(screen.getByRole('cell', { name: /Acme Segurança acme/ })).toBeVisible();
     expect(screen.getByText('Ativo')).toBeVisible();
-    expect(screen.getByRole('table', { name: 'Diretório de usuários das empresas' })).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Exibir usuários de'), 'tenant-1');
+    await user.selectOptions(screen.getByLabelText('Empresa'), 'tenant-1');
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) =>
       String(input) === '/api/platform/users?offset=0&limit=50&tenantId=tenant-1',
     )).toBe(true));
     expect(screen.getByText(/Dados de autenticação nunca são exibidos/)).toBeVisible();
-    const newUserButton = screen.getByRole('button', { name: '+ Novo usuário' });
-    await user.click(newUserButton);
-    expect(screen.getByRole('dialog', { name: 'Cadastrar usuário em uma empresa' })).toBeVisible();
+
+    await user.type(screen.getByLabelText('Buscar usuário'), 'employee');
+    await user.selectOptions(screen.getByLabelText('Perfil'), 'Participant');
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) =>
+      String(input) === '/api/platform/users?offset=0&limit=50&tenantId=tenant-1&search=employee&role=Participant',
+    )).toBe(true));
+
+    const createButton = screen.getByRole('button', { name: '+ Novo usuário' });
+    await waitFor(() => expect(createButton).toBeEnabled());
+    await user.click(createButton);
+    expect(screen.getByRole('dialog', { name: 'Novo usuário' })).toBeVisible();
     await user.type(screen.getByLabelText('Nome completo'), 'Joana Exemplo');
     await user.type(screen.getByLabelText('Matrícula'), 'joana-200');
-    await user.type(screen.getByLabelText('Senha inicial temporária'), 'SenhaDemo12345');
+    await user.click(screen.getByRole('button', { name: 'Gerar senha forte' }));
+    const generatedPassword = screen.getByLabelText('Senha inicial temporária');
+    expect((generatedPassword as HTMLInputElement).value)
+      .toMatch(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%&*+\-_=]).{16}$/);
     await user.click(screen.getByRole('button', { name: 'Cadastrar usuário' }));
 
     expect(await screen.findByRole('status')).toHaveTextContent(
       'Joana Exemplo foi cadastrado em Acme Segurança.',
     );
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(createButton).toHaveFocus();
     expect(fetchMock).toHaveBeenCalledWith('/api/platform/users', expect.objectContaining({
       method: 'POST',
       credentials: 'include',
       body: expect.stringContaining('"tenantId":"tenant-1"'),
     }));
     expect(screen.queryByText(/passwordHash|senha:|hash:/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(newUserButton).toHaveFocus();
   });
 });

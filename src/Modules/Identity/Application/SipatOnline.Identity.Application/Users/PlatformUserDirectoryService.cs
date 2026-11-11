@@ -28,6 +28,8 @@ public sealed class PlatformUserDirectoryService(
 
     public async Task<Result<PlatformUserDirectoryPage>> ListAsync(
         Guid? tenantId,
+        string? search,
+        string? role,
         int offset,
         int limit,
         CancellationToken cancellationToken)
@@ -41,15 +43,32 @@ public sealed class PlatformUserDirectoryService(
                     "Você não tem permissão para consultar usuários de todas as empresas."));
         }
 
-        if (tenantId == Guid.Empty || offset < 0 || limit is < 1 or > MaximumPageSize)
+        var normalizedSearch = string.IsNullOrWhiteSpace(search) ? null : search.Trim();
+        var normalizedRole = string.IsNullOrWhiteSpace(role) ? null : role.Trim();
+        var validRoles = new[]
+        {
+            PlatformRoles.SuperAdmin,
+            PlatformRoles.ClientAdmin,
+            PlatformRoles.Participant,
+            PlatformRoles.Supervisor,
+        };
+        if (tenantId == Guid.Empty || offset < 0 || limit is < 1 or > MaximumPageSize ||
+            normalizedSearch is { Length: > 128 } ||
+            normalizedRole is not null && !validRoles.Contains(normalizedRole, StringComparer.OrdinalIgnoreCase))
         {
             return Result<PlatformUserDirectoryPage>.Failure(
                 new DomainError(
                     "identity.platform_directory.pagination_invalid",
-                    $"A empresa deve ser válida e a paginação deve ter deslocamento não negativo e limite entre 1 e {MaximumPageSize}."));
+                    $"A empresa e o perfil devem ser válidos, a busca pode ter até 128 caracteres e a paginação deve ter deslocamento não negativo e limite entre 1 e {MaximumPageSize}."));
         }
 
-        var page = await directoryStore.ListAsync(tenantId, offset, limit, cancellationToken);
+        var page = await directoryStore.ListAsync(
+            tenantId,
+            normalizedSearch,
+            normalizedRole,
+            offset,
+            limit,
+            cancellationToken);
         return Result<PlatformUserDirectoryPage>.Success(page);
     }
 

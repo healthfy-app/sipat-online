@@ -623,6 +623,31 @@
   min-width: 760px;
 }
 
+.platform-user-filters {
+  grid-template-columns: minmax(14rem, 1fr) minmax(12rem, 0.65fr) minmax(12rem, 0.55fr);
+}
+
+.platform-user-form .field {
+  margin-bottom: var(--admin-space-3);
+}
+
+.admin-link-button {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  color: var(--admin-success);
+  background: transparent;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.admin-link-button:hover {
+  color: var(--admin-ink);
+}
+
 .company-detail-actions {
   display: flex;
   flex-wrap: wrap;
@@ -800,6 +825,10 @@
   .admin-page-heading {
     align-items: flex-start;
   }
+
+  .platform-user-filters {
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  }
 }
 
 @media (max-width: 600px) {
@@ -837,6 +866,10 @@
   }
 
   .admin-filter-bar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .platform-user-filters {
     grid-template-columns: minmax(0, 1fr);
   }
 

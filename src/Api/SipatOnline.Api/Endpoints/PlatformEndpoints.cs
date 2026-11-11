@@ -154,11 +154,15 @@ public static class PlatformEndpoints
             int? offset,
             int? limit,
             Guid? tenantId,
+            string? search,
+            string? role,
             PlatformUserDirectoryService userDirectoryService,
             CancellationToken cancellationToken) =>
         {
             var result = await userDirectoryService.ListAsync(
                 tenantId,
+                search,
+                role,
                 offset ?? 0,
                 limit ?? 50,
                 cancellationToken);

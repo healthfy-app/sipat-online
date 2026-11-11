@@ -239,14 +239,31 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
 
     public async Task<PlatformUserDirectoryPage> ListAsync(
         Guid? tenantId,
+        string? search,
+        string? role,
         int offset,
         int limit,
         CancellationToken cancellationToken)
     {
+        var normalizedSearch = search?.ToUpperInvariant();
+        var normalizedRole = role?.ToUpperInvariant();
         var usersQuery =
             from user in dbContext.Users.AsNoTracking()
             where user.TenantId != null &&
-                  (tenantId == null || user.TenantId == tenantId)
+                  (tenantId == null || user.TenantId == tenantId) &&
+                  (normalizedSearch == null ||
+                   user.EmployeeIdentifier.ToUpper().Contains(normalizedSearch) ||
+                   user.DisplayName.ToUpper().Contains(normalizedSearch) ||
+                   dbContext.Tenants.Any(tenant =>
+                       tenant.Id == user.TenantId &&
+                       (tenant.Name.ToUpper().Contains(normalizedSearch) ||
+                        tenant.Key.ToUpper().Contains(normalizedSearch)))) &&
+                  (normalizedRole == null ||
+                   dbContext.UserRoles.Any(userRole =>
+                       userRole.UserId == user.Id &&
+                       dbContext.Roles.Any(userRoleDefinition =>
+                           userRoleDefinition.Id == userRole.RoleId &&
+                           userRoleDefinition.NormalizedName == normalizedRole)))
             join tenant in dbContext.Tenants.AsNoTracking()
                 on user.TenantId equals tenant.Id
             orderby tenant.Name, user.DisplayName, user.Id
@@ -269,10 +286,10 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
         var roleAssignments = await (
                 from userRole in dbContext.UserRoles.AsNoTracking()
                 where userIds.Contains(userRole.UserId)
-                join role in dbContext.Roles.AsNoTracking()
-                    on userRole.RoleId equals role.Id
-                where role.Name != null
-                select new UserRoleRow(userRole.UserId, role.Name!))
+                join directoryRole in dbContext.Roles.AsNoTracking()
+                    on userRole.RoleId equals directoryRole.Id
+                where directoryRole.Name != null
+                select new UserRoleRow(userRole.UserId, directoryRole.Name!))
             .ToListAsync(cancellationToken);
         var rolesByUser = roleAssignments
             .GroupBy(assignment => assignment.UserId)

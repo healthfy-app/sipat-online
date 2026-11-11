@@ -15,6 +15,8 @@ public interface IPlatformUserDirectoryStore
 
     Task<PlatformUserDirectoryPage> ListAsync(
         Guid? tenantId,
+        string? search,
+        string? role,
         int offset,
         int limit,
         CancellationToken cancellationToken);
