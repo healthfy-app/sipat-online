@@ -70,6 +70,7 @@ describe('Platform company employees', () => {
     expect(screen.getByText('Ativo')).toBeInTheDocument();
     expect(screen.getByText('Identificador · acme')).toBeInTheDocument();
     expect(screen.getByText('Administradores')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver histórico' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Administrar empresa' }))
       .toHaveAttribute('href', '/admin/dashboard?companyId=company-1');
     expect(screen.getByRole('columnheader', { name: 'Atividades e certificados' })).toBeInTheDocument();

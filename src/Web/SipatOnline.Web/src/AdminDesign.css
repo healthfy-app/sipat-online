@@ -854,18 +854,20 @@
   min-width: 740px;
 }
 
-.company-employee-table .button-quiet {
-  padding-inline: 0;
+.portal-layout:not(.portal-layout-learner) .company-employee-table .participant-outcomes-trigger {
+  padding-inline: var(--admin-space-2);
   border-color: transparent;
-  color: var(--admin-success);
+  color: var(--admin-primary);
   background: transparent;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
 }
 
-.company-employee-table .button-quiet:hover:not(:disabled) {
-  color: var(--admin-ink);
-  background: transparent;
+.portal-layout:not(.portal-layout-learner) .company-employee-table .participant-outcomes-trigger:hover:not(:disabled) {
+  border-color: transparent;
+  color: var(--admin-primary);
+  background: var(--admin-success-bg);
 }
 
 .employee-progress {

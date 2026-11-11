@@ -9,13 +9,17 @@ export default function ParticipantOutcomesPanel({ participantId, companyId }: {
   const [busy, setBusy] = useState(false);
   const certificateCompanyId = companyId ?? getCompanyAdministrationId();
   async function load() {
-    setOpen(true); setBusy(true); setError(''); setData(null);
+    setOpen(true);
+    setBusy(true);
+    setError('');
+    setData(null);
     try { setData(await getParticipantOutcomes(participantId, companyId)); }
     catch (failure) { setError(failure instanceof Error ? failure.message : 'Não foi possível carregar os resultados.'); }
     finally { setBusy(false); }
   }
   return <>
-    <button className="button button-quiet" disabled={!participantId} onClick={() => void load()} type="button">Atividades e certificados</button>
+    <button className="button button-quiet participant-outcomes-trigger" disabled={!participantId}
+      onClick={() => void load()} type="button">Ver histórico</button>
     {open && <CourseDialog busy={busy} onClose={() => setOpen(false)} title="Atividades e certificados">
       {busy && <LoadingState className="loading-state-compact">Carregando resultados...</LoadingState>}
       {error && <div role="alert"><p>{error}</p><button className="button button-secondary" onClick={() => void load()} type="button">Tentar novamente</button></div>}

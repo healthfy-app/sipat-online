@@ -112,7 +112,7 @@ describe('company participant management', () => {
     await user.click(within(row).getByRole('button', { name: /Ver trilhas/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Trilhas de Maria José Oliveira' });
     expect(within(dialog).getByText('Ergonomia')).toBeVisible();
-    expect(within(dialog).getByRole('button', { name: 'Atividades e certificados' })).toBeVisible();
+    expect(within(dialog).getByRole('button', { name: 'Ver histórico' })).toBeVisible();
     expect(within(dialog).queryByRole('button', { name: 'Atribuir trilha' })).not.toBeInTheDocument();
     expect(within(dialog).queryByLabelText('Liberar outra trilha')).not.toBeInTheDocument();
     expect(fetchMock.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true);
