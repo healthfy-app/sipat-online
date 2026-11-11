@@ -27,6 +27,7 @@ import CourseEditorFrame, { type CourseEditorStep } from './CourseEditorFrame';
 import VideoPreview from './VideoPreview';
 import { getCourseCover } from './courseCover';
 import CourseDialog from './CourseDialog';
+import { CourseCard as AdminCourseCard, PageHeader } from './AdminComponents';
 
 type Tab = 'courses' | 'library' | 'modules';
 type StatusFilter = 'all' | PlatformCourseStatus;
@@ -143,20 +144,19 @@ export default function PlatformCoursesPage() {
         />
       ) : (
         <>
-          <div className="course-content-heading">
-            <div className="course-page-title">
-              <h1>Conteúdo</h1>
-              {import.meta.env.DEV && <span className="demo-presentation-badge">Apresentação demo</span>}
-            </div>
-            <div className="course-heading-actions">
+          <PageHeader
+            actions={<>
               <button className="button button-secondary" onClick={() => setIsLibraryOpen(true)} type="button">
                 Pesquisar biblioteca
               </button>
-              <button className="button course-primary" onClick={() => setIsCreating(true)} type="button">
+              <button className="button button-primary" onClick={() => setIsCreating(true)} type="button">
                 + Criar curso
               </button>
-            </div>
-          </div>
+            </>}
+            description={`${courses.length.toLocaleString('pt-BR')} ${courses.length === 1 ? 'curso' : 'cursos'} · Biblioteca de conteúdo da plataforma`}
+            eyebrow="PLATAFORMA"
+            title="Cursos"
+          />
           {isLoading ? <LoadingState className="list-state">Carregando catálogo...</LoadingState> : !error && courses.length === 0 && (
           <section aria-label="Como deseja começar?" className="course-start-options">
             <button
@@ -274,18 +274,28 @@ export default function PlatformCoursesPage() {
               ) : filteredCourses.length === 0 ? (
                 <div className="empty-state"><p>Nenhum curso corresponde aos filtros.</p></div>
               ) : (
-                <div className="platform-course-grid">
+                <div className="admin-course-grid">
                   {filteredCourses.map((course) => (
-                    <CourseCard
-                      course={course}
+                    <AdminCourseCard
+                      coverUrl={course.coverUrl ?? getCourseCover(course.title)}
+                      description={getCourseDescription(course.description) || undefined}
+                      duration={course.videos.length > 0
+                        ? formatDuration(course.videos.reduce((sum, video) => sum + video.durationMilliseconds, 0))
+                        : undefined}
+                      gamificationEnabled={course.gamificationEnabled}
                       key={course.id}
-                      onDuplicate={() => handleDuplicate(course)}
                       onOpen={() => {
                         setSelectedCourseId(course.id);
                         setIsLibraryOpen(false);
                         setError('');
                         setNotice('');
                       }}
+                      onDuplicate={() => handleDuplicate(course)}
+                      optionLabel={getCourseOption(course.description) ?? undefined}
+                      statusLabel={statusLabels[course.status]}
+                      statusVariant={course.status === 'Published' ? 'success' : 'neutral'}
+                      title={course.title}
+                      videoCount={course.videos.length}
                     />
                   ))}
                 </div>
@@ -333,56 +343,6 @@ function CourseStartIcon({ kind }: { kind: 'folder' | 'pencil' }) {
         </>
       )}
     </svg>
-  );
-}
-
-function CourseCard({
-  course,
-  onOpen,
-  onDuplicate,
-}: {
-  course: PlatformCourse;
-  onOpen: () => void;
-  onDuplicate: () => void;
-}) {
-  const totalMilliseconds = course.videos.reduce((sum, video) => sum + video.durationMilliseconds, 0);
-  return (
-    <article className="platform-course-card">
-      <img alt="" className="platform-course-cover" decoding="async" loading="lazy" src={course.coverUrl ?? getCourseCover(course.title)} />
-      <div className="platform-course-card-top">
-        {getCourseOption(course.description) && (
-          <span className="course-option-label">Opção {getCourseOption(course.description)}</span>
-        )}
-        <span className={`status-badge status-${course.status.toLowerCase()}`}>
-          {statusLabels[course.status]}
-        </span>
-        {course.gamificationEnabled && <span className="status-badge status-active">Gamificação</span>}
-      </div>
-      <h3>{course.title}</h3>
-      <p className="muted-copy">{getCourseDescription(course.description) || 'Sem descrição.'}</p>
-      <p className="platform-course-card-meta">
-        {course.videos.length} {course.videos.length === 1 ? 'vídeo' : 'vídeos'}
-        {course.videos.length > 0 && ` · ${formatDuration(totalMilliseconds)}`}
-      </p>
-      <div className="platform-course-card-actions">
-        <button
-          aria-label={`Abrir curso ${course.title}`}
-          className="button button-primary"
-          onClick={onOpen}
-          type="button"
-        >
-          Abrir
-        </button>
-        <button
-          aria-label={`Duplicar curso ${course.title}`}
-          className="button button-secondary"
-          onClick={onDuplicate}
-          type="button"
-        >
-          Duplicar
-        </button>
-      </div>
-    </article>
   );
 }
 
