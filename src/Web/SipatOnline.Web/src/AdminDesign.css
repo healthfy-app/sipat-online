@@ -487,6 +487,11 @@
   font-size: 13px;
 }
 
+.company-summary-card small {
+  color: var(--admin-muted);
+  font-size: 12px;
+}
+
 .company-summary-card strong {
   color: var(--admin-ink);
   font-size: 22px;
@@ -533,6 +538,20 @@
 
 .company-employee-table {
   min-width: 740px;
+}
+
+.company-employee-table .button-quiet {
+  padding-inline: 0;
+  border-color: transparent;
+  color: var(--admin-success);
+  background: transparent;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.company-employee-table .button-quiet:hover:not(:disabled) {
+  color: var(--admin-ink);
+  background: transparent;
 }
 
 .employee-progress {

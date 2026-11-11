@@ -18,10 +18,10 @@ beforeEach(() => {
     id: 'company-1',
     key: 'acme',
     name: 'Acme',
-    createdAt: '2025-01-01T00:00:00Z',
+    createdAt: '2026-10-21T12:00:00Z',
     isActive: true,
-    employeeCount: 2,
-    administratorCount: 1,
+    employeeCount: 1,
+    administratorCount: 2,
     totalUserCount: 3,
   }]);
 });
@@ -68,8 +68,11 @@ describe('Platform company employees', () => {
     expect(screen.getByRole('progressbar', { name: /50% concluído; 1 de 2 aulas/ }))
       .toHaveAttribute('aria-valuenow', '50');
     expect(screen.getByText('Ativo')).toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Resumo da empresa' }))
-      .toHaveTextContent('Colaboradores2Administradores1');
+    expect(screen.getByText('Identificador · acme')).toBeInTheDocument();
+    expect(screen.getByText('Administradores')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Administrar empresa' }))
+      .toHaveAttribute('href', '/admin/dashboard?companyId=company-1');
+    expect(screen.getByRole('columnheader', { name: 'Atividades e certificados' })).toBeInTheDocument();
     expect(screen.queryByText('Conclusão média')).not.toBeInTheDocument();
   });
 

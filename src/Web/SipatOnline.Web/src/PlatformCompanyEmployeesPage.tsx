@@ -9,15 +9,14 @@ import {
 import CompanyLearningPanel from './CompanyLearningPanel';
 import ParticipantOutcomesPanel from './ParticipantOutcomesPanel';
 import CompanyCertificateLogoPanel from './CompanyCertificateLogoPanel';
-import { DataTable, FilterBar, PageHeader, StatusChip } from './AdminComponents';
-import LoadingState from './LoadingState';
+import { DataTable, PageHeader, StatusChip } from './AdminComponents';
 
 const pageSize = 50;
 
 export default function PlatformCompanyEmployeesPage() {
   const { companyId = '' } = useParams<{ companyId: string }>();
   const [page, setPage] = useState<PlatformCompanyEmployeePage | null>(null);
-  const [company, setCompany] = useState<PlatformCompanyOverview | null>(null);
+  const [companyOverview, setCompanyOverview] = useState<PlatformCompanyOverview | null>(null);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [includeInactive, setIncludeInactive] = useState(false);
@@ -28,18 +27,17 @@ export default function PlatformCompanyEmployeesPage() {
 
   useEffect(() => {
     let isCurrent = true;
-    setCompany(null);
     setSummaryError('');
     getPlatformDashboard()
       .then((companies) => {
-        if (!isCurrent) return;
-        const foundCompany = companies.find((item) => item.id === companyId);
-        setCompany(foundCompany ?? null);
-        if (!foundCompany) setSummaryError('Resumo da empresa indisponível.');
+        if (isCurrent) setCompanyOverview(companies.find((company) => company.id === companyId) ?? null);
       })
       .catch((loadError) => {
         if (isCurrent) {
-          setSummaryError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar o resumo da empresa.');
+          setCompanyOverview(null);
+          setSummaryError(loadError instanceof Error
+            ? loadError.message
+            : 'Não foi possível carregar os indicadores da empresa.');
         }
       });
     return () => {
@@ -79,44 +77,54 @@ export default function PlatformCompanyEmployeesPage() {
 
   return (
     <div className="page-content platform-company-employees">
-      <nav aria-label="Breadcrumb" className="admin-breadcrumb">
-        <Link to="/platform">Empresas</Link>
-        <span aria-hidden="true">/</span>
-        <span>{page?.companyName ?? 'Empresa'}</span>
+      <nav aria-label="Breadcrumb">
+        <ol className="admin-breadcrumb">
+          <li><Link to="/platform">Empresas</Link></li>
+          <li aria-hidden="true">/</li>
+          <li aria-current="page">{page?.companyName ?? 'Empresa'}</li>
+        </ol>
       </nav>
+
       <PageHeader
-        actions={<>
-          <CompanyLearningPanel companyId={companyId} />
-          <CompanyCertificateLogoPanel companyId={companyId} />
-          <a className="button button-primary" href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}>
-            Administrar empresa
-          </a>
-        </>}
-        description={page?.companyKey}
-        eyebrow="DETALHE DA EMPRESA"
-        meta={company && <StatusChip variant={company.isActive ? 'success' : 'neutral'}>
-          {company.isActive ? 'Ativa' : 'Inativa'}
-        </StatusChip>}
+        actions={(
+          <div className="company-detail-actions">
+            <CompanyLearningPanel companyId={companyId} />
+            <CompanyCertificateLogoPanel companyId={companyId} />
+            <a className="button button-primary" href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}>
+              Administrar empresa
+            </a>
+          </div>
+        )}
+        description={page ? `Identificador · ${page.companyKey}` : 'Carregando dados da empresa...'}
+        meta={companyOverview && (
+          <StatusChip variant={companyOverview.isActive ? 'success' : 'neutral'}>
+            {companyOverview.isActive ? 'Ativa' : 'Inativa'}
+          </StatusChip>
+        )}
         title={page?.companyName ?? (isLoading ? 'Carregando empresa...' : 'Colaboradores')}
       />
 
-      {error && <p className="form-error page-error" role="alert">{error}</p>}
-      {summaryError && <p className="form-error page-error" role="status">{summaryError}</p>}
-
-      {company && (
+      {summaryError && <p className="form-error page-error" role="alert">{summaryError}</p>}
+      {(page || companyOverview) && (
         <section aria-label="Resumo da empresa" className="company-summary-grid">
           <article className="company-summary-card">
             <span>Colaboradores</span>
-            <strong>{company.employeeCount.toLocaleString('pt-BR')}</strong>
+            <strong>{(companyOverview?.employeeCount ?? page?.totalCount ?? 0).toLocaleString('pt-BR')}</strong>
+            <small>{companyOverview ? 'Ativos' : 'Na listagem atual'}</small>
           </article>
-          <article className="company-summary-card">
-            <span>Administradores</span>
-            <strong>{company.administratorCount.toLocaleString('pt-BR')}</strong>
-          </article>
+          {companyOverview && (
+            <article className="company-summary-card">
+              <span>Administradores</span>
+              <strong>{companyOverview.administratorCount.toLocaleString('pt-BR')}</strong>
+              <small>Com acesso de administração</small>
+            </article>
+          )}
         </section>
       )}
 
-      <FilterBar className="company-employee-filters" label="Filtros de colaboradores">
+      {error && <p className="form-error page-error" role="alert">{error}</p>}
+
+      <section aria-label="Filtros de colaboradores" className="company-employee-filters">
         <form className="company-employee-search" onSubmit={handleSearch}>
           <div className="field">
             <label htmlFor="employee-search">Buscar por nome ou matrícula</label>
@@ -141,11 +149,14 @@ export default function PlatformCompanyEmployeesPage() {
           />
           Incluir colaboradores inativos
         </label>
-      </FilterBar>
+      </section>
 
       <section aria-labelledby="company-employees-heading" className="list-section">
         <div className="section-heading">
           <h2 id="company-employees-heading">Colaboradores</h2>
+          <span className="count-label">
+            {(page?.totalCount ?? 0).toLocaleString('pt-BR')} resultados
+          </span>
         </div>
         {isLoading ? (
           <LoadingState className="list-state">Carregando colaboradores...</LoadingState>
@@ -164,7 +175,7 @@ export default function PlatformCompanyEmployeesPage() {
               <tbody>
                 {page.items.map((employee) => (
                   <tr key={employee.id}>
-                    <td>{employee.displayName}</td>
+                    <td><strong>{employee.displayName}</strong></td>
                     <td>{employee.loginIdentifier}</td>
                     <td>
                       <div
@@ -224,3 +235,4 @@ export default function PlatformCompanyEmployeesPage() {
     </div>
   );
 }
+import LoadingState from './LoadingState';
