@@ -11,6 +11,33 @@ afterEach(() => {
 });
 
 describe('platform user directory', () => {
+  it('applies a participant role filter supplied by the company card link', async () => {
+    const company = {
+      id: 'tenant-1',
+      key: 'acme',
+      name: 'Acme',
+      createdAt: '2026-10-21T12:00:00Z',
+      isActive: true,
+    };
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === '/api/platform/companies') return Response.json([company]);
+      return Response.json({ offset: 0, limit: 50, totalCount: 0, items: [] });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    render(
+      <MemoryRouter initialEntries={['/platform/users?tenant=tenant-1&role=Participant']}>
+        <PlatformUsersPage />
+      </MemoryRouter>,
+    );
+
+    await screen.findByText('Nenhum usuário corresponde aos filtros');
+    expect(screen.getByLabelText('Perfil')).toHaveValue('Participant');
+    expect(fetchMock.mock.calls.some(([input]) =>
+      String(input) === '/api/platform/users?offset=0&limit=50&tenantId=tenant-1&role=Participant',
+    )).toBe(true);
+  });
+
   it('creates a tenant-bound account and lists it without exposing authentication data', async () => {
     const userPage = {
       offset: 0,

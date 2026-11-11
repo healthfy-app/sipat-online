@@ -31,7 +31,7 @@ export default function PlatformUsersPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [offset, setOffset] = useState(0);
   const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<PlatformUserRoleFilter | ''>('');
+  const [roleFilter, setRoleFilter] = useState<PlatformUserRoleFilter | ''>(() => getRoleFilter(searchParams.get('role')));
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -146,6 +146,7 @@ export default function PlatformUsersPage() {
     setUserForm((current) => ({
       ...emptyUserForm,
       tenantId: current.tenantId || companies[0]?.id || '',
+      role: roleFilter === 'ClientAdmin' || roleFilter === 'Supervisor' ? roleFilter : 'Participant',
     }));
     setIsFormOpen(true);
   }
@@ -475,6 +476,18 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
     : 'Ocorreu um erro inesperado. Tente novamente.';
+}
+
+function getRoleFilter(value: string | null): PlatformUserRoleFilter | '' {
+  switch (value) {
+    case 'Participant':
+    case 'ClientAdmin':
+    case 'SuperAdmin':
+    case 'Supervisor':
+      return value;
+    default:
+      return '';
+  }
 }
 
 function createStrongPassword(): string {
