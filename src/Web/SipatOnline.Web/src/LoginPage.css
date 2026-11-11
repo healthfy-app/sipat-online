@@ -222,20 +222,6 @@
   font-weight: 800;
 }
 
-.login-brand-art-label {
-  position: absolute;
-  right: 0;
-  bottom: 0.25rem;
-  color: #fff;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-}
-
-.login-brand-art-label span {
-  color: #fff;
-}
-
 .login-caption {
   position: relative;
   z-index: 1;

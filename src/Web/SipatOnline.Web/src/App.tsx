@@ -415,7 +415,6 @@ function LoginPage({
             </span>
             <span className="login-brand-card-check">✓</span>
           </div>
-          <span className="login-brand-art-label">SIPAT <span>ONLINE</span></span>
         </div>
         <span className="login-caption">
           {tenant.tenantKey === 'platform' ? 'Acesso exclusivo para operadores' : 'Ambiente de aprendizagem da empresa'}
