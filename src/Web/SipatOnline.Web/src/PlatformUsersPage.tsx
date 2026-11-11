@@ -8,6 +8,7 @@ import {
   type PlatformUserProvisionData,
   type PlatformUserDirectoryPage,
 } from './api';
+import { DataTable, Drawer, PageHeader, StatusChip } from './AdminComponents';
 
 const pageSize = 50;
 const emptyUserForm: PlatformUserProvisionData = {
@@ -25,11 +26,13 @@ export default function PlatformUsersPage() {
   const [companies, setCompanies] = useState<PlatformCompany[]>([]);
   const [directoryCompanies, setDirectoryCompanies] = useState<PlatformCompany[]>([]);
   const [userForm, setUserForm] = useState(emptyUserForm);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingCompanies, setIsLoadingCompanies] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [formError, setFormError] = useState('');
   const [notice, setNotice] = useState('');
 
   const loadCompanies = useCallback(async () => {
@@ -113,6 +116,7 @@ export default function PlatformUsersPage() {
   async function handleCreateUser(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError('');
+    setFormError('');
     setNotice('');
     setIsSaving(true);
 
@@ -129,27 +133,25 @@ export default function PlatformUsersPage() {
       }));
       setNotice(`${user.displayName} foi cadastrado em ${user.tenantName}.`);
       await loadUsers(offset);
+      setIsFormOpen(false);
     } catch (saveError) {
-      setError(getErrorMessage(saveError));
+      setFormError(getErrorMessage(saveError));
     } finally {
       setIsSaving(false);
     }
   }
 
   return (
-    <div className="page-content">
-      <div className="page-heading">
-        <div>
-          <p className="eyebrow">SUPER ADMIN SIPAT ONLINE</p>
-          <h1>Usuários das empresas</h1>
-          <p className="muted-copy">
-            Consulte os acessos das empresas cadastradas. Dados de autenticação nunca são exibidos.
-          </p>
-        </div>
-        <span className="count-label">
-          {page?.totalCount ?? 0} {page?.totalCount === 1 ? 'usuário' : 'usuários'}
-        </span>
-      </div>
+    <div className="page-content platform-users-page">
+      <PageHeader
+        actions={<button className="button button-primary" onClick={() => {
+          setFormError('');
+          setIsFormOpen(true);
+        }} type="button">+ Novo usuário</button>}
+        description={`${(page?.totalCount ?? 0).toLocaleString('pt-BR')} ${(page?.totalCount ?? 0) === 1 ? 'usuário' : 'usuários'} · Dados de autenticação nunca são exibidos.`}
+        eyebrow="PLATAFORMA"
+        title="Usuários"
+      />
 
       {error && (
         <div className="page-error" role="alert">
@@ -168,98 +170,6 @@ export default function PlatformUsersPage() {
       )}
       {notice && <p className="success-message" role="status">{notice}</p>}
 
-      <section aria-labelledby="platform-user-form-title" className="form-card">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">NOVO ACESSO</p>
-            <h2 id="platform-user-form-title">Cadastrar usuário em uma empresa</h2>
-          </div>
-          <span className="draft-note">A senha não será exibida novamente</span>
-        </div>
-        {isLoadingCompanies ? (
-          <LoadingState className="list-state">Carregando empresas...</LoadingState>
-        ) : companies.length === 0 ? (
-          <div className="empty-state">
-            <p>Cadastre uma empresa antes de criar usuários.</p>
-          </div>
-        ) : (
-          <form className="event-form" onSubmit={handleCreateUser}>
-            <div className="field">
-              <label htmlFor="platform-user-company">Empresa</label>
-              <select
-                id="platform-user-company"
-                onChange={(event) => updateUserField('tenantId', event.target.value)}
-                required
-                value={userForm.tenantId}
-              >
-                {companies.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name} · {company.key}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="platform-user-role">Perfil</label>
-              <select
-                id="platform-user-role"
-                onChange={(event) => updateUserField(
-                  'role',
-                  event.target.value as PlatformUserProvisionData['role'],
-                )}
-                value={userForm.role}
-              >
-                <option value="Participant">Participante</option>
-                <option value="ClientAdmin">Administrador da empresa</option>
-                <option value="Supervisor">Supervisor (relatórios da empresa)</option>
-              </select>
-            </div>
-            <div className="field">
-              <label htmlFor="platform-user-name">Nome completo</label>
-              <input
-                autoComplete="name"
-                id="platform-user-name"
-                maxLength={150}
-                onChange={(event) => updateUserField('displayName', event.target.value)}
-                required
-                value={userForm.displayName}
-              />
-            </div>
-            <div className="field">
-              <label htmlFor="platform-user-login">Matrícula</label>
-              <input
-                autoComplete="off"
-                id="platform-user-login"
-                maxLength={128}
-                onChange={(event) => updateUserField('loginIdentifier', event.target.value)}
-                required
-                value={userForm.loginIdentifier}
-              />
-            </div>
-            <div className="field full-width">
-              <label htmlFor="platform-user-password">Senha inicial temporária</label>
-              <input
-                autoComplete="new-password"
-                id="platform-user-password"
-                minLength={12}
-                onChange={(event) => updateUserField('initialPassword', event.target.value)}
-                required
-                type="password"
-                value={userForm.initialPassword}
-              />
-              <span className="field-hint">
-                Use uma senha forte e entregue-a por um canal seguro.
-              </span>
-            </div>
-            <div className="form-actions full-width">
-              <button className="button button-primary" disabled={isSaving} type="submit">
-                {isSaving ? 'Cadastrando...' : 'Cadastrar usuário'}
-              </button>
-            </div>
-          </form>
-        )}
-      </section>
-
       <section aria-label="Empresa selecionada" className="platform-company-selector form-card">
         <div className="platform-company-selector-copy">
           <p className="eyebrow">EMPRESA</p>
@@ -267,7 +177,7 @@ export default function PlatformUsersPage() {
           <p className="muted-copy">
             {selectedCompany
               ? `${selectedCompany.key} · ${selectedCompany.isActive ? 'Ativa' : 'Inativa'}`
-              : `${directoryCompanies.length} empresas no diretório global`}
+              : `${directoryCompanies.length.toLocaleString('pt-BR')} ${directoryCompanies.length === 1 ? 'empresa no' : 'empresas no'} diretório global`}
           </p>
         </div>
         <div className="field">
@@ -289,10 +199,7 @@ export default function PlatformUsersPage() {
 
       <section aria-labelledby="platform-users-heading" className="platform-user-directory">
         <div className="section-heading">
-          <div>
-            <p className="eyebrow">DIRETÓRIO</p>
-            <h2 id="platform-users-heading">Usuários</h2>
-          </div>
+          <h2 id="platform-users-heading">Diretório de usuários</h2>
           <span className="count-label">
             {page?.totalCount ?? 0} {page?.totalCount === 1 ? 'usuário' : 'usuários'}
           </span>
@@ -312,27 +219,37 @@ export default function PlatformUsersPage() {
           </div>
         ) : (
           <>
-            <div aria-label="Diretório de usuários das empresas" className="platform-user-grid">
-              {page.items.map((user) => (
-                <article className="platform-user-card" key={user.id}>
-                  <div className="platform-user-card-heading">
-                    <span className={`status-pill${user.isActive ? ' status-active' : ''}`}>
-                      {user.isActive ? 'Ativo' : 'Inativo'}
-                    </span>
-                    <span className="platform-user-role">
-                      {user.roles.length > 0
-                        ? user.roles.map(getRoleLabel).join(', ')
-                        : 'Sem perfil atribuído'}
-                    </span>
-                  </div>
-                  <div className="platform-user-card-copy">
-                    <p className="platform-user-company">{user.tenantName} · {user.tenantKey}</p>
-                    <h3>{user.displayName}</h3>
-                    <p className="muted-copy">Matrícula: {user.loginIdentifier}</p>
-                  </div>
-                </article>
-              ))}
-            </div>
+            <DataTable label="Diretório de usuários das empresas">
+              <thead>
+                <tr>
+                  <th scope="col">Nome</th>
+                  <th scope="col">Matrícula</th>
+                  <th scope="col">Empresa</th>
+                  <th scope="col">Perfil</th>
+                  <th scope="col">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {page.items.map((user) => (
+                  <tr key={user.id}>
+                    <td><strong>{user.displayName}</strong></td>
+                    <td>{user.loginIdentifier}</td>
+                    <td>
+                      {user.tenantName}
+                      <small className="admin-table-secondary">{user.tenantKey}</small>
+                    </td>
+                    <td>{user.roles.length > 0
+                      ? user.roles.map(getRoleLabel).join(', ')
+                      : 'Sem perfil atribuído'}</td>
+                    <td>
+                      <StatusChip variant={user.isActive ? 'success' : 'neutral'}>
+                        {user.isActive ? 'Ativo' : 'Inativo'}
+                      </StatusChip>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
 
             {page.totalCount > pageSize && (
               <nav aria-label="Paginação de usuários" className="pagination">
@@ -362,6 +279,95 @@ export default function PlatformUsersPage() {
         )
       )}
       </section>
+
+      {isFormOpen && (
+        <Drawer
+          busy={isSaving}
+          onClose={() => setIsFormOpen(false)}
+          title="Cadastrar usuário em uma empresa"
+        >
+          <p className="field-hint">A senha inicial não será exibida novamente. Entregue-a por um canal seguro.</p>
+          {isLoadingCompanies ? (
+            <LoadingState className="list-state">Carregando empresas...</LoadingState>
+          ) : companies.length === 0 ? (
+            <div className="empty-state"><p>Cadastre uma empresa antes de criar usuários.</p></div>
+          ) : (
+            <form className="event-form event-form-single" onSubmit={handleCreateUser}>
+              {formError && <p className="form-error" role="alert">{formError}</p>}
+              <div className="field">
+                <label htmlFor="platform-user-company">Empresa</label>
+                <select
+                  id="platform-user-company"
+                  onChange={(event) => updateUserField('tenantId', event.target.value)}
+                  required
+                  value={userForm.tenantId}
+                >
+                  {companies.map((company) => (
+                    <option key={company.id} value={company.id}>
+                      {company.name} · {company.key}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="platform-user-role">Perfil</label>
+                <select
+                  id="platform-user-role"
+                  onChange={(event) => updateUserField(
+                    'role',
+                    event.target.value as PlatformUserProvisionData['role'],
+                  )}
+                  value={userForm.role}
+                >
+                  <option value="Participant">Participante</option>
+                  <option value="ClientAdmin">Administrador da empresa</option>
+                  <option value="Supervisor">Supervisor (relatórios da empresa)</option>
+                </select>
+              </div>
+              <div className="field">
+                <label htmlFor="platform-user-name">Nome completo</label>
+                <input
+                  autoComplete="name"
+                  id="platform-user-name"
+                  maxLength={150}
+                  onChange={(event) => updateUserField('displayName', event.target.value)}
+                  required
+                  value={userForm.displayName}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="platform-user-login">Matrícula</label>
+                <input
+                  autoComplete="off"
+                  id="platform-user-login"
+                  maxLength={128}
+                  onChange={(event) => updateUserField('loginIdentifier', event.target.value)}
+                  required
+                  value={userForm.loginIdentifier}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="platform-user-password">Senha inicial temporária</label>
+                <input
+                  autoComplete="new-password"
+                  id="platform-user-password"
+                  minLength={12}
+                  onChange={(event) => updateUserField('initialPassword', event.target.value)}
+                  required
+                  type="password"
+                  value={userForm.initialPassword}
+                />
+                <span className="field-hint">Use uma senha forte e entregue-a por um canal seguro.</span>
+              </div>
+              <div className="form-actions">
+                <button className="button button-primary" disabled={isSaving} type="submit">
+                  {isSaving ? 'Cadastrando...' : 'Cadastrar usuário'}
+                </button>
+              </div>
+            </form>
+          )}
+        </Drawer>
+      )}
     </div>
   );
 }
