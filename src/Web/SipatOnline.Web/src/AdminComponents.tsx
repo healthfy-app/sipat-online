@@ -64,7 +64,11 @@ export function FilterBar({
   className?: string;
   children: ReactNode;
 }) {
-  return <div aria-label={label} className={`admin-filter-bar ${className}`.trim()}>{children}</div>;
+  return (
+    <div aria-label={label} className={`admin-filter-bar ${className}`.trim()} role="group">
+      {children}
+    </div>
+  );
 }
 
 export function Drawer({

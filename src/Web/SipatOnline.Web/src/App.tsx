@@ -473,7 +473,7 @@ function ProtectedPortal({
     !hasAdminRole(session) &&
     !session.roles.includes('PlatformOperator');
   const isPlatformOperator = session.roles.includes('PlatformOperator');
-  const isPlatformCompanyContext = isPlatformOperator && Boolean(getCompanyAdministrationId());
+  const isPlatformCompanyContext = isPlatformOperator && getCompanyAdministrationId() !== null;
 
   async function handleSignOut() {
     setError('');
@@ -488,8 +488,13 @@ function ProtectedPortal({
     }
   }
 
+  function handleReturnToPlatform() {
+    configureCompanyAdministration(null);
+    window.sessionStorage.removeItem(companyContextKey);
+  }
+
   return (
-    <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
+    <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${isPlatformCompanyContext ? ' portal-layout-company-context' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
       {!isLearnerOnly && <header className="portal-header">
         <Link
           aria-label={`${tenant.tenantName} - início`}
@@ -499,17 +504,6 @@ function ProtectedPortal({
           <TenantIdentity tenant={tenant} compact />
         </Link>
         <div className="header-actions">
-          {isPlatformCompanyContext && (
-            <aside aria-label="Modo de administração da empresa" className="company-context-banner">
-              <span>
-                <strong>Administrando como dono</strong>
-                <span>{tenant.tenantName} · Dono da plataforma</span>
-              </span>
-              <a className="button button-secondary" href="/platform" onClick={clearCompanyAdministration}>
-                Voltar à plataforma
-              </a>
-            </aside>
-          )}
           <span className="user-name">{session.displayName}</span>
           <button
             className="button button-quiet"
@@ -517,10 +511,21 @@ function ProtectedPortal({
             onClick={handleSignOut}
             type="button"
           >
-            {isSigningOut ? 'Saindo...' : 'Sair da conta'}
+            {isSigningOut ? 'Saindo...' : 'Sair'}
           </button>
         </div>
       </header>}
+      {!isLearnerOnly && isPlatformCompanyContext && (
+        <aside aria-label="Modo de administração da empresa" className="company-context-banner" role="status">
+          <span>
+            <strong>MODO DONO · Administrando {tenant.tenantName}</strong>
+            <span> · Você está agindo em nome desta empresa.</span>
+          </span>
+          <a className="button button-secondary company-context-return" href="/platform" onClick={handleReturnToPlatform}>
+            Voltar à plataforma
+          </a>
+        </aside>
+      )}
       <div className={`portal-body${isLearnerOnly ? ' portal-body-learner' : ''}`}>
         {isLearnerOnly && (
           <aside aria-label="Área do aluno" className="learner-sidebar">
@@ -587,7 +592,9 @@ function ProtectedPortal({
           {session.roles.includes('Participant') && !isPlatformCompanyContext && (
             <>
               <p className="sidebar-label">APRENDIZAGEM</p>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/learning">Minhas trilhas</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/learning">
+                Minhas trilhas
+              </NavLink>
             </>
           )}
           {canViewCompany(session) && (!isPlatformOperator || isPlatformCompanyContext) && (
@@ -606,7 +613,7 @@ function ProtectedPortal({
           )}
           {isPlatformOperator && !isPlatformCompanyContext && (
             <>
-              <p className="sidebar-label">PLATAFORMA</p>
+              <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/dashboard">Dashboard</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/users">Usuários</NavLink>

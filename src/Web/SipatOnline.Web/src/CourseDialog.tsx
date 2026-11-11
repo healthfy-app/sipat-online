@@ -28,7 +28,7 @@ export default function CourseDialog({ title, onClose, children, wide = false, b
     };
   }, []);
   useEffect(() => { if (busy) panel.current?.focus(); }, [busy]);
-  return createPortal(<div className="course-dialog-backdrop" style={theme} onClick={event => {
+  return createPortal(<div className={`course-dialog-backdrop${drawer ? ' course-dialog-backdrop-drawer' : ''}`} style={theme} onClick={event => {
     if (event.target === event.currentTarget && !busy) onClose();
   }}>
     <div aria-labelledby={titleId} aria-modal="true" className={`course-dialog${wide ? ' course-dialog-wide' : ''}${drawer ? ' course-dialog-drawer' : ''}`}

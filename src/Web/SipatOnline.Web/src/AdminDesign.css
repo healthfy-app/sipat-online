@@ -9,6 +9,15 @@
   --admin-warning: #7a4a00;
   --admin-warning-bg: #fff1d6;
   --admin-primary: #0f2a20;
+  --admin-primary-hover: #1b4537;
+  --admin-on-primary: #fff;
+  --admin-danger: #7a1f1f;
+  --admin-danger-bg: #fce8e6;
+  --admin-warning-border: #e6c46b;
+  --admin-warning-ink: #402b00;
+  --admin-warning-action-border: #8a5a00;
+  --admin-neutral-chip: #eef1ef;
+  --admin-table-head: #f9faf9;
   --admin-input-border: #cbd3ce;
   --admin-progress-track: #e3e9e6;
   --admin-radius-control: 8px;
@@ -29,6 +38,9 @@
 }
 
 .portal-layout:not(.portal-layout-learner) .portal-header {
+  position: sticky;
+  z-index: 20;
+  top: 0;
   height: 56px;
   gap: var(--admin-space-4);
   padding-inline: var(--admin-space-6);
@@ -36,13 +48,23 @@
   background: var(--admin-surface);
 }
 
-.portal-layout:not(.portal-layout-learner) .portal-body {
+.portal-layout:not(.portal-layout-learner) .header-actions {
+  gap: var(--admin-space-3);
+}
+
+.portal-layout:not(.portal-layout-learner) .user-name {
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .portal-body {
   min-height: calc(100vh - 56px);
   grid-template-columns: 208px minmax(0, 1fr);
 }
 
-.portal-layout:not(.portal-layout-learner) .sidebar {
+.portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .sidebar {
   top: 56px;
+  width: 208px;
   height: calc(100vh - 56px);
   gap: var(--admin-space-1);
   padding: var(--admin-space-5) var(--admin-space-3);
@@ -55,6 +77,10 @@
   color: var(--admin-muted);
   font-size: 12px;
   letter-spacing: 0.06em;
+}
+
+.portal-layout:not(.portal-layout-learner) .sidebar-label-spaced {
+  margin-top: 0;
 }
 
 .portal-layout:not(.portal-layout-learner) .sidebar-link {
@@ -85,20 +111,20 @@
 .portal-layout:not(.portal-layout-learner) .page-content {
   width: min(100%, 1120px);
   max-width: 1120px;
+  gap: var(--admin-space-5);
 }
 
 .portal-layout:not(.portal-layout-learner) .page-heading {
   align-items: center;
   gap: var(--admin-space-5);
-  margin-bottom: var(--admin-space-5);
+  margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
   box-shadow: none;
 }
 
-.portal-layout:not(.portal-layout-learner) .page-heading h1,
-.admin-page-heading h1 {
+.portal-layout:not(.portal-layout-learner) .page-heading h1 {
   margin: 0;
   color: var(--admin-ink);
   font-family: Inter, Arial, sans-serif;
@@ -123,12 +149,13 @@
   line-height: 1.45;
 }
 
-.admin-page-heading {
+.portal-layout:not(.portal-layout-learner) .admin-page-heading {
   display: flex;
   justify-content: space-between;
 }
 
-.admin-page-actions {
+.admin-page-actions,
+.admin-course-actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -147,70 +174,29 @@
   display: flex;
   align-items: center;
   gap: var(--admin-space-2);
-  margin-bottom: var(--admin-space-3);
+  margin: 0;
+  padding: 0;
   color: var(--admin-muted);
   font-size: 13px;
+  list-style: none;
 }
 
-.admin-breadcrumb a {
+.admin-breadcrumb a,
+.admin-link {
   color: var(--admin-success);
   font-weight: 600;
   text-decoration: none;
 }
 
-.admin-breadcrumb a:hover {
+.admin-breadcrumb a:hover,
+.admin-link:hover {
   text-decoration: underline;
 }
 
-.admin-breadcrumb span:last-child {
+.admin-breadcrumb [aria-current="page"] {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.company-summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--admin-space-3);
-  margin-bottom: var(--admin-space-4);
-}
-
-.company-summary-card {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: var(--admin-space-2);
-  padding: var(--admin-space-4);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius-card);
-  background: var(--admin-surface);
-}
-
-.company-summary-card span {
-  color: var(--admin-muted);
-  font-size: 13px;
-}
-
-.company-summary-card strong {
-  color: var(--admin-ink);
-  font-size: 22px;
-  font-variant-numeric: tabular-nums;
-}
-
-.admin-table-secondary {
-  display: block;
-  margin-top: 2px;
-  color: var(--admin-muted);
-  font-size: 12px;
-}
-
-.admin-table-action {
-  text-align: right;
-  white-space: nowrap;
-}
-
-.admin-table-action .button {
-  min-height: 40px;
 }
 
 .portal-layout:not(.portal-layout-learner) :is(.form-card, .list-section, .settings-section,
@@ -259,72 +245,79 @@
 
 .portal-layout:not(.portal-layout-learner) :is(input:not([type="checkbox"]):not([type="radio"]), select) {
   min-height: 44px;
+  background: var(--admin-surface);
 }
 
-.portal-layout:not(.portal-layout-learner) .button-primary {
+.portal-layout:not(.portal-layout-learner) :is(.button-primary, .course-primary) {
   border-color: var(--admin-primary);
-  color: #fff;
+  color: var(--admin-on-primary);
   background: var(--admin-primary);
-  font-weight: 600;
 }
 
-.portal-layout:not(.portal-layout-learner) .button-secondary {
+.portal-layout:not(.portal-layout-learner) :is(.button-primary, .course-primary):hover:not(:disabled) {
+  border-color: var(--admin-primary-hover);
+  background: var(--admin-primary-hover);
+}
+
+.portal-layout:not(.portal-layout-learner) :is(.button-secondary, .button-quiet) {
   border-color: var(--admin-input-border);
   color: var(--admin-ink);
   background: var(--admin-surface);
 }
 
+.portal-layout:not(.portal-layout-learner) :is(.button-secondary, .button-quiet):hover:not(:disabled) {
+  background: var(--admin-bg);
+}
+
 .portal-layout:not(.portal-layout-learner) :is(a, button, input, select, textarea, [tabindex]):focus-visible {
-  outline: 3px solid #477f68;
+  outline: 3px solid var(--admin-success);
   outline-offset: 2px;
 }
 
-.portal-layout:not(.portal-layout-learner) .event-form:not(.event-form-single) {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: var(--admin-space-4);
-}
-
-.portal-layout:not(.portal-layout-learner) .event-form .full-width {
-  grid-column: 1 / -1;
+.portal-layout:not(.portal-layout-learner) :is(.form-error, .page-error) {
+  color: var(--admin-danger);
 }
 
 .admin-filter-bar {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(14rem, 1fr) repeat(auto-fit, minmax(12rem, 0.55fr));
   align-items: end;
   gap: var(--admin-space-3);
-  margin-bottom: var(--admin-space-4);
+  padding: var(--admin-space-4);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  background: var(--admin-surface);
 }
 
 .admin-filter-bar .field {
-  min-width: min(100%, 220px);
+  min-width: 0;
   margin: 0;
 }
 
-.admin-filter-bar .field:first-child {
-  flex: 1 1 260px;
+.admin-filter-bar :is(label, .field label) {
+  color: var(--admin-muted);
+  font-size: 13px;
 }
 
 .admin-table-scroll {
   width: 100%;
-  overflow: auto;
+  overflow-x: auto;
   border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius-control);
+  border-radius: var(--admin-radius-card);
   background: var(--admin-surface);
-  overscroll-behavior-inline: contain;
 }
 
 .admin-data-table {
   width: 100%;
-  min-width: 640px;
+  min-width: 680px;
   border-collapse: collapse;
 }
 
 .portal-layout:not(.portal-layout-learner) .admin-data-table th {
   height: 44px;
-  padding: var(--admin-space-2) var(--admin-space-3);
+  padding: var(--admin-space-3) var(--admin-space-4);
   color: var(--admin-muted);
-  background: var(--admin-bg);
+  background: var(--admin-table-head);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -334,25 +327,32 @@
 
 .portal-layout:not(.portal-layout-learner) .admin-data-table td {
   height: 56px;
-  padding: var(--admin-space-2) var(--admin-space-3);
+  padding: var(--admin-space-3) var(--admin-space-4);
   border-top: 1px solid var(--admin-border);
   color: var(--admin-ink);
-  font-size: 14px;
   vertical-align: middle;
 }
 
 .portal-layout:not(.portal-layout-learner) .admin-data-table tbody tr:hover {
-  background: #f8faf8;
+  background: var(--admin-table-head);
+}
+
+.admin-table-secondary {
+  display: block;
+  margin-top: 2px;
+  color: var(--admin-muted);
+  font-size: 12px;
 }
 
 .admin-status-chip {
   display: inline-flex;
-  min-height: 26px;
+  min-height: 28px;
   align-items: center;
-  padding: 2px 9px;
+  justify-content: center;
+  padding: 4px 10px;
   border-radius: 999px;
-  color: var(--admin-ink);
-  background: #edf0ee;
+  color: var(--admin-muted);
+  background: var(--admin-neutral-chip);
   font-size: 12px;
   font-weight: 600;
   line-height: 1.3;
@@ -370,13 +370,8 @@
 }
 
 .admin-status-danger {
-  color: #7a271f;
-  background: #fce9e6;
-}
-
-.admin-status-neutral {
-  color: var(--admin-muted);
-  background: var(--admin-bg);
+  color: var(--admin-danger);
+  background: var(--admin-danger-bg);
 }
 
 .admin-course-grid {
@@ -386,38 +381,35 @@
 }
 
 .admin-course-card {
-  display: grid;
+  display: flex;
   min-width: 0;
-  min-height: 132px;
-  grid-template-columns: 96px minmax(0, 1fr);
-  gap: var(--admin-space-3);
-  padding: var(--admin-space-3);
+  flex-direction: column;
+  overflow: hidden;
   border: 1px solid var(--admin-border);
   border-radius: var(--admin-radius-card);
   background: var(--admin-surface);
 }
 
 .admin-course-cover {
-  width: 96px;
+  width: 100%;
   height: 96px;
-  border-radius: var(--admin-radius-control);
   object-fit: cover;
   background: var(--admin-bg);
 }
 
 .admin-course-card-content {
   display: flex;
-  min-width: 0;
+  min-height: 204px;
+  flex: 1;
   flex-direction: column;
-  align-items: flex-start;
   gap: var(--admin-space-2);
+  padding: var(--admin-space-4);
 }
 
-.admin-course-badges,
-.admin-course-actions {
+.admin-course-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--admin-space-1);
+  gap: var(--admin-space-2);
 }
 
 .admin-course-card h3 {
@@ -425,20 +417,10 @@
   color: var(--admin-ink);
   font-size: 15px;
   font-weight: 600;
-  overflow-wrap: anywhere;
-}
-
-.admin-course-description {
-  display: -webkit-box;
-  margin: 0;
-  overflow: hidden;
-  color: var(--admin-muted);
-  font-size: 13px;
   line-height: 1.4;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
 }
 
+.admin-course-description,
 .admin-course-meta {
   margin: 0;
   color: var(--admin-muted);
@@ -446,41 +428,167 @@
 }
 
 .admin-course-actions {
+  justify-content: flex-start;
   margin-top: auto;
-  padding-top: var(--admin-space-1);
 }
 
-.admin-course-actions .button {
-  min-height: 40px;
-  padding-inline: var(--admin-space-3);
-}
-
-.platform-users-page .platform-company-selector {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(220px, 360px);
+.company-context-banner {
+  position: sticky;
+  z-index: 19;
+  top: 56px;
+  display: flex;
+  min-height: 44px;
   align-items: center;
+  justify-content: space-between;
   gap: var(--admin-space-4);
-  margin-bottom: var(--admin-space-4);
+  padding: var(--admin-space-2) var(--admin-space-6);
+  border-bottom: 1px solid var(--admin-warning-border);
+  color: var(--admin-warning-ink);
+  background: var(--admin-warning-bg);
+  font-size: 13px;
 }
 
-.platform-users-page .platform-company-selector .field {
-  margin: 0;
+.company-context-banner strong {
+  font-weight: 700;
 }
 
-.platform-users-page .platform-user-directory {
-  min-width: 0;
+.company-context-return {
+  flex: 0 0 auto;
+  border-color: var(--admin-warning-action-border);
+  color: var(--admin-warning-ink);
+  background: var(--admin-surface);
+  font-weight: 600;
 }
 
-.tenant-dashboard-donut-layout.is-single-status {
-  grid-template-columns: minmax(0, 1fr);
+.portal-layout-company-context .sidebar {
+  top: 100px;
+  height: calc(100vh - 100px);
 }
 
-.portal-layout:not(.portal-layout-learner) .platform-summary-grid,
-.portal-layout:not(.portal-layout-learner) .tenant-dashboard-summary {
+.company-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--admin-space-3);
 }
 
-.portal-layout:not(.portal-layout-learner) .platform-summary-card {
+.company-summary-card {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: var(--admin-space-2);
+  padding: var(--admin-space-4);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  background: var(--admin-surface);
+}
+
+.company-summary-card span {
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.company-summary-card strong {
+  color: var(--admin-ink);
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.company-employee-filters {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--admin-space-4);
+  margin: 0;
+  padding: var(--admin-space-4);
+  border: 1px solid var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  background: var(--admin-surface);
+}
+
+.company-employee-search {
+  display: flex;
+  min-width: min(100%, 34rem);
+  align-items: end;
+  gap: var(--admin-space-2);
+}
+
+.company-employee-search .field {
+  flex: 1;
+  margin: 0;
+}
+
+.company-employee-inactive-filter {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: var(--admin-space-2);
+  color: var(--admin-muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.company-employee-inactive-filter input {
+  accent-color: var(--admin-success);
+}
+
+.company-employee-table {
+  min-width: 740px;
+}
+
+.employee-progress {
+  display: flex;
+  min-width: 8rem;
+  align-items: center;
+  gap: var(--admin-space-2);
+}
+
+.employee-progress-track {
+  width: 5rem;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--admin-progress-track);
+}
+
+.employee-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--admin-success);
+}
+
+.employee-progress strong {
+  min-width: 2rem;
+  font-size: 13px;
+}
+
+.company-employee-pagination,
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--admin-space-3);
+  margin-top: var(--admin-space-4);
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.company-employee-pagination > div,
+.pagination > div {
+  display: flex;
+  gap: var(--admin-space-2);
+}
+
+.platform-company-table {
+  min-width: 720px;
+}
+
+.platform-company-table td:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.platform-user-directory {
   min-width: 0;
   padding: var(--admin-space-4);
   border: 1px solid var(--admin-border);
@@ -488,113 +596,129 @@
   background: var(--admin-surface);
 }
 
-.portal-layout:not(.portal-layout-learner) .platform-summary-card > span {
-  color: var(--admin-muted);
-  font-size: 13px;
+.platform-user-directory .admin-table-scroll {
+  border-radius: var(--admin-radius-control);
 }
 
-.portal-layout:not(.portal-layout-learner) .platform-summary-card strong {
-  color: var(--admin-ink);
-  font-size: 22px;
-  font-variant-numeric: tabular-nums;
+.platform-user-table {
+  min-width: 760px;
 }
 
-.portal-layout:not(.portal-layout-learner) .tenant-dashboard-track-list {
-  max-height: none;
-  overflow: visible;
-  gap: var(--admin-space-2);
-}
-
-.portal-layout:not(.portal-layout-learner) .company-employee-filters {
-  margin: 0 0 var(--admin-space-4);
-  padding: 0;
-  border: 0;
-  background: transparent;
-}
-
-.portal-layout:not(.portal-layout-learner) .company-employee-inactive-filter {
-  min-height: 44px;
-  padding: 0 var(--admin-space-2);
-  color: var(--admin-ink);
-  font-size: 13px;
-}
-
-.portal-layout:not(.portal-layout-learner) .company-employee-inactive-filter input {
-  width: 16px;
-  height: 16px;
-}
-
-.portal-layout:not(.portal-layout-learner) .company-employee-table {
-  min-width: 680px;
-}
-
-.portal-layout:not(.portal-layout-learner) .employee-progress {
-  min-width: 10rem;
-  gap: var(--admin-space-2);
-}
-
-.portal-layout:not(.portal-layout-learner) .employee-progress-track {
-  width: 6rem;
-  background: var(--admin-progress-track);
-}
-
-.portal-layout:not(.portal-layout-learner) .company-employee-pagination {
-  margin-top: var(--admin-space-3);
-  color: var(--admin-muted);
-  font-size: 13px;
-}
-
-.company-context-banner {
+.company-detail-actions {
   display: flex;
-  min-width: 0;
-  flex: 1 1 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--admin-space-2);
+}
+
+.course-content-heading {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--admin-space-4);
-  padding: 6px var(--admin-space-3);
-  border: 1px solid #bfd9ca;
-  border-left: 4px solid var(--admin-success);
-  border-radius: var(--admin-radius-control);
-  color: var(--admin-ink);
-  background: var(--admin-success-bg);
-  font-size: 13px;
 }
 
-.company-context-banner strong {
-  display: block;
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.company-context-banner .button {
-  min-height: 36px;
-  flex: 0 0 auto;
-}
-
-.portal-layout:not(.portal-layout-learner) .header-actions {
+.course-page-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--admin-space-3);
 }
 
-.portal-layout:not(.portal-layout-learner) .user-name {
-  color: var(--admin-muted);
-  font-size: 13px;
+.course-page-title h1 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 650;
 }
 
-.course-dialog-drawer {
-  width: min(300px, 100%);
+.course-heading-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--admin-space-2);
+}
+
+.platform-course-grid {
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--admin-space-4);
+}
+
+.platform-course-card {
+  min-height: 0;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-color: var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  background: var(--admin-surface);
+  box-shadow: none;
+}
+
+.platform-course-card > img {
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+}
+
+.platform-course-card > :not(img) {
+  margin-inline: var(--admin-space-4);
+}
+
+.platform-course-card-top {
+  margin-top: var(--admin-space-3);
+}
+
+.platform-course-card h3 {
+  margin-top: var(--admin-space-3);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.platform-course-card > .muted-copy {
+  display: none;
+}
+
+.platform-course-card-meta {
+  margin-top: var(--admin-space-2);
+}
+
+.platform-course-card-actions {
+  margin: auto var(--admin-space-4) var(--admin-space-4);
+  padding-top: var(--admin-space-4);
+}
+
+.tenant-dashboard-summary .platform-summary-card,
+.tenant-dashboard-panel {
+  border-color: var(--admin-border);
+  border-radius: var(--admin-radius-card);
+  background: var(--admin-surface);
+  box-shadow: none;
+}
+
+.tenant-dashboard-panel {
+  gap: var(--admin-space-4);
+}
+
+.tenant-dashboard-track-list {
+  max-height: none;
+  overflow: visible;
+}
+
+.course-dialog-backdrop.course-dialog-backdrop-drawer {
+  align-items: stretch;
+  justify-content: flex-end;
+  padding: 0;
+}
+
+.course-dialog.course-dialog-drawer {
+  width: min(300px, 100vw);
+  max-width: 300px;
   height: 100%;
-  max-height: 100dvh;
+  max-height: 100vh;
   margin: 0 0 0 auto;
   padding: var(--admin-space-5);
   border: 0;
   border-left: 1px solid var(--admin-border);
   border-radius: 0;
-}
-
-.course-dialog-backdrop:has(.course-dialog-drawer) {
-  align-items: stretch;
-  justify-content: flex-end;
-  padding: 0;
 }
 
 .course-dialog-drawer .course-dialog-heading {
@@ -612,131 +736,31 @@
   font-size: 15px;
 }
 
-.loading-state {
-  display: grid;
-  grid-template-columns: minmax(100px, 0.5fr) minmax(0, 1fr);
-  align-items: center;
-  gap: var(--admin-space-3);
-  min-height: 0;
-  padding: var(--admin-space-3) 0;
-  color: var(--admin-muted);
-  font-size: 13px;
-  text-align: left;
-}
-
-.loading-state-mark {
-  display: block;
-  width: 100%;
-  height: 32px;
-  flex: initial;
-}
-
-.loading-state-skeleton {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  align-items: center;
-  gap: var(--admin-space-2);
-  width: 100%;
-  height: 32px;
-}
-
-.loading-state-skeleton span {
-  height: 8px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #e8edea 0%, #f5f7f5 50%, #e8edea 100%);
-  background-size: 200% 100%;
-}
-
-.loading-state-skeleton span:first-child {
-  grid-column: span 2;
-  width: 76%;
-}
-
-.loading-state-skeleton span:last-child {
-  grid-column: 1 / -1;
-  width: 54%;
-  height: 6px;
-}
-
-.loading-brand-gear {
-  display: none;
-}
-
-.loading-state-compact {
-  grid-template-columns: minmax(72px, 0.25fr) minmax(0, 1fr);
-  gap: var(--admin-space-2);
-  padding-block: var(--admin-space-2);
-}
-
-.app-loading .loading-state {
-  width: min(420px, 100%);
-  min-height: 0;
-  grid-template-columns: 1fr;
-  gap: var(--admin-space-3);
-  padding: var(--admin-space-6);
-  border: 1px solid var(--admin-border);
-  border-radius: var(--admin-radius-card);
-  background: var(--admin-surface);
-  box-shadow: 0 10px 24px rgb(15 42 32 / 6%);
-}
-
-.app-loading .loading-state-mark {
-  height: 44px;
-}
-
-.app-loading .loading-state-skeleton {
-  grid-template-columns: 1fr;
-  height: auto;
-  gap: var(--admin-space-2);
-}
-
-.app-loading .loading-state-skeleton span:first-child,
-.app-loading .loading-state-skeleton span:last-child {
-  grid-column: auto;
-  width: 100%;
-}
-
-.app-loading .loading-state-skeleton span:last-child {
-  width: 64%;
-}
-
-.button[aria-busy="true"]::before {
-  display: none;
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .loading-state-skeleton span {
-    animation: admin-skeleton-shimmer 1.8s ease-in-out infinite;
-    animation-play-state: running;
-  }
-
-  .loading-state[data-motion-paused="true"] .loading-state-skeleton span {
-    animation-play-state: paused;
-  }
-
-  @keyframes admin-skeleton-shimmer {
-    to { background-position: -200% 0; }
-  }
-}
-
 @media (max-width: 860px) {
   .portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .portal-body {
-    grid-template-columns: minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
   }
 
-  .portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .sidebar {
+  .portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .sidebar,
+  .portal-layout-company-context .sidebar {
     position: sticky;
-    z-index: 4;
+    z-index: 10;
     top: 56px;
+    display: flex;
+    width: 100%;
     height: auto;
-    min-width: 0;
+    min-height: 56px;
     flex-direction: row;
+    align-items: center;
     overflow-x: auto;
-    padding: var(--admin-space-2) var(--admin-space-3);
+    padding: var(--admin-space-2) var(--admin-space-4);
     border-right: 0;
     border-bottom: 1px solid var(--admin-border);
-    flex-wrap: wrap;
-    overflow: visible;
+  }
+
+  .portal-layout-company-context .sidebar {
+    top: 100px;
   }
 
   .portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .sidebar-label,
@@ -745,91 +769,76 @@
   }
 
   .portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .sidebar-link {
-    flex: 0 1 auto;
+    flex: 0 0 auto;
+    padding-inline: var(--admin-space-3);
     white-space: nowrap;
   }
 
   .portal-layout:not(.portal-layout-learner) .portal-content {
-    padding: 20px;
+    padding: 24px;
   }
 
-  .company-context-banner {
-    flex-wrap: wrap;
-    gap: var(--admin-space-2);
-  }
-
-  .portal-layout:not(.portal-layout-learner) .header-actions {
-    gap: var(--admin-space-2);
+  .admin-page-heading {
+    align-items: flex-start;
   }
 }
 
 @media (max-width: 600px) {
   .portal-layout:not(.portal-layout-learner) .portal-header {
-    height: auto;
-    min-height: 56px;
-    flex-wrap: wrap;
-    padding: var(--admin-space-2) var(--admin-space-3);
-  }
-
-  .portal-layout:not(.portal-layout-learner) .header-actions {
-    width: 100%;
-    flex-wrap: wrap;
-    justify-content: space-between;
-  }
-
-  .portal-layout:not(.portal-layout-learner) .company-context-banner {
-    order: -1;
-    width: 100%;
-  }
-
-  .portal-layout:not(.portal-layout-learner) .page-heading,
-  .admin-page-heading {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .admin-page-actions {
-    width: 100%;
-    justify-content: flex-start;
-  }
-
-  .platform-users-page .platform-company-selector {
-    grid-template-columns: minmax(0, 1fr);
+    padding-inline: var(--admin-space-4);
   }
 
   .portal-layout:not(.portal-layout-learner) .portal-content {
-    padding: 16px 12px;
+    padding: var(--admin-space-4);
   }
 
-  .portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .sidebar {
-    position: static;
-    top: auto;
+  .portal-layout:not(.portal-layout-learner) .user-name {
+    display: none;
   }
 
-  .portal-layout:not(.portal-layout-learner) .event-form:not(.event-form-single) {
+  .company-context-banner {
+    align-items: flex-start;
+    padding-inline: var(--admin-space-4);
+  }
+
+  .company-context-return {
+    white-space: nowrap;
+  }
+
+  .admin-page-heading,
+  .company-employee-filters,
+  .course-content-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .admin-page-actions,
+  .course-heading-actions {
+    justify-content: flex-start;
+  }
+
+  .admin-filter-bar {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .portal-layout:not(.portal-layout-learner) .event-form .full-width {
-    grid-column: auto;
+  .company-employee-search {
+    min-width: 0;
   }
 
-  .admin-course-card {
-    grid-template-columns: 72px minmax(0, 1fr);
-  }
-
-  .admin-course-cover {
-    width: 72px;
-    height: 72px;
-  }
-
-  .course-dialog-drawer {
-    width: min(100%, 380px);
+  .company-employee-pagination,
+  .pagination {
+    align-items: flex-start;
+    flex-direction: column;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .loading-state-skeleton span {
-    animation: none !important;
+  .portal-layout:not(.portal-layout-learner) *,
+  .portal-layout:not(.portal-layout-learner) *::before,
+  .portal-layout:not(.portal-layout-learner) *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

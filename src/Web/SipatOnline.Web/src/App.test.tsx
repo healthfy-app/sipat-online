@@ -87,14 +87,15 @@ describe('tenant portal', () => {
     }));
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
-    expect(screen.getByText('Administrando como dono')).toBeVisible();
-    expect(screen.getByText('Acme · Dono da plataforma')).toBeVisible();
+    expect(screen.getByRole('status', { name: 'Modo de administração da empresa' }))
+      .toHaveTextContent('MODO DONO · Administrando Acme');
     expect(screen.getByRole('link', { name: 'Identidade visual' })).toHaveAttribute('href', '/admin/appearance');
     expect(screen.getByRole('link', { name: 'Voltar à plataforma' })).toHaveAttribute('href', '/platform');
-    expect(screen.getByRole('button', { name: 'Sair da conta' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Trilhas e vídeos' })).toBeVisible();
-    expect(screen.queryByRole('link', { name: 'Cursos' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Empresas' })).not.toBeInTheDocument();
+    const companyNavigation = screen.getByRole('complementary', { name: 'Navegação principal' });
+    expect(within(companyNavigation).getByText('GESTÃO DA EMPRESA')).toBeVisible();
+    expect(within(companyNavigation).queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
+    expect(within(companyNavigation).queryByRole('link', { name: 'Empresas' })).not.toBeInTheDocument();
     expect(sessionStorage.getItem('sipat-company-administration')).toBe('company-1');
     expect(requests).toContainEqual({ url: '/api/platform/identity/session', company: null });
     expect(requests.filter(request => request.url.startsWith('/api/admin/')))
@@ -455,7 +456,8 @@ describe('tenant portal', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', { name: 'Empresas' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Nova empresa' })).toHaveAttribute('href', '/platform/companies');
+    expect(screen.getByRole('link', { name: '+ Nova empresa' })).toHaveAttribute('href', '/platform/companies');
+    expect(screen.queryByRole('link', { name: 'Cadastrar empresa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Painel' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Usuários' })).toHaveAttribute('href', '/platform/users');
     await waitFor(() => {
