@@ -10,6 +10,8 @@ x-api-environment: &api-environment
   SipatOnline__Tenant__PlatformHost: ${PLATFORM_HOST:-ops.localhost}
   SipatOnline__DevelopmentProxy__Host: ${DEVELOPMENT_PROXY_HOST:-web}
   SipatOnline__Learning__DevelopmentSampleEnabled: ${DEVELOPMENT_SAMPLE_ENABLED:-true}
+  SipatOnline__DemoPresentation__Enabled: ${DEMO_PRESENTATION_ENABLED:-false}
+  SipatOnline__DemoPresentation__VideoSizeBytes: ${DEMO_VIDEO_SIZE_BYTES:-0}
   SipatOnline__Learning__DevelopmentSampleParticipant__LoginIdentifier: ${DEVELOPMENT_SAMPLE_PARTICIPANT_LOGIN_IDENTIFIER:-}
   SipatOnline__Learning__DevelopmentSampleParticipant__DisplayName: ${DEVELOPMENT_SAMPLE_PARTICIPANT_DISPLAY_NAME:-}
   SipatOnline__Learning__DevelopmentSampleParticipant__Password: ${DEVELOPMENT_SAMPLE_PARTICIPANT_PASSWORD:-}
@@ -68,7 +70,7 @@ services:
 
   web:
     build:
-      context: ./src/SipatOnline.Web
+      context: ./src/Web/SipatOnline.Web
       dockerfile: Dockerfile
     environment:
       SIPAT_API_TARGET: http://api:8080

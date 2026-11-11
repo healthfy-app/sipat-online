@@ -10,12 +10,12 @@ Plataformas de treinamento em SST, como a Worklinic, oferecem dezenas de jogos e
 
 | Tipo | Valor na API | Como funciona | Estado atual |
 | --- | --- | --- | --- |
-| Quiz | `Quiz` | Perguntas de múltipla escolha com feedback imediato, sem pontuação. | Configurável e jogável na pré-visualização. |
-| Caça aos riscos | `RiskSpotting` | O participante marca os perigos em uma imagem do ambiente de trabalho. | Apenas configurável. |
-| Quebra-cabeça | `Puzzle` | Montar uma imagem ou cartaz de segurança. | Apenas configurável. |
-| Jogo da memória | `Memory` | Associar EPIs ou sinalizações aos seus usos. | Apenas configurável. |
-| Simulador de cenários | `Scenario` | Escolher a melhor atitude diante de uma situação de risco. | Apenas configurável. |
-| Ordenação | `Ordering` | Colocar os passos de um procedimento na ordem correta. | Apenas configurável. |
+| Quiz | `Quiz` | Perguntas de múltipla escolha com feedback imediato, sem pontuação. | Autoria, prévia e participante. |
+| Caça aos riscos | `RiskSpotting` | Identificar áreas de risco em uma imagem, com teclado ou apontador. | Autoria, prévia e participante. |
+| Quebra-cabeça | `Puzzle` | Reconstruir uma imagem trocando duas peças por vez, sem exigir arrastar. | Autoria, prévia e participante. |
+| Jogo da memória | `Memory` | Associar equipamentos às suas funções; os textos se complementam, não precisam ser iguais. | Autoria, prévia e participante. |
+| Cenários | `Scenario` | Responder situações com alternativas e feedback, em sequência linear. | Autoria, prévia e participante. |
+| Ordenação | `Ordering` | Colocar etapas na ordem correta com controles subir/descer. | Autoria, prévia e participante. |
 
 ## Regras
 
@@ -32,7 +32,19 @@ Plataformas de treinamento em SST, como a Worklinic, oferecem dezenas de jogos e
 - No painel do Operacional, a aba "Jogos e perguntas" cadastra módulos; no detalhe do curso é possível posicionar módulos na trilha, definir paradas e pré-visualizar o vídeo parando na minutagem.
 - Duplicar um curso copia o tipo de jogo e os módulos da trilha.
 
-## Limitações
+## Participante e publicação
 
-- Os cursos da plataforma ainda não chegam ao participante; a execução (Quiz) acontece na pré-visualização do Operacional.
-- Apenas o Quiz é jogável; os demais tipos só têm nome por enquanto.
+- No detalhe da empresa, **Cursos da empresa** associa um curso publicado a uma SIPAT publicada e aos participantes ativos. A operação repetida retorna a mesma associação.
+- A distribuição congela conteúdo e atividades em um snapshot da revisão; editar o catálogo depois não altera o conteúdo já atribuído. A atualização de uma associação existente para outra versão não é automática.
+- `GET /api/learning/tracks/{id}/activities` só retorna atividades de cursos atribuídos no tenant do participante.
+- Atividades são abertas antes, entre ou depois dos vídeos conforme `afterVideoCount`. Checkpoints pausam na minutagem configurada; a retomada acontece depois da gravação do resultado ou da opção de pular.
+- `PUT /api/learning/tracks/{id}/activities/{activityId}/outcome` registra `completed` ou `skipped`, de forma idempotente. Um acerto já registrado não é rebaixado para pulado.
+- Esses resultados são autodeclarados para acompanhamento, não notas de prova nem evidência de reprodução. Não concedem progresso de vídeo ou elegibilidade ao certificado.
+- O jogo da memória bloqueia cliques duplicados e a terceira carta durante a comparação. Pares encontrados continuam visíveis, com indicação de acerto; pares incorretos voltam a ficar ocultos.
+- Falhas de carregamento ou gravação são visíveis e têm recuperação. Jogos não substituem o player e não bloqueiam a conclusão.
+
+## Limites atuais
+
+- Cenários são perguntas lineares, não simulações com árvore de decisões.
+- Não há pontuação, ranking, prêmio ou avaliação formal.
+- A evidência de vídeo da demo é apenas demonstrativa. O provedor de produção continua pendente; consulte [a arquitetura de vídeo](architecture/video-progress.md).

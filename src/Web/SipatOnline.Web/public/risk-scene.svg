@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500">
+  <rect width="800" height="500" fill="#e8ece8"/>
+  <path d="M0 300H800V500H0Z" fill="#d0d5ce"/>
+  <path d="M0 300H800" stroke="#718378" stroke-width="4"/>
+  <rect x="565" y="65" width="200" height="260" rx="8" fill="#164b3a"/>
+  <rect x="590" y="95" width="150" height="55" rx="4" fill="#fff"/>
+  <text x="665" y="131" font-family="sans-serif" font-size="26" text-anchor="middle" fill="#164b3a">SAÍDA</text>
+  <path d="M640 195H695M680 180L695 195L680 210" stroke="#fff" stroke-width="9" fill="none"/>
+  <rect x="580" y="245" width="150" height="140" rx="4" fill="#9c6a37" stroke="#64451f" stroke-width="4"/>
+  <path d="M655 245V385M580 280H730" stroke="#dbbd88" stroke-width="14"/>
+  <path d="M110 390C130 330 210 430 245 375S300 360 340 402" stroke="#263b32" stroke-width="14" fill="none"/>
+  <rect x="62" y="358" width="55" height="42" rx="6" fill="#263b32"/>
+  <path d="M60 369H35M60 387H35" stroke="#263b32" stroke-width="7"/>
+  <rect x="80" y="65" width="330" height="125" rx="10" fill="#fff"/>
+  <text x="105" y="107" font-family="sans-serif" font-size="25" fill="#164b3a">Observe a circulação</text>
+  <text x="105" y="150" font-family="sans-serif" font-size="19" fill="#263b32">Identifique os dois riscos na cena.</text>
+</svg>

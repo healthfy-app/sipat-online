@@ -1,0 +1,561 @@
+.participant-management-page {
+  display: grid;
+  gap: 1.25rem;
+}
+
+.participant-page-heading {
+  align-items: center;
+}
+
+.participant-heading-actions,
+.tenant-dashboard-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.participant-heading-actions .count-label {
+  white-space: nowrap;
+}
+
+.participant-directory {
+  display: grid;
+  min-width: 0;
+  gap: 1.125rem;
+  padding: clamp(1rem, 2vw, 1.5rem);
+  border: 1px solid var(--line-strong);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 0.75rem 1.875rem rgb(26 49 43 / 5%);
+}
+
+.participant-directory-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.participant-directory-heading h2,
+.participant-directory-heading h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.12rem;
+}
+
+.participant-directory-heading .eyebrow {
+  margin: 0 0 0.3rem;
+  color: var(--green);
+}
+
+.participant-directory-filters {
+  display: grid;
+  grid-template-columns: minmax(15rem, 1fr) minmax(12rem, 15rem) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.participant-directory-filters .field {
+  margin: 0;
+}
+
+.participant-directory-table .data-table {
+  min-width: 52rem;
+}
+
+.participant-directory-table .data-table th:last-child,
+.participant-directory-table .data-table td:last-child {
+  text-align: right;
+}
+
+.participant-directory-table .data-table tbody tr {
+  transition: background-color 140ms ease;
+}
+
+.participant-directory-person {
+  display: flex;
+  min-width: 12rem;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.participant-directory-person > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 0.25rem;
+}
+
+.participant-directory-person strong {
+  color: var(--ink);
+  font-size: 0.86rem;
+}
+
+.participant-directory-person small,
+.participant-directory-secondary {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.participant-directory-avatar {
+  display: grid;
+  width: 2.45rem;
+  height: 2.45rem;
+  flex: 0 0 2.45rem;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--green);
+  background: var(--green-soft);
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.participant-directory-progress,
+.participant-detail-track-progress {
+  display: flex;
+  min-width: 7rem;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--green);
+  font-size: 0.78rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.participant-directory-progress progress,
+.participant-detail-track-progress progress {
+  width: 5rem;
+  height: 0.5rem;
+  accent-color: var(--green);
+}
+
+.participant-directory-secondary {
+  display: block;
+  margin-top: 0.3rem;
+}
+
+.participant-directory-actions .button {
+  white-space: nowrap;
+}
+
+.participant-status-in-progress {
+  color: #155e46;
+  background: #e2f1e9;
+}
+
+.participant-status-not-started {
+  color: #795512;
+  background: #f8efd8;
+}
+
+.participant-status-no-tracks {
+  color: var(--muted-strong);
+  background: var(--surface-soft);
+}
+
+.participant-status-inactive {
+  color: #4b5853;
+  background: #e7ebe9;
+}
+
+.participant-add-modes {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+  padding: 0.3rem;
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  background: var(--surface-soft);
+}
+
+.participant-add-modes button {
+  min-height: 2.7rem;
+  flex: 1 1 0;
+  padding: 0.5rem 0.875rem;
+  border: 0;
+  border-radius: 0.55rem;
+  color: var(--muted-strong);
+  background: transparent;
+  font: inherit;
+  font-size: 0.83rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+.participant-add-modes button:hover {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.participant-add-modes button.is-selected {
+  color: var(--on);
+  background: var(--ink);
+}
+
+.participant-add-modes button:focus-visible {
+  outline: 3px solid rgb(40 109 88 / 35%);
+  outline-offset: 2px;
+}
+
+.participant-create-form {
+  max-width: 42rem;
+  margin: 0 auto;
+}
+
+.participant-create-form > .muted-copy {
+  margin: 0;
+  font-size: 0.86rem;
+}
+
+.participant-csv-import {
+  display: grid;
+  gap: 1.125rem;
+}
+
+.participant-csv-instructions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.125rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.8rem;
+  background: var(--green-soft);
+}
+
+.participant-csv-instructions h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.95rem;
+}
+
+.participant-csv-instructions p {
+  margin: 0.4rem 0 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.participant-csv-file {
+  margin: 0;
+}
+
+.participant-csv-file input[type="file"] {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem;
+  border: 1px dashed var(--line-strong);
+  border-radius: 0.625rem;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.participant-csv-file-name {
+  overflow-wrap: anywhere;
+  margin: -0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.participant-csv-preview {
+  display: grid;
+  justify-items: start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.8rem;
+  background: var(--surface-soft);
+}
+
+.participant-csv-preview > p {
+  margin: 0;
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.participant-csv-issues {
+  display: grid;
+  max-height: 10rem;
+  gap: 0.35rem;
+  overflow: auto;
+  margin: 0;
+  padding-left: 1.25rem;
+  color: var(--danger);
+  font-size: 0.78rem;
+}
+
+.participant-csv-results {
+  display: grid;
+  width: 100%;
+  gap: 0.75rem;
+}
+
+.participant-csv-results > p {
+  margin: 0;
+}
+
+.participant-csv-credentials {
+  display: grid;
+  justify-items: start;
+  gap: 0.65rem;
+  padding: 0.875rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.65rem;
+  background: var(--surface);
+}
+
+.participant-csv-credentials p {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.participant-csv-credentials .success-message {
+  margin: 0;
+}
+
+.participant-detail-overview {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.85rem;
+  background: var(--green-soft);
+}
+
+.participant-detail-overview > div {
+  display: grid;
+  gap: 0.3rem;
+}
+
+.participant-detail-overview .eyebrow {
+  margin: 0;
+  color: var(--green);
+  font-size: 0.65rem;
+}
+
+.participant-detail-overview strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.83rem;
+}
+
+.participant-detail-section {
+  display: grid;
+  gap: 0.875rem;
+  margin-top: 1.25rem;
+}
+
+.participant-detail-track-list {
+  display: grid;
+  max-height: min(45vh, 30rem);
+  gap: 0.6rem;
+  overflow: auto;
+  margin: 0;
+  padding: 0.1rem;
+  list-style: none;
+}
+
+.participant-detail-track {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(9rem, 12rem) auto;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.7rem;
+  background: var(--surface);
+}
+
+.participant-detail-track-info {
+  display: grid;
+  min-width: 0;
+  gap: 0.3rem;
+}
+
+.participant-detail-track-info strong {
+  color: var(--ink);
+  font-size: 0.84rem;
+}
+
+.participant-detail-track-info span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.participant-detail-track-progress {
+  min-width: 0;
+}
+
+.participant-detail-track-progress progress {
+  width: 100%;
+}
+
+.participant-detail-outcomes {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0.75rem 0;
+}
+
+.participant-detail-assignment {
+  display: flex;
+  align-items: end;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.participant-detail-assignment .field {
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .participant-detail-overview {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .participant-heading-actions {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .participant-heading-actions .button {
+    width: 100%;
+  }
+
+  .participant-directory-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .participant-directory-table {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
+  .participant-directory-table .data-table {
+    min-width: 0;
+    border-collapse: separate;
+    border-spacing: 0 0.7rem;
+  }
+
+  .participant-directory-table .data-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    clip-path: inset(50%);
+  }
+
+  .participant-directory-table .data-table tbody {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .participant-directory-table .data-table tbody tr {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0;
+    overflow: hidden;
+    border: 1px solid var(--line-strong);
+    border-radius: 0.8rem;
+    background: var(--surface);
+  }
+
+  .participant-directory-table .data-table tbody tr:nth-child(even),
+  .participant-directory-table .data-table tbody tr:hover {
+    background: var(--surface);
+  }
+
+  .participant-directory-table .data-table td {
+    display: grid;
+    min-width: 0;
+    align-content: start;
+    gap: 0.4rem;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--line);
+    text-align: left;
+  }
+
+  .participant-directory-table .data-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.65rem;
+    font-weight: 750;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .participant-directory-table .data-table td:first-child,
+  .participant-directory-table .data-table td:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .participant-directory-table .data-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .participant-directory-table .participant-directory-person {
+    min-width: 0;
+  }
+
+  .participant-directory-table .participant-directory-progress {
+    min-width: 0;
+  }
+
+  .participant-directory-table .participant-directory-progress progress {
+    width: min(100%, 8rem);
+  }
+
+  .participant-directory-table .participant-directory-actions .button {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .participant-csv-instructions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .participant-detail-overview {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .participant-detail-track {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.65rem;
+  }
+
+  .participant-detail-track-progress {
+    width: 100%;
+  }
+
+  .participant-detail-assignment {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .participant-detail-assignment .button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 420px) {
+  .participant-directory,
+  .participant-detail-overview {
+    padding: 0.75rem;
+  }
+
+  .participant-add-modes button {
+    padding-inline: 0.5rem;
+    font-size: 0.74rem;
+  }
+}

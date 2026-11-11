@@ -1,0 +1,37 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="..\..\BuildingBlocks\Application\SipatOnline.BuildingBlocks.Application\SipatOnline.BuildingBlocks.Application.csproj" />
+    <ProjectReference Include="..\..\BuildingBlocks\Domain\SipatOnline.BuildingBlocks.Domain\SipatOnline.BuildingBlocks.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\Application\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Identity\Domain\SipatOnline.Identity.Domain\SipatOnline.Identity.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Learning\Application\SipatOnline.Learning.Application\SipatOnline.Learning.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Learning\Domain\SipatOnline.Learning.Domain\SipatOnline.Learning.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Sipats\Application\SipatOnline.Sipats.Application\SipatOnline.Sipats.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Sipats\Domain\SipatOnline.Sipats.Domain\SipatOnline.Sipats.Domain.csproj" />
+    <ProjectReference Include="..\..\Modules\Tenancy\Application\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
+    <ProjectReference Include="..\..\Modules\Tenancy\Domain\SipatOnline.Tenancy.Domain\SipatOnline.Tenancy.Domain.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+    <PackageReference Include="PDFsharp" />
+    <PackageReference Include="System.Security.Cryptography.Pkcs" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Learning\Assets\*" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14.0</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>

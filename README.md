@@ -4,6 +4,8 @@ SIPAT é a Semana Interna de Prevenção de Acidentes do Trabalho: um evento de 
 
 O projeto está em fase inicial de desenvolvimento. As fatias verticais atuais implementam configuração do tenant, identidade/autenticação, programação da SIPAT e aprendizagem em vídeo, atravessando Domain, Application, Infrastructure, API e interface web. A SIPAT é o evento semanal de prevenção da empresa; a plataforma oferece o conteúdo digital das palestras em EAD e acompanha a participação.
 
+O [guia do MVP local](docs/MVP-DEMO.md) descreve o percurso de demonstração: catálogo com fotos, reprodução e retomada, atividades opcionais, distribuição de cursos e certificado com a logo da contratante. O provedor de streaming de produção continua pendente; a demo não comprova participação oficial.
+
 ## Objetivos
 
 - Apoiar a realização da SIPAT de cada empresa com palestras e conteúdos digitais em EAD.
@@ -17,9 +19,9 @@ O projeto está em fase inicial de desenvolvimento. As fatias verticais atuais i
 
 | Perfil | Capacidades previstas |
 | --- | --- |
-| Operacional / Super Admin da plataforma (`PlatformOperator`, identidade global) | Gestor máximo ("dono"): vê todas as empresas e todas as SIPATs, gere usuários e empresas, cria e mantém cursos (criar ou duplicar), sobe vídeos para uma biblioteca reutilizável, vincula vídeos aos cursos, ativa ou desativa a gamificação do curso e consulta relatórios globais. Já provisiona empresas e consulta um diretório paginado de usuários de todos os tenants; edição de contas, relatórios globais, biblioteca de vídeos e gamificação ainda faltam. |
-| Supervisor | Usuário da empresa contratante, criado pelo Operacional (papel `Supervisor`), sem acesso às telas administrativas. Ele pertence a uma única empresa e o isolamento por tenant já se aplica a ele. A associação por SIPAT e as telas de relatório serão feitas junto com o módulo de relatórios, que ainda não existe. |
-| Admin do cliente (`ClientAdmin`) | Gestão dos usuários da própria empresa e acesso aos relatórios das SIPATs sob sua responsabilidade. Pode consultar participação individual e por subgrupos, avançar/retroceder a reprodução para acompanhamento e moderar comentários. O acesso continua limitado ao tenant e às SIPATs autorizadas. |
+| Operacional / Dono da plataforma (`PlatformOperator`, identidade global) | Provisiona empresas, cria ou duplica cursos, administra vídeos e gamificação e acompanha resultados de todas as empresas. Em **Administrar empresa**, reutiliza dashboard, participantes, programação e autoria da empresa selecionada, com permissão administrativa e auditoria na própria identidade global. Não precisa de uma conta por cliente. |
+| Supervisor (`Supervisor`) | Um ou mais usuários da contratante, vinculados a uma única empresa. Acessam dashboard, busca de participantes, progresso por trilha, atividades e certificados em modo de consulta. Não cadastram participantes, não atribuem trilhas, não alteram cursos, SIPATs ou identidade visual e não acessam outras empresas. O escopo atual é a empresa inteira, não uma seleção individual de SIPATs. |
+| Admin do cliente (`ClientAdmin`) | Acessa o dashboard e administra participantes, atribuições, trilhas, programação da SIPAT e identidade visual da própria empresa. Pode cadastrar participantes; a criação de outros administradores e supervisores fica disponível ao dono no diretório global. |
 | Super Admin legado (`SuperAdmin`) | Papel administrativo existente, ainda tenant-bound. Não equivale ao Super Admin global descrito pelo PO; alinhar/migrar esse papel sem ampliar acesso entre empresas por acidente. |
 | Participante | Consulta seu próprio relatório de conteúdos assistidos e progresso, pode retroceder mas não avançar para trechos não assistidos, comentar nos vídeos e emitir certificado quando cumprir os critérios. |
 
@@ -51,14 +53,14 @@ O domínio de aprendizagem é um módulo separado (`Learning`); trilhas, mídias
 - **Participação:** realização dos conteúdos e carga horária computados para uma pessoa em uma SIPAT.
 - **Grupo/Subgrupo:** agrupamento organizacional usado para segmentar participantes e relatórios.
 - **Operacional:** nome de produto do perfil do dono da plataforma (`PlatformOperator`); sua visão inicial é a lista de empresas e a lista de treinamentos (cujos nomes costumam incluir a empresa), e o dashboard fica em página separada.
-- **Supervisor:** usuário da empresa contratante com acesso apenas aos relatórios da sua SIPAT.
-- **Curso (catálogo):** conjunto reutilizável de vídeos mantido pelo Operacional; pode ser duplicado e tem gamificação opcional, definida ao criar o curso. Fluxo: curso, vídeos, gamificação.
+- **Supervisor:** usuário da empresa contratante com acesso de consulta ao dashboard, progresso e resultados da sua empresa.
+- **Curso (catálogo):** conjunto reutilizável de vídeos mantido pelo Operacional; pode ser duplicado e tem gamificação opcional, configurada nos detalhes do curso. Em **Conteúdo**, escolha abrir um treinamento existente ou criar um novo. A criação usa um popup com capa opcional (PNG/JPEG/WebP de até 2 MiB), título e descrição; biblioteca, edição, inclusão de vídeos e jogos ficam em popups contextuais, sem formulários na página inicial. Documentos e apresentações ainda não são convertidos em cursos.
 
 ## Tecnologias
 
 - .NET 10 e C# 14
 - ASP.NET Core Minimal API
-- React, TypeScript e Vite (frontend em `src/SipatOnline.Web`)
+- React, TypeScript e Vite (frontend em `src/Web/SipatOnline.Web`)
 - xUnit
 - Nullable habilitado e warnings tratados como erros
 
@@ -67,16 +69,28 @@ O domínio de aprendizagem é um módulo separado (`Learning`); trilhas, mídias
 ```text
 SipatOnline.slnx
 src/
-  SipatOnline.Api/
-  SipatOnline.BuildingBlocks.Application/
-  SipatOnline.BuildingBlocks.Domain/
-  SipatOnline.Identity.Application/
-  SipatOnline.Identity.Domain/
-  SipatOnline.Sipats.Application/
-  SipatOnline.Sipats.Domain/
-  SipatOnline.Infrastructure/
-  SipatOnline.Tenancy.Application/
-  SipatOnline.Tenancy.Domain/
+  Api/
+    SipatOnline.Api/
+  BuildingBlocks/
+    Application/SipatOnline.BuildingBlocks.Application/
+    Domain/SipatOnline.BuildingBlocks.Domain/
+  Infrastructure/
+    SipatOnline.Infrastructure/
+  Modules/
+    Identity/
+      Application/SipatOnline.Identity.Application/
+      Domain/SipatOnline.Identity.Domain/
+    Learning/
+      Application/SipatOnline.Learning.Application/
+      Domain/SipatOnline.Learning.Domain/
+    Sipats/
+      Application/SipatOnline.Sipats.Application/
+      Domain/SipatOnline.Sipats.Domain/
+    Tenancy/
+      Application/SipatOnline.Tenancy.Application/
+      Domain/SipatOnline.Tenancy.Domain/
+  Web/
+    SipatOnline.Web/
 tests/
   SipatOnline.Application.UnitTests/
   SipatOnline.ArchitectureTests/
@@ -84,7 +98,7 @@ tests/
   SipatOnline.IntegrationTests/
 ```
 
-Os projetos ficam diretamente em `src/` e `tests/` para manter a estrutura enxuta. As camadas e módulos são separados por projeto, não por vários níveis de diretórios.
+Os projetos de domínio ficam agrupados por módulo de negócio em `src/Modules/`, com `Application` e `Domain` separados dentro de cada módulo. API, infraestrutura, building blocks e frontend ficam em pastas próprias; os testes permanecem em `tests/`.
 
 `Domain` concentra regras e tipos do negócio sem dependência de infraestrutura. `Application` coordena casos de uso e contratos. `Infrastructure` implementa persistência e integração com ASP.NET Core Identity. `Api` expõe os endpoints HTTP. A solução segue um monólito modular; não há requisito atual para microserviços ou Azure Functions.
 
@@ -114,7 +128,7 @@ dotnet build SipatOnline.slnx --no-restore
 dotnet test SipatOnline.slnx --no-build
 ```
 
-Para validar o frontend, execute a partir de `src\SipatOnline.Web`:
+Para validar o frontend, execute a partir de `src\Web\SipatOnline.Web`:
 
 ```powershell
 npm ci
@@ -128,53 +142,53 @@ npm run build
 A API exige configuração explícita do banco e do tenant; não há valores de produção fictícios como fallback. Para desenvolvimento local, configure User Secrets no projeto da API:
 
 ```powershell
-dotnet user-secrets init --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "ConnectionStrings:SipatOnline" "Host=localhost;Database=sipat_online;Username=postgres;Password=<senha-local>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:Tenant:Id" "<guid-estavel-do-tenant>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:Tenant:Key" "desenvolvimento" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:Tenant:Name" "Empresa de desenvolvimento" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:Tenant:BaseDomain" "localhost" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:Tenant:PlatformHost" "ops.localhost" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets init --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "ConnectionStrings:SipatOnline" "Host=localhost;Database=sipat_online;Username=postgres;Password=<senha-local>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Tenant:Id" "<guid-estavel-do-tenant>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Tenant:Key" "desenvolvimento" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Tenant:Name" "Empresa de desenvolvimento" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Tenant:BaseDomain" "localhost" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Tenant:PlatformHost" "ops.localhost" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
 ```
 
 Para acessar a operação global local, configure um operador distinto de qualquer conta de empresa. Use uma senha forte e guarde-a em User Secrets:
 
 ```powershell
-dotnet user-secrets set "SipatOnline:PlatformOperator:LoginIdentifier" "<matricula-do-operador>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:PlatformOperator:DisplayName" "<nome-do-operador>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:PlatformOperator:Password" "<senha-forte>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:PlatformOperator:LoginIdentifier" "<matricula-do-operador>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:PlatformOperator:DisplayName" "<nome-do-operador>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:PlatformOperator:Password" "<senha-forte>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
 ```
 
 O `BootstrapAdmin` abaixo cria um `SuperAdmin` tenant-bound para manutenção da empresa configurada; ele não pode cadastrar tenants:
 
 ```powershell
-dotnet user-secrets set "SipatOnline:BootstrapAdmin:LoginIdentifier" "<matricula>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:BootstrapAdmin:DisplayName" "<nome>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:BootstrapAdmin:Password" "<senha-forte>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:BootstrapAdmin:LoginIdentifier" "<matricula>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:BootstrapAdmin:DisplayName" "<nome>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:BootstrapAdmin:Password" "<senha-forte>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
 ```
 
 Inicialize o banco explicitamente. O comando aplica as migrations e cria o tenant local, os perfis e as contas de bootstrap configuradas:
 
 ```powershell
-dotnet run --project src\SipatOnline.Api\SipatOnline.Api.csproj -- --initialize-database
+dotnet run --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj -- --initialize-database
 ```
 
 Depois, inicie a API:
 
 ```powershell
-dotnet run --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet run --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
 ```
 
-A API fornece `GET /health`; a especificação OpenAPI é disponibilizada em ambiente de desenvolvimento. Em produção, cada empresa é resolvida pelo subdomínio de `SipatOnline:Tenant:BaseDomain` (por exemplo, `empresa.sipat.online`); em desenvolvimento, o domínio raiz usa o tenant configurado e subdomínios `*.localhost` resolvem pelo identificador da empresa. A operação central usa o host distinto `SipatOnline:Tenant:PlatformHost` (localmente `ops.localhost`). Hostnames desconhecidos e tenants inativos não recebem acesso. Domínios próprios de clientes não são resolvidos nesta etapa.
+A API fornece `GET /health`; a especificação OpenAPI é disponibilizada em ambiente de desenvolvimento. Cada empresa é resolvida pelo subdomínio de `SipatOnline:Tenant:BaseDomain` (por exemplo, `empresa.sipat.online` ou `empresa.localhost`). O domínio raiz e `SipatOnline:Tenant:PlatformHost` (localmente `ops.localhost`) são entradas neutras da plataforma, sem logo ou contexto de empresa por padrão. Hostnames desconhecidos e tenants inativos não recebem acesso. Domínios próprios de clientes não são resolvidos nesta etapa.
 
 ### Demonstração local de vídeo e progresso
 
 Em `Development`, `SipatOnline:Learning:DevelopmentSampleEnabled` cria um perfil de participante separado do Super Admin, uma SIPAT e quatro trilhas atribuídas a esse participante. Configure o acesso local com uma senha forte guardada em User Secrets:
 
 ```powershell
-dotnet user-secrets set "SipatOnline:Learning:DevelopmentSampleParticipant:LoginIdentifier" "participante.demo" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:Learning:DevelopmentSampleParticipant:DisplayName" "Participante de demonstração" --project src\SipatOnline.Api\SipatOnline.Api.csproj
-dotnet user-secrets set "SipatOnline:Learning:DevelopmentSampleParticipant:Password" "<senha-forte>" --project src\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Learning:DevelopmentSampleParticipant:LoginIdentifier" "participante.demo" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Learning:DevelopmentSampleParticipant:DisplayName" "Participante de demonstração" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
+dotnet user-secrets set "SipatOnline:Learning:DevelopmentSampleParticipant:Password" "<senha-forte>" --project src\Api\SipatOnline.Api\SipatOnline.Api.csproj
 ```
 
 O perfil de desenvolvimento recebe as trilhas **Ergonomia e atividade física**, **Alimentação para uma vida saudável** e **Comportamento seguro**, com referências públicas do NIOSH/CDC que não são o catálogo proprietário da SIPAT Online. Uma quarta trilha, **Demonstração técnica — vídeo e progresso**, contém o MP4 CC0 de flores da MDN para validar a reprodução e o salvamento de progresso em navegadores compatíveis; ela não é conteúdo de curso. Para testar o fluxo numa empresa recém-cadastrada, o Admin pode criar uma trilha com a referência `development:mdn-flower-demo` e duração `5,055` segundos, publicar e atribuí-la a um participante. A integração de produção continua indisponível até que os arquivos/URLs autorizados do catálogo e um provedor com evidência verificável sejam configurados.
@@ -199,7 +213,37 @@ Inicie o Docker Desktop e execute na raiz do projeto:
 
 O script cria o projeto Docker isolado `sipat-online-dev`, sem modificar os volumes de outros projetos, e gera `.env.docker.local` e `.docker-local-credentials.txt` somente na primeira execução. Ambos são ignorados pelo Git. O documento contém os acessos locais do participante, administrador, operador e PostgreSQL; mantenha-o privado e não use essas senhas em produção. As portas do ambiente isolado são expostas apenas em `127.0.0.1`. Acesse `https://localhost:5188` ou `https://ops.localhost:5188` para a operação. O navegador pode pedir confirmação do certificado de desenvolvimento.
 
-Se `ops.localhost` ou o subdomínio de uma empresa não resolver no Windows, adicione uma entrada `127.0.0.1 ops.localhost` ou `127.0.0.1 <chave-da-empresa>.localhost` ao arquivo `C:\Windows\System32\drivers\etc\hosts` como administrador. O script não modifica esse arquivo.
+Se `ops.localhost` ou o subdomínio de uma empresa não resolver no Windows, adicione uma entrada `127.0.0.1 ops.localhost` ou `127.0.0.1 <chave-da-empresa>.localhost` ao arquivo `%SystemRoot%\System32\drivers\etc\hosts` como administrador. O script não modifica esse arquivo.
+
+### Transferir para outro computador
+
+Os carregamentos usam a engrenagem vetorial do próprio `favicon.svg`, com giro suave e pausa fora da tela/aba. A preferência de movimento reduzido mantém o ícone estático. Jogos e conclusões possuem feedback visual sem alterar regras, pontuação ou a opção de pular.
+
+Os projetos e scripts usam caminhos relativos à pasta extraída; não dependem de nome de usuário, unidade ou diretório deste computador. Instale e inicie o Docker Desktop no destino. Não é necessário instalar .NET ou Node para executar o ambiente pelo Docker.
+
+Para gerar um ZIP limpo, incluindo todos os fontes atuais (mesmo ainda não commitados), execute:
+
+```powershell
+.\portable.ps1 export
+```
+
+O ZIP fica em `artifacts\portable`. Ele não inclui `.git`, `.vs`, caches de ferramentas, `bin`, `obj`, `node_modules`, builds do frontend ou segredos locais. No outro PC, extraia em qualquer pasta e execute `.\docker-local.ps1 up -Build`. Essa opção cria um ambiente novo, com novas credenciais locais.
+
+Para levar também as empresas, contas, cursos, progresso, logos e vídeos atuais:
+
+```powershell
+.\portable.ps1 export -IncludeLocalData
+```
+
+Essa opção pausa brevemente a API e o frontend para obter uma cópia consistente e depois os reinicia. O ZIP **PRIVATE** contém também as credenciais: transfira somente entre seus computadores, nunca publique ou envie a terceiros. O manifesto registra checksums SHA-256 dos dados. Os backups intermediários ficam em `artifacts\portable` e também são privados.
+
+No outro PC, extraia o ZIP privado e, **antes de iniciar um ambiente novo**, execute:
+
+```powershell
+.\portable.ps1 import -ConfirmImport
+```
+
+A importação valida os arquivos, constrói as imagens, restaura PostgreSQL e vídeos, aplica migrations sem refazer a demonstração e inicia o portal. Não sobrescreve configuração, containers ou volumes já existentes. As senhas e URLs locais continuam no arquivo `.docker-local-credentials.txt`; faça login novamente, pois sessões/cookies não são transferidos. Não use `reset` para importar: ele apaga os dados.
 
 Na primeira execução, as imagens são construídas; nas seguintes são reutilizadas. O script aguarda o banco e executa as migrations e o seed idempotente antes de iniciar os serviços, sem apagar dados ou substituir senhas de usuários existentes. Para aplicar alterações no código ou nas dependências, reconstrua explicitamente:
 
@@ -231,10 +275,14 @@ docker compose up --build -d api web
 
 `db-init` aplica as migrations e inicializa o tenant e os perfis; se configurado, também cria o Super Admin. A API usa o hostname interno `postgres` para acessar o banco. O `.env` não deve ser versionado; a porta local do PostgreSQL e a porta HTTP da API podem ser alteradas por `POSTGRES_PORT` e `API_PORT`.
 
-Abra `https://localhost:5173` para o tenant local configurado ou `https://<TENANT_KEY>.localhost:5173` para um tenant pelo subdomínio (o navegador pode pedir confirmação do certificado de desenvolvimento). Configure `TENANT_BASE_DOMAIN` para o domínio-raiz usado no ambiente; `localhost` é o padrão local. A API permanece acessível em `http://localhost:8080/health`.
+Abra `https://ops.localhost:5173` para o Operacional ou `https://<TENANT_KEY>.localhost:5173` para a empresa (o navegador pode pedir confirmação do certificado de desenvolvimento). A entrada web `https://localhost:5173` redireciona ao Operacional, preservando a porta; não representa uma empresa. No Docker local, use a porta `5188`. A API no domínio raiz também é neutra, inclusive em Development. Configure `TENANT_BASE_DOMAIN` para o domínio-raiz usado no ambiente; `localhost` é o padrão local. A API permanece acessível em `http://localhost:8080/health`.
+
+O Operacional inicia na lista de empresas; o dashboard tem navegação separada. Em **Cursos**, o catálogo aparece diretamente com busca e filtros. As duas opções de início aparecem somente quando não existem cursos. Criar ou abrir um curso leva a uma rota própria, com as etapas **Editar**, **Configurar** e **Publicar**: organize vídeos e perguntas, confira a prévia, ajuste capa/detalhes/gamificação e publique imediatamente no catálogo. A publicação não altera automaticamente vínculos nem progresso das empresas. Aulas/slides livres, agendamento e atribuição em lote não fazem parte deste fluxo. O Supervisor usa o mesmo dashboard e acompanhamento de participantes, sem os controles de alteração.
+
+O participante entra em **Minha formação** (`/learning`) e vê todos os cursos atribuídos, com progresso individual e geral, busca e filtros por andamento/conclusão. Nenhum vídeo inicia nessa entrada. Ao escolher um curso, a reprodução mostra somente seus vídeos e seu progresso, sem o caminho de navegação entre todos os cursos. **Meus cursos** retorna ao catálogo. Posição, tempo assistido e critérios de conclusão mantêm as regras existentes.
 Em desenvolvimento, `DEVELOPMENT_PROXY_HOST` define o endereço confiável do proxy da API e usa `web` por padrão. Para um proxy HTTP executado no host, use o endereço gateway da rede Docker local (por exemplo, `172.18.0.1`); não use `host.docker.internal`, que aponta para o host de destino e não para o endereço de origem visto pela API.
 
-Para executar o frontend sem Compose, instale Node.js LTS e rode `npm ci` e `npm run dev` dentro de `src\SipatOnline.Web`; por padrão o proxy local encaminha `/api` para `http://localhost:8080`. O destino pode ser alterado com `SIPAT_API_TARGET`.
+Para executar o frontend sem Compose, instale Node.js LTS e rode `npm ci` e `npm run dev` dentro de `src\Web\SipatOnline.Web`; por padrão o proxy local encaminha `/api` para `http://localhost:8080`. O destino pode ser alterado com `SIPAT_API_TARGET`.
 
 Confira a API e acompanhe os logs com:
 
@@ -276,11 +324,17 @@ O endereço inicial abre o login ou, se já houver uma sessão, a área correspo
 
 Cada tenant ativo é acessado pelo seu identificador como subdomínio de `SipatOnline:Tenant:BaseDomain` (por exemplo, `empresa.sipat.online`). O servidor resolve o tenant antes da autenticação; hostnames desconhecidos, chaves reservadas (`api`, `admin`, `app`, `www`) e tenants inativos não recebem contexto de tenant. A sessão também carrega o tenant ao qual o usuário pertence, e uma sessão de uma empresa não pode ser reutilizada em outra.
 
-`GET /api/tenant/branding` retorna nome, logo e cores públicos do tenant atual; `GET /api/identity/session` retorna o usuário autenticado e seus papéis. Em desenvolvimento, o hostname raiz `localhost` usa o tenant configurado e subdomínios como `empresa.localhost` resolvem pela chave. Em produção, a raiz do domínio não é um tenant: o tráfego do portal deve chegar pelo subdomínio.
+`GET /api/tenant/branding` retorna nome, logo e cores públicos do tenant atual; `GET /api/identity/session` retorna o usuário autenticado e seus papéis. O hostname raiz e o host de operação retornam a identidade neutra SIPAT Online, inclusive em desenvolvimento. Subdomínios como `empresa.localhost` resolvem pela chave da empresa.
 
-O host configurado em `SipatOnline:Tenant:PlatformHost` é isolado do tenant plane. Nele, `PlatformOperator` autentica por `/api/platform/identity/login`, cadastra empresas em `/api/platform/companies` e consulta usuários de empresas em `/api/platform/users?offset=0&limit=50`. O login global padrão é `sipat.online.admin`; a conta só é provisionada quando `PLATFORM_OPERATOR_PASSWORD` está configurada como segredo local. O provisionamento cria o tenant e seu primeiro `ClientAdmin` em uma transação auditada. O diretório global é paginado (limite máximo `100`) e não retorna e-mails, senhas ou hashes. `POST /api/platform/users` cria usuários em uma empresa ativa, limitado aos perfis `Participant` e `ClientAdmin`, e registra a operação na auditoria. A listagem de empresas também não retorna credenciais. Usuários de empresa não podem usar essas APIs, mesmo que tentem reutilizar uma sessão em outro host.
+Administradores da empresa e o dono em contexto administrativo acessam **Identidade visual** em `/admin/appearance`: upload de PNG até 256 KB e 2000 × 2000 pixels, remoção da logo, seleção de cores por picker ou HEX, contraste mínimo de 4,5:1 e prévia local antes de salvar. `PUT /api/tenant/branding/appearance` salva cores e logo juntas, com antifalsificação e auditoria. A logo do portal é armazenada no banco e servida publicamente por `/api/tenant/logo/{key}?v={hash}`, para permitir sua exibição no login. Hosts de outras empresas não podem ler essa imagem. A logo dos certificados permanece separada e os certificados emitidos não mudam. Supervisores e participantes não podem alterar a identidade visual.
+
+O host configurado em `SipatOnline:Tenant:PlatformHost` é isolado do tenant plane. Nele, `PlatformOperator` autentica por `/api/platform/identity/login`, cadastra empresas em `/api/platform/companies` e consulta usuários de empresas em `/api/platform/users?offset=0&limit=50`. O login global padrão é `sipat.online.admin`; a conta só é provisionada quando `PLATFORM_OPERATOR_PASSWORD` está configurada como segredo local. O provisionamento cria o tenant e seu primeiro `ClientAdmin` em uma transação auditada. O diretório global é paginado (limite máximo `100`) e não retorna e-mails, senhas ou hashes. `POST /api/platform/users` cria usuários em uma empresa ativa, limitado aos perfis `Participant`, `ClientAdmin` e `Supervisor`, e registra a operação na auditoria. A listagem de empresas também não retorna credenciais. Usuários de empresa não podem usar essas APIs, mesmo que tentem reutilizar uma sessão em outro host.
+
+**Contexto administrativo do dono:** a ação **Administrar empresa** abre `/admin/dashboard?companyId=<id>` no próprio host central. A interface mantém somente o ID da seleção em `sessionStorage` (por aba), exibe a empresa no cabeçalho e oferece **Sair da empresa**; sair da conta também limpa a seleção. As requisições a `/api/admin/*`, `/api/tenant/branding` e seus subendpoints enviam `X-Sipat-Company`. O backend aceita esse cabeçalho apenas de um `PlatformOperator` global autenticado, no host central, para uma empresa ativa e somente nesses endpoints. Cabeçalhos forjados por usuários de cliente são recusados. Sem seleção, o dono não acessa `/api/admin/*`; a seleção não concede acesso como aluno nem altera sua identidade. As operações continuam filtradas pela empresa e auditadas com o ID real do dono. Certificados do dono usam os endpoints globais já existentes, com o ID explícito da empresa.
 
 O painel global `/platform/dashboard` ordena empresas pela quantidade de participantes ativos cadastrados; esse número não representa o limite comercial contratado. O catálogo global `/platform/courses` permite cadastrar cursos e vídeos MP4/WebM de até 250 MiB. No Compose, os arquivos ficam no volume Docker `platform-course-videos`; o armazenamento atual é local e não deve ser considerado uma solução de mídia de produção. Contratos, limites comerciais e associação do catálogo global aos pacotes dos tenants ainda não existem.
+
+Para preparar a apresentação local com os três modelos de grade da página pública, execute `.\docker-local.ps1 reset -ConfirmReset` na raiz. O comando baixa uma única amostra CC0 do MDN antes da limpeza, exige a confirmação explícita, remove somente o volume PostgreSQL `sipat-online-dev_postgres-data` e mantém os vídeos. Depois recria 10 empresas de demonstração, duas contas de colaboradores por empresa e todas as trilhas/aulas, reutilizando o mesmo vídeo; valida as contagens e atualiza `.docker-local-credentials.txt`. As empresas usam nomes reais apenas como dados fictícios de demonstração. Os demais dados do banco local são apagados. As URLs locais usam um certificado HTTPS autossinado de desenvolvimento; sua confiança depende da configuração da máquina.
 
 O proxy/ingress de produção deve preservar o `Host` original ao encaminhar as requisições para a API. Não confie em `X-Forwarded-Host` de clientes nem habilite essa resolução sem configurar uma lista de proxies confiáveis. No modo Development, a API aceita `X-Forwarded-Proto` somente do proxy local configurado por `SipatOnline:DevelopmentProxy:Host` (o serviço `web` no Compose; `localhost` fora dele).
 

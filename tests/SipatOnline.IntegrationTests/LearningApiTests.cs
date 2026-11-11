@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using SipatOnline.Api.Endpoints;
 using SipatOnline.Infrastructure;
@@ -15,15 +16,18 @@ public sealed class LearningApiTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
-        await using var factory = new SipatOnlineApiFactory(
+        var clock = new TestClock(DateTimeOffset.UtcNow);
+        await using var baseFactory = new SipatOnlineApiFactory(
             postgres.GetConnectionString(),
             developmentSampleEnabled: true);
+        await using var factory = baseFactory.WithWebHostBuilder(builder =>
+            builder.ConfigureServices(services => services.AddSingleton<TimeProvider>(clock)));
         await InitializeDatabaseAsync(factory);
         await InitializeDatabaseAsync(factory);
 
         using var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"),
+            BaseAddress = new Uri("https://integration-test.localhost"),
             AllowAutoRedirect = false
         });
         await SignInAdminAsync(client);
@@ -101,7 +105,7 @@ public sealed class LearningApiTests
         using var participantClient = factory.CreateClient(
             new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
             {
-                BaseAddress = new Uri("https://localhost"),
+                BaseAddress = new Uri("https://integration-test.localhost"),
                 AllowAutoRedirect = false
             });
         await SignInParticipantAsync(participantClient);
@@ -186,9 +190,60 @@ public sealed class LearningApiTests
             row =>
                 row.GetProperty("trackId").GetGuid() == trackId &&
                 row.GetProperty("progressPercentage").GetInt32() == 39);
+
+        clock.Now = clock.Now.AddSeconds(2);
+        foreach (var (end, coverage, completion, coursePercentage) in new[]
+                 {
+                     (4549, 89, false, 89),
+                     (4550, 90, true, 100)
+                 })
+        {
+            token = await GetAntiforgeryTokenAsync(participantClient);
+            using var boundaryResponse = await SendJsonWithAntiforgeryAsync(
+                participantClient,
+                HttpMethod.Post,
+                $"/api/learning/tracks/{trackId:D}/lessons/{lessonId:D}/ranges",
+                new { sessionId, startMilliseconds = 2000, endMilliseconds = end, positionMilliseconds = end },
+                token);
+            Assert.Equal(HttpStatusCode.OK, boundaryResponse.StatusCode);
+            using var boundary = JsonDocument.Parse(await boundaryResponse.Content.ReadAsStringAsync());
+            Assert.Equal(coverage, boundary.RootElement.GetProperty("watchedPercentage").GetInt32());
+            Assert.Equal(completion, boundary.RootElement.GetProperty("isCompleted").GetBoolean());
+
+            using var detailResponse = await participantClient.GetAsync($"/api/learning/tracks/{trackId:D}");
+            Assert.Equal(HttpStatusCode.OK, detailResponse.StatusCode);
+            using var detail = JsonDocument.Parse(await detailResponse.Content.ReadAsStringAsync());
+            Assert.Equal(coursePercentage, detail.RootElement.GetProperty("track").GetProperty("progressPercentage").GetInt32());
+            Assert.Equal(completion ? 1 : 0, detail.RootElement.GetProperty("track").GetProperty("completedLessonCount").GetInt32());
+            var persistedLesson = Assert.Single(detail.RootElement.GetProperty("lessons").EnumerateArray());
+            Assert.Equal(coverage, persistedLesson.GetProperty("watchedPercentage").GetInt32());
+            Assert.Equal(completion, persistedLesson.GetProperty("isCompleted").GetBoolean());
+
+            using var listResponse = await participantClient.GetAsync("/api/learning/tracks");
+            Assert.Equal(HttpStatusCode.OK, listResponse.StatusCode);
+            using var list = JsonDocument.Parse(await listResponse.Content.ReadAsStringAsync());
+            var listedTrack = Assert.Single(list.RootElement.EnumerateArray(),
+                item => item.GetProperty("id").GetGuid() == trackId);
+            Assert.Equal(coursePercentage, listedTrack.GetProperty("progressPercentage").GetInt32());
+
+            using var reportResponse = await client.GetAsync("/api/admin/learning/participation");
+            Assert.Equal(HttpStatusCode.OK, reportResponse.StatusCode);
+            using var report = JsonDocument.Parse(await reportResponse.Content.ReadAsStringAsync());
+            var reportedTrack = Assert.Single(report.RootElement.EnumerateArray(),
+                item => item.GetProperty("trackId").GetGuid() == trackId);
+            Assert.Equal(coursePercentage, reportedTrack.GetProperty("progressPercentage").GetInt32());
+            Assert.Equal(completion, reportedTrack.GetProperty("isCompleted").GetBoolean());
+        }
     }
 
-    private static async Task InitializeDatabaseAsync(SipatOnlineApiFactory factory)
+    private sealed class TestClock(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    private static async Task InitializeDatabaseAsync(WebApplicationFactory<Program> factory)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         await scope.ServiceProvider

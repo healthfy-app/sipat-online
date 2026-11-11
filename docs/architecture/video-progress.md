@@ -12,7 +12,20 @@ Esta decisão define a arquitetura para conteúdo em vídeo e progresso no SIPAT
 - A administração já permite criar trilhas vinculadas à programação da SIPAT, adicionar vídeos a rascunhos retomáveis, publicá-las e atribuir trilhas publicadas individualmente.
 - Em `Development`, o perfil de participante separado recebe três trilhas com vídeos de referência em domínio público do NIOSH/CDC e uma trilha técnica isolada com o vídeo CC0 de flores da MDN para validar reprodução MP4 e salvamento de progresso. Nenhum desses vídeos representa o catálogo proprietário da SIPAT Online. A verificação continua local/em memória e não deve ser usada como participação oficial. Fora de `Development`, sem provider configurado, playback retorna indisponibilidade explícita.
 
-O escopo implementado é trilhas versionadas, vídeos assistidos em qualquer ordem e progresso por participante/item, com autoria/publicação e atribuição individual. Grupos/subgrupos, comentários, certificados, relatórios, ranking e regras oficiais de carga horária seguem pendentes, embora sejam requisitos de produto confirmados pelo PO.
+O escopo implementado inclui trilhas versionadas, vídeos em qualquer ordem, progresso por participante/item, autoria/publicação, atribuição individual, atividades opcionais e certificados de participação por SIPAT. Grupos/subgrupos, comentários, relatórios completos, ranking e regras oficiais de carga horária seguem pendentes.
+
+### MVP demonstrável
+
+- O participante entra em um catálogo de cursos atribuídos com fotos e progresso ponderado pela duração. O player mostra somente as aulas do curso escolhido.
+- Conclusão e cobertura são medidas diferentes: ao atingir a cobertura mínima de 90%, a aula é concluída, sem alterar a porcentagem realmente assistida. Quando todas as aulas estão concluídas, o curso exibe 100% de conclusão no catálogo, player, resumo e acompanhamento administrativo; não fica preso em 99%. Cursos incompletos não exibem 100%.
+- A fila de gravação aguarda operações pendentes antes da troca de aula ou navegação por links do portal. Falhas mantêm o curso aberto e oferecem nova tentativa.
+- Buscar outro instante preserva a cobertura anterior, mas não credita o intervalo pulado. Pausa e fim salvam também os intervalos finais menores que um segundo. Posição de retomada e velocidade são aplicadas ao elemento de mídia.
+- Em Development, vídeos enviados ao catálogo usam uma URL de mídia protegida por tenant, atribuição ativa e revisão atual, com suporte a HTTP Range. A verificação local continua demonstrativa; não equivale a prova server-to-server.
+- Jogos e checkpoints são copiados para um snapshot na distribuição. Resultados de jogos não modificam cobertura ou conclusão de vídeos.
+- Certificados exigem todos os vídeos de todos os cursos atualmente atribuídos à SIPAT concluídos pela regra dos 90%, SIPAT publicada e logo da empresa cadastrada. A emissão revalida o estado em transação serializável, com tentativas limitadas para conflitos, e mantém um único documento por participante/SIPAT.
+- A logo da contratante é enviada como PNG pela operação e incorporada ao snapshot do certificado. O PDF não busca URLs externas e não troca a logo de um documento já emitido. Logo, fonte e identidade da plataforma são incorporadas ao arquivo.
+- PDFs são acessíveis ao titular, à administração do próprio tenant e ao operador global pelo endpoint específico da empresa. Em Development, o documento é explicitamente demonstrativo e não comprova capacitação regulamentada.
+- Personalização visual completa por empresa e streaming de produção continuam fora do MVP local.
 
 ## Onboarding multiempresa
 

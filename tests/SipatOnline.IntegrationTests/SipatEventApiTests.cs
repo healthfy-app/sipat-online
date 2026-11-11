@@ -159,7 +159,7 @@ public sealed class SipatEventApiTests
     private static HttpClient CreateClient(SipatOnlineApiFactory factory) =>
         factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"),
+            BaseAddress = new Uri("https://integration-test.localhost"),
             AllowAutoRedirect = false
         });
 

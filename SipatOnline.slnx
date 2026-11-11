@@ -1,21 +1,44 @@
 <Solution>
-  <Folder Name="/src/">
-    <Project Path="src/SipatOnline.Learning.Application/SipatOnline.Learning.Application.csproj" />
-    <Project Path="src/SipatOnline.Learning.Domain/SipatOnline.Learning.Domain.csproj" />
-    <Project Path="src/SipatOnline.Infrastructure/SipatOnline.Infrastructure.csproj" />
-    <Project Path="src/SipatOnline.Sipats.Application/SipatOnline.Sipats.Application.csproj" />
-    <Project Path="src/SipatOnline.Sipats.Domain/SipatOnline.Sipats.Domain.csproj" />
-    <Project Path="src/SipatOnline.Tenancy.Application/SipatOnline.Tenancy.Application.csproj" />
-    <Project Path="src/SipatOnline.Tenancy.Domain/SipatOnline.Tenancy.Domain.csproj" />
+  <Folder Name="/src/Api/">
+    <Project Path="src/Api/SipatOnline.Api/SipatOnline.Api.csproj" />
   </Folder>
-  <Folder Name="/tests/" />
-  <Project Path="src/SipatOnline.Api/SipatOnline.Api.csproj" />
-  <Project Path="src/SipatOnline.BuildingBlocks.Application/SipatOnline.BuildingBlocks.Application.csproj" />
-  <Project Path="src/SipatOnline.BuildingBlocks.Domain/SipatOnline.BuildingBlocks.Domain.csproj" />
-  <Project Path="src/SipatOnline.Identity.Application/SipatOnline.Identity.Application.csproj" />
-  <Project Path="src/SipatOnline.Identity.Domain/SipatOnline.Identity.Domain.csproj" />
-  <Project Path="tests/SipatOnline.Application.UnitTests/SipatOnline.Application.UnitTests.csproj" />
-  <Project Path="tests/SipatOnline.ArchitectureTests/SipatOnline.ArchitectureTests.csproj" />
-  <Project Path="tests/SipatOnline.Domain.UnitTests/SipatOnline.Domain.UnitTests.csproj" />
-  <Project Path="tests/SipatOnline.IntegrationTests/SipatOnline.IntegrationTests.csproj" />
+  <Folder Name="/src/BuildingBlocks/Application/">
+    <Project Path="src/BuildingBlocks/Application/SipatOnline.BuildingBlocks.Application/SipatOnline.BuildingBlocks.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/BuildingBlocks/Domain/">
+    <Project Path="src/BuildingBlocks/Domain/SipatOnline.BuildingBlocks.Domain/SipatOnline.BuildingBlocks.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Infrastructure/">
+    <Project Path="src/Infrastructure/SipatOnline.Infrastructure/SipatOnline.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Identity/Application/">
+    <Project Path="src/Modules/Identity/Application/SipatOnline.Identity.Application/SipatOnline.Identity.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Identity/Domain/">
+    <Project Path="src/Modules/Identity/Domain/SipatOnline.Identity.Domain/SipatOnline.Identity.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Learning/Application/">
+    <Project Path="src/Modules/Learning/Application/SipatOnline.Learning.Application/SipatOnline.Learning.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Learning/Domain/">
+    <Project Path="src/Modules/Learning/Domain/SipatOnline.Learning.Domain/SipatOnline.Learning.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Sipats/Application/">
+    <Project Path="src/Modules/Sipats/Application/SipatOnline.Sipats.Application/SipatOnline.Sipats.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Sipats/Domain/">
+    <Project Path="src/Modules/Sipats/Domain/SipatOnline.Sipats.Domain/SipatOnline.Sipats.Domain.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Tenancy/Application/">
+    <Project Path="src/Modules/Tenancy/Application/SipatOnline.Tenancy.Application/SipatOnline.Tenancy.Application.csproj" />
+  </Folder>
+  <Folder Name="/src/Modules/Tenancy/Domain/">
+    <Project Path="src/Modules/Tenancy/Domain/SipatOnline.Tenancy.Domain/SipatOnline.Tenancy.Domain.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SipatOnline.Application.UnitTests/SipatOnline.Application.UnitTests.csproj" />
+    <Project Path="tests/SipatOnline.ArchitectureTests/SipatOnline.ArchitectureTests.csproj" />
+    <Project Path="tests/SipatOnline.Domain.UnitTests/SipatOnline.Domain.UnitTests.csproj" />
+    <Project Path="tests/SipatOnline.IntegrationTests/SipatOnline.IntegrationTests.csproj" />
+  </Folder>
 </Solution>

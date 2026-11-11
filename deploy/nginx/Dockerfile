@@ -1,8 +1,8 @@
 FROM node:24-alpine AS frontend-build
 WORKDIR /app
-COPY src/SipatOnline.Web/package.json src/SipatOnline.Web/package-lock.json ./
+COPY src/Web/SipatOnline.Web/package.json src/Web/SipatOnline.Web/package-lock.json ./
 RUN npm ci
-COPY src/SipatOnline.Web/ ./
+COPY src/Web/SipatOnline.Web/ ./
 RUN npm run build
 
 FROM nginx:1.28-alpine

@@ -19,9 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
-    <ProjectReference Include="..\..\src\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
-    <ProjectReference Include="..\..\src\SipatOnline.Sipats.Application\SipatOnline.Sipats.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Identity\Application\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Tenancy\Application\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Sipats\Application\SipatOnline.Sipats.Application\SipatOnline.Sipats.Application.csproj" />
   </ItemGroup>
 
 </Project>

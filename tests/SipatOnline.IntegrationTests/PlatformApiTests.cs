@@ -7,6 +7,7 @@ using SipatOnline.Infrastructure.Auditing;
 using SipatOnline.Identity.Application.Users;
 using SipatOnline.Infrastructure;
 using SipatOnline.Infrastructure.Identity;
+using SipatOnline.Infrastructure.Learning;
 using SipatOnline.Sipats.Application.Sipats;
 using SipatOnline.Tenancy.Application.Provisioning;
 using Testcontainers.PostgreSql;
@@ -16,7 +17,7 @@ namespace SipatOnline.IntegrationTests;
 public sealed class PlatformApiTests
 {
     [DockerFact]
-    public async Task PlatformOperator_CreatesCompanyAndInitialAdmin_OnPlatformHostOnly()
+    public async Task PlatformOperator_CreatesCompanyAndListsCompanyEmployeesWithScopedCompletionAcrossTracks()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
@@ -29,6 +30,9 @@ public sealed class PlatformApiTests
         using var anonymousCompaniesResponse =
             await client.GetAsync("https://ops.localhost/api/platform/companies");
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousCompaniesResponse.StatusCode);
+        using var anonymousEmployeesResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{Guid.Empty:D}/employees");
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousEmployeesResponse.StatusCode);
 
         var antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
         using var loginResponse = await SendJsonWithAntiforgeryAsync(
@@ -39,6 +43,19 @@ public sealed class PlatformApiTests
             new LoginRequest("platform-operator", "PlatformPassword123"),
             antiforgeryToken);
         Assert.Equal(HttpStatusCode.NoContent, loginResponse.StatusCode);
+
+        using var invalidEmployeePageResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{Guid.Empty:D}/employees?limit=0");
+        Assert.Equal(HttpStatusCode.BadRequest, invalidEmployeePageResponse.StatusCode);
+        using var tooLargeEmployeePageResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{Guid.Empty:D}/employees?limit=101");
+        Assert.Equal(HttpStatusCode.BadRequest, tooLargeEmployeePageResponse.StatusCode);
+        using var negativeEmployeeOffsetResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{Guid.Empty:D}/employees?offset=-1");
+        Assert.Equal(HttpStatusCode.BadRequest, negativeEmployeeOffsetResponse.StatusCode);
+        using var oversizedEmployeeSearchResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{Guid.Empty:D}/employees?search={new string('a', 129)}");
+        Assert.Equal(HttpStatusCode.BadRequest, oversizedEmployeeSearchResponse.StatusCode);
 
         using var usersResponse =
             await client.GetAsync("https://ops.localhost/api/platform/users?offset=0&limit=100");
@@ -85,6 +102,18 @@ public sealed class PlatformApiTests
         Assert.NotNull(company);
         Assert.Equal("acme-health", company.Key);
 
+        using var maximumEmployeePageResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{company.Id:D}/employees?limit=100&search={new string('a', 128)}");
+        Assert.Equal(HttpStatusCode.OK, maximumEmployeePageResponse.StatusCode);
+        var maximumEmployeePage =
+            await maximumEmployeePageResponse.Content.ReadFromJsonAsync<PlatformCompanyEmployeePage>();
+        Assert.NotNull(maximumEmployeePage);
+        Assert.Empty(maximumEmployeePage.Items);
+
+        using var missingCompanyEmployeesResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{Guid.NewGuid():D}/employees");
+        Assert.Equal(HttpStatusCode.NotFound, missingCompanyEmployeesResponse.StatusCode);
+
         antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
         using var participantCreateResponse = await SendJsonWithAntiforgeryAsync(
             client,
@@ -103,13 +132,28 @@ public sealed class PlatformApiTests
         Assert.NotNull(participant);
         Assert.Equal(company.Id, participant.TenantId);
 
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var unassignedParticipantCreateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Post,
+            "/api/platform/users",
+            new CreatePlatformUserRequest(
+                company.Id,
+                "acme-unassigned",
+                "Sem trilhas",
+                "UnassignedParticipantPass123",
+                "Participant"),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, unassignedParticipantCreateResponse.StatusCode);
+
         using var filteredUsersResponse = await client.GetAsync(
             $"https://ops.localhost/api/platform/users?offset=0&limit=1&tenantId={company.Id:D}");
         Assert.Equal(HttpStatusCode.OK, filteredUsersResponse.StatusCode);
         var filteredUsersPage =
             await filteredUsersResponse.Content.ReadFromJsonAsync<PlatformUserDirectoryPage>();
         Assert.NotNull(filteredUsersPage);
-        Assert.Equal(2, filteredUsersPage.TotalCount);
+        Assert.Equal(3, filteredUsersPage.TotalCount);
         Assert.Equal("acme-admin", Assert.Single(filteredUsersPage.Items).LoginIdentifier);
 
         using var filteredUsersBeyondPageResponse = await client.GetAsync(
@@ -118,7 +162,7 @@ public sealed class PlatformApiTests
         var filteredUsersBeyondPage =
             await filteredUsersBeyondPageResponse.Content.ReadFromJsonAsync<PlatformUserDirectoryPage>();
         Assert.NotNull(filteredUsersBeyondPage);
-        Assert.Equal(2, filteredUsersBeyondPage.TotalCount);
+        Assert.Equal(3, filteredUsersBeyondPage.TotalCount);
         Assert.Equal(
             "acme-participant",
             Assert.Single(filteredUsersBeyondPage.Items).LoginIdentifier);
@@ -222,6 +266,39 @@ public sealed class PlatformApiTests
         Assert.Equal(HttpStatusCode.Created, lessonCreateResponse.StatusCode);
 
         antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var secondTrackCreateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/admin/sipats/{sipatId:D}/tracks",
+            new
+            {
+                title = "Trilha complementar",
+                description = "Segunda trilha para validar o progresso consolidado."
+            },
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, secondTrackCreateResponse.StatusCode);
+        using var secondTrackJson = System.Text.Json.JsonDocument.Parse(
+            await secondTrackCreateResponse.Content.ReadAsStringAsync());
+        var secondTrackId = secondTrackJson.RootElement.GetProperty("id").GetGuid();
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var secondTrackLessonResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/admin/learning/tracks/{secondTrackId:D}/lessons",
+            new
+            {
+                title = "Vídeo complementar",
+                description = "Aula da segunda trilha.",
+                providerAssetReference = "development:mdn-flower-demo",
+                durationMilliseconds = 7000
+            },
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, secondTrackLessonResponse.StatusCode);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
         using var trackPublishResponse = await SendJsonWithAntiforgeryAsync(
             client,
             "acme-health.localhost",
@@ -232,6 +309,16 @@ public sealed class PlatformApiTests
         Assert.Equal(HttpStatusCode.OK, trackPublishResponse.StatusCode);
 
         antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var secondTrackPublishResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/admin/learning/tracks/{secondTrackId:D}/publish",
+            new { },
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.OK, secondTrackPublishResponse.StatusCode);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
         using var assignmentResponse = await SendJsonWithAntiforgeryAsync(
             client,
             "acme-health.localhost",
@@ -240,6 +327,49 @@ public sealed class PlatformApiTests
             new AssignLearningTrackRequest(participant.Id),
             antiforgeryToken);
         Assert.Equal(HttpStatusCode.Created, assignmentResponse.StatusCode);
+
+        antiforgeryToken = await GetAntiforgeryTokenAsync(client, "acme-health.localhost");
+        using var secondTrackAssignmentResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "acme-health.localhost",
+            HttpMethod.Post,
+            $"/api/admin/learning/tracks/{secondTrackId:D}/assignments",
+            new AssignLearningTrackRequest(participant.Id),
+            antiforgeryToken);
+        Assert.Equal(HttpStatusCode.Created, secondTrackAssignmentResponse.StatusCode);
+
+        using var employeesResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{company.Id:D}/employees?offset=0&limit=1");
+        Assert.Equal(HttpStatusCode.OK, employeesResponse.StatusCode);
+        var employeesPage = await employeesResponse.Content.ReadFromJsonAsync<PlatformCompanyEmployeePage>();
+        Assert.NotNull(employeesPage);
+        Assert.Equal("Acme Health", employeesPage.CompanyName);
+        Assert.Equal(2, employeesPage.TotalCount);
+        var listedEmployee = Assert.Single(employeesPage.Items);
+        Assert.Equal("acme-participant", listedEmployee.LoginIdentifier);
+        Assert.Equal(0, listedEmployee.ProgressPercentage);
+        Assert.Equal(0, listedEmployee.CompletedLessonCount);
+        Assert.Equal(2, listedEmployee.LessonCount);
+
+        using var secondEmployeePageResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{company.Id:D}/employees?offset=1&limit=1");
+        Assert.Equal(HttpStatusCode.OK, secondEmployeePageResponse.StatusCode);
+        var secondEmployeePage =
+            await secondEmployeePageResponse.Content.ReadFromJsonAsync<PlatformCompanyEmployeePage>();
+        Assert.NotNull(secondEmployeePage);
+        var unassignedEmployee = Assert.Single(secondEmployeePage.Items);
+        Assert.Equal("acme-unassigned", unassignedEmployee.LoginIdentifier);
+        Assert.Equal(0, unassignedEmployee.ProgressPercentage);
+        Assert.Equal(0, unassignedEmployee.LessonCount);
+        using var employeeNameSearchResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{company.Id:D}/employees?search=Sem%20trilhas");
+        Assert.Equal(HttpStatusCode.OK, employeeNameSearchResponse.StatusCode);
+        var employeeNameSearchPage =
+            await employeeNameSearchResponse.Content.ReadFromJsonAsync<PlatformCompanyEmployeePage>();
+        Assert.NotNull(employeeNameSearchPage);
+        Assert.Equal(
+            "acme-unassigned",
+            Assert.Single(employeeNameSearchPage.Items).LoginIdentifier);
 
         using var participantClient = CreateClient(factory);
         antiforgeryToken = await GetAntiforgeryTokenAsync(participantClient, "acme-health.localhost");
@@ -257,7 +387,11 @@ public sealed class PlatformApiTests
         Assert.Equal(HttpStatusCode.OK, assignedTracksResponse.StatusCode);
         using var assignedTracksJson = System.Text.Json.JsonDocument.Parse(
             await assignedTracksResponse.Content.ReadAsStringAsync());
-        var assignedTrack = Assert.Single(assignedTracksJson.RootElement.EnumerateArray());
+        var assignedTracks = assignedTracksJson.RootElement.EnumerateArray().ToArray();
+        Assert.Equal(2, assignedTracks.Length);
+        var assignedTrack = Assert.Single(
+            assignedTracks,
+            item => item.GetProperty("title").GetString() == "Trilha de demonstração");
         Assert.Equal("Trilha de demonstração", assignedTrack.GetProperty("title").GetString());
         Assert.Equal(0, assignedTrack.GetProperty("progressPercentage").GetInt32());
 
@@ -266,7 +400,9 @@ public sealed class PlatformApiTests
         Assert.Equal(HttpStatusCode.OK, experienceResponse.StatusCode);
         using var experienceJson = System.Text.Json.JsonDocument.Parse(
             await experienceResponse.Content.ReadAsStringAsync());
-        var lesson = Assert.Single(experienceJson.RootElement.GetProperty("lessons").EnumerateArray());
+        var experienceLessons = experienceJson.RootElement.GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Single(experienceLessons);
+        var lesson = experienceLessons[0];
 
         antiforgeryToken = await GetAntiforgeryTokenAsync(participantClient, "acme-health.localhost");
         using var playbackResponse = await SendJsonWithAntiforgeryAsync(
@@ -286,6 +422,52 @@ public sealed class PlatformApiTests
 
         await using var scope = factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var trackEntity = await dbContext.LearningTracks.SingleAsync(track => track.Id == trackId);
+        var progress = new LearningProgressEntity
+        {
+            Id = Guid.NewGuid(),
+            TenantId = company.Id,
+            ParticipantId = participant.Id,
+            TrackId = trackId,
+            RevisionId = trackEntity.CurrentRevisionId!.Value,
+            LessonId = lesson.GetProperty("id").GetGuid(),
+            DurationMilliseconds = 5055,
+            CompletionThresholdPercent = 80,
+            LastPlaybackPositionMilliseconds = 5055,
+            WatchedRangesJson = "[]",
+            FirstStartedAt = now,
+            LastAccessedAt = now,
+            CompletedAt = now
+        };
+        dbContext.LearningProgress.Add(progress);
+        var participantEntity = await dbContext.Users.SingleAsync(user => user.Id == participant.Id);
+        participantEntity.IsActive = false;
+        await dbContext.SaveChangesAsync();
+
+        using var employeesDefaultFilterResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{company.Id:D}/employees");
+        Assert.Equal(HttpStatusCode.OK, employeesDefaultFilterResponse.StatusCode);
+        var activeEmployeesPage =
+            await employeesDefaultFilterResponse.Content.ReadFromJsonAsync<PlatformCompanyEmployeePage>();
+        Assert.NotNull(activeEmployeesPage);
+        var remainingActiveEmployee = Assert.Single(activeEmployeesPage.Items);
+        Assert.Equal("acme-unassigned", remainingActiveEmployee.LoginIdentifier);
+        Assert.Equal(0, remainingActiveEmployee.ProgressPercentage);
+        Assert.Equal(0, remainingActiveEmployee.LessonCount);
+        Assert.Equal(1, activeEmployeesPage.TotalCount);
+
+        using var employeesWithInactiveResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{company.Id:D}/employees?search=ACME-PARTICIPANT&includeInactive=true&offset=0&limit=1");
+        Assert.Equal(HttpStatusCode.OK, employeesWithInactiveResponse.StatusCode);
+        var employeesWithInactivePage =
+            await employeesWithInactiveResponse.Content.ReadFromJsonAsync<PlatformCompanyEmployeePage>();
+        Assert.NotNull(employeesWithInactivePage);
+        var inactiveEmployee = Assert.Single(employeesWithInactivePage.Items);
+        Assert.False(inactiveEmployee.IsActive);
+        Assert.Equal(50, inactiveEmployee.ProgressPercentage);
+        Assert.Equal(1, inactiveEmployee.CompletedLessonCount);
+        Assert.Equal(2, inactiveEmployee.LessonCount);
+
         var tenantAdmin = await dbContext.Users.SingleAsync(
             user => user.TenantId == company.Id && user.EmployeeIdentifier == "acme-admin");
         Assert.Equal("acme-admin", tenantAdmin.EmployeeIdentifier);
@@ -297,7 +479,7 @@ public sealed class PlatformApiTests
     }
 
     [DockerFact]
-    public async Task TenantSuperAdmin_CannotUsePlatformCompanyProvisioning()
+    public async Task TenantSuperAdmin_CannotAccessPlatformCompanyOrEmployeeDirectory()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
@@ -305,10 +487,10 @@ public sealed class PlatformApiTests
         await InitializeDatabaseAsync(factory);
         using var client = CreateClient(factory);
 
-        var antiforgeryToken = await GetAntiforgeryTokenAsync(client, "localhost");
+        var antiforgeryToken = await GetAntiforgeryTokenAsync(client, "integration-test.localhost");
         using var loginResponse = await SendJsonWithAntiforgeryAsync(
             client,
-            "localhost",
+            "integration-test.localhost",
             HttpMethod.Post,
             "/api/identity/login",
             new LoginRequest("admin-root", "AdminPassword123"),
@@ -336,6 +518,14 @@ public sealed class PlatformApiTests
 
         Assert.Equal(HttpStatusCode.Forbidden, directoryResponse.StatusCode);
 
+        using var employeeRequest = new HttpRequestMessage(
+            HttpMethod.Get,
+            $"https://ops.localhost/api/platform/companies/{Guid.NewGuid():D}/employees");
+        employeeRequest.Headers.Add("Cookie", authCookie);
+        using var employeeResponse = await client.SendAsync(employeeRequest);
+
+        Assert.Equal(HttpStatusCode.Forbidden, employeeResponse.StatusCode);
+
         using var provisionRequest = new HttpRequestMessage(
             HttpMethod.Post,
             "https://ops.localhost/api/platform/users")
@@ -356,7 +546,7 @@ public sealed class PlatformApiTests
     private static HttpClient CreateClient(SipatOnlineApiFactory factory) =>
         factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"),
+            BaseAddress = new Uri("https://integration-test.localhost"),
             AllowAutoRedirect = false
         });
 

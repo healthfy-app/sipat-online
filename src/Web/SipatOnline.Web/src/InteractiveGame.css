@@ -1,0 +1,26 @@
+.interactive-game { display: grid; gap: 1rem; }
+.memory-game-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.memory-game-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .35rem; min-width: 0; min-height: 7rem; border: 1px solid var(--line); border-radius: .6rem; padding: .85rem; background: var(--ink); color: var(--surface); line-height: 1.4; overflow-wrap: break-word; hyphens: auto; cursor: pointer; }
+.memory-game-card.is-revealed { background: var(--surface); color: var(--ink); opacity: 1; }
+.memory-game-card.is-matched { border-color: var(--green); background: var(--green-soft); color: var(--ink); }
+.memory-game-card:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+.memory-game-match { color: var(--green); font-weight: 700; }
+.memory-game-progress { margin: 0; color: var(--muted); font-size: .875rem; }
+.course-dialog .interactive-game { border: 0; padding: 0; margin-top: .5rem; }
+.course-dialog .interactive-game > h3 { display: none; }
+.puzzle-game-grid { display: grid; aspect-ratio: 1; max-width: 28rem; width: 100%; gap: .2rem; }
+.puzzle-game-grid button { min-width: 0; border: 2px solid transparent; display: flex; align-items: flex-start; padding: .3rem; }
+.puzzle-game-grid button[aria-pressed="true"] { border-color: #111; outline: 3px solid #fff; outline-offset: -5px; }
+.puzzle-game-grid button span { background: #102d26; color: #fff; padding: .1rem .4rem; border-radius: .2rem; }
+.ordering-game-list { display: grid; gap: .5rem; padding-left: 1.5rem; }
+.ordering-game-list li { padding: .65rem; border: 1px solid var(--line); border-radius: .5rem; }
+.ordering-game-list li > div { display: inline-flex; gap: .4rem; margin-left: .5rem; }
+.ordering-game-list button { min-width: 44px; min-height: 44px; }
+.risk-game-image { position: relative; width: 100%; }
+.risk-game-image > img { display: block; width: 100%; }
+.risk-game-region { position: absolute; min-width: 24px; min-height: 24px; border: 2px solid transparent; background: transparent; padding: 0; }
+.risk-game-region:focus-visible { outline: 3px solid #fff; box-shadow: 0 0 0 5px #102d26; }
+.risk-game-region.is-found { border: 3px solid #fff; background: #102d26cc; color: #fff; font-weight: 700; }
+@media (min-width: 700px) {
+  .memory-game-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}

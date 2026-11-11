@@ -27,7 +27,7 @@ public sealed class PlatformCourseCatalogApiTests
 
         using var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {
-            BaseAddress = new Uri("https://localhost"),
+            BaseAddress = new Uri("https://integration-test.localhost"),
             AllowAutoRedirect = false
         });
         using var login = await SendAsync(
@@ -161,6 +161,18 @@ public sealed class PlatformCourseCatalogApiTests
         Assert.Equal(2, copy.GetProperty("videos").GetArrayLength());
         Assert.Equal(1, copy.GetProperty("modules").GetArrayLength());
         Assert.NotNull(copy.GetProperty("coverUrl").GetString());
+        var copyId = copy.GetProperty("id").GetGuid();
+        using var copiedCover = await client.GetAsync($"https://{Host}/api/platform/catalog/courses/{copyId}/cover");
+        Assert.Equal(png, await copiedCover.Content.ReadAsByteArrayAsync());
+
+        using var deleteCover = await SendAsync(client, HttpMethod.Delete,
+            $"/api/platform/catalog/courses/{courseId}/cover", (object?)null);
+        Assert.Equal(HttpStatusCode.OK, deleteCover.StatusCode);
+        Assert.Equal(JsonValueKind.Null, (await ReadAsync(deleteCover)).GetProperty("coverUrl").ValueKind);
+        using var missingCover = await client.GetAsync($"https://{Host}/api/platform/catalog/courses/{courseId}/cover");
+        Assert.Equal(HttpStatusCode.NotFound, missingCover.StatusCode);
+        using var remainingCopy = await client.GetAsync($"https://{Host}/api/platform/catalog/courses/{copyId}/cover");
+        Assert.Equal(png, await remainingCopy.Content.ReadAsByteArrayAsync());
 
         using var libraryResponse = await client.GetAsync("https://ops.localhost/api/platform/catalog/videos");
         Assert.Equal(HttpStatusCode.OK, libraryResponse.StatusCode);

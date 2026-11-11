@@ -1,12 +1,14 @@
 .git
 .vs
+**/.impeccable
+local-data
 .env
 .env.*
 .docker-local-credentials.txt
 deploy
 docs
 tests
-src/SipatOnline.Web
+src/Web/SipatOnline.Web
 **/bin
 **/obj
 **/TestResults

@@ -21,8 +21,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\SipatOnline.Api\SipatOnline.Api.csproj" />
-    <ProjectReference Include="..\..\src\SipatOnline.Sipats.Application\SipatOnline.Sipats.Application.csproj" />
+    <ProjectReference Include="..\..\src\Api\SipatOnline.Api\SipatOnline.Api.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Sipats\Application\SipatOnline.Sipats.Application\SipatOnline.Sipats.Application.csproj" />
   </ItemGroup>
 
 </Project>

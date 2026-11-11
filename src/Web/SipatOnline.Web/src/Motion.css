@@ -1,0 +1,84 @@
+:root {
+  --motion-feedback: 140ms;
+  --motion-state: 240ms;
+  --motion-arrive: cubic-bezier(0.16, 1, 0.3, 1);
+}
+.loading-state { display: flex; align-items: center; justify-content: center; gap: 1rem; min-height: 7rem; padding: 1.5rem; color: var(--muted, #52635b); text-align: left; }
+.app-loading .loading-state { flex-direction: column; min-height: 12rem; text-align: center; }
+.loading-state-mark { position: relative; display: grid; place-items: center; flex: 0 0 3rem; width: 3rem; height: 3rem; color: var(--green, #176b52); }
+.loading-brand-gear { display: block; width: 3rem; height: 3rem; transform-origin: center; }
+.loading-state-compact { justify-content: flex-start; min-height: 0; padding: 0.75rem 0; }
+.loading-state-compact .loading-state-mark { flex-basis: 2rem; width: 2rem; height: 2rem; }
+.loading-state-compact .loading-brand-gear { width: 2rem; height: 2rem; }
+.button[aria-busy="true"]::before { content: ''; width: 0.9rem; height: 0.9rem; flex-shrink: 0; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; }
+.achievement-mark { display: block; flex-shrink: 0; width: 3rem; height: 3rem; color: var(--green); overflow: visible; }
+.achievement-ring { stroke: currentColor; stroke-width: 1.5; stroke-dasharray: 1; }
+.achievement-check { stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 1; }
+.certificate-availability { display: grid; gap: 0.75rem; align-content: start; }
+.certificate-availability > p { margin: 0; }
+.certificate-availability > .achievement-mark { margin-block: 0.5rem; width: 4rem; height: 4rem; }
+.certificate-availability > [role="status"] { color: var(--green); font-weight: 650; }
+.game-feedback { display: flex; align-items: center; gap: 0.75rem; min-height: 2.5rem; margin-block: 0.75rem; line-height: 1.5; }
+.game-feedback.is-complete { padding: 1rem; border: 1px solid var(--green-line); border-radius: 0.65rem; background: var(--green-soft); color: var(--green); }
+.game-step-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 0.75rem; color: var(--muted); font-size: 0.85rem; }
+.game-question-progress { width: 100%; height: 0.4rem; accent-color: var(--green); }
+.game-option { display: flex; align-items: center; gap: 0.75rem; min-height: 3.25rem; color: var(--ink); }
+.game-option-letter { display: grid; place-items: center; flex: 0 0 1.75rem; height: 1.75rem; border: 1px solid var(--line); border-radius: 0.35rem; font-size: 0.8rem; font-weight: 650; }
+.game-option.is-correct .game-option-letter { border-color: var(--green); background: var(--green); color: white; }
+.game-option.is-wrong .game-option-letter { border-color: var(--danger); color: var(--danger); }
+.game-board { min-width: 0; }
+.game-board progress { display: block; width: 100%; height: 0.4rem; margin-bottom: 1rem; accent-color: var(--green); }
+.memory-card-face { display: flex; flex-direction: column; align-items: center; gap: 0.35rem; }
+.memory-card-back { display: grid; place-items: center; width: 2.5rem; height: 2.5rem; border: 1px solid currentColor; border-radius: 50%; font-size: 1.4rem; }
+.memory-game-card:disabled { opacity: 1; cursor: default; }
+.game-option:focus-visible, .puzzle-game-grid button:focus-visible, .ordering-game-list button:focus-visible {
+  outline: 2px solid var(--green); outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loading-brand-gear { animation: loading-orbit 2400ms linear infinite; }
+  .button[aria-busy="true"]::before { animation: loading-orbit 900ms linear infinite; }
+  .loading-state[data-motion-paused="true"] .loading-brand-gear { animation-play-state: paused; }
+  .page-content:not(.learning-page), .learning-page, .game-question { animation: surface-arrive 180ms var(--motion-arrive); }
+  .course-dialog-backdrop { animation: surface-arrive 150ms ease-out; }
+  .course-dialog { animation: dialog-arrive 260ms var(--motion-arrive); transform-origin: 50% 70%; }
+  .success-message { animation: feedback-arrive 220ms var(--motion-arrive); }
+  .button, .sidebar-link, .course-dialog-close, .game-option,
+  .memory-game-card, .puzzle-game-grid button, .ordering-game-list button {
+    transition: background-color var(--motion-feedback) ease, border-color var(--motion-feedback) ease,
+      color var(--motion-feedback) ease, box-shadow var(--motion-feedback) ease, transform var(--motion-feedback) var(--motion-arrive);
+  }
+  .game-option.is-correct { animation: answer-confirm 300ms var(--motion-arrive); }
+  .memory-game-card.is-revealed:not(.is-matched) .memory-card-face { animation: card-turn 300ms var(--motion-arrive); }
+  .memory-game-match, .risk-game-region.is-found { animation: match-confirm 380ms var(--motion-arrive); }
+  .game-feedback.is-complete { animation: feedback-arrive 250ms var(--motion-arrive); }
+  .achievement-mark.is-celebrating { animation: achievement-stamp 620ms var(--motion-arrive); }
+  .is-celebrating .achievement-ring { animation: achievement-draw 500ms var(--motion-arrive); }
+  .is-celebrating .achievement-check { animation: achievement-draw 550ms 120ms var(--motion-arrive) backwards; }
+  .appearance-preview-button, .appearance-preview-header { transition: background-color 180ms ease, color 180ms ease; }
+  .tenant-dashboard-donut circle[data-progress-status] { animation: distribution-draw 600ms var(--motion-arrive); }
+  progress::-webkit-progress-value { animation: progress-arrive 450ms var(--motion-arrive); transform-origin: left center; }
+  progress::-moz-progress-bar { animation: progress-arrive 450ms var(--motion-arrive); transform-origin: left center; }
+}
+@media (prefers-reduced-motion: no-preference) and (hover: hover) and (pointer: fine) {
+  .game-option:hover:not(:disabled), .memory-game-card:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 4px 10px rgb(10 24 19 / 10%); }
+  .button:hover:not(:disabled) { transform: translateY(-1px); }
+  .button:active:not(:disabled), .memory-game-card:active:not(:disabled) { transform: translateY(1px); }
+}
+@keyframes loading-orbit { to { transform: rotate(360deg); } }
+@keyframes surface-arrive { from { opacity: 0.65; } }
+@keyframes dialog-arrive { from { opacity: 0.7; transform: translateY(14px) scale(0.985); } }
+@keyframes feedback-arrive { from { opacity: 0.7; transform: translateY(4px); } }
+@keyframes answer-confirm { 40% { transform: scale(1.015); } }
+@keyframes card-turn { from { opacity: 0.6; transform: perspective(500px) rotateY(-65deg); } }
+@keyframes match-confirm { from { opacity: 0.7; transform: scale(0.8); } }
+@keyframes achievement-stamp { from { transform: scale(0.8) rotate(-12deg); } 55% { transform: scale(1.06) rotate(2deg); } }
+@keyframes achievement-draw { from { stroke-dashoffset: 1; } to { stroke-dashoffset: 0; } }
+@keyframes distribution-draw { from { stroke-dasharray: 0 264; } }
+@keyframes progress-arrive { from { transform: scaleX(0); } }
+@media (prefers-reduced-motion: reduce) {
+  .loading-brand-gear, .achievement-mark,
+  .achievement-mark *, .course-dialog, .course-dialog-backdrop, .page-content, .game-question {
+    animation: none !important;
+  }
+}
