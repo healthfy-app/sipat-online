@@ -20,7 +20,8 @@ public sealed record LearningLessonProgress(
     long LastPlaybackPositionMilliseconds,
     int WatchedPercentage,
     bool IsCompleted,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    string? SectionTitle = null);
 
 public sealed record LearningExperience(
     LearningTrackCard Track,

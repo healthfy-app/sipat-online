@@ -50,6 +50,9 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var track = LearningTrack.Create(tenant, sipatId, course.Title, course.Description, now);
         if (!track.IsSuccess) return Result<Guid>.Failure(track.Error);
         var revision = LearningTrackRevision.CreateDraft(track.Value.Id, tenant, 1, now).Value;
+        var sectionByVideo = (course.Lessons ?? [])
+            .SelectMany(group => group.VideoIds.Select(id => (id, group.Title)))
+            .ToDictionary(item => item.id, item => item.Title);
         foreach (var video in course.Videos)
         {
             var lesson = revision.AddLesson(video.Title, null, $"catalog:{video.Id:D}", video.DurationMilliseconds);
@@ -72,7 +75,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             Description = item.Description,
             Position = item.Position,
             ProviderAssetReference = item.ProviderAssetReference,
-            DurationMilliseconds = item.DurationMilliseconds
+            DurationMilliseconds = item.DurationMilliseconds,
+            SectionTitle = sectionByVideo.GetValueOrDefault(Guid.Parse(item.ProviderAssetReference.Replace("catalog:", "")))
         }));
         var cover = await catalog.GetCoverAsync(course.Id, token);
         db.LearningContentSnapshots.Add(new LearningContentSnapshotEntity

@@ -37,6 +37,9 @@ public sealed class LearningTrackRevisionEntity
 
 public sealed class LearningLessonEntity
 {
+    /// <summary>Nome da aula do curso a que este vídeo pertence (agrupa a lista do participante).</summary>
+    public string? SectionTitle { get; set; }
+
     public Guid Id { get; set; }
 
     public Guid TenantId { get; set; }

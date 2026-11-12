@@ -516,6 +516,7 @@ export default function LearningTrackPage({
   const previousLesson = currentIndex > 0 ? experience.lessons[currentIndex - 1] : null;
   const nextLesson = currentIndex >= 0 ? experience.lessons[currentIndex + 1] ?? null : null;
   const completedLessons = experience.lessons.filter(lesson => lesson.isCompleted).length;
+  const hasSections = new Set(experience.lessons.map((lesson) => lesson.sectionTitle).filter(Boolean)).size > 1;
   const isTrackComplete = completedLessons === experience.lessons.length && experience.lessons.length > 0;
   const lessonTabs = [
     { id: 'about', label: 'Sobre a aula' },
@@ -685,10 +686,13 @@ export default function LearningTrackPage({
               <span className="learning-curriculum-count">{completedLessons}/{experience.lessons.length}</span>
             </div>
             <ol className="learning-lesson-list">
-              {experience.lessons.map((lesson) => {
+              {experience.lessons.map((lesson, lessonIndex) => {
                 const isCurrent = lesson.id === selectedLesson?.id;
+                const showSection = hasSections && lesson.sectionTitle
+                  && lesson.sectionTitle !== experience.lessons[lessonIndex - 1]?.sectionTitle;
                 return (
                   <li key={lesson.id}>
+                    {showSection && <p className="learning-section-heading">{lesson.sectionTitle}</p>}
                     <button
                       aria-current={isCurrent ? 'step' : undefined}
                       className={`learning-lesson-item${isCurrent ? ' is-current' : ''}${lesson.isCompleted ? ' is-complete' : ''}`}

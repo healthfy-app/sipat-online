@@ -388,6 +388,7 @@ export interface LearningLessonProgress {
   watchedPercentage: number;
   isCompleted: boolean;
   completedAt: string | null;
+  sectionTitle?: string | null;
 }
 
 export interface LearningExperience {

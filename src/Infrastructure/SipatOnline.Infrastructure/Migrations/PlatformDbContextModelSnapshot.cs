@@ -367,6 +367,10 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 
+                    b.Property<string>("SectionTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
                     b.Property<string>("ProviderAssetReference")
                         .IsRequired()
                         .HasMaxLength(256)

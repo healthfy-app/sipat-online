@@ -80,7 +80,7 @@ function progress(position: number, percentage = 40) {
     watchedPercentage: percentage, isCompleted: percentage >= 90, completedAt: null };
 }
 
-async function playableCourse(lessons = [lesson]) {
+async function playableCourse(lessons: Array<typeof lesson & { sectionTitle?: string }> = [lesson]) {
   listAssignedTracks.mockResolvedValue([trackCard]);
   getAssignedTrack.mockResolvedValue({ track: { ...trackCard, lessonCount: lessons.length }, lessons });
   startPlayback.mockReset().mockImplementation((_track: string, id: string) => Promise.resolve({
@@ -155,6 +155,22 @@ describe('learning experience', () => {
     expect(screen.getAllByRole('article')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Continuar curso Ergonomia' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Segurança no trabalho' })).not.toBeInTheDocument();
+  });
+
+  it('groups the lesson list by course section only when there is more than one', async () => {
+    const second = { ...lesson, id: 'lesson-2', position: 2, title: 'Postura' };
+    await playableCourse([
+      { ...lesson, sectionTitle: 'Introdução' },
+      { ...second, sectionTitle: 'Prática' },
+    ]);
+    expect(await screen.findByText('Introdução')).toBeVisible();
+    expect(screen.getByText('Prática')).toBeVisible();
+  });
+
+  it('hides the section heading for a course with a single section', async () => {
+    await playableCourse([{ ...lesson, sectionTitle: 'Aula 1' }]);
+    await screen.findByText('Conteúdo do curso');
+    expect(screen.queryByText('Aula 1')).not.toBeInTheDocument();
   });
 
   it('does not repeat lesson completion status in the lesson details', async () => {

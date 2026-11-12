@@ -389,7 +389,8 @@ public sealed class EfLearningStore(
                 domainProgress?.LastPlaybackPositionMilliseconds ?? 0,
                 domainProgress?.WatchedPercentage ?? 0,
                 domainProgress?.IsCompleted ?? false,
-                domainProgress?.CompletedAt);
+                domainProgress?.CompletedAt,
+                entity.SectionTitle);
         }).ToArray();
 
         var totalDuration = lessonEntities.Sum(lesson => lesson.DurationMilliseconds);

@@ -64,6 +64,7 @@ public sealed class LearningLessonEntityConfiguration : IEntityTypeConfiguration
         builder.Property(lesson => lesson.Id).ValueGeneratedNever();
         builder.Property(lesson => lesson.Title).HasMaxLength(200).IsRequired();
         builder.Property(lesson => lesson.Description).HasMaxLength(2000);
+        builder.Property(lesson => lesson.SectionTitle).HasMaxLength(200);
         builder.Property(lesson => lesson.ProviderAssetReference).HasMaxLength(256).IsRequired();
         builder.HasOne<LearningTrackRevisionEntity>()
             .WithMany()
