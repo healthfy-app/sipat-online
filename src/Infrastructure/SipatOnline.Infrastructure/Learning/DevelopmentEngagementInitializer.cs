@@ -63,27 +63,41 @@ public sealed class DevelopmentEngagementInitializer(PlatformDbContext db, IConf
                     var source = await db.PlatformCourses.SingleAsync(item => item.Id == course.Id, token);
                     source.GamificationEnabled = true;
                     for (var index = 0; index < moduleIds.Count; index++)
-                        db.PlatformCourseModuleLinks.Add(new PlatformCourseModuleLinkEntity {
-                            Id = Guid.NewGuid(), CourseId = course.Id, ModuleId = moduleIds[index], Order = index, AfterVideoCount = 1
+                        db.PlatformCourseModuleLinks.Add(new PlatformCourseModuleLinkEntity
+                        {
+                            Id = Guid.NewGuid(),
+                            CourseId = course.Id,
+                            ModuleId = moduleIds[index],
+                            Order = index,
+                            AfterVideoCount = 1
                         });
                     if (!await db.PlatformVideoCheckpoints.AnyAsync(item => item.VideoId == course.Videos[0].Id, token))
-                        db.PlatformVideoCheckpoints.Add(new PlatformVideoCheckpointEntity {
+                        db.PlatformVideoCheckpoints.Add(new PlatformVideoCheckpointEntity
+                        {
                             Id = DevelopmentDemoPresentationInitializer.StableId("demo-video-checkpoint"),
-                            VideoId = course.Videos[0].Id, ModuleId = moduleIds[0], TimeMilliseconds = 2000
+                            VideoId = course.Videos[0].Id,
+                            ModuleId = moduleIds[0],
+                            TimeMilliseconds = 2000
                         });
                     await db.SaveChangesAsync(token);
                     course = (await catalog.FindCourseAsync(course.Id, token))!;
                 }
                 var snapshot = await distribution.CreateSnapshotAsync(course, token);
                 if (!snapshot.IsSuccess) throw new InvalidOperationException($"Invalid demo activities: {snapshot.Error.Code}");
-                var content = snapshot.Value with {
+                var content = snapshot.Value with
+                {
                     Videos = lessons.Select(_ => new SnapshotVideo(course.Videos[0].Id, course.Videos[0].Checkpoints)).ToArray()
                 };
                 var cover = await catalog.GetCoverAsync(course.Id, token);
                 track.SourceCourseId = course.Id;
-                db.LearningContentSnapshots.Add(new LearningContentSnapshotEntity {
-                    RevisionId = revisionId, TenantId = tenantId, SourceCourseId = course.Id,
-                    ContentJson = JsonSerializer.Serialize(content, json), CoverData = cover?.Data, CoverContentType = cover?.ContentType
+                db.LearningContentSnapshots.Add(new LearningContentSnapshotEntity
+                {
+                    RevisionId = revisionId,
+                    TenantId = tenantId,
+                    SourceCourseId = course.Id,
+                    ContentJson = JsonSerializer.Serialize(content, json),
+                    CoverData = cover?.Data,
+                    CoverContentType = cover?.ContentType
                 });
                 first = false;
             }

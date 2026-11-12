@@ -19,12 +19,26 @@ public static class LearningEngagementEndpoints
         learning.MapGet("/tracks/{trackId:guid}/activities", async (Guid trackId, LearningEngagementService service, CancellationToken token) =>
         {
             var result = await service.GetActivitiesAsync(trackId, token);
-            return result.IsSuccess ? Results.Ok(new {
+            return result.IsSuccess ? Results.Ok(new
+            {
                 result.Value.RevisionId,
-                Items = result.Value.Items.Select(item => new {
-                    item.Id, item.AfterVideoCount, item.LessonId, item.TimeMilliseconds, item.Outcome,
-                    Module = new { item.Module.Id, item.Module.Title, GameType = item.Module.GameType.ToString(),
-                        item.Module.Questions, item.Module.Content, item.Module.CreatedAt, UsageCount = 0 }
+                Items = result.Value.Items.Select(item => new
+                {
+                    item.Id,
+                    item.AfterVideoCount,
+                    item.LessonId,
+                    item.TimeMilliseconds,
+                    item.Outcome,
+                    Module = new
+                    {
+                        item.Module.Id,
+                        item.Module.Title,
+                        GameType = item.Module.GameType.ToString(),
+                        item.Module.Questions,
+                        item.Module.Content,
+                        item.Module.CreatedAt,
+                        UsageCount = 0
+                    }
                 })
             }) : Problem(result.Error);
         });
@@ -40,9 +54,14 @@ public static class LearningEngagementEndpoints
         learning.MapGet("/certificates", async (LearningEngagementService service, CancellationToken token) =>
         {
             var result = await service.ListCertificatesAsync(token);
-            return result.IsSuccess ? Results.Ok(result.Value.Select(item => new {
-                item.SipatEventId, item.EventTitle, item.TotalCourses, item.CompletedCourses,
-                item.IsEligible, item.HasCompanyLogo,
+            return result.IsSuccess ? Results.Ok(result.Value.Select(item => new
+            {
+                item.SipatEventId,
+                item.EventTitle,
+                item.TotalCourses,
+                item.CompletedCourses,
+                item.IsEligible,
+                item.HasCompanyLogo,
                 Certificate = item.Certificate is null ? null : CertificateResponse(item.Certificate)
             })) : Problem(result.Error);
         });
@@ -181,7 +200,8 @@ public static class LearningEngagementEndpoints
             .Where(item => item.TenantId == tenantId && item.ParticipantId == participantId).ToArrayAsync(token);
         var certificates = await db.ParticipationCertificates.AsNoTracking()
             .Where(item => item.TenantId == tenantId && item.ParticipantId == participantId).ToArrayAsync(token);
-        return Results.Ok(new {
+        return Results.Ok(new
+        {
             CompletedActivities = outcomes.Count(item => item.Outcome == "completed"),
             SkippedActivities = outcomes.Count(item => item.Outcome == "skipped"),
             Certificates = certificates.Select(item => JsonSerializer.Deserialize<ParticipationCertificate>(item.SnapshotJson,
@@ -205,11 +225,18 @@ public static class LearningEngagementEndpoints
         }
     }
 
-    private static object CertificateResponse(ParticipationCertificate certificate) => new {
-            certificate.Id, certificate.ParticipantName, certificate.CompanyName, certificate.EventTitle,
-            certificate.StartsAt, certificate.EndsAt, certificate.DurationMilliseconds,
-            certificate.IssuedAt, certificate.IsDemonstration
-        };
+    private static object CertificateResponse(ParticipationCertificate certificate) => new
+    {
+        certificate.Id,
+        certificate.ParticipantName,
+        certificate.CompanyName,
+        certificate.EventTitle,
+        certificate.StartsAt,
+        certificate.EndsAt,
+        certificate.DurationMilliseconds,
+        certificate.IssuedAt,
+        certificate.IsDemonstration
+    };
 
 }
 

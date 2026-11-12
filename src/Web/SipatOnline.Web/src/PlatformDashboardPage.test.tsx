@@ -12,7 +12,7 @@ vi.mock('./api', async (importOriginal) => ({
 afterEach(cleanup);
 
 describe('platform dashboard', () => {
-  it('shows compact participant cards with actionable administrator status', async () => {
+  it('shows platform indicators and keeps company management in its own directory', async () => {
     vi.mocked(api.getPlatformDashboard).mockResolvedValue([
       { id: 't1', key: 'adobe-demo', name: 'Adobe', createdAt: '2026-10-21T12:00:00Z', isActive: true, employeeCount: 2, administratorCount: 0, totalUserCount: 2 },
       { id: 't2', key: 'microsoft-demo', name: 'Microsoft', createdAt: '2026-10-21T12:00:00Z', isActive: false, employeeCount: 2, administratorCount: 1, totalUserCount: 3 },
@@ -21,21 +21,29 @@ describe('platform dashboard', () => {
     render(<MemoryRouter><PlatformDashboardPage /></MemoryRouter>);
 
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
-    const adobe = screen.getByRole('link', { name: 'Ver participantes de Adobe' });
-    expect(adobe).toHaveAttribute('href', '/platform/users?tenant=t1&role=Participant');
-    expect(adobe).toHaveTextContent('Adobe');
-    expect(adobe).toHaveTextContent('adobe-demo');
-    expect(within(adobe).getByText('2')).toBeVisible();
-    expect(within(adobe).getByText('participantes')).toBeVisible();
-    expect(adobe).toHaveTextContent('Sem administrador');
-    expect(adobe).not.toHaveTextContent('2 contas');
-    expect(adobe).not.toHaveTextContent('#1');
-
-    const microsoft = screen.getByRole('link', { name: 'Ver participantes de Microsoft' });
-    expect(microsoft).toHaveTextContent('1 administrador');
-    expect(within(microsoft).getByText('Inativa')).toBeVisible();
-    expect(within(microsoft).queryByText('Ativa')).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /Empresas sem administrador/ }))
+    const indicators = screen.getByRole('region', { name: 'Indicadores da plataforma' });
+    expect(within(indicators).getByText('Empresas cadastradas')).toBeVisible();
+    expect(within(indicators).getByText('Participantes')).toBeVisible();
+    expect(within(indicators).getByText('Empresas sem administrador')).toBeVisible();
+    expect(within(indicators).getByRole('link', { name: /Empresas sem administrador/ }))
       .toHaveAttribute('href', '/platform?sem-admin=1');
+    expect(screen.getByText('Algumas empresas precisam de um administrador')).toBeVisible();
+    expect(screen.getByRole('link', { name: 'Revisar empresas' })).toHaveAttribute('href', '/platform?sem-admin=1');
+    expect(screen.getByRole('link', { name: 'Gerenciar empresas Buscar, filtrar e administrar clientes' }))
+      .toHaveAttribute('href', '/platform');
+    expect(screen.getByRole('heading', { name: 'Acessos rápidos' })).toBeVisible();
+    expect(screen.queryByText('Adobe')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Ver participantes de Adobe' })).not.toBeInTheDocument();
+  });
+
+  it('does not present a failed load as an empty platform', async () => {
+    vi.mocked(api.getPlatformDashboard).mockRejectedValue(new Error('Serviço indisponível.'));
+    render(<MemoryRouter><PlatformDashboardPage /></MemoryRouter>);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Serviço indisponível.');
+    const indicators = screen.getByRole('region', { name: 'Indicadores da plataforma' });
+    expect(within(indicators).getAllByText('—')).toHaveLength(3);
+    expect(screen.getByText('Não foi possível verificar os dados')).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Cadastrar empresa' })).not.toBeInTheDocument();
   });
 });

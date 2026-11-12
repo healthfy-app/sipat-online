@@ -33,14 +33,15 @@ describe('Platform home', () => {
     expect(screen.getByText('Beta')).toBeInTheDocument();
     const companyRow = screen.getByRole('row', { name: /Acme/ });
     const companyLink = within(companyRow).getByRole('link', { name: 'Ver participantes de Acme' });
+    const administerLink = within(companyRow).getByRole('link', { name: 'Administrar empresa Acme' });
     expect(companyRow).toHaveTextContent(/Acme.*acme.*10.*1.*Ativa/);
     expect(companyLink).toHaveAttribute('href', '/platform/companies/t1');
+    expect(administerLink).toHaveAttribute('href', '/admin/dashboard?companyId=t1');
     expect(screen.getByRole('status')).toHaveTextContent('1 empresa sem administrador');
     expect(screen.queryByText('Sem admin')).not.toBeInTheDocument();
     expect(screen.queryByText('2 exibidas')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: '+ Nova empresa' }))
       .toHaveAttribute('href', '/platform/companies');
-    expect(screen.queryByRole('link', { name: /Administrar/ })).not.toBeInTheDocument();
     expect(api.listPlatformCourses).not.toHaveBeenCalled();
 
     await userEvent.setup().click(screen.getByRole('button', { name: 'Ver quais' }));

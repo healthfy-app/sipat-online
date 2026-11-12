@@ -13,32 +13,37 @@ public sealed class AddLearningActivitiesAndCertificates : Migration
         migrationBuilder.AddColumn<Guid>(name: "SourceCourseId", schema: "learning", table: "LearningTracks", type: "uuid", nullable: true);
         migrationBuilder.CreateIndex(name: "IX_LearningTracks_TenantId_SipatEventId_SourceCourseId", schema: "learning",
             table: "LearningTracks", columns: ["TenantId", "SipatEventId", "SourceCourseId"], unique: true);
-        migrationBuilder.CreateTable(name: "LearningContentSnapshots", schema: "learning", columns: table => new {
+        migrationBuilder.CreateTable(name: "LearningContentSnapshots", schema: "learning", columns: table => new
+        {
             RevisionId = table.Column<Guid>(type: "uuid", nullable: false),
             TenantId = table.Column<Guid>(type: "uuid", nullable: false),
             SourceCourseId = table.Column<Guid>(type: "uuid", nullable: false),
             ContentJson = table.Column<string>(type: "text", nullable: false),
             CoverData = table.Column<byte[]>(type: "bytea", nullable: true),
             CoverContentType = table.Column<string>(type: "text", nullable: true)
-        }, constraints: table => {
+        }, constraints: table =>
+        {
             table.PrimaryKey("PK_LearningContentSnapshots", item => item.RevisionId);
             table.ForeignKey("FK_LearningContentSnapshots_LearningTrackRevisions_RevisionId", item => item.RevisionId,
                 "LearningTrackRevisions", "Id", principalSchema: "learning", onDelete: ReferentialAction.Restrict);
         });
-        migrationBuilder.CreateTable(name: "LearningActivityOutcomes", schema: "learning", columns: table => new {
+        migrationBuilder.CreateTable(name: "LearningActivityOutcomes", schema: "learning", columns: table => new
+        {
             TenantId = table.Column<Guid>(type: "uuid", nullable: false),
             ParticipantId = table.Column<Guid>(type: "uuid", nullable: false),
             RevisionId = table.Column<Guid>(type: "uuid", nullable: false),
             ActivityId = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
             Outcome = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
             RecordedAt = table.Column<DateTimeOffset>(type: "timestamp with time zone", nullable: false)
-        }, constraints: table => {
+        }, constraints: table =>
+        {
             table.PrimaryKey("PK_LearningActivityOutcomes", item => new { item.TenantId, item.ParticipantId, item.RevisionId, item.ActivityId });
             table.ForeignKey("FK_LearningActivityOutcomes_LearningTrackRevisions_RevisionId", item => item.RevisionId,
                 "LearningTrackRevisions", "Id", principalSchema: "learning", onDelete: ReferentialAction.Restrict);
         });
         migrationBuilder.CreateIndex(name: "IX_LearningActivityOutcomes_RevisionId", schema: "learning", table: "LearningActivityOutcomes", column: "RevisionId");
-        migrationBuilder.CreateTable(name: "ParticipationCertificates", schema: "learning", columns: table => new {
+        migrationBuilder.CreateTable(name: "ParticipationCertificates", schema: "learning", columns: table => new
+        {
             Id = table.Column<Guid>(type: "uuid", nullable: false),
             TenantId = table.Column<Guid>(type: "uuid", nullable: false),
             ParticipantId = table.Column<Guid>(type: "uuid", nullable: false),

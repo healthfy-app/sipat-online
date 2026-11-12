@@ -33,7 +33,7 @@ async function setup(items: LearningActivity[]) {
   const result = render(<LearningActivitiesPanel trackId="track-1" lessonId="lesson-1"
     lessonPosition={1} playbackKey="session-1" videoRef={videoRef} />);
   await waitFor(() => expect(load).toHaveBeenCalledWith('track-1'));
-  if (items.length) await screen.findByRole('region', { name: 'Jogos e questionários' });
+  if (items.length) await screen.findByRole('region', { name: 'Atividades para praticar' });
   return { ...result, video, videoRef };
 }
 
@@ -53,16 +53,36 @@ describe('course activities during playback', () => {
     expect(video.play).toHaveBeenCalledTimes(1);
     fireEvent.timeUpdate(video);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Pratique segurança · Concluída' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Ver atividades' }));
+    const completedActivity = screen.getByRole('button', { name: 'Pratique segurança · Concluída' });
+    expect(completedActivity).toBeVisible();
+    expect(completedActivity).toHaveTextContent('✓');
+    expect(completedActivity).not.toHaveTextContent('Concluída');
   });
 
   it('does not open a saved checkpoint again after reloading the course', async () => {
+    const user = userEvent.setup();
     const { video } = await setup([{ ...checkpoint, outcome: 'skipped' }]);
     video.currentTime = 3; fireEvent.timeUpdate(video);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(video.pause).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Ver atividades' }));
     expect(screen.getByRole('button', { name: 'Pratique segurança · Pulada' })).toBeVisible();
     expect(save).not.toHaveBeenCalled();
+  });
+
+  it('opens the optional activity list in a dialog and resumes the video when dismissed', async () => {
+    const user = userEvent.setup();
+    const { video } = await setup([checkpoint]);
+
+    await user.click(screen.getByRole('button', { name: 'Ver atividades' }));
+    expect(screen.getByRole('dialog', { name: 'Atividades para praticar' })).toBeVisible();
+    expect(video.paused).toBe(true);
+    expect(screen.getByRole('button', { name: 'Pratique segurança · Iniciar atividade' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Fechar atividades para praticar' }));
+    await waitFor(() => expect(video.play).toHaveBeenCalledTimes(1));
+    expect(video.paused).toBe(false);
   });
 
   it('does not trigger checkpoints for another lesson or while seeking', async () => {

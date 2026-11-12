@@ -212,11 +212,11 @@ public static class PlatformEndpoints
                 "identity.platform_directory.forbidden" or
                 "identity.platform_user.forbidden" or
                 "identity.platform_user.role_forbidden" => StatusCodes.Status403Forbidden,
-                "identity.platform_directory.pagination_invalid" => StatusCodes.Status400BadRequest,
-                "identity.platform_directory.tenant_not_found" or
-                    "platform.user.tenant_not_found" => StatusCodes.Status404NotFound,
-                "identity.platform_user.actor_required" => StatusCodes.Status400BadRequest,
-                "platform.user.tenant_inactive" => StatusCodes.Status409Conflict,
+            "identity.platform_directory.pagination_invalid" => StatusCodes.Status400BadRequest,
+            "identity.platform_directory.tenant_not_found" or
+                "platform.user.tenant_not_found" => StatusCodes.Status404NotFound,
+            "identity.platform_user.actor_required" => StatusCodes.Status400BadRequest,
+            "platform.user.tenant_inactive" => StatusCodes.Status409Conflict,
             "tenant.key.duplicate" or "identity.login_identifier.duplicate" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };

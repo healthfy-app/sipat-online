@@ -62,16 +62,27 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         await using var transaction = await db.Database.BeginTransactionAsync(token);
         await learning.CreateTrackAsync(track.Value, revision, token);
         db.LearningTracks.Local.Single(item => item.Id == track.Value.Id).SourceCourseId = course.Id;
-        db.LearningLessons.AddRange(revision.Lessons.Select(item => new LearningLessonEntity {
-            Id = item.Id, TenantId = tenantId, TrackId = track.Value.Id, RevisionId = revision.Id,
-            Title = item.Title, Description = item.Description, Position = item.Position,
-            ProviderAssetReference = item.ProviderAssetReference, DurationMilliseconds = item.DurationMilliseconds
+        db.LearningLessons.AddRange(revision.Lessons.Select(item => new LearningLessonEntity
+        {
+            Id = item.Id,
+            TenantId = tenantId,
+            TrackId = track.Value.Id,
+            RevisionId = revision.Id,
+            Title = item.Title,
+            Description = item.Description,
+            Position = item.Position,
+            ProviderAssetReference = item.ProviderAssetReference,
+            DurationMilliseconds = item.DurationMilliseconds
         }));
         var cover = await catalog.GetCoverAsync(course.Id, token);
-        db.LearningContentSnapshots.Add(new LearningContentSnapshotEntity {
-            RevisionId = revision.Id, TenantId = tenantId, SourceCourseId = course.Id,
+        db.LearningContentSnapshots.Add(new LearningContentSnapshotEntity
+        {
+            RevisionId = revision.Id,
+            TenantId = tenantId,
+            SourceCourseId = course.Id,
             ContentJson = JsonSerializer.Serialize(snapshot.Value, EfLearningEngagementStore.JsonOptions),
-            CoverData = cover?.Data, CoverContentType = cover?.ContentType
+            CoverData = cover?.Data,
+            CoverContentType = cover?.ContentType
         });
         var participantIds = await db.Users.AsNoTracking().Where(item => item.TenantId == tenantId && item.IsActive)
             .Select(item => item.Id).ToArrayAsync(token);

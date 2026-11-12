@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import LearningPage, { type LearningSummary } from './LearningPage';
@@ -116,6 +116,9 @@ describe('learning experience', () => {
     expect(screen.getByRole('progressbar', {
       name: 'Progresso da formação: 1 de 1 cursos concluídos',
     })).toHaveAttribute('aria-valuenow', '100');
+    expect(screen.getByRole('region', { name: 'Formação concluída' })
+      .querySelector('.learning-completion-illustration')).not.toHaveClass('is-in-progress');
+    expect(screen.queryByRole('link', { name: 'Ver certificados' })).not.toBeInTheDocument();
     expect(screen.queryByText('Formação concluída. Parabéns por chegar até aqui!')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Sua trilha' })).not.toBeInTheDocument();
     expect(screen.queryByRole('progressbar', { name: 'Progresso da trilha' })).not.toBeInTheDocument();
@@ -141,6 +144,8 @@ describe('learning experience', () => {
     renderAt('/learning');
     expect(await screen.findByRole('link', { name: /Continuar aula/ }))
       .toBeVisible();
+    expect(screen.getByRole('region', { name: 'Formação em andamento' })
+      .querySelector('.learning-completion-illustration')).toHaveClass('is-in-progress');
     await waitFor(() => expect(screen.getByRole('link', { name: /Continuar aula/ }))
       .toHaveAttribute('href', '/learning/tracks/ergonomia?lesson=lesson-1'));
     expect(screen.getByText('Passo 2 de 2 · 70% da formação')).toBeVisible();
@@ -149,6 +154,53 @@ describe('learning experience', () => {
     expect(screen.getAllByRole('article')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Continuar curso Ergonomia' })).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Segurança no trabalho' })).not.toBeInTheDocument();
+  });
+
+  it('does not repeat lesson completion status in the lesson details', async () => {
+    const user = userEvent.setup();
+    const completedLesson = {
+      ...lesson,
+      isCompleted: true,
+      watchedPercentage: 100,
+    };
+    const { container } = await playableCourse([completedLesson]);
+
+    expect(container.querySelector('.learning-lesson-navigation .learning-status')).toHaveTextContent('Concluída');
+    await user.click(screen.getByRole('button', { name: 'Ver detalhes da aula' }));
+    const lessonDetails = screen.getByRole('dialog', { name: 'Informações da aula' });
+    expect(lessonDetails.querySelector('.learning-lesson-heading .learning-status')).not.toBeInTheDocument();
+  });
+
+  it('opens lesson information and its tabs from the compact sidebar panel', async () => {
+    const user = userEvent.setup();
+    const { container, video } = await playableCourse();
+    const play = vi.spyOn(video, 'play').mockResolvedValue(undefined);
+
+    expect(container.querySelector('.learning-course-sidebar .learning-lesson-info-launcher'))
+      .toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: 'Minhas anotações' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ver detalhes da aula' }));
+    expect(video.pause).toHaveBeenCalledOnce();
+
+    const dialog = screen.getByRole('dialog', { name: 'Informações da aula' });
+    expect(dialog).toBeVisible();
+    expect(within(dialog).getByRole('tabpanel')).toHaveTextContent(lesson.description);
+    await user.click(within(dialog).getByRole('tab', { name: 'Minhas anotações' }));
+    expect(within(dialog).getByRole('tabpanel')).toHaveTextContent('Anotações ainda não estão disponíveis');
+    await user.click(within(dialog).getByRole('button', { name: 'Fechar informações da aula' }));
+    expect(screen.queryByRole('dialog', { name: 'Informações da aula' })).not.toBeInTheDocument();
+    await waitFor(() => expect(play).toHaveBeenCalledOnce());
+  });
+
+  it('keeps lesson navigation under the video and lesson details in the sidebar', async () => {
+    const { container } = await playableCourse();
+
+    expect(container.querySelector('.learning-main-column .learning-player-frame + .learning-lesson-navigation'))
+      .toBeInTheDocument();
+    expect(container.querySelector('.learning-course-sidebar .learning-curriculum-card'))
+      .toBeInTheDocument();
+    expect(container.querySelector('.learning-course-sidebar [aria-label="Informações da aula"]'))
+      .toBeInTheDocument();
   });
 
   it.each([
@@ -164,11 +216,13 @@ describe('learning experience', () => {
   });
 
   it('shows 100 course completion at the accepted threshold without changing watched coverage', async () => {
+    const user = userEvent.setup();
     const { video } = await playableCourse();
     recordRange.mockResolvedValue(progress(4500, 90));
     atTime(video, 0); fireEvent.playing(video);
     atTime(video, 4.5); fireEvent.pause(video);
     await waitFor(() => expect(screen.getByRole('progressbar', { name: 'Progresso do curso' })).toHaveAttribute('aria-valuenow', '100'));
+    await user.click(screen.getByRole('button', { name: 'Ver detalhes da aula' }));
     expect(screen.getByText('90% assistido')).toBeVisible();
     expect(screen.getByText('1 de 1 aulas · 100%')).toBeVisible();
     expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 4500, 4500);
@@ -449,6 +503,8 @@ describe('learning experience', () => {
       { ...trackCard, id: 'track-3', title: 'Comportamento seguro', completedLessonCount: 1, progressPercentage: 100 },
       { ...trackCard, id: 'track-4', title: 'Primeiros socorros' },
       { ...trackCard, id: 'track-5', title: 'Demonstração técnica — vídeo e progresso' },
+      { ...trackCard, id: 'track-6', title: 'Hábitos de vida' },
+      { ...trackCard, id: 'track-7', title: 'Higiene Mental' },
     ];
     listAssignedTracks.mockResolvedValue(tracks);
     getAssignedTrack.mockResolvedValue({ track: tracks[0], lessons: [lesson] });
@@ -456,13 +512,15 @@ describe('learning experience', () => {
 
     const { container } = renderAt('/learning');
 
-    await screen.findByRole('heading', { name: 'Meus cursos 5' });
+    await screen.findByRole('heading', { name: 'Meus cursos 7' });
     const artworkByTrack = [
       ['Ergonomia e atividade física', 'ergonomics'],
       ['Alimentação para uma vida saudável', 'nutrition'],
       ['Comportamento seguro', 'safety'],
       ['Primeiros socorros', 'first-aid'],
       ['Demonstração técnica — vídeo e progresso', 'practice'],
+      ['Hábitos de vida', 'habits'],
+      ['Higiene Mental', 'wellbeing'],
     ] as const;
 
     for (const [label, artwork] of artworkByTrack) {
@@ -472,13 +530,24 @@ describe('learning experience', () => {
       expect(card.querySelector('img')).toHaveAttribute('alt', '');
       expect(card.querySelector('img')).toHaveAttribute('loading', 'lazy');
       expect(card.querySelector('img')?.getAttribute('src')).toMatch(/^\/course-covers\/.+\.jpg$/);
+      expect(card.querySelector('.learning-catalog-course-category')).toBeInTheDocument();
+      expect(card.querySelector('.learning-catalog-video-count')).toBeInTheDocument();
+      expect(card.querySelector('.learning-catalog-description')).not.toBeInTheDocument();
+    }
+
+    const categorylessCards = Array.from(container.querySelectorAll<HTMLElement>('.learning-catalog-course'))
+      .filter(card => ['Hábitos de vida', 'Higiene Mental'].includes(card.querySelector('h3')?.textContent ?? ''));
+    expect(categorylessCards).toHaveLength(2);
+    for (const card of categorylessCards) {
+      expect(card.querySelector('.learning-catalog-course-category')).toHaveAttribute('aria-hidden', 'true');
+      expect(card.querySelector('.learning-catalog-course-category')).toHaveClass('is-empty');
     }
 
     expect(screen.getByRole('link', { name: 'Ver certificado de Comportamento seguro' })).toBeVisible();
-    expect(container.querySelectorAll('.learning-catalog-course')).toHaveLength(5);
+    expect(container.querySelectorAll('.learning-catalog-course')).toHaveLength(7);
   });
 
-  it('moves demo option prefixes into badges and gives adjacent wellness courses distinct covers', async () => {
+  it('hides internal option prefixes and gives adjacent wellness courses distinct covers', async () => {
     const habitsTrack = { ...trackCard, id: 'track-4', title: 'Opção 1 · Hábitos de vida' };
     const mentalHealthTrack = { ...trackCard, id: 'track-5', title: 'Opção 1 · Higiene Mental' };
     listAssignedTracks.mockResolvedValue([habitsTrack, mentalHealthTrack]);
@@ -493,8 +562,10 @@ describe('learning experience', () => {
     const habitsCard = cardFor('Hábitos de vida');
     const mentalHealthCard = cardFor('Higiene Mental');
 
-    expect(habitsCard.querySelector('.learning-catalog-option-label')).toHaveTextContent('Opção 1');
-    expect(mentalHealthCard.querySelector('.learning-catalog-option-label')).toHaveTextContent('Opção 1');
+    expect(habitsCard).not.toHaveTextContent('Opção 1');
+    expect(mentalHealthCard).not.toHaveTextContent('Opção 1');
+    expect(habitsCard.querySelector('h3 a')).toHaveTextContent('Hábitos de vida');
+    expect(mentalHealthCard.querySelector('h3 a')).toHaveTextContent('Higiene Mental');
     expect(habitsCard.querySelector('img')).toHaveAttribute('src', '/course-covers/workplace.jpg');
     expect(mentalHealthCard.querySelector('img')).toHaveAttribute('src', '/course-covers/wellbeing.jpg');
   });

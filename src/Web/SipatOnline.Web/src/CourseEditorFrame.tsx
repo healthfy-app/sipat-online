@@ -19,6 +19,8 @@ export default function CourseEditorFrame({
   onSave: () => void;
   children: ReactNode;
 }) {
+  const activeStageIndex = stages.findIndex((stage) => stage.id === step);
+
   useEffect(() => {
     function beforeUnload(event: BeforeUnloadEvent) {
       if (!dirty && !busy) return;
@@ -48,9 +50,16 @@ export default function CourseEditorFrame({
         }} type="button">← Voltar ao conteúdo</button>
         <nav aria-label="Etapas do curso" className="course-editor-stages">
           {stages.map((stage, index) => (
-            <button aria-current={step === stage.id ? 'step' : undefined} disabled={busy} key={stage.id}
+            <button
+              aria-current={step === stage.id ? 'step' : undefined}
+              className={`course-editor-stage${step === stage.id ? ' is-current' : ''}${index < activeStageIndex ? ' is-complete' : ''}`}
+              disabled={busy}
+              key={stage.id}
               onClick={() => onStep(stage.id)} type="button">
-              <span aria-hidden="true">{index + 1}</span>{stage.label}
+              <span aria-hidden="true" className="course-editor-stage-number">
+                {index < activeStageIndex ? '✓' : index + 1}
+              </span>
+              <span className="course-editor-stage-label">{stage.label}</span>
             </button>
           ))}
         </nav>

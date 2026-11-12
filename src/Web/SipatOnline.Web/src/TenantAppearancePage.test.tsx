@@ -16,17 +16,21 @@ describe('company identity settings', () => {
   it('previews picker and HEX changes locally and discards without publishing', async () => {
     render(<TenantAppearancePage tenant={tenant} onSaved={vi.fn()} />);
     const user = userEvent.setup();
+    expect(screen.getByText('Identidade visual publicada')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Salvar identidade visual' })).not.toBeInTheDocument();
     const picker = screen.getByLabelText('Selecionar cor principal');
     fireEvent.change(picker, { target: { value: '#234567' } });
     expect(screen.getByLabelText('Cor principal (HEX)')).toHaveValue('#234567');
     expect(screen.getByText('Continuar curso').closest('.appearance-preview')).toHaveStyle('--brand-primary: #234567');
+    expect(screen.getByText('Alterações não publicadas')).toBeVisible();
     const hex = screen.getByLabelText('Cor principal (HEX)');
     await user.clear(hex); await user.type(hex, '#345678');
     expect(picker).toHaveValue('#345678');
     expect(saveTenantAppearance).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Descartar alterações' }));
     expect(hex).toHaveValue('#123456');
-    expect(screen.getByRole('button', { name: 'Salvar identidade visual' })).toBeDisabled();
+    expect(screen.getByText('Identidade visual publicada')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Salvar identidade visual' })).not.toBeInTheDocument();
   });
 
   it('blocks invalid HEX and insufficient contrast without calling the API', async () => {
@@ -35,7 +39,7 @@ describe('company identity settings', () => {
     expect(screen.getByLabelText('Cor principal (HEX)')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', { name: 'Salvar identidade visual' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Cor principal (HEX)'), { target: { value: '#777777' } });
-    expect(screen.getByText(/Ajuste as cores para atingir 4,5:1/)).toBeVisible();
+    expect(screen.getByText(/ajuste para atingir 4,5:1/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Salvar identidade visual' })).toBeDisabled();
     expect(saveTenantAppearance).not.toHaveBeenCalled();
   });

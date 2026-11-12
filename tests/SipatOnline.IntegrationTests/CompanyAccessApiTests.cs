@@ -274,7 +274,10 @@ public sealed class CompanyAccessApiTests
                     60000, DateTimeOffset.UtcNow, true, "Runtime fixture");
                 db.ParticipationCertificates.Add(new ParticipationCertificateEntity
                 {
-                    Id = id, TenantId = tenantId, ParticipantId = userId, SipatEventId = snapshot.SipatEventId,
+                    Id = id,
+                    TenantId = tenantId,
+                    ParticipantId = userId,
+                    SipatEventId = snapshot.SipatEventId,
                     SnapshotJson = JsonSerializer.Serialize(snapshot)
                 });
             }

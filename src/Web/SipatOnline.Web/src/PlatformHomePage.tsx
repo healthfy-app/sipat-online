@@ -72,9 +72,6 @@ export default function PlatformHomePage() {
   const pageCompanies = sortedCompanies.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const firstItem = sortedCompanies.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastItem = Math.min(currentPage * pageSize, sortedCompanies.length);
-  const activeEmployeeCount = companies
-    .filter((company) => company.isActive)
-    .reduce((total, company) => total + company.employeeCount, 0);
   const companiesWithoutAdminCount = companies.filter((company) => company.administratorCount === 0).length;
   const hasActiveFilters = Boolean(term) || statusFilter !== 'all' || showCompaniesWithoutAdmin;
   function updateSort(nextKey: CompanySortKey) {
@@ -87,78 +84,79 @@ export default function PlatformHomePage() {
     <div className="page-content platform-home">
       <PageHeader
         actions={<Link className="button button-primary" to="/platform/companies">+ Nova empresa</Link>}
-        description={isLoading
-          ? 'Carregando indicadores das empresas...'
-          : `${companies.length.toLocaleString('pt-BR')} ${companies.length === 1 ? 'empresa' : 'empresas'} · ${activeEmployeeCount.toLocaleString('pt-BR')} participantes ativos`}
+        description="Pesquise, filtre e administre as empresas e os acessos da plataforma."
         eyebrow="SIPAT.ONLINE.ADMIN"
         title="Empresas"
-        meta={hasActiveFilters && (
+        meta={!isLoading && (
           <span className="count-label">
-            {visibleCompanies.length.toLocaleString('pt-BR')} de {companies.length.toLocaleString('pt-BR')} exibidas
+            {hasActiveFilters
+              ? `${visibleCompanies.length.toLocaleString('pt-BR')} de ${companies.length.toLocaleString('pt-BR')} exibidas`
+              : `${companies.length.toLocaleString('pt-BR')} ${companies.length === 1 ? 'empresa' : 'empresas'}`}
           </span>
         )}
       />
 
-      {!isLoading && !error && companiesWithoutAdminCount > 0 && (
-        <aside aria-label="Empresas sem administrador" className="platform-company-admin-alert" role="status">
-          <p>
-            <strong>{companiesWithoutAdminCount.toLocaleString('pt-BR')} {companiesWithoutAdminCount === 1 ? 'empresa' : 'empresas'}</strong>
-            {' '}sem administrador
-          </p>
-          <button
-            aria-pressed={showCompaniesWithoutAdmin}
-            className="button button-secondary"
-            onClick={() => setSearchParams((current) => {
-              const next = new URLSearchParams(current);
-              if (showCompaniesWithoutAdmin) next.delete('sem-admin');
-              else next.set('sem-admin', '1');
-              setCurrentPage(1);
-              return next;
-            })}
-            type="button"
-          >
-            {showCompaniesWithoutAdmin ? 'Mostrar todas' : 'Ver quais'}
-          </button>
-        </aside>
-      )}
-
       {error && <p className="form-error page-error" role="alert">{error}</p>}
 
-      <FilterBar className="platform-company-filters" label="Filtros de empresas">
-        <div className="field">
-          <label htmlFor="platform-home-search">Buscar empresa</label>
-          <input
-            id="platform-home-search"
-            onChange={(event) => {
-              setSearch(event.target.value);
-              setCurrentPage(1);
-            }}
-            placeholder="Nome ou identificador"
-            type="search"
-            value={search}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="platform-company-status">Status</label>
-          <select
-            id="platform-company-status"
-            onChange={(event) => {
-              setStatusFilter(event.target.value as CompanyStatusFilter);
-              setCurrentPage(1);
-            }}
-            value={statusFilter}
-          >
-            <option value="all">Todos</option>
-            <option value="active">Ativas</option>
-            <option value="inactive">Inativas</option>
-          </select>
-        </div>
-      </FilterBar>
-
       <section aria-labelledby="home-companies-heading" className="list-section platform-company-list-section">
-        <div className="section-heading">
-          <h2 id="home-companies-heading">Diretório de empresas</h2>
+        <div className="platform-company-list-heading">
+          <div>
+            <h2 id="home-companies-heading">Todas as empresas</h2>
+            <p>Entre na administração de uma empresa ou consulte seus participantes.</p>
+          </div>
+          {!isLoading && !error && companiesWithoutAdminCount > 0 && (
+            <aside aria-label="Empresas sem administrador" className="platform-company-admin-alert" role="status">
+              <p>
+                <strong>{companiesWithoutAdminCount.toLocaleString('pt-BR')} {companiesWithoutAdminCount === 1 ? 'empresa' : 'empresas'}</strong>
+                {' '}sem administrador
+              </p>
+              <button
+                aria-pressed={showCompaniesWithoutAdmin}
+                className="button button-secondary"
+                onClick={() => setSearchParams((current) => {
+                  const next = new URLSearchParams(current);
+                  if (showCompaniesWithoutAdmin) next.delete('sem-admin');
+                  else next.set('sem-admin', '1');
+                  setCurrentPage(1);
+                  return next;
+                })}
+                type="button"
+              >
+                {showCompaniesWithoutAdmin ? 'Mostrar todas' : 'Ver quais'}
+              </button>
+            </aside>
+          )}
         </div>
+        <FilterBar className="platform-company-filters" label="Filtros de empresas">
+          <div className="field">
+            <label htmlFor="platform-home-search">Buscar empresa</label>
+            <input
+              id="platform-home-search"
+              onChange={(event) => {
+                setSearch(event.target.value);
+                setCurrentPage(1);
+              }}
+              placeholder="Nome ou identificador"
+              type="search"
+              value={search}
+            />
+          </div>
+          <div className="field">
+            <label htmlFor="platform-company-status">Status</label>
+            <select
+              id="platform-company-status"
+              onChange={(event) => {
+                setStatusFilter(event.target.value as CompanyStatusFilter);
+                setCurrentPage(1);
+              }}
+              value={statusFilter}
+            >
+              <option value="all">Todos</option>
+              <option value="active">Ativas</option>
+              <option value="inactive">Inativas</option>
+            </select>
+          </div>
+        </FilterBar>
         {isLoading ? (
           <LoadingState className="list-state">Carregando empresas...</LoadingState>
         ) : sortedCompanies.length === 0 ? (
@@ -183,7 +181,7 @@ export default function PlatformHomePage() {
                   <SortButton label="Status" active={sortKey === 'status'} direction={sortDirection}
                     onClick={() => updateSort('status')} />
                 </th>
-                <th scope="col">Ação</th>
+                <th scope="col">Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -212,13 +210,22 @@ export default function PlatformHomePage() {
                     </StatusChip>
                   </td>
                   <td>
-                    <Link
-                      aria-label={`Ver participantes de ${company.name}`}
-                      className="platform-company-row-action"
-                      to={`/platform/companies/${company.id}`}
-                    >
-                      <span aria-hidden="true">›</span>
-                    </Link>
+                    <div className="platform-company-actions">
+                      <a
+                        aria-label={`Administrar empresa ${company.name}`}
+                        className="button button-primary platform-company-manage-action"
+                        href={`/admin/dashboard?companyId=${encodeURIComponent(company.id)}`}
+                      >
+                        Administrar
+                      </a>
+                      <Link
+                        aria-label={`Ver participantes de ${company.name}`}
+                        className="button button-quiet platform-company-row-action"
+                        to={`/platform/companies/${company.id}`}
+                      >
+                        Participantes
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               ))}

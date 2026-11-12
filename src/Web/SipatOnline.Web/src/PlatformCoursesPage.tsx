@@ -636,71 +636,89 @@ function CourseDetail({
       </div>
       {error && !activeDialog && <p className="form-error" role="alert">{error}</p>}
       {step === 'configure' && (
-        <section className="course-editor-settings" aria-label="Configuração do curso">
-          <h2>Visão geral</h2>
-          <CourseCoverEditor course={course} onBusyChange={setIsMediaBusy} onChanged={onChanged} onError={onError} />
-          <form className="event-form event-form-single" onSubmit={handleSave}>
-            <div className="field">
-              <label htmlFor="edit-course-title">Nome do curso</label>
-              <input
-                disabled={isSaving || isMediaBusy}
-                id="edit-course-title"
-                maxLength={200}
-                onChange={(event) => setTitle(event.target.value)}
-                required
-                value={title}
-              />
+        <section aria-label="Configuração do curso" className="course-editor-settings course-editor-settings-configure">
+          <header className="course-editor-settings-heading">
+            <div>
+              <p className="eyebrow">ETAPA 2 · CONFIGURAÇÃO</p>
+              <h2>Detalhes do curso</h2>
+              <p className="muted-copy">Revise as informações e escolha como o curso será apresentado aos participantes.</p>
             </div>
-            <div className="field">
-              <label htmlFor="edit-course-description">Descrição</label>
-              <textarea
-                disabled={isSaving || isMediaBusy}
-                id="edit-course-description"
-                maxLength={2000}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={3}
-                value={description}
-              />
-            </div>
-            <label className="platform-toggle" htmlFor="edit-course-gamification">
-              <input
-                disabled={isSaving || isMediaBusy}
-                checked={gamificationEnabled}
-                id="edit-course-gamification"
-                onChange={(event) => setGamificationEnabled(event.target.checked)}
-                type="checkbox"
-              />
-              <span>
-                <strong>Gamificação após os vídeos</strong>
-                <small>Ative ou desative a experiência de jogo deste curso.</small>
-              </span>
-            </label>
-            {gamificationEnabled && (
-              <fieldset className="platform-game-types">
-                <legend>Tipo de jogo</legend>
-                {gameTypeOptions.map((option) => (
-                  <label className="platform-game-option" key={option.value}>
-                    <input
-                      disabled={isSaving || isMediaBusy}
-                      checked={gameType === option.value}
-                      name="course-game-type"
-                      onChange={() => setGameType(option.value)}
-                      type="radio"
-                      value={option.value}
-                    />
-                    <span>
-                      <strong>{option.label}</strong>
-                      <small>{option.description}</small>
-                      {!option.playable && <em>Configurável agora · jogável em breve</em>}
-                    </span>
-                  </label>
-                ))}
-              </fieldset>
-            )}
-            <button className="button button-primary" disabled={isSaving || isMediaBusy} type="submit">
-              {isSaving ? 'Salvando...' : 'Salvar alterações'}
-            </button>
-          </form>
+          </header>
+          <div className="course-editor-settings-grid">
+            <form className="event-form event-form-single course-editor-basics" onSubmit={handleSave}>
+              <div className="course-editor-panel-heading">
+                <h3>Informações e preferências</h3>
+                <p>O nome e a descrição ajudam as pessoas a identificar este curso no catálogo.</p>
+              </div>
+              <div className="field">
+                <label htmlFor="edit-course-title">Nome do curso</label>
+                <input
+                  disabled={isSaving || isMediaBusy}
+                  id="edit-course-title"
+                  maxLength={200}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                  value={title}
+                />
+              </div>
+              <div className="field">
+                <label htmlFor="edit-course-description">Descrição</label>
+                <textarea
+                  disabled={isSaving || isMediaBusy}
+                  id="edit-course-description"
+                  maxLength={2000}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={3}
+                  value={description}
+                />
+              </div>
+              <label className="platform-toggle" htmlFor="edit-course-gamification">
+                <input
+                  disabled={isSaving || isMediaBusy}
+                  checked={gamificationEnabled}
+                  id="edit-course-gamification"
+                  onChange={(event) => setGamificationEnabled(event.target.checked)}
+                  type="checkbox"
+                />
+                <span>
+                  <strong>Gamificação após os vídeos</strong>
+                  <small>Ative ou desative a experiência de jogo deste curso.</small>
+                </span>
+              </label>
+              {gamificationEnabled && (
+                <fieldset className="platform-game-types">
+                  <legend>Tipo de jogo</legend>
+                  {gameTypeOptions.map((option) => (
+                    <label className="platform-game-option" key={option.value}>
+                      <input
+                        disabled={isSaving || isMediaBusy}
+                        checked={gameType === option.value}
+                        name="course-game-type"
+                        onChange={() => setGameType(option.value)}
+                        type="radio"
+                        value={option.value}
+                      />
+                      <span>
+                        <strong>{option.label}</strong>
+                        <small>{option.description}</small>
+                        {!option.playable && <em>Configurável agora · jogável em breve</em>}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+              <button className="button button-primary course-editor-configure-save" disabled={isSaving || isMediaBusy} type="submit">
+                {isSaving ? 'Salvando...' : 'Salvar alterações'}
+              </button>
+            </form>
+            <aside aria-label="Foto do curso" className="course-editor-cover-card">
+              <div className="course-editor-panel-heading">
+                <h3>Foto do curso</h3>
+                <p>Uma imagem ajuda a identificar o conteúdo no catálogo.</p>
+              </div>
+              <CourseCoverEditor course={course} onBusyChange={setIsMediaBusy} onChanged={onChanged} onError={onError} />
+            </aside>
+          </div>
         </section>
       )}
 
@@ -781,44 +799,115 @@ function CourseDetail({
           <h2>{previewVideo?.title ?? 'Novo conteúdo'}</h2>
           <p className="muted-copy">{previewVideo ? formatDuration(previewVideo.durationMilliseconds) : 'Envie um vídeo ou escolha na biblioteca.'}</p>
           <hr />
-          <h3>Interatividade</h3>
-          <p className="muted-copy">Vincule jogos e configure perguntas nos momentos do vídeo.</p>
-          <button className="button button-secondary" onClick={() => { onError(''); setActiveDialog('games'); }} type="button">Jogos e perguntas</button>
-          <p className="field-hint">Gamificação {gamificationEnabled ? 'ativada' : 'desativada'}. Altere na etapa Configurar.</p>
+          <h3>Atividades e perguntas</h3>
+          <p className="muted-copy">Adicione atividades entre vídeos ou perguntas durante a reprodução.</p>
+          <button className="button button-secondary" onClick={() => { onError(''); setActiveDialog('games'); }} type="button">
+            Configurar atividades
+          </button>
+          <p className="field-hint">
+            Atividades opcionais · {gamificationEnabled ? 'gamificação ativada' : 'gamificação desativada'}
+          </p>
         </aside>
       </div>}
-      {step === 'publish' && <section className="course-editor-settings" aria-label="Revisar e publicar">
-        <h2>Revisar e publicar</h2>
-        <div className="form-card">
-          <h3>Detalhes do curso</h3>
-          <dl className="course-publish-summary">
-            <dt>Título</dt><dd>{title}</dd>
-            <dt>Descrição</dt><dd>{description || 'Sem descrição'}</dd>
-            <dt>Vídeos</dt><dd>{course.videos.length}</dd>
-            <dt>Gamificação após os vídeos</dt><dd>{gamificationEnabled ? 'Ativada' : 'Desativada'}</dd>
-          </dl>
-          <button className="button button-secondary" onClick={() => setStep('configure')} type="button">Revisar configurações</button>
-        </div>
-        <div className="form-card">
-          <h3>Publicação no catálogo</h3>
-          <p>Publique agora para disponibilizar o curso no catálogo de cursos. Os vínculos e o progresso das empresas existentes são preservados.</p>
-          <ul aria-label="Checklist de publicação" className="course-publish-checklist">
-            <li className={title.trim() ? 'is-ready' : ''}>Nome do curso</li>
-            <li className={description.trim() ? 'is-ready' : ''}>Descrição</li>
-            <li className={course.videos.length > 0 ? 'is-ready' : ''}>Vídeo</li>
-            <li className={course.coverUrl ? 'is-ready' : 'is-optional'}>Foto do curso · opcional</li>
-          </ul>
-          {course.videos.length === 0 && <p className="form-error">Adicione ao menos um vídeo antes de publicar.</p>}
-          <button className="button course-primary" disabled={isSaving || isMediaBusy || course.videos.length === 0 || !title.trim() || !description.trim()}
-            onClick={() => void saveCourse('Published')} type="button">{status === 'Published' ? 'Publicar alterações' : 'Publicar agora'}</button>
-          {status === 'Published' && <button className="button button-secondary" disabled={isSaving || isMediaBusy}
-            onClick={() => {
-              if (window.confirm('Voltar este curso para rascunho? Ele deixará de aparecer no catálogo.')) {
-                void saveCourse('Draft');
-              }
-            }} type="button">Voltar a rascunho</button>}
-        </div>
-      </section>}
+      {step === 'publish' && (
+        <section aria-label="Revisar e publicar" className="course-editor-settings course-editor-settings-review">
+          <header className="course-editor-settings-heading">
+            <div>
+              <p className="eyebrow">ETAPA 3 · REVISÃO</p>
+              <h2>Revisar e publicar</h2>
+              <p className="muted-copy">Confira os dados e os requisitos antes de disponibilizar o curso para as empresas.</p>
+            </div>
+          </header>
+          <div className="course-publish-grid">
+            <section aria-labelledby="course-publish-details-title" className="course-publish-card">
+              <div className="course-publish-card-heading">
+                <div>
+                  <h3 id="course-publish-details-title">Detalhes do curso</h3>
+                  <p>Resumo das informações que serão exibidas no catálogo.</p>
+                </div>
+              </div>
+              <dl className="course-publish-summary">
+                <div>
+                  <dt>Título</dt>
+                  <dd>{title || 'Não informado'}</dd>
+                </div>
+                <div>
+                  <dt>Descrição</dt>
+                  <dd>{description || 'Sem descrição'}</dd>
+                </div>
+                <div>
+                  <dt>Vídeos</dt>
+                  <dd>{course.videos.length} {course.videos.length === 1 ? 'vídeo' : 'vídeos'}</dd>
+                </div>
+                <div>
+                  <dt>Gamificação</dt>
+                  <dd>{gamificationEnabled ? 'Ativada após os vídeos' : 'Desativada'}</dd>
+                </div>
+              </dl>
+              <button className="button button-secondary" onClick={() => setStep('configure')} type="button">
+                Revisar configurações
+              </button>
+            </section>
+
+            <section aria-labelledby="course-publish-action-title" className="course-publish-card course-publish-action-card">
+              <div className="course-publish-card-heading">
+                <div>
+                  <h3 id="course-publish-action-title">Publicação no catálogo</h3>
+                  <p>Ao publicar, o curso ficará disponível no catálogo. Os vínculos e o progresso das empresas existentes serão preservados.</p>
+                </div>
+                <span className={`course-publish-status${status === 'Published' ? ' is-published' : ''}`}>
+                  {status === 'Published' ? 'No catálogo' : 'Rascunho'}
+                </span>
+              </div>
+              <ul aria-label="Checklist de publicação" className="course-publish-checklist">
+                <li className={title.trim() ? 'is-ready' : ''}>
+                  <span>Nome do curso</span>
+                  <strong>{title.trim() ? 'Pronto' : 'Obrigatório'}</strong>
+                </li>
+                <li className={description.trim() ? 'is-ready' : ''}>
+                  <span>Descrição</span>
+                  <strong>{description.trim() ? 'Pronta' : 'Obrigatória'}</strong>
+                </li>
+                <li className={course.videos.length > 0 ? 'is-ready' : ''}>
+                  <span>Vídeo</span>
+                  <strong>{course.videos.length > 0 ? 'Adicionado' : 'Obrigatório'}</strong>
+                </li>
+                <li className={course.coverUrl ? 'is-ready' : 'is-optional'}>
+                  <span>Foto do curso</span>
+                  <strong>{course.coverUrl ? 'Adicionada' : 'Opcional'}</strong>
+                </li>
+              </ul>
+              {course.videos.length === 0 && (
+                <p className="form-error" role="alert">Adicione ao menos um vídeo antes de publicar.</p>
+              )}
+              <div className="course-publish-actions">
+                <button
+                  className="button course-primary"
+                  disabled={isSaving || isMediaBusy || course.videos.length === 0 || !title.trim() || !description.trim()}
+                  onClick={() => void saveCourse('Published')}
+                  type="button"
+                >
+                  {status === 'Published' ? 'Publicar alterações' : 'Publicar agora'}
+                </button>
+                {status === 'Published' && (
+                  <button
+                    className="button button-secondary"
+                    disabled={isSaving || isMediaBusy}
+                    onClick={() => {
+                      if (window.confirm('Voltar este curso para rascunho? Ele deixará de aparecer no catálogo.')) {
+                        void saveCourse('Draft');
+                      }
+                    }}
+                    type="button"
+                  >
+                    Voltar a rascunho
+                  </button>
+                )}
+              </div>
+            </section>
+          </div>
+        </section>
+      )}
       {activeDialog === 'video' && (
         <CourseDialog busy={isMediaBusy} onClose={() => setActiveDialog(null)} title="Adicionar vídeo">
           {error && <p className="form-error" role="alert">{error}</p>}
@@ -864,7 +953,7 @@ function CourseDetail({
         </CourseDialog>
       )}
       {activeDialog === 'games' && (
-        <CourseDialog onClose={() => setActiveDialog(null)} title="Jogos e perguntas" wide>
+        <CourseDialog onClose={() => setActiveDialog(null)} title="Atividades e perguntas" wide>
           {error && <p className="form-error" role="alert">{error}</p>}
           <CourseGamesSection course={course} modules={modules} onChanged={onChanged} onError={onError} />
         </CourseDialog>
@@ -956,11 +1045,14 @@ function CourseCoverEditor({
 
   return (
     <div className="platform-cover-editor">
-      <h3 className="platform-subheading">Foto do curso</h3>
       {course.coverUrl ? (
         <img alt="Foto atual do curso" className="platform-cover-preview" src={course.coverUrl} />
       ) : (
-        <p className="compact-empty">Este curso ainda não tem foto.</p>
+        <div aria-label={`Prévia da capa de ${course.title}`} className="platform-cover-placeholder">
+          <span>PRÉVIA DA CAPA</span>
+          <strong>{course.title}</strong>
+          <small>Imagem opcional · formato 16:9</small>
+        </div>
       )}
       <div className="platform-course-card-actions">
         <FilePicker

@@ -16,13 +16,14 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
   const [retry, setRetry] = useState(0);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState('');
+  const [activitiesOpen, setActivitiesOpen] = useState(false);
   const resume = useRef(false);
   const opened = useRef(new Set<string>());
   const activeRef = useRef<LearningActivity | null>(null);
   const boundary = useRef<number | null>(null);
   useEffect(() => {
     let current = true;
-    setError(''); setActivities([]); opened.current.clear();
+    setError(''); setActivities([]); setActivitiesOpen(false); opened.current.clear();
     getLearningActivities(trackId).then(result => { if (current) setActivities(result.items); })
       .catch((failure: unknown) => { if (current) setError(failure instanceof Error ? failure.message : 'Não foi possível carregar as atividades.'); });
     return () => { current = false; };
@@ -34,6 +35,29 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
     activeRef.current = activity;
     videoRef.current?.pause();
     opened.current.add(activity.id); setSaveError(''); setActive(activity);
+  }
+
+  function openActivityList() {
+    resume.current = !!videoRef.current && !videoRef.current.paused && !videoRef.current.ended;
+    videoRef.current?.pause();
+    setActivitiesOpen(true);
+  }
+
+  function closeActivityList() {
+    setActivitiesOpen(false);
+    const shouldResume = resume.current;
+    resume.current = false;
+    if (shouldResume && videoRef.current) {
+      void videoRef.current.play().catch(() => {
+        setNotice('Use Reproduzir para continuar o vídeo.');
+      });
+    }
+  }
+
+  function startFromList(activity: LearningActivity) {
+    const shouldResume = resume.current;
+    setActivitiesOpen(false);
+    open(activity, shouldResume);
   }
   useEffect(() => {
     const video = videoRef.current;
@@ -91,14 +115,46 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
     <p>{error}</p><button className="button button-secondary" onClick={() => setRetry(value => value + 1)} type="button">Recarregar atividades</button>
   </section>;
   if (!activities.length) return null;
-  return <section aria-label="Jogos e questionários" className="learning-lesson-details">
-    <h2>Pratique o que aprendeu</h2>
-    <p className="muted-copy">Atividades opcionais, sem pontos. Você pode pular e continuar seus vídeos.</p>
-    <div className="game-actions">{activities.map(activity => <button className="button button-secondary" key={activity.id}
-      onClick={() => open(activity)} type="button">
-      {activity.module.title}{activity.outcome === 'completed' ? ' · Concluída' : activity.outcome === 'skipped' ? ' · Pulada' : ''}
-    </button>)}</div>
+  return <section aria-labelledby="learning-activities-title" className="learning-lesson-details learning-activities-panel">
+    <div className="learning-activities-intro">
+      <div className="learning-activities-heading">
+        <h2 id="learning-activities-title">Atividades para praticar</h2>
+        <span>{activities.length}</span>
+      </div>
+      <p>Quizzes opcionais, sem pontos. Pular não bloqueia a conclusão do curso.</p>
+    </div>
+    <button aria-expanded={activitiesOpen} aria-haspopup="dialog" className="learning-activities-open"
+      onClick={openActivityList} type="button">
+      Ver atividades <span aria-hidden="true">→</span>
+    </button>
     {notice && <p role="status">{notice}</p>}
+    {activitiesOpen && (
+      <CourseDialog onClose={closeActivityList} title="Atividades para praticar" wide>
+        <div className="learning-activity-grid">
+          {activities.map(activity => {
+            const status = activity.outcome === 'completed'
+              ? 'Concluída'
+              : activity.outcome === 'skipped'
+                ? 'Pulada'
+                : 'Iniciar atividade';
+            return (
+              <button
+                aria-label={`${activity.module.title} · ${status}`}
+                className="learning-activity-card"
+                key={activity.id}
+                onClick={() => startFromList(activity)}
+                type="button"
+              >
+                <span className="learning-activity-title">{activity.module.title}</span>
+                <span aria-hidden="true" className={`learning-activity-status${activity.outcome ? ` is-${activity.outcome}` : ' is-available'}`}>
+                  {activity.outcome === 'completed' ? '✓' : activity.outcome === 'skipped' ? 'Pulada' : '→'}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </CourseDialog>
+    )}
     {active && <CourseDialog busy={busy} onClose={() => void close('skipped')} title={active.module.title}>
       <GamePlayer key={active.id} module={active.module} onClose={outcome => void close(outcome)} />
       {saveError && <div role="alert"><p>{saveError}</p>

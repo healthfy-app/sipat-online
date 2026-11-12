@@ -44,6 +44,14 @@ function makeVideo(id: string, title: string): api.PlatformCourseVideo {
 
 const opening = makeVideo('v-1', 'Abertura');
 const closing = makeVideo('v-2', 'Encerramento');
+const memoryModule: api.GameModule = {
+  id: 'g-1',
+  title: 'Memória: equipamentos e funções',
+  gameType: 'Memory',
+  questions: [],
+  createdAt: '2026-11-02T12:00:00Z',
+  usageCount: 0,
+};
 
 const ergonomics: api.PlatformCourse = {
   id: 'c-1',
@@ -340,6 +348,9 @@ describe('Platform course catalog', () => {
     await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
     await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
     await user.click(screen.getByRole('button', { name: 'Configurar' }));
+    expect(screen.getByRole('heading', { name: 'Detalhes do curso' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Informações e preferências' })).toBeVisible();
+    expect(screen.getByText('PRÉVIA DA CAPA')).toBeVisible();
     const photo = new File(['img'], 'capa.png', { type: 'image/png' });
     await user.upload(screen.getByLabelText('Escolher foto'), photo);
 
@@ -427,8 +438,40 @@ describe('Platform course catalog', () => {
     await user.click(screen.getByRole('button', { name: 'Próximo: Configurar →' }));
     expect(screen.getByLabelText('Nome do curso')).toHaveValue('Ergonomia');
     await user.click(screen.getByRole('button', { name: 'Próximo: Publicar →' }));
-    expect(screen.getByRole('region', { name: 'Revisar e publicar' })).toBeVisible();
+    const review = screen.getByRole('region', { name: 'Revisar e publicar' });
+    expect(review).toBeVisible();
+    expect(within(review).getByRole('heading', { name: 'Detalhes do curso' })).toBeVisible();
+    expect(within(review).getByRole('heading', { name: 'Publicação no catálogo' })).toBeVisible();
+    expect(within(review).getByText('Título').parentElement).toHaveTextContent('Ergonomia');
+    expect(within(review).getByText('2 vídeos')).toBeVisible();
+    expect(within(review).getByText('Ativada após os vídeos')).toBeVisible();
+    expect(within(review).getByText('No catálogo')).toBeVisible();
     expect(api.updatePlatformCourse).not.toHaveBeenCalled();
+  });
+
+  it('explains where optional activities appear and how to configure a video question', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listGameModules).mockResolvedValue([memoryModule]);
+    render(<PlatformCoursesPage />, '/platform/courses/c-1/edit');
+
+    await user.click(await screen.findByRole('button', { name: 'Configurar atividades' }));
+    const dialog = screen.getByRole('dialog', { name: 'Atividades e perguntas' });
+    expect(within(dialog).getByRole('heading', { name: 'Atividade entre vídeos' })).toBeVisible();
+    expect(within(dialog).getByRole('heading', { name: 'Atividade durante o vídeo' })).toBeVisible();
+    expect(within(dialog).getByText('Sem pontos · nunca bloqueia o progresso')).toBeVisible();
+    expect(within(dialog).getByLabelText('Atividade')).toBeVisible();
+    expect(within(dialog).getByLabelText('Quando exibir')).toHaveValue('2');
+    expect(within(dialog).getByRole('button', { name: 'Adicionar à trilha' })).toBeDisabled();
+
+    await user.selectOptions(within(dialog).getByLabelText('Atividade'), 'g-1');
+    expect(within(dialog).getByRole('button', { name: 'Adicionar à trilha' })).toBeEnabled();
+    const firstVideo = within(dialog).getByText('Vídeo 1 · Abertura').closest('details')!;
+    expect(firstVideo).not.toHaveAttribute('open');
+    await user.click(within(dialog).getByText('Vídeo 1 · Abertura'));
+    expect(firstVideo).toHaveAttribute('open');
+    expect(within(firstVideo).getByLabelText('Prévia de Abertura')).toBeVisible();
+    expect(within(firstVideo).getByLabelText('Momento do vídeo (segundos)')).toBeVisible();
+    expect(within(firstVideo).getByLabelText('Atividade a exibir')).toBeVisible();
   });
 
   it('recovers from a media failure in the editor preview', async () => {

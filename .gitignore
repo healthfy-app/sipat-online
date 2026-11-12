@@ -11,6 +11,7 @@
 .impeccable/
 local-data/
 deploy/.env.production
+!deploy/.env.production.example
 deploy/terraform/terraform.tfvars
 deploy/terraform/sipat-online.tfplan
 deploy/terraform/.terraform/

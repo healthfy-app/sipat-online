@@ -75,78 +75,111 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
   }
 
   return <div className="page-content tenant-appearance-page">
-    <div className="page-heading">
+    <div className="page-heading appearance-page-heading">
       <div>
+        <span className="appearance-eyebrow">PORTAL DA EMPRESA</span>
         <h1>Identidade visual</h1>
-        <p className="muted-copy">Personalize o portal de {tenant.tenantName}. Confira a prévia antes de publicar para a sua empresa.</p>
+        <p className="muted-copy">Personalize a experiência de aprendizagem de {tenant.tenantName}.</p>
       </div>
     </div>
     <form className="appearance-layout" onSubmit={event => void save(event)}>
       <div className="appearance-settings">
         <section className="appearance-section" aria-labelledby="appearance-logo-title">
-          <h2 id="appearance-logo-title">Logo da empresa</h2>
-          <p>Ela aparece na página de entrada e na navegação do portal, sem mudar os certificados já emitidos.</p>
-          <div className="appearance-logo-sample">
-            <img src={previewLogo ?? '/favicon.svg'} alt="Prévia da logo da empresa" />
+          <div className="appearance-section-heading">
+            <span aria-hidden="true" className="appearance-section-number">01</span>
+            <div>
+              <h2 id="appearance-logo-title">Logo da empresa</h2>
+              <p>Aparece na entrada e na navegação. Os certificados já emitidos não são alterados.</p>
+            </div>
           </div>
-          <label
-            className="appearance-upload-dropzone"
-            htmlFor="appearance-logo"
-            onDragOver={event => event.preventDefault()}
-            onDrop={event => {
-              event.preventDefault();
-              void readLogo(event.dataTransfer.files[0]);
-            }}
-          >
-            <strong>Selecionar logo PNG</strong>
-            <span>Arraste o arquivo até aqui ou clique para procurar · até 256 KB</span>
-            <input
-              aria-label="Selecionar logo PNG"
-              aria-describedby="appearance-logo-help"
-              accept=".png,image/png"
-              className="appearance-file-input"
-              disabled={busy || reading}
-              id="appearance-logo"
-              key={fileVersion}
-              onChange={event => void readLogo(event.target.files?.[0])}
-              type="file"
-            />
-          </label>
-          <p className="field-hint" id="appearance-logo-help">Até 2000 × 2000 pixels. Prefira um PNG com fundo transparente.</p>
-          {fileName && <p className="muted-copy">{fileName} · pronto para salvar</p>}
-          {(previewLogo || logoBase64) && <button className="button button-quiet" type="button" disabled={busy || reading}
-            onClick={() => { setRemoveLogo(true); setLogoBase64(null); setFileName(''); setFileVersion(value => value + 1); setNotice(''); }}>
-            Remover logo
-          </button>}
+          <div className="appearance-logo-editor">
+            <div className="appearance-logo-sample">
+              <img src={previewLogo ?? '/favicon.svg'} alt="Prévia da logo da empresa" />
+              <span>PRÉVIA</span>
+            </div>
+            <div className="appearance-logo-controls">
+              <label
+                className="appearance-upload-dropzone"
+                htmlFor="appearance-logo"
+                onDragOver={event => event.preventDefault()}
+                onDrop={event => {
+                  event.preventDefault();
+                  void readLogo(event.dataTransfer.files[0]);
+                }}
+              >
+                <span aria-hidden="true" className="appearance-upload-icon">↑</span>
+                <strong>Escolher arquivo PNG</strong>
+                <span>Solte aqui ou procure no dispositivo · até 256 KB</span>
+                <input
+                  aria-label="Selecionar logo PNG"
+                  aria-describedby="appearance-logo-help"
+                  accept=".png,image/png"
+                  className="appearance-file-input"
+                  disabled={busy || reading}
+                  id="appearance-logo"
+                  key={fileVersion}
+                  onChange={event => void readLogo(event.target.files?.[0])}
+                  type="file"
+                />
+              </label>
+              {fileName && <p className="appearance-file-name" role="status">{fileName} · pronto para salvar</p>}
+              {(previewLogo || logoBase64) && <button className="button button-quiet appearance-remove-logo"
+                type="button" disabled={busy || reading}
+                onClick={() => { setRemoveLogo(true); setLogoBase64(null); setFileName(''); setFileVersion(value => value + 1); setNotice(''); }}>
+                Remover logo
+              </button>}
+            </div>
+          </div>
+          <p className="field-hint" id="appearance-logo-help">PNG de até 2000 × 2000 px. Para melhores resultados, use fundo transparente.</p>
         </section>
         <section className="appearance-section" aria-labelledby="appearance-colors-title">
-          <h2 id="appearance-colors-title">Cores do portal</h2>
-          <p>A cor principal identifica a empresa nos botões e destaques. A segunda cor mantém o texto legível sobre ela.</p>
-          <ColorField label="Cor principal" value={primary} fallback={tenant.primaryColor} onChange={setPrimary} disabled={busy} id="primary" />
-          <ColorField label="Cor do texto dos botões" value={secondary} fallback={tenant.secondaryColor} onChange={setSecondary} disabled={busy} id="secondary" />
+          <div className="appearance-section-heading">
+            <span aria-hidden="true" className="appearance-section-number">02</span>
+            <div>
+              <h2 id="appearance-colors-title">Cores do portal</h2>
+              <p>Defina a cor de destaque e a cor do texto dos botões. A prévia acompanha suas alterações.</p>
+            </div>
+          </div>
+          <div className="appearance-color-grid">
+            <ColorField label="Cor principal" value={primary} fallback={tenant.primaryColor} onChange={setPrimary} disabled={busy} id="primary" />
+            <ColorField label="Texto dos botões" value={secondary} fallback={tenant.secondaryColor} onChange={setSecondary} disabled={busy} id="secondary" />
+          </div>
           <p className={`appearance-contrast${colorsValid && contrast >= 4.5 ? '' : ' appearance-contrast-warning'}`} role="status">
+            <span aria-hidden="true">{colorsValid && contrast >= 4.5 ? '✓' : '!'}</span>
             {colorsValid
-              ? `${contrast >= 4.5 ? '✓' : '!'} Contraste ${contrast.toFixed(2).replace('.', ',')}:1 · ${contrast >= 4.5 ? 'Texto legível' : 'Ajuste as cores para atingir 4,5:1'}`
+              ? `Contraste ${contrast.toFixed(2).replace('.', ',')}:1 · ${contrast >= 4.5 ? 'texto legível' : 'ajuste para atingir 4,5:1'}`
               : 'Use cores no formato #RRGGBB.'}
           </p>
         </section>
         <div className="appearance-save">
           {error && <p className="form-error" role="alert">{error}</p>}
           {notice && <p className="success-message" role="status">{notice}</p>}
-          <p className="field-hint">{changed ? 'Alterações ainda não salvas. A prévia é visível somente para você.' : 'A aparência publicada está atualizada.'}</p>
-          <div className="form-actions">
-            <button className="button button-primary" type="submit"
-              aria-busy={busy || reading}
-              disabled={busy || reading || !changed || !colorsValid || contrast < 4.5}>
-              {busy ? 'Salvando...' : reading ? 'Lendo logo...' : 'Salvar identidade visual'}
-            </button>
-            <button className="button button-secondary" type="button" disabled={busy || reading || !changed} onClick={reset}>Descartar alterações</button>
-          </div>
+          <p className={`appearance-save-state${changed ? ' is-dirty' : ''}`} role="status">
+            <span aria-hidden="true">{changed ? '●' : '✓'}</span>
+            {changed ? 'Alterações não publicadas' : 'Identidade visual publicada'}
+          </p>
+          {changed && (
+            <div className="form-actions">
+              <button className="button button-primary" type="submit"
+                aria-busy={busy || reading}
+                disabled={busy || reading || !colorsValid || contrast < 4.5}>
+                {busy ? 'Salvando...' : reading ? 'Lendo logo...' : 'Salvar identidade visual'}
+              </button>
+              <button className="button button-secondary" type="button" disabled={busy || reading} onClick={reset}>
+                Descartar alterações
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <aside className="appearance-preview-column" aria-label="Prévia da identidade visual">
-        <h2>Assim ficará o portal</h2>
-        <p className="muted-copy">Uma prévia, não uma publicação automática.</p>
+        <div className="appearance-preview-heading">
+          <div>
+            <h2>Prévia do portal</h2>
+            <p>Veja como a identidade aparece para os participantes.</p>
+          </div>
+          <span><span aria-hidden="true" />AO VIVO</span>
+        </div>
         <div className="appearance-preview" style={tenantTheme(colorsValid ? primary : tenant.primaryColor, colorsValid ? secondary : tenant.secondaryColor)}>
           <div className="appearance-preview-header">
             <img src={previewLogo ?? '/favicon.svg'} alt="" />
@@ -156,10 +189,10 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
             <span className="appearance-preview-section">Minha formação</span>
             <h3>Aprender também faz parte de cuidar.</h3>
             <p>Os cursos e conteúdos da sua empresa, em um só lugar.</p>
-            <span className="appearance-preview-button">Continuar curso</span>
+            <span className="appearance-preview-button">Continuar curso <span aria-hidden="true">→</span></span>
           </div>
         </div>
-        <p className="field-hint">O nome e os dados da empresa permanecem os mesmos. A logo do certificado é configurada separadamente pelo dono da plataforma.</p>
+        <p className="appearance-preview-note">Nome, dados e certificados não mudam. A logo dos certificados é configurada separadamente pela plataforma.</p>
       </aside>
     </form>
   </div>;

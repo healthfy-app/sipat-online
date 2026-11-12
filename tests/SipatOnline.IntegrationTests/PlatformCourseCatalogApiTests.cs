@@ -214,7 +214,8 @@ public sealed class PlatformCourseCatalogApiTests
         content.Add(file, "cover", "capa");
         using var request = new HttpRequestMessage(
             HttpMethod.Put,
-            $"https://{Host}/api/platform/catalog/courses/{courseId}/cover") { Content = content };
+            $"https://{Host}/api/platform/catalog/courses/{courseId}/cover")
+        { Content = content };
         request.Headers.Add("X-CSRF-TOKEN", token!.RequestToken);
         return await client.SendAsync(request);
     }
