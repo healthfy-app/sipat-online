@@ -261,18 +261,42 @@ describe('learning experience', () => {
     expect(screen.queryByRole('button', { name: /Marcar como concluída/ })).not.toBeInTheDocument();
   });
 
-  it('restores saved position and preserves the chosen playback speed', async () => {
-    const user = userEvent.setup();
+  it('restores the saved position and keeps the player locked at normal speed', async () => {
     const { video } = await playableCourse([{ ...lesson, lastPlaybackPositionMilliseconds: 2400 }]);
     Object.defineProperty(video, 'duration', { configurable: true, value: 5 });
     fireEvent.loadedMetadata(video);
     expect(video.currentTime).toBe(2.4);
     expect(video).toHaveAttribute('controls');
     expect(video).toHaveAttribute('playsinline');
-    await user.selectOptions(screen.getByLabelText('Velocidade de reprodução'), '1.5');
-    fireEvent.loadedMetadata(video);
-    expect(video.playbackRate).toBe(1.5);
+    expect(screen.queryByLabelText('Velocidade de reprodução')).not.toBeInTheDocument();
+    expect(video).toHaveAttribute('controlslist', expect.stringContaining('noplaybackrate'));
+    video.playbackRate = 2;
+    fireEvent.rateChange(video);
+    expect(video.playbackRate).toBe(1);
     expect(recordRange).not.toHaveBeenCalled();
+  });
+
+  it('sends the viewer back when they try to skip ahead of what was watched', async () => {
+    const { video } = await playableCourse([{ ...lesson, lastPlaybackPositionMilliseconds: 2400 }]);
+    Object.defineProperty(video, 'duration', { configurable: true, value: 60 });
+    fireEvent.loadedMetadata(video);
+    video.currentTime = 40;
+    fireEvent.seeking(video);
+    expect(video.currentTime).toBe(2.4);
+    expect(await screen.findByText(/não é possível avançar/i)).toBeVisible();
+
+    video.currentTime = 1;
+    fireEvent.seeking(video);
+    expect(video.currentTime).toBe(1);
+  });
+
+  it('lets a finished lesson be reviewed freely', async () => {
+    const { video } = await playableCourse([{ ...lesson, isCompleted: true, lastPlaybackPositionMilliseconds: 0 }]);
+    Object.defineProperty(video, 'duration', { configurable: true, value: 60 });
+    fireEvent.loadedMetadata(video);
+    video.currentTime = 40;
+    fireEvent.seeking(video);
+    expect(video.currentTime).toBe(40);
   });
 
   it('waits for pending progress and the final range before changing lessons', async () => {
@@ -296,17 +320,13 @@ describe('learning experience', () => {
     await waitFor(() => expect(recordRange).toHaveBeenLastCalledWith('track-1', 'lesson-2', 'session-lesson-2', 0, 1000, 1000));
   });
 
-  it('saves watched coverage before seeking without crediting the skipped interval', async () => {
+  it('saves watched coverage before rewinding and resumes from the new position', async () => {
     const { video } = await playableCourse();
     atTime(video, 0); fireEvent.playing(video);
-    atTime(video, 2); fireEvent.timeUpdate(video);
-    atTime(video, 4); fireEvent.seeking(video); fireEvent.seeked(video);
-    await waitFor(() => expect(savePosition).toHaveBeenCalledWith('track-1', 'lesson-1', 4000));
-    fireEvent.playing(video);
-    atTime(video, 5); fireEvent.ended(video);
-    await waitFor(() => expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 4000, 5000, 5000));
-    expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 2000, 2000);
-    expect(recordRange.mock.calls.every((call: unknown[]) => !(call[3] === 0 && call[4] === 5000))).toBe(true);
+    atTime(video, 4); fireEvent.timeUpdate(video);
+    atTime(video, 1); fireEvent.seeking(video); fireEvent.seeked(video);
+    await waitFor(() => expect(savePosition).toHaveBeenCalledWith('track-1', 'lesson-1', 1000));
+    expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 4000, 4000);
   });
 
   it('keeps the course open on save failure and retries before returning to the catalog', async () => {
@@ -601,7 +621,6 @@ describe('learning experience', () => {
       sessionId: 'session-1',
       isDevelopmentDemo: true,
     });
-    const user = userEvent.setup();
 
     const { container } = renderAt('/learning/tracks/track-1');
 
@@ -609,8 +628,7 @@ describe('learning experience', () => {
     expect(await screen.findByText(/não comprova participação oficial/i)).toBeVisible();
     expect(container.querySelector('video')).toHaveAttribute('src', 'https://media.example.test/session/video.mp4');
 
-    await user.selectOptions(screen.getByLabelText('Velocidade de reprodução'), '1.5');
-    expect(screen.getByLabelText('Velocidade de reprodução')).toHaveValue('1.5');
+    expect(screen.queryByLabelText('Velocidade de reprodução')).not.toBeInTheDocument();
     expect(startPlayback).toHaveBeenCalledWith('track-1', 'lesson-1');
   });
 

@@ -49,7 +49,8 @@ export default function LearningTrackPage({
   const [saveMessage, setSaveMessage] = useState('');
   const [retry, setRetry] = useState(0);
   const [playbackRetry, setPlaybackRetry] = useState(0);
-  const [playbackRate, setPlaybackRate] = useState('1');
+  const [seekNotice, setSeekNotice] = useState(false);
+  const furthestRef = useRef(0);
   const [activeLessonTab, setActiveLessonTab] = useState<'about' | 'notes' | 'materials'>('about');
   const [isLessonDetailsOpen, setLessonDetailsOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -178,6 +179,9 @@ export default function LearningTrackPage({
     rangeStartRef.current = null;
     lastSampleRef.current = null;
     lastSavePositionRef.current = selectedLesson.lastPlaybackPositionMilliseconds;
+    // aula já concluída pode ser revista livremente; as demais só andam até onde a pessoa já assistiu
+    furthestRef.current = selectedLesson.isCompleted ? Number.POSITIVE_INFINITY : selectedLesson.lastPlaybackPositionMilliseconds / 1000;
+    setSeekNotice(false);
 
     startLearningPlayback(apiTrackId, selectedLesson.id)
       .then((session) => {
@@ -397,12 +401,20 @@ export default function LearningTrackPage({
 
     if (currentTime < previousTime || currentTime - previousTime > 5) {
       rangeStartRef.current = Math.floor(currentTime * 1000);
+    } else if (currentTime > furthestRef.current) {
+      furthestRef.current = currentTime;
     }
     lastSampleRef.current = currentTime;
   }
 
   function handleSeeking() {
     const video = videoRef.current;
+    if (video && video.currentTime > furthestRef.current + 1) {
+      // tentativa de pular o que ainda não foi assistido: volta ao ponto liberado
+      video.currentTime = furthestRef.current;
+      setSeekNotice(true);
+      return;
+    }
     if (video) {
       if (lastSampleRef.current !== null && rangeStartRef.current !== null)
         void persistPlayback(true, { position: Math.floor(lastSampleRef.current * 1000), rangeStart: rangeStartRef.current });
@@ -421,7 +433,7 @@ export default function LearningTrackPage({
     if (resumeAt > 0 && resumeAt < video.duration) {
       video.currentTime = resumeAt;
     }
-    video.playbackRate = Number(playbackRate);
+    video.playbackRate = 1;
   }
 
   async function selectLesson(lesson: LearningLessonProgress) {
@@ -574,6 +586,7 @@ export default function LearningTrackPage({
                   aria-label={selectedLesson?.title ?? 'Vídeo da trilha'}
                   className="learning-video"
                   controls
+                  controlsList="nodownload noplaybackrate"
                   key={`${selectedLesson?.id}-${playbackSession.sessionId}`}
                   onError={() => {
                     setPlaybackSession(null);
@@ -583,6 +596,7 @@ export default function LearningTrackPage({
                   onLoadedMetadata={handleLoadedMetadata}
                   onPause={() => void persistPlayback(true)}
                   onPlaying={handlePlaying}
+                  onRateChange={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }}
                   onSeeking={handleSeeking}
                   onSeeked={() => void persistPlayback(true)}
                   onTimeUpdate={handleTimeUpdate}
@@ -653,24 +667,11 @@ export default function LearningTrackPage({
           )}
 
           <div className="learning-player-tools">
-            <label className="learning-speed-control">
-              <span>Velocidade</span>
-              <select
-                aria-label="Velocidade de reprodução"
-                disabled={!playbackSession}
-                onChange={(event) => {
-                  setPlaybackRate(event.target.value);
-                  if (videoRef.current) {
-                    videoRef.current.playbackRate = Number(event.target.value);
-                  }
-                }}
-                value={playbackRate}
-              >
-                {['0.5', '0.75', '1', '1.25', '1.5', '1.75', '2'].map((rate) => (
-                  <option key={rate} value={rate}>{rate.replace('.', ',')}x</option>
-                ))}
-              </select>
-            </label>
+            {seekNotice && (
+              <span className="learning-seek-notice" role="status">
+                Assista ao vídeo em sequência: não é possível avançar além do que você já viu.
+              </span>
+            )}
             <span className={`learning-save-status${saveMessage && !isSaving ? ' is-visible' : ''}`} role="status">
               {isSaving ? 'Salvando progresso...' : saveMessage}
             </span>
