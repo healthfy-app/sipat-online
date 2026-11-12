@@ -6,12 +6,15 @@ import LoadingState from './LoadingState';
 import ParticipantOutcomesPanel from './ParticipantOutcomesPanel';
 import {
   assignLearningTrack,
+  changeUserStatus,
   createParticipant,
+  getLearningParticipantReport,
   listAllParticipants,
   listLearningParticipation,
   listTenantLearningTracks,
   type CreateParticipantData,
   type LearningParticipantProgress,
+  type LearningParticipantReport,
   type LearningTrackSummary,
   type ParticipantAccount,
 } from './api';
@@ -31,6 +34,13 @@ import {
   type ParticipantProgressSummary,
   type ParticipantProgressStatus,
 } from './participantProgress';
+import {
+  companyReportCsv,
+  formatReportDate,
+  formatWatchTime,
+  participantReportCsv,
+  reportFileName,
+} from './participantReports';
 import './LearningManagementPage.css';
 
 const emptyParticipant: CreateParticipantData = {
@@ -84,6 +94,10 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
   const [csvParseResult, setCsvParseResult] = useState<ParticipantCsvParseResult | null>(null);
   const [csvImportResult, setCsvImportResult] = useState<ParticipantCsvImportResult | null>(null);
   const [credentialsDownloaded, setCredentialsDownloaded] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
+  const [isBulkBusy, setIsBulkBusy] = useState(false);
+  const [report, setReport] = useState<LearningParticipantReport | null>(null);
+  const [reportError, setReportError] = useState('');
   const [error, setError] = useState('');
   const [dialogError, setDialogError] = useState('');
   const [notice, setNotice] = useState('');
@@ -142,6 +156,73 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    if (!isDetailsOpen || !selectedParticipantId) return undefined;
+    let cancelled = false;
+    setReport(null);
+    setReportError('');
+    getLearningParticipantReport(selectedParticipantId)
+      .then((value) => { if (!cancelled) setReport(value); })
+      .catch((reportLoadError) => { if (!cancelled) setReportError(getErrorMessage(reportLoadError)); });
+    return () => { cancelled = true; };
+  }, [isDetailsOpen, selectedParticipantId]);
+
+  const visibleIds = visibleParticipants.map((summary) => summary.participant.id);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+
+  function toggleSelected(id: string) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAllVisible() {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      visibleIds.forEach((id) => (allVisibleSelected ? next.delete(id) : next.add(id)));
+      return next;
+    });
+  }
+
+  async function handleBulkStatus(isActive: boolean) {
+    const targets = participants.filter((participant) => selectedIds.has(participant.id) && participant.isActive !== isActive);
+    if (targets.length === 0) {
+      setNotice(isActive ? 'As pessoas selecionadas já estão ativas.' : 'As pessoas selecionadas já estão inativas.');
+      return;
+    }
+    const verb = isActive ? 'ativar' : 'desativar';
+    const detail = isActive ? '' : ' Elas deixam de acessar a plataforma, mas o progresso é mantido.';
+    if (!window.confirm(`Deseja ${verb} ${targets.length} ${targets.length === 1 ? 'pessoa' : 'pessoas'}?${detail}`)) return;
+    setIsBulkBusy(true);
+    setError('');
+    setNotice('');
+    const failed: string[] = [];
+    for (const participant of targets) {
+      try {
+        await changeUserStatus(participant.id, isActive);
+      } catch {
+        failed.push(participant.displayName);
+      }
+    }
+    setIsBulkBusy(false);
+    setSelectedIds(new Set());
+    await loadData(selectedParticipantId);
+    const done = targets.length - failed.length;
+    setNotice(`${done} ${done === 1 ? 'pessoa' : 'pessoas'} ${isActive ? 'ativada(s)' : 'desativada(s)'}.`);
+    if (failed.length > 0) setError(`Não foi possível alterar: ${failed.join(', ')}.`);
+  }
+
+  function handleDownloadCompanyReport() {
+    downloadCsv(reportFileName('empresa'), companyReportCsv(participants, participation));
+  }
+
+  function handleDownloadParticipantReport() {
+    if (!report) return;
+    downloadCsv(reportFileName(report.displayName), participantReportCsv(report));
+  }
 
   async function handleCreateParticipant(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -312,6 +393,9 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
           {!isLoading && (search || statusFilter !== 'all') && <span className="count-label">
             {visibleParticipants.length} de {participants.length} participantes
           </span>}
+          <button className="button button-secondary" disabled={isLoading || participants.length === 0} onClick={handleDownloadCompanyReport} type="button">
+            Baixar relatório (CSV)
+          </button>
           {!readOnly && <button className="button button-primary" onClick={openAddDialog} type="button">
             Adicionar participantes
           </button>}
@@ -375,6 +459,15 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
           )}
         </div>
 
+        {!readOnly && selectedIds.size > 0 && (
+          <div aria-label="Ações em lote" className="participant-bulk-bar" role="group">
+            <strong>{selectedIds.size} {selectedIds.size === 1 ? 'selecionada' : 'selecionadas'}</strong>
+            <button className="button button-secondary" disabled={isBulkBusy} onClick={() => void handleBulkStatus(true)} type="button">Ativar</button>
+            <button className="button button-secondary" disabled={isBulkBusy} onClick={() => void handleBulkStatus(false)} type="button">Desativar</button>
+            <button className="button button-quiet" disabled={isBulkBusy} onClick={() => setSelectedIds(new Set())} type="button">Limpar seleção</button>
+          </div>
+        )}
+
         {isLoading ? (
           <LoadingState className="list-state">Carregando participantes e progresso...</LoadingState>
         ) : participants.length === 0 ? (
@@ -395,6 +488,14 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
             <table aria-label="Participantes da empresa e progresso geral" className="data-table">
               <thead>
                 <tr>
+                  {!readOnly && <th scope="col">
+                    <input
+                      aria-label="Selecionar todos os participantes listados"
+                      checked={allVisibleSelected}
+                      onChange={toggleAllVisible}
+                      type="checkbox"
+                    />
+                  </th>}
                   <th scope="col">Participante</th>
                   <th scope="col">Trilhas concluídas</th>
                   <th scope="col">Aulas concluídas</th>
@@ -407,6 +508,8 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
                   <ParticipantRow
                     key={summary.participant.id}
                     onOpen={() => openParticipantDetails(summary)}
+                    onToggle={readOnly ? undefined : () => toggleSelected(summary.participant.id)}
+                    selected={selectedIds.has(summary.participant.id)}
                     summary={summary}
                   />
                 ))}
@@ -661,6 +764,51 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
             )}
           </section>
 
+          <section aria-labelledby="participant-videos-title" className="participant-detail-section">
+            <div className="participant-directory-heading">
+              <div>
+                <p className="eyebrow">AUDITORIA</p>
+                <h3 id="participant-videos-title">Vídeos assistidos</h3>
+              </div>
+              <button className="button button-secondary" disabled={!report} onClick={handleDownloadParticipantReport} type="button">
+                Baixar relatório (CSV)
+              </button>
+            </div>
+            {reportError && <p className="form-error" role="alert">{reportError}</p>}
+            {!report && !reportError && <LoadingState className="list-state">Carregando vídeos assistidos...</LoadingState>}
+            {report && report.tracks.length === 0 && <p className="muted-copy">Nenhuma trilha liberada para esta pessoa.</p>}
+            {report?.tracks.map((experience) => (
+              <div className="table-scroll" key={experience.track.id}>
+                <table aria-label={`Vídeos de ${experience.track.title}`} className="data-table">
+                  <caption>
+                    {experience.track.title} · {experience.track.completedLessonCount} de {experience.track.lessonCount} vídeos concluídos
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Vídeo</th>
+                      <th scope="col">Assistido</th>
+                      <th scope="col">Tempo</th>
+                      <th scope="col">Concluído em</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {experience.lessons.map((lesson) => (
+                      <tr key={lesson.id}>
+                        <td data-label="Vídeo">
+                          {lesson.title}
+                          {lesson.sectionTitle && <small className="participant-directory-secondary"> · {lesson.sectionTitle}</small>}
+                        </td>
+                        <td data-label="Assistido">{lesson.isCompleted ? 'Concluído' : `${lesson.watchedPercentage}%`}</td>
+                        <td data-label="Tempo">{formatWatchTime(lesson.watchedMilliseconds)}</td>
+                        <td data-label="Concluído em">{formatReportDate(lesson.completedAt) || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </section>
+
           <div className="participant-detail-outcomes">
             <ParticipantOutcomesPanel participantId={selectedParticipantId} />
           </div>
@@ -704,20 +852,32 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
 
 function ParticipantRow({
   summary,
+  selected,
+  onToggle,
   onOpen,
 }: {
   summary: ParticipantProgressSummary;
+  selected: boolean;
+  onToggle?: () => void;
   onOpen: () => void;
 }) {
   return (
     <tr>
+      {onToggle && <td data-label="Selecionar">
+        <input
+          aria-label={`Selecionar ${summary.participant.displayName}`}
+          checked={selected}
+          onChange={onToggle}
+          type="checkbox"
+        />
+      </td>}
       <td data-label="Participante">
         <div className="participant-directory-person">
           <span aria-hidden="true" className="participant-directory-avatar">
             {getInitials(summary.participant.displayName)}
           </span>
           <span>
-            <strong>{summary.participant.displayName}</strong>
+            <button className="participant-name-link" onClick={onOpen} type="button">{summary.participant.displayName}</button>
             <small>Usuário {summary.participant.loginIdentifier}</small>
           </span>
         </div>

@@ -393,6 +393,41 @@ public sealed class LearningService(
             await learningStore.ListParticipantProgressAsync(tenantId.Value, cancellationToken));
     }
 
+    public async Task<Result<LearningParticipantReport>> GetParticipantReportAsync(
+        Guid participantId,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsureReportViewer();
+        if (!permission.IsSuccess)
+        {
+            return Result<LearningParticipantReport>.Failure(permission.Error);
+        }
+
+        var tenantId = GetTenantId();
+        if (!tenantId.IsSuccess)
+        {
+            return Result<LearningParticipantReport>.Failure(tenantId.Error);
+        }
+
+        var rows = (await learningStore.ListParticipantProgressAsync(tenantId.Value, cancellationToken))
+            .Where(item => item.ParticipantId == participantId)
+            .ToArray();
+        var tracks = new List<LearningExperience>();
+        foreach (var row in rows)
+        {
+            var experience = await learningStore.GetAssignedExperienceAsync(
+                tenantId.Value, participantId, row.TrackId, cancellationToken);
+            if (experience is not null)
+            {
+                tracks.Add(experience);
+            }
+        }
+
+        var identity = rows.FirstOrDefault();
+        return Result<LearningParticipantReport>.Success(new LearningParticipantReport(
+            participantId, identity?.LoginIdentifier ?? string.Empty, identity?.DisplayName ?? string.Empty, tracks));
+    }
+
     public async Task<Result<IReadOnlyList<LearningTrackCard>>> ListAssignedAsync(
         CancellationToken cancellationToken)
     {

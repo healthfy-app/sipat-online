@@ -10,4 +10,7 @@ public sealed record LearningParticipantProgress(
     int LessonCount,
     int CompletedLessonCount,
     int ProgressPercentage,
-    bool IsCompleted);
+    bool IsCompleted,
+    long WatchedMilliseconds = 0,
+    DateTimeOffset? CompletedAt = null,
+    DateTimeOffset? LastAccessedAt = null);

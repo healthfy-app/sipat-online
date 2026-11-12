@@ -376,6 +376,9 @@ export interface LearningParticipantProgress {
   completedLessonCount: number;
   progressPercentage: number;
   isCompleted: boolean;
+  watchedMilliseconds?: number;
+  completedAt?: string | null;
+  lastAccessedAt?: string | null;
 }
 
 export interface LearningLessonProgress {
@@ -389,6 +392,7 @@ export interface LearningLessonProgress {
   isCompleted: boolean;
   completedAt: string | null;
   sectionTitle?: string | null;
+  watchedMilliseconds?: number;
 }
 
 export interface LearningExperience {
@@ -770,6 +774,24 @@ export function createParticipant(data: CreateParticipantData): Promise<Particip
 
 export function listTenantLearningTracks(): Promise<LearningTrackSummary[]> {
   return requestJson<LearningTrackSummary[]>('/api/admin/learning/tracks');
+}
+
+export interface LearningParticipantReport {
+  participantId: string;
+  loginIdentifier: string;
+  displayName: string;
+  tracks: LearningExperience[];
+}
+
+export function getLearningParticipantReport(participantId: string): Promise<LearningParticipantReport> {
+  return requestJson<LearningParticipantReport>(`/api/admin/learning/participants/${participantId}/report`);
+}
+
+export function changeUserStatus(userId: string, isActive: boolean): Promise<ParticipantAccount> {
+  return requestJson<ParticipantAccount>(`/api/admin/users/${userId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ isActive }),
+  });
 }
 
 export function listLearningParticipation(): Promise<LearningParticipantProgress[]> {

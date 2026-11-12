@@ -21,7 +21,8 @@ public sealed record LearningLessonProgress(
     int WatchedPercentage,
     bool IsCompleted,
     DateTimeOffset? CompletedAt,
-    string? SectionTitle = null);
+    string? SectionTitle = null,
+    long WatchedMilliseconds = 0);
 
 public sealed record LearningExperience(
     LearningTrackCard Track,
@@ -40,3 +41,9 @@ public sealed record LearningLessonContext(
     Guid LessonId,
     string ProviderAssetReference,
     long DurationMilliseconds);
+
+public sealed record LearningParticipantReport(
+    Guid ParticipantId,
+    string LoginIdentifier,
+    string DisplayName,
+    IReadOnlyList<LearningExperience> Tracks);

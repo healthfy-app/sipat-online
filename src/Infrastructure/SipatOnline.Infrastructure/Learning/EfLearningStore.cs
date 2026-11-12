@@ -324,7 +324,10 @@ public sealed class EfLearningStore(
                 completedLessonCount == revisionLessons.Length
                     ? 100
                     : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
-                completedLessonCount == revisionLessons.Length));
+                completedLessonCount == revisionLessons.Length,
+                watchedDuration,
+                completedLessonCount == revisionLessons.Length ? participantProgress.Max(item => item.CompletedAt) : null,
+                participantProgress.Length == 0 ? null : LastAccess(progress, assignment.ParticipantId, revisionId)));
         }
 
         return rows
@@ -332,6 +335,11 @@ public sealed class EfLearningStore(
             .ThenBy(item => item.TrackTitle)
             .ToArray();
     }
+
+    private static DateTimeOffset? LastAccess(
+        IEnumerable<LearningProgressEntity> progress, Guid participantId, Guid revisionId) =>
+        progress.Where(item => item.ParticipantId == participantId && item.RevisionId == revisionId)
+            .Select(item => (DateTimeOffset?)item.LastAccessedAt).Max();
 
     public async Task<LearningExperience?> GetAssignedExperienceAsync(
         TenantId tenantId,
@@ -390,7 +398,8 @@ public sealed class EfLearningStore(
                 domainProgress?.WatchedPercentage ?? 0,
                 domainProgress?.IsCompleted ?? false,
                 domainProgress?.CompletedAt,
-                entity.SectionTitle);
+                entity.SectionTitle,
+                domainProgress?.WatchedMilliseconds ?? 0);
         }).ToArray();
 
         var totalDuration = lessonEntities.Sum(lesson => lesson.DurationMilliseconds);

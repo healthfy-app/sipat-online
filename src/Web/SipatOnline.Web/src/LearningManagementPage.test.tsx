@@ -10,6 +10,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+function readBlob(blob: Blob): Promise<string> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(blob);
+  });
+}
+
 function renderPage(path = '/admin/learning', readOnly = false) {
   return render(
     <MemoryRouter initialEntries={[path]}>
@@ -56,6 +64,25 @@ function setupApi() {
     }
     if (url === '/api/admin/learning/tracks') return Response.json([...tracks]);
     if (url === '/api/admin/learning/participation') return Response.json([...participation]);
+    if (url.startsWith('/api/admin/learning/participants/') && url.endsWith('/report')) {
+      return Response.json({
+        participantId: 'participant-1', loginIdentifier: 'MAT-001', displayName: 'Maria José Oliveira',
+        tracks: [{
+          track: { id: 'track-1', title: 'Ergonomia', lessonCount: 2, completedLessonCount: 1 },
+          lessons: [
+            { id: 'l-1', title: 'Abertura', sectionTitle: 'Introdução', durationMilliseconds: 600000, watchedMilliseconds: 600000, watchedPercentage: 100, isCompleted: true, completedAt: '2026-10-21T12:00:00Z' },
+            { id: 'l-2', title: 'Postura', sectionTitle: 'Prática', durationMilliseconds: 600000, watchedMilliseconds: 180000, watchedPercentage: 30, isCompleted: false, completedAt: null },
+          ],
+        }],
+      });
+    }
+    if (url.startsWith('/api/admin/users/') && url.endsWith('/status') && method === 'PUT') {
+      const id = url.split('/')[4];
+      const body = JSON.parse(String(init?.body)) as { isActive: boolean };
+      const target = participants.find((item) => item.id === id);
+      if (target) target.isActive = body.isActive;
+      return Response.json({ id, isActive: body.isActive });
+    }
     if (url === '/api/identity/antiforgery') return Response.json({ requestToken: 'csrf-token' });
     if (url === '/api/admin/users' && method === 'POST') {
       const data = JSON.parse(String(init?.body)) as Record<string, unknown>;
@@ -156,6 +183,52 @@ describe('company participant management', () => {
     renderPage('/admin/learning?status=not-started');
 
     expect(await screen.findByLabelText('Situação')).toHaveValue('not-started');
+  });
+
+  it('deactivates the selected participants in one batch', async () => {
+    const { fetchMock } = setupApi();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const user = userEvent.setup();
+    renderPage();
+
+    await screen.findByRole('row', { name: /Maria José Oliveira/ });
+    await user.click(screen.getByLabelText('Selecionar Maria José Oliveira'));
+    await user.click(screen.getByLabelText('Selecionar Carlos Souza'));
+    expect(screen.getByText('2 selecionadas')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Desativar' }));
+
+    expect(await screen.findByText('2 pessoas desativada(s).')).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/participant-1/status', expect.objectContaining({ method: 'PUT', body: JSON.stringify({ isActive: false }) }));
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/users/participant-2/status', expect.objectContaining({ method: 'PUT' }));
+    expect(screen.queryByText('2 selecionadas')).not.toBeInTheDocument();
+  });
+
+  it('shows the videos a person watched and offers the CSV reports', async () => {
+    setupApi();
+    const created: Blob[] = [];
+    vi.stubGlobal('URL', Object.assign(URL, {
+      createObjectURL: (blob: Blob) => { created.push(blob); return 'blob:report'; },
+      revokeObjectURL: () => undefined,
+    }));
+    const user = userEvent.setup();
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Baixar relatório (CSV)' }));
+    const company = await readBlob(created[0]);
+    expect(company).toContain('"Login";"Nome";"Conta";"Trilha"');
+    expect(company).toContain('"MAT-001";"Maria José Oliveira";"Ativo";"Ergonomia"');
+    expect(company).toContain('"MAT-002";"Carlos Souza";"Ativo";"";"0"');
+
+    await user.click(screen.getByRole('button', { name: 'Maria José Oliveira' }));
+    const detail = await screen.findByRole('dialog', { name: 'Trilhas de Maria José Oliveira' });
+    const table = await within(detail).findByRole('table', { name: 'Vídeos de Ergonomia' });
+    expect(within(table).getByText('Abertura')).toBeVisible();
+    expect(within(table).getByText('30%')).toBeVisible();
+    expect(within(table).getByText('0h03m')).toBeVisible();
+
+    await user.click(within(detail).getByRole('button', { name: 'Baixar relatório (CSV)' }));
+    const person = await readBlob(created[1]);
+    expect(person).toContain('"Postura";"0h10m";"0h03m";"30%";"Em andamento"');
   });
 
   it('drills into all assigned tracks and keeps assignment scoped to the selected participant', async () => {
