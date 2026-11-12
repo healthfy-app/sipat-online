@@ -1,5 +1,5 @@
-import { CirclePlus, Puzzle } from 'lucide-react';
-import type { Ref } from 'react';
+import { CirclePlus, Gamepad2, Puzzle } from 'lucide-react';
+import { Fragment, type Ref } from 'react';
 import type { PlatformCourse, PlatformCourseStatus } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,7 @@ export interface OutlineActions {
   onMoveVideo: (videoId: string, offset: -1 | 1) => void;
   onRemoveVideo: (videoId: string) => void;
   onManageActivities: () => void;
+  onAddActivity: (afterVideoCount: number) => void;
   onDuplicate: () => void;
 }
 
@@ -125,12 +126,12 @@ export default function CourseOutlinePanel({
                       const selected = item.key === selectedKey;
                       const flatIndex = item.kind === 'video' ? flatVideoIds.indexOf(item.video.id) : -1;
                       return (
+                        <Fragment key={item.key}>
                         <li
                           className={cn(
                             'group/item relative grid min-h-8 grid-cols-[1.25rem_minmax(0,1fr)_auto] items-center gap-x-1 rounded-sm px-1 transition-colors',
                             selected ? 'bg-accent' : 'hover:bg-background',
                           )}
-                          key={item.key}
                         >
                           <span aria-hidden="true" className={cn('grid place-items-center text-xs tabular-nums', item.kind === 'activity' ? 'text-[#b07d00]' : 'text-muted-foreground')}>
                             {item.kind === 'video' ? item.videoIndex + 1 : <Puzzle className="size-3.5" />}
@@ -179,6 +180,19 @@ export default function CourseOutlinePanel({
                             </span>
                           </>}
                         </li>
+                        {item.kind === 'video' && (
+                          <li className="min-h-0">
+                            <button
+                              className="m-0 inline-flex min-h-7 cursor-pointer items-center gap-1.5 border-0 bg-transparent py-0 pl-7 pr-2 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
+                              disabled={busy}
+                              onClick={() => actions.onAddActivity(item.videoIndex + 1)}
+                              type="button"
+                            >
+                              <Gamepad2 className="size-3.5" /> Atividade depois deste vídeo
+                            </button>
+                          </li>
+                        )}
+                        </Fragment>
                       );
                     })}
                   </ol>

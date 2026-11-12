@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  setPlatformCourseModules,
   setPlatformCourseStructure,
   type CourseLessonDraft,
   updatePlatformCourse,
@@ -10,6 +11,7 @@ import {
 } from '../api';
 import { Dialog } from '@/components/ui/dialog';
 import CourseGamesSection from '../CourseGamesSection';
+import AddActivityDialog from './AddActivityDialog';
 import AddVideoDialog from './AddVideoDialog';
 import CourseConfigureStep, { type CourseSettingsValues } from './CourseConfigureStep';
 import CourseEditorFrame, { type CourseEditorStep } from './CourseEditorFrame';
@@ -64,6 +66,7 @@ export default function CourseEditor({
   const [isMediaBusy, setIsMediaBusy] = useState(false);
   const [activeDialog, setActiveDialog] = useState<'video' | 'games' | null>(null);
   const [addTarget, setAddTarget] = useState<string | null>(null);
+  const [activityPosition, setActivityPosition] = useState<number | null>(null);
   const [previewSize, setPreviewSize] = useState<PreviewSize>('phone');
   const [selectedKey, setSelectedKey] = useState<string | null>(
     () => (course.videos[0] ? `video-${course.videos[0].id}` : null),
@@ -149,10 +152,29 @@ export default function CourseEditor({
     onMoveVideo: (videoId, offset) => void changeStructure(moveVideoInStructure(drafts(), videoId, offset), 'A ordem dos vídeos foi atualizada.'),
     onRemoveVideo: (videoId) => void changeStructure(removeVideo(drafts(), videoId), 'O vídeo foi removido do curso; continua na biblioteca.'),
     onManageActivities: () => openDialog('games'),
+    onAddActivity: (afterVideoCount) => {
+      onError('');
+      setActivityPosition(afterVideoCount);
+    },
     onDuplicate: () => {
       if (!dirty || window.confirm('Há alterações não salvas. Deseja duplicar a versão salva?')) onDuplicate();
     },
   };
+
+  async function addActivity(moduleId: string) {
+    if (activityPosition === null) return;
+    onError('');
+    setIsMediaBusy(true);
+    try {
+      await setPlatformCourseModules(course.id, [...course.modules, { moduleId, afterVideoCount: activityPosition }]);
+      await onChanged('A atividade foi adicionada à trilha.');
+      setActivityPosition(null);
+    } catch (activityError) {
+      onError(getErrorMessage(activityError));
+    } finally {
+      setIsMediaBusy(false);
+    }
+  }
 
   function linkVideo(videoId: string) {
     const current = drafts();
@@ -241,6 +263,17 @@ export default function CourseEditor({
           }}
           status={status}
           title={values.title}
+        />
+      )}
+
+      {activityPosition !== null && (
+        <AddActivityDialog
+          busy={isMediaBusy}
+          error={error}
+          modules={modules}
+          onClose={() => setActivityPosition(null)}
+          onPick={(moduleId) => void addActivity(moduleId)}
+          position={activityPosition}
         />
       )}
 

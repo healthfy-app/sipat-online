@@ -25,6 +25,7 @@ vi.mock('./api', async (importOriginal) => {
     listPlatformCourses: vi.fn(),
     listPlatformLibraryVideos: vi.fn(),
     setPlatformCourseCover: vi.fn(),
+    setPlatformCourseModules: vi.fn(),
     setPlatformCourseStructure: vi.fn(),
     setPlatformCourseVideos: vi.fn(),
     updatePlatformCourse: vi.fn(),
@@ -97,6 +98,7 @@ beforeEach(() => {
   vi.mocked(api.duplicatePlatformCourse).mockReset();
   vi.mocked(api.setPlatformCourseVideos).mockReset();
   vi.mocked(api.setPlatformCourseStructure).mockReset();
+  vi.mocked(api.setPlatformCourseModules).mockReset();
   vi.mocked(api.updatePlatformCourse).mockReset();
 });
 
@@ -469,6 +471,24 @@ describe('Platform course catalog', () => {
     await user.type(lessonName, 'Introdução{Enter}');
     expect(api.setPlatformCourseStructure).toHaveBeenLastCalledWith('c-1', [
       expect.objectContaining({ title: 'Introdução' }),
+    ]);
+  });
+
+  it('adds an activity right after a video with one click from the track', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listGameModules).mockResolvedValue([memoryModule]);
+    vi.mocked(api.setPlatformCourseModules).mockResolvedValue(ergonomics);
+    render(<PlatformCoursesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
+
+    const buttons = screen.getAllByRole('button', { name: 'Atividade depois deste vídeo' });
+    await user.click(buttons[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Adicionar atividade' });
+    await user.click(within(dialog).getByRole('button', { name: new RegExp(memoryModule.title) }));
+
+    expect(api.setPlatformCourseModules).toHaveBeenCalledWith('c-1', [
+      ...ergonomics.modules,
+      { moduleId: memoryModule.id, afterVideoCount: 1 },
     ]);
   });
 

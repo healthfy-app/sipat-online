@@ -114,7 +114,9 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
                 return Failure<LearningContentSnapshot>("learning.activity_invalid", "Revise os jogos e perguntas antes de associar este curso.");
             games.Add(game);
         }
-        return Result<LearningContentSnapshot>.Success(new(course.GamificationEnabled, games, course.Modules,
+        return Result<LearningContentSnapshot>.Success(new(
+            // ter atividades no curso basta: o interruptor antigo não pode esconder o que o editor mostra
+            course.GamificationEnabled || games.Count > 0, games, course.Modules,
             course.Videos.Select(item => new SnapshotVideo(item.Id, item.Checkpoints)).ToArray()));
     }
 
