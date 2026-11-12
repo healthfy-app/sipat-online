@@ -1671,3 +1671,8 @@
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+
+.portal-layout-learner .learning-seek-notice {
+  color: var(--learner-muted, #5b6b66);
+  font-size: 0.8125rem;
+}
