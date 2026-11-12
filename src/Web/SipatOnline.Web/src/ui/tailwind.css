@@ -15,7 +15,8 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
-  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
 
   --color-background: var(--canvas, #f3f5f4);
   --color-foreground: var(--ink, #0e2a22);
@@ -69,6 +70,9 @@ select[data-slot="select"] {
   background-repeat: no-repeat;
   background-size: 1rem;
 }
+
+/* diálogos, menus e painéis renderizam fora do layout: levam a fonte do design system */
+[data-slot="dialog"], [data-slot="dropdown-menu"], [data-slot="sheet"] { font-family: var(--font-sans); }
 
 /* ---------- Ponte para as telas de gestão ainda não reescritas ----------
  * As classes antigas (.button, .field, .form-card...) ganham as medidas e cores do design

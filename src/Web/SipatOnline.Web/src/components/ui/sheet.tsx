@@ -37,6 +37,7 @@ export function Sheet({
             'animate-[sheet-in_240ms_cubic-bezier(0.16,1,0.3,1)]',
             className,
           )}
+          data-slot="sheet"
           onCloseAutoFocus={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
           onInteractOutside={(event) => { if (busy) event.preventDefault(); }}
