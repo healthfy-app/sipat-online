@@ -19,6 +19,67 @@ namespace SipatOnline.IntegrationTests;
 public sealed class CompanyAccessApiTests
 {
     [DockerFact]
+    public async Task PortalBanner_IsStoredServedAndRemovedPerCompany_AndColorsAreNotContrastChecked()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString(), true);
+        await InitializeAsync(factory);
+        using var root = Client(factory, "localhost");
+        await LoginAsync(root, "platform-operator", "PlatformPassword123", true);
+        await CreateCompanyAsync(root, "banner-company");
+        using var admin = Client(factory, "banner-company.localhost");
+        using var other = Client(factory, "integration-test.localhost");
+        await LoginAsync(admin, "client-admin", "CompanyAdminPassword123");
+        var png = Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGP4z8AAAAMBAQDJ/pLvAAAAAElFTkSuQmCC");
+        var path = "/api/tenant/branding/appearance";
+
+        // sem regra de contraste: cores parecidas são aceitas
+        TenantBrandingResponse saved;
+        using (var response = await MutateAsync(admin, HttpMethod.Put, path,
+            new TenantAppearanceRequest("#777777", "#FFFFFF", null, false, Convert.ToBase64String(png))))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+            saved = (await response.Content.ReadFromJsonAsync<TenantBrandingResponse>())!;
+            Assert.Equal("#777777", saved.PrimaryColor);
+            Assert.Matches(@"^/api/tenant/banner/banner-company\?v=[0-9a-f]+$", saved.BannerReference);
+        }
+
+        using var anonymous = Client(factory, "banner-company.localhost");
+        Assert.Equal(saved, await anonymous.GetFromJsonAsync<TenantBrandingResponse>("/api/tenant/branding"));
+        using (var image = await anonymous.GetAsync(saved.BannerReference))
+        {
+            Assert.Equal(HttpStatusCode.OK, image.StatusCode);
+            Assert.Equal("image/png", image.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(png, await image.Content.ReadAsByteArrayAsync());
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await other.GetAsync(saved.BannerReference)).StatusCode);
+
+        foreach (var (banner, status) in new[]
+        {
+            (Convert.ToBase64String(new byte[] { 1, 2, 3 }), HttpStatusCode.BadRequest),
+            (Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes("isto não é uma imagem, é só texto comprido")), HttpStatusCode.BadRequest),
+            (Convert.ToBase64String(new byte[1_500_001]), HttpStatusCode.RequestEntityTooLarge),
+        })
+        {
+            using var invalid = await MutateAsync(admin, HttpMethod.Put, path,
+                new TenantAppearanceRequest("#777777", "#FFFFFF", null, false, banner));
+            Assert.Equal(status, invalid.StatusCode);
+        }
+        using (var both = await MutateAsync(admin, HttpMethod.Put, path,
+            new TenantAppearanceRequest("#777777", "#FFFFFF", null, false, Convert.ToBase64String(png), true)))
+            Assert.Equal(HttpStatusCode.BadRequest, both.StatusCode);
+
+        using (var removed = await MutateAsync(admin, HttpMethod.Put, path,
+            new TenantAppearanceRequest("#777777", "#FFFFFF", null, false, null, true)))
+        {
+            Assert.Equal(HttpStatusCode.OK, removed.StatusCode);
+            Assert.Null((await removed.Content.ReadFromJsonAsync<TenantBrandingResponse>())!.BannerReference);
+        }
+        Assert.Equal(HttpStatusCode.NotFound, (await anonymous.GetAsync(saved.BannerReference)).StatusCode);
+    }
+
+    [DockerFact]
     public async Task BaseHost_IsNeutralAndAppearancePersistsWithTenantIsolation()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
@@ -79,8 +140,6 @@ public sealed class CompanyAccessApiTests
         foreach (var (request, status) in new[]
         {
             (new TenantAppearanceRequest("invalid", "#FFFFFF"), HttpStatusCode.BadRequest),
-            (new TenantAppearanceRequest("#777777", "#FFFFFF"), HttpStatusCode.BadRequest),
-            (new TenantAppearanceRequest("#FFFFFF", "#FFFFFF"), HttpStatusCode.BadRequest),
             (new TenantAppearanceRequest("#123456", "#FFFFFF", "not-base64"), HttpStatusCode.BadRequest),
             (new TenantAppearanceRequest("#123456", "#FFFFFF", "AA=="), HttpStatusCode.BadRequest),
             (new TenantAppearanceRequest("#123456", "#FFFFFF", Convert.ToBase64String(new byte[262145])), HttpStatusCode.RequestEntityTooLarge),

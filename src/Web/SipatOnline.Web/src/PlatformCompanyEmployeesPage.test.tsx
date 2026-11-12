@@ -99,7 +99,7 @@ describe('Platform company employees', () => {
     renderPage();
     await screen.findByText('Ana Silva');
 
-    await user.type(screen.getByLabelText('Buscar por nome ou matrícula'), 'MAT-002');
+    await user.type(screen.getByLabelText('Buscar por nome ou login'), 'MAT-002');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByText('Nenhum participante encontrado. Tente outro nome ou identificador.')).toBeInTheDocument();
     expect(api.getPlatformCompanyEmployees).toHaveBeenLastCalledWith(

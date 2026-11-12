@@ -440,9 +440,9 @@ function LoginPage({
           <p className="muted-copy">
             {tenant.tenantKey === 'platform'
               ? 'Entre com suas credenciais de operação.'
-              : 'Use a matrícula e a senha fornecidas pela sua empresa.'}
+              : 'Use o login e a senha fornecidas pela sua empresa.'}
           </p>
-          <label htmlFor="login-identifier">Matrícula</label>
+          <label htmlFor="login-identifier">Login</label>
           <input
             autoComplete="username"
             id="login-identifier"

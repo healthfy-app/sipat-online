@@ -62,7 +62,7 @@ function setupApi() {
       const status = data.loginIdentifier === 'MAT-101' ? 409 : 201;
       createRequests.push({ data, status });
       if (status === 409) {
-        return Response.json({ detail: 'Matrícula já cadastrada nesta empresa.' }, { status });
+        return Response.json({ detail: 'Login já cadastrado nesta empresa.' }, { status });
       }
       const participant = {
         id: `participant-${participants.length + 1}`,
@@ -193,7 +193,7 @@ describe('company participant management', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Adicionar participantes' });
     await user.type(within(dialog).getByLabelText('Nome completo'), 'João Silva');
-    await user.type(within(dialog).getByLabelText('Matrícula'), 'MAT-003');
+    await user.type(within(dialog).getByLabelText('Login'), 'MAT-003');
     await user.type(within(dialog).getByLabelText('Senha inicial'), 'StrongPassword123');
     await user.click(within(dialog).getByRole('button', { name: 'Criar participante' }));
 
@@ -222,7 +222,7 @@ describe('company participant management', () => {
     await user.click(await screen.findByRole('button', { name: 'Adicionar participantes' }));
     await user.click(screen.getByRole('button', { name: 'Importar CSV' }));
     const csv = new File([
-      'nome;matricula\r\nAna Import;MAT-100\r\nPessoa existente;mat-001\r\nBruna Import;MAT-101\r\nCaio Import;MAT-102\r\n',
+      'nome;login\r\nAna Import;MAT-100\r\nPessoa existente;mat-001\r\nBruna Import;MAT-101\r\nCaio Import;MAT-102\r\n',
     ], 'participantes.csv', { type: 'text/csv' });
     await user.upload(screen.getByLabelText('Arquivo CSV'), csv);
 
@@ -230,11 +230,11 @@ describe('company participant management', () => {
       element?.tagName === 'P' && element.textContent?.includes('3 prontos para criar')
       && element.textContent.includes('1 registros precisam de correção'),
     )).toBeVisible();
-    expect(screen.getByText(/Matrícula já cadastrada nesta empresa/)).toBeVisible();
+    expect(screen.getByText(/Login já cadastrado nesta empresa/)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Importar 3 participantes' }));
 
     expect(await screen.findByText('2 criados · 2 não importados.')).toBeVisible();
-    expect(screen.getByText(/MAT-101: Matrícula já cadastrada nesta empresa/)).toBeVisible();
+    expect(screen.getByText(/MAT-101: Login já cadastrado nesta empresa/)).toBeVisible();
     expect(createRequests).toHaveLength(3);
     expect(createRequests.map((request) => request.data.loginIdentifier)).toEqual([
       'MAT-100', 'MAT-101', 'MAT-102',

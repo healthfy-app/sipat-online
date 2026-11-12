@@ -9,7 +9,7 @@ import {
 describe('participant CSV import', () => {
   it('parses semicolon-separated records with BOM, CRLF, and quoted delimiters', () => {
     const result = parseParticipantCsv(
-      '\uFEFFnome;matrícula\r\n"Ana; da Silva";MAT-001\r\n',
+      '\uFEFFnome;login\r\n"Ana; da Silva";MAT-001\r\n',
       [],
     );
 
@@ -54,8 +54,8 @@ describe('participant CSV import', () => {
       loginIdentifier: 'MAT-010',
     }]);
     expect(result.issues).toEqual([
-      { recordNumber: 3, loginIdentifier: 'mat-010', message: 'Matrícula repetida neste arquivo.' },
-      { recordNumber: 4, loginIdentifier: 'MAT-011', message: 'Informe nome e matrícula.' },
+      { recordNumber: 3, loginIdentifier: 'mat-010', message: 'Login repetido neste arquivo.' },
+      { recordNumber: 4, loginIdentifier: 'MAT-011', message: 'Informe nome e login.' },
       { recordNumber: 5, loginIdentifier: 'MAT-012', message: 'A quantidade de colunas não corresponde ao cabeçalho.' },
     ]);
   });
@@ -65,7 +65,7 @@ describe('participant CSV import', () => {
     expect(existing.rows).toEqual([]);
     expect(existing.issues[0]).toMatchObject({
       recordNumber: 2,
-      message: 'Matrícula já cadastrada nesta empresa.',
+      message: 'Login já cadastrado nesta empresa.',
     });
 
     const tooManyRows = Array.from({ length: 501 }, (_, index) => `Nome ${index};MAT-${index}`).join('\n');
@@ -84,7 +84,7 @@ describe('participant CSV import', () => {
   it('continues after a row fails and returns credentials only for successful creates', async () => {
     const create = vi.fn()
       .mockResolvedValueOnce({ id: 'user-1', displayName: 'Ana', loginIdentifier: 'MAT-021', isActive: true })
-      .mockRejectedValueOnce(new Error('Matrícula já cadastrada.'))
+      .mockRejectedValueOnce(new Error('Login já cadastrado.'))
       .mockResolvedValueOnce({ id: 'user-3', displayName: 'Caio', loginIdentifier: 'MAT-023', isActive: true });
 
     const result = await createParticipantsFromCsv([
@@ -100,7 +100,7 @@ describe('participant CSV import', () => {
       recordNumber: 3,
       loginIdentifier: 'MAT-022',
       displayName: 'Bia',
-      message: 'Matrícula já cadastrada.',
+      message: 'Login já cadastrado.',
     }]);
     expect(JSON.stringify(result.failed)).not.toContain('InitialPass123456789');
   });
@@ -112,6 +112,6 @@ describe('participant CSV import', () => {
       initialPassword: 'Secure1234567890',
     }]);
 
-    expect(csv).toBe('\uFEFF"nome";"matricula";"senha_inicial"\r\n"Ana ""Nina""; Costa";"MAT-031";"Secure1234567890"\r\n');
+    expect(csv).toBe('\uFEFF"nome";"login";"senha_inicial"\r\n"Ana ""Nina""; Costa";"MAT-031";"Secure1234567890"\r\n');
   });
 });

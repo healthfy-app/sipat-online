@@ -110,7 +110,7 @@ describe('platform user directory', () => {
     );
 
     expect(await screen.findByRole('row', { name: /Alex Participante/ })).toBeVisible();
-    expect(screen.getByRole('columnheader', { name: 'Matrícula' })).toBeVisible();
+    expect(screen.getByRole('columnheader', { name: 'Login' })).toBeVisible();
     expect(screen.getByRole('cell', { name: /Acme Segurança acme/ })).toBeVisible();
     expect(screen.getByText('Ativo')).toBeVisible();
     await user.selectOptions(screen.getByLabelText('Empresa'), 'tenant-1');
@@ -130,8 +130,8 @@ describe('platform user directory', () => {
     await user.click(createButton);
     expect(screen.getByRole('dialog', { name: 'Novo usuário' })).toBeVisible();
     await user.type(screen.getByLabelText('Nome completo'), 'Joana Exemplo');
-    await user.type(screen.getByLabelText('Matrícula'), 'joana-200');
-    await user.click(screen.getByRole('button', { name: 'Gerar senha forte' }));
+    await user.type(screen.getByLabelText('Login'), 'joana-200');
+    await user.click(screen.getByRole('button', { name: 'Gerar senha' }));
     const generatedPassword = screen.getByLabelText('Senha inicial temporária');
     expect((generatedPassword as HTMLInputElement).value)
       .toMatch(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%&*+\-_=]).{16}$/);

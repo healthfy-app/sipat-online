@@ -144,7 +144,7 @@ export default function CompanyPage() {
               <form className="flex min-w-0 flex-[1_1_20rem] gap-2" onSubmit={handleSearch}>
                 <label className="relative flex min-w-0 flex-1 items-center text-muted-foreground sm:max-w-sm">
                   <Search className="pointer-events-none absolute left-3 size-4" />
-                  <Input aria-label="Buscar por nome ou matrícula" className="pl-9" placeholder="Buscar por nome ou matrícula" type="search"
+                  <Input aria-label="Buscar por nome ou login" className="pl-9" placeholder="Buscar por nome ou login" type="search"
                     value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
                 </label>
                 <Button type="submit" variant="outline">Buscar</Button>
@@ -164,7 +164,7 @@ export default function CompanyPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead scope="col">Nome</TableHead>
-                      <TableHead className="max-sm:hidden" scope="col">Matrícula</TableHead>
+                      <TableHead className="max-sm:hidden" scope="col">Login</TableHead>
                       <TableHead scope="col">Conclusão</TableHead>
                       <TableHead className="max-md:hidden" scope="col">Status</TableHead>
                       <TableHead scope="col">Atividades e certificados</TableHead>
@@ -229,7 +229,7 @@ export default function CompanyPage() {
                 <TableHeader>
                   <TableRow>
                     <TableHead scope="col">Nome</TableHead>
-                    <TableHead scope="col">Matrícula</TableHead>
+                    <TableHead scope="col">Login</TableHead>
                     <TableHead className="max-sm:hidden" scope="col">Papel</TableHead>
                     <TableHead scope="col">Status</TableHead>
                   </TableRow>

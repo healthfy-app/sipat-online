@@ -807,6 +807,13 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<byte[]>("PortalBannerData")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("PortalBannerContentType")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<byte[]>("PortalLogoData")
                         .HasColumnType("bytea");
 

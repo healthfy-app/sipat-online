@@ -12,6 +12,11 @@ public sealed class TenantEntity
 
     public byte[]? PortalLogoData { get; set; }
 
+    /// <summary>Banner exibido na entrada (login) do portal da empresa.</summary>
+    public byte[]? PortalBannerData { get; set; }
+
+    public string? PortalBannerContentType { get; set; }
+
     public byte[]? CertificateLogoData { get; set; }
 
     public string? CertificateLogoContentType { get; set; }

@@ -226,7 +226,7 @@ describe('tenant portal', () => {
     expect(screen.getByRole('region', { name: 'Acesso ao portal da empresa' })).toBeVisible();
     expect(screen.getByText('Pequenos passos. Rotinas mais seguras.')).toBeInTheDocument();
     expect(screen.getByText('Acme Segurança')).toBeVisible();
-    expect(screen.getByLabelText('Matrícula')).toBeVisible();
+    expect(screen.getByLabelText('Login')).toBeVisible();
     expect(screen.getByLabelText('Senha')).toHaveAttribute('placeholder', 'Digite sua senha');
   });
 
@@ -295,7 +295,7 @@ describe('tenant portal', () => {
 
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Matrícula'), 'admin');
+    await user.type(await screen.findByLabelText('Login'), 'admin');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
@@ -338,7 +338,7 @@ describe('tenant portal', () => {
 
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Matrícula'), 'participant');
+    await user.type(await screen.findByLabelText('Login'), 'participant');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
@@ -410,7 +410,7 @@ describe('tenant portal', () => {
 
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Matrícula'), 'participant');
+    await user.type(await screen.findByLabelText('Login'), 'participant');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
@@ -456,7 +456,7 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Acesse a plataforma' })).toBeVisible();
     expect(screen.getByRole('region', { name: 'Acesso à plataforma' })).toBeVisible();
     expect(screen.getByText('Acesso exclusivo para a equipe de operação.')).toBeVisible();
-    await user.type(screen.getByLabelText('Matrícula'), 'operator');
+    await user.type(screen.getByLabelText('Login'), 'operator');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 

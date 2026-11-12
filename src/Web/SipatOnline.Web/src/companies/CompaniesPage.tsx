@@ -9,14 +9,13 @@ import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { pluralize } from '@/courseEditor/courseFormat';
-import { cn } from '@/lib/utils';
 import LoadingState from '@/LoadingState';
 import AddAdministratorDialog from './AddAdministratorDialog';
 import CompanyAvatar from './CompanyAvatar';
 import CreateCompanyDialog from './CreateCompanyDialog';
 
 type StatusFilter = 'all' | 'active' | 'inactive';
-type SortKey = 'name' | 'participants' | 'administrators' | 'status';
+type SortKey = 'name' | 'participants' | 'status';
 type SortDirection = 'ascending' | 'descending';
 const pageSize = 10;
 
@@ -33,7 +32,6 @@ export default function CompaniesPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [adminTarget, setAdminTarget] = useState<PlatformCompanyOverview | null>(null);
-  const withoutAdminOnly = searchParams.get('sem-admin') === '1';
   const isCreating = searchParams.get('nova-empresa') === '1';
 
   async function load() {
@@ -61,12 +59,10 @@ export default function CompaniesPage() {
   const term = search.trim().toLocaleLowerCase('pt-BR');
   const visible = useMemo(() => companies.filter((company) =>
     `${company.name} ${company.key}`.toLocaleLowerCase('pt-BR').includes(term)
-    && (statusFilter === 'all' || (statusFilter === 'active' ? company.isActive : !company.isActive))
-    && (!withoutAdminOnly || company.administratorCount === 0)), [companies, statusFilter, term, withoutAdminOnly]);
+    && (statusFilter === 'all' || (statusFilter === 'active' ? company.isActive : !company.isActive))), [companies, statusFilter, term]);
 
   const sorted = useMemo(() => [...visible].sort((a, b) => {
     const comparison = sortKey === 'participants' ? a.employeeCount - b.employeeCount
-      : sortKey === 'administrators' ? a.administratorCount - b.administratorCount
         : sortKey === 'status' ? Number(a.isActive) - Number(b.isActive)
           : a.name.localeCompare(b.name, 'pt-BR');
     return sortDirection === 'ascending' ? comparison : -comparison;
@@ -76,8 +72,7 @@ export default function CompaniesPage() {
   const pageItems = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const firstItem = sorted.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastItem = Math.min(currentPage * pageSize, sorted.length);
-  const withoutAdminCount = companies.filter((company) => company.administratorCount === 0).length;
-  const hasFilters = Boolean(term) || statusFilter !== 'all' || withoutAdminOnly;
+  const hasFilters = Boolean(term) || statusFilter !== 'all';
 
   function sortBy(key: SortKey) {
     setSortDirection(sortKey === key && sortDirection === 'ascending' ? 'descending' : 'ascending');
@@ -126,21 +121,6 @@ export default function CompaniesPage() {
             <option value="active">Ativas</option>
             <option value="inactive">Inativas</option>
           </NativeSelect>
-          {withoutAdminCount > 0 && (
-            <button
-              aria-pressed={withoutAdminOnly}
-              className={cn(
-                'm-0 inline-flex h-9 min-h-9 cursor-pointer items-center gap-2 rounded-full border border-border bg-card px-3.5 text-[0.8125rem] font-medium text-foreground transition-colors',
-                'hover:border-warning/40 aria-pressed:border-warning/50 aria-pressed:bg-warning-soft aria-pressed:text-warning',
-                'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-              )}
-              onClick={() => { setParam('sem-admin', !withoutAdminOnly); setCurrentPage(1); }}
-              type="button"
-            >
-              Sem administrador
-              <span className="rounded-full bg-warning-soft px-1.5 text-xs font-semibold tabular-nums text-warning">{withoutAdminCount}</span>
-            </button>
-          )}
         </div>
 
         {isLoading ? (
@@ -153,7 +133,6 @@ export default function CompaniesPage() {
               <TableRow>
                 {sortable('name', 'Empresa')}
                 {sortable('participants', 'Participantes', 'max-md:hidden')}
-                {sortable('administrators', 'Administração')}
                 {sortable('status', 'Status', 'max-sm:hidden')}
                 <TableHead className="w-12"><span className="sr-only">Ações</span></TableHead>
               </TableRow>
@@ -178,11 +157,6 @@ export default function CompaniesPage() {
                     </div>
                   </TableCell>
                   <TableCell className="tabular-nums max-md:hidden">{company.employeeCount.toLocaleString('pt-BR')}</TableCell>
-                  <TableCell>
-                    {company.administratorCount === 0
-                      ? <Badge variant="neutral">Sem administrador</Badge>
-                      : <span className="text-sm">{pluralize(company.administratorCount, 'administrador', 'administradores')}</span>}
-                  </TableCell>
                   <TableCell className="max-sm:hidden">
                     <Badge variant={company.isActive ? 'success' : 'neutral'}>{company.isActive ? 'Ativa' : 'Inativa'}</Badge>
                   </TableCell>

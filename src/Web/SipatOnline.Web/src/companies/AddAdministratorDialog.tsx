@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { createPlatformUser, type PlatformUserSummary } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
@@ -52,12 +53,12 @@ export default function AddAdministratorDialog({
           <Input autoComplete="name" data-autofocus id="admin-name" maxLength={150} required value={displayName}
             onChange={(event) => setDisplayName(event.target.value)} />
         </Field>
-        <Field htmlFor="admin-login" label="Matrícula">
+        <Field htmlFor="admin-login" label="Login">
           <Input autoComplete="username" id="admin-login" maxLength={128} required value={loginIdentifier}
             onChange={(event) => setLoginIdentifier(event.target.value)} />
         </Field>
-        <Field hint="Mínimo de 12 caracteres. Entregue por um canal seguro." htmlFor="admin-password" label="Senha inicial temporária">
-          <Input autoComplete="new-password" id="admin-password" minLength={12} required type="password" value={initialPassword}
+        <Field hint={`${passwordRulesHint} Entregue por um canal seguro.`} htmlFor="admin-password" label="Senha inicial temporária">
+          <Input autoComplete="new-password" id="admin-password" minLength={passwordMinLength} required type="password" value={initialPassword}
             onChange={(event) => setInitialPassword(event.target.value)} />
         </Field>
         <DialogActions>

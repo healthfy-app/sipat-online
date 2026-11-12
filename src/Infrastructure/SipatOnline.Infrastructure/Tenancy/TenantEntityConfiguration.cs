@@ -14,6 +14,7 @@ public sealed class TenantEntityConfiguration : IEntityTypeConfiguration<TenantE
         builder.Property(tenant => tenant.Key).HasMaxLength(TenantKey.MaximumLength).IsRequired();
         builder.Property(tenant => tenant.Name).HasMaxLength(TenantName.MaximumLength).IsRequired();
         builder.Property(tenant => tenant.LogoReference).HasMaxLength(2048);
+        builder.Property(tenant => tenant.PortalBannerContentType).HasMaxLength(32);
         builder.Property(tenant => tenant.PrimaryColor).HasMaxLength(7).IsRequired();
         builder.Property(tenant => tenant.SecondaryColor).HasMaxLength(7).IsRequired();
         builder.Property(tenant => tenant.CustomDomain).HasMaxLength(253);

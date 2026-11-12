@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
+import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { useSearchParams } from 'react-router-dom';
 import {
   createPlatformUser,
@@ -235,7 +236,7 @@ export default function PlatformUsersPage() {
               setOffset(0);
               setSearch(event.target.value);
             }}
-            placeholder="Nome, matrícula ou empresa"
+            placeholder="Nome, login ou empresa"
             type="search"
             value={search}
           />
@@ -299,7 +300,7 @@ export default function PlatformUsersPage() {
                 <thead>
                   <tr>
                     <th scope="col">Nome</th>
-                    <th scope="col">Matrícula</th>
+                    <th scope="col">Login</th>
                     <th scope="col">Empresa</th>
                     <th scope="col">Perfil</th>
                     <th scope="col">Status</th>
@@ -416,7 +417,7 @@ export default function PlatformUsersPage() {
                 />
               </div>
               <div className="field">
-                <label htmlFor="platform-user-login">Matrícula</label>
+                <label htmlFor="platform-user-login">Login</label>
                 <input
                   autoComplete="off"
                   id="platform-user-login"
@@ -431,17 +432,17 @@ export default function PlatformUsersPage() {
                 <input
                   autoComplete="new-password"
                   id="platform-user-password"
-                  minLength={12}
+                  minLength={passwordMinLength}
                   onChange={(event) => updateUserField('initialPassword', event.target.value)}
                   required
                   type="password"
                   value={userForm.initialPassword}
                 />
                 <button className="admin-link-button" onClick={handleGeneratePassword} type="button">
-                  Gerar senha forte
+                  Gerar senha
                 </button>
                 <span className="field-hint">
-                  Use uma senha forte e entregue-a por um canal seguro.
+                  {passwordRulesHint} Entregue-a por um canal seguro.
                 </span>
               </div>
               <div className="form-actions">

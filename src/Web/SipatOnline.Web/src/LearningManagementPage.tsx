@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from 'react';
+import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { useSearchParams } from 'react-router-dom';
 import CourseDialog from './CourseDialog';
 import LoadingState from './LoadingState';
@@ -290,7 +291,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
     try {
       downloadCsv(
         'modelo-importacao-participantes.csv',
-        '\uFEFFnome;matricula\r\nMaria Silva;MAT-001\r\n',
+        '\uFEFFnome;login\r\nMaria Silva;maria.silva\r\n',
       );
     } catch (downloadError) {
       setDialogError(getErrorMessage(downloadError));
@@ -444,7 +445,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
           {addMode === 'single' ? (
             <form className="event-form event-form-single participant-create-form" onSubmit={handleCreateParticipant}>
               <p className="muted-copy">
-                Crie um acesso individual. A matrícula identifica a pessoa nesta empresa.
+                Crie um acesso individual. O login identifica a pessoa nesta empresa.
               </p>
               <div className="field">
                 <label htmlFor="participant-name">Nome completo</label>
@@ -460,7 +461,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
                 />
               </div>
               <div className="field">
-                <label htmlFor="participant-login">Matrícula</label>
+                <label htmlFor="participant-login">Login</label>
                 <input
                   autoComplete="off"
                   id="participant-login"
@@ -477,7 +478,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
                 <input
                   autoComplete="new-password"
                   id="participant-password"
-                  minLength={12}
+                  minLength={passwordMinLength}
                   onChange={(event) =>
                     setParticipantForm((current) => ({ ...current, initialPassword: event.target.value }))
                   }
@@ -485,7 +486,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
                   type="password"
                   value={participantForm.initialPassword}
                 />
-                <span className="field-hint">Use ao menos 12 caracteres, com letras maiúsculas, minúsculas e números.</span>
+                <span className="field-hint">{passwordRulesHint}</span>
               </div>
               <div className="form-actions full-width">
                 <button className="button button-primary" disabled={isSavingParticipant} type="submit">
@@ -499,7 +500,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
                 <div>
                   <h3>Importe várias pessoas de uma vez</h3>
                   <p>
-                    O CSV precisa das colunas <strong>nome</strong> e <strong>matricula</strong>.
+                    O CSV precisa das colunas <strong>nome</strong> e <strong>login</strong>.
                     Aceita separador vírgula ou ponto e vírgula.
                   </p>
                   <p className="field-hint">
@@ -519,7 +520,7 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
                   onChange={(event) => void handleCsvFileChange(event)}
                   type="file"
                 />
-                <span className="field-hint">Matrículas já cadastradas e repetidas no arquivo serão ignoradas.</span>
+                <span className="field-hint">Logins já cadastrados e repetidas no arquivo serão ignoradas.</span>
               </div>
               {csvFileName && <p className="participant-csv-file-name">{csvFileName}</p>}
               {isReadingCsv && <LoadingState className="loading-state-compact">Lendo e validando o arquivo...</LoadingState>}

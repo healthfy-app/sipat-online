@@ -38,26 +38,12 @@ describe('Platform companies', () => {
 
     expect(await screen.findByText('Acme')).toBeInTheDocument();
     const acmeRow = screen.getByRole('row', { name: /Acme/ });
-    expect(acmeRow).toHaveTextContent(/Acme.*acme.*10.*1 administrador.*Ativa/);
+    expect(acmeRow).toHaveTextContent(/Acme.*acme.*10.*Ativa/);
     expect(within(acmeRow).getByRole('link', { name: 'Abrir empresa Acme' })).toHaveAttribute('href', '/platform/companies/t1');
-    const betaRow = screen.getByRole('row', { name: /Beta/ });
-    expect(within(betaRow).getByText('Sem administrador')).toBeInTheDocument();
+    expect(screen.queryByText(/sem administrador/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Atribuir administrador' })).not.toBeInTheDocument();
     expect(screen.getByText('2 empresas na plataforma')).toBeInTheDocument();
     expect(api.listPlatformCourses).not.toHaveBeenCalled();
-  });
-
-  it('filters companies without administrator from a single toggle', async () => {
-    const user = userEvent.setup();
-    renderHome();
-
-    const toggle = await screen.findByRole('button', { name: /Sem administrador/ });
-    expect(toggle).toHaveTextContent('1');
-    await user.click(toggle);
-    expect(toggle).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.queryByText('Acme')).not.toBeInTheDocument();
-    expect(screen.getByText('Beta')).toBeInTheDocument();
-    expect(screen.getByText('1 de 2 exibidas')).toBeInTheDocument();
   });
 
   it('combines company search and status filters', async () => {
@@ -69,14 +55,6 @@ describe('Platform companies', () => {
     await user.selectOptions(screen.getByLabelText('Status'), 'active');
     expect(screen.queryByText('Beta')).not.toBeInTheDocument();
     expect(screen.getByText('Acme')).toBeInTheDocument();
-  });
-
-  it('opens directly with only companies missing an administrator', async () => {
-    renderHome('/platform?sem-admin=1');
-
-    expect(await screen.findByText('Beta')).toBeInTheDocument();
-    expect(screen.queryByText('Acme')).not.toBeInTheDocument();
-    expect(screen.getByText('1 de 2 exibidas')).toBeInTheDocument();
   });
 
   it('adds an administrator from the company row menu without leaving the page', async () => {
@@ -92,7 +70,7 @@ describe('Platform companies', () => {
     await user.click(screen.getByRole('menuitem', { name: /Adicionar administrador/ }));
     const dialog = await screen.findByRole('dialog', { name: 'Adicionar administrador' });
     await user.type(within(dialog).getByLabelText('Nome'), 'Ana Souza');
-    await user.type(within(dialog).getByLabelText('Matrícula'), 'ana.admin');
+    await user.type(within(dialog).getByLabelText('Login'), 'ana.admin');
     await user.type(within(dialog).getByLabelText('Senha inicial temporária'), 'SenhaSegura123!');
     await user.click(within(dialog).getByRole('button', { name: 'Adicionar administrador' }));
 
@@ -112,7 +90,7 @@ describe('Platform companies', () => {
     await user.type(within(dialog).getByLabelText('Nome da empresa'), 'Gama Ltda');
     expect(within(dialog).getByLabelText('Identificador do portal')).toHaveValue('gama-ltda');
     await user.type(within(dialog).getByLabelText('Nome do administrador'), 'Bruno');
-    await user.type(within(dialog).getByLabelText('Matrícula do administrador'), 'bruno');
+    await user.type(within(dialog).getByLabelText('Login do administrador'), 'bruno');
     await user.type(within(dialog).getByLabelText('Senha inicial temporária'), 'SenhaSegura123!');
     await user.click(within(dialog).getByRole('button', { name: 'Cadastrar empresa' }));
 

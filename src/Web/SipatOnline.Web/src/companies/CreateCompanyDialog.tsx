@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { createPlatformCompany, type PlatformCompany, type PlatformCompanyData } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
@@ -74,13 +75,13 @@ export default function CreateCompanyDialog({
             <Input autoComplete="name" id="first-admin-name" maxLength={150} required value={form.adminDisplayName}
               onChange={(event) => update('adminDisplayName', event.target.value)} />
           </Field>
-          <Field htmlFor="first-admin-login" label="Matrícula do administrador">
+          <Field htmlFor="first-admin-login" label="Login do administrador">
             <Input autoComplete="username" id="first-admin-login" maxLength={128} required value={form.adminLoginIdentifier}
               onChange={(event) => update('adminLoginIdentifier', event.target.value)} />
           </Field>
-          <Field className="sm:col-span-2" hint="Mínimo de 12 caracteres. Entregue por um canal seguro: a senha não será exibida novamente."
+          <Field className="sm:col-span-2" hint={`${passwordRulesHint} Entregue por um canal seguro: a senha não será exibida novamente.`}
             htmlFor="first-admin-password" label="Senha inicial temporária">
-            <Input autoComplete="new-password" id="first-admin-password" minLength={12} required type="password" value={form.adminPassword}
+            <Input autoComplete="new-password" id="first-admin-password" minLength={passwordMinLength} required type="password" value={form.adminPassword}
               onChange={(event) => update('adminPassword', event.target.value)} />
           </Field>
         </fieldset>

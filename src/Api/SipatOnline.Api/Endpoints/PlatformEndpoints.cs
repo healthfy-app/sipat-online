@@ -39,7 +39,7 @@ public static class PlatformEndpoints
                 : Results.Problem(
                     statusCode: StatusCodes.Status401Unauthorized,
                     title: "Não foi possível autenticar.",
-                    detail: "Matrícula ou senha inválida.");
+                    detail: "Login ou senha inválida.");
         })
         .AllowAnonymous()
         .RequireRateLimiting("identity-auth")

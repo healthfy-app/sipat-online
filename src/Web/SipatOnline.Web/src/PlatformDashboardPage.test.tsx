@@ -24,11 +24,8 @@ describe('platform dashboard', () => {
     const indicators = screen.getByRole('region', { name: 'Indicadores da plataforma' });
     expect(within(indicators).getByText('Empresas cadastradas')).toBeVisible();
     expect(within(indicators).getByText('Participantes')).toBeVisible();
-    expect(within(indicators).getByText('Empresas sem administrador')).toBeVisible();
-    expect(within(indicators).getByRole('link', { name: /Empresas sem administrador/ }))
-      .toHaveAttribute('href', '/platform?sem-admin=1');
-    expect(screen.getByText('Algumas empresas precisam de um administrador')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Revisar empresas' })).toHaveAttribute('href', '/platform?sem-admin=1');
+    expect(screen.queryByText(/sem administrador/i)).not.toBeInTheDocument();
+    expect(within(indicators).getByText('1 ativas')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Gerenciar empresas Buscar, filtrar e administrar clientes' }))
       .toHaveAttribute('href', '/platform');
     expect(screen.getByRole('heading', { name: 'Acessos rápidos' })).toBeVisible();
@@ -42,8 +39,8 @@ describe('platform dashboard', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Serviço indisponível.');
     const indicators = screen.getByRole('region', { name: 'Indicadores da plataforma' });
-    expect(within(indicators).getAllByText('—')).toHaveLength(3);
-    expect(screen.getByText('Não foi possível verificar os dados')).toBeVisible();
+    expect(within(indicators).getAllByText('—')).toHaveLength(2);
+    expect(screen.getByText('Não foi possível verificar os dados. Atualize o painel para tentar novamente.')).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Cadastrar empresa' })).not.toBeInTheDocument();
   });
 });
