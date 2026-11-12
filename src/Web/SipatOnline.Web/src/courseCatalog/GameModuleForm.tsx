@@ -1,14 +1,14 @@
 import { useState, type FormEvent } from 'react';
 import {
   createGameModule,
-  deleteGameModule,
   updateGameModule,
   type GameModule,
   type GameQuestion,
   type GamificationGameType,
-} from './api';
-import { gameTypeOptions } from './gamificationGames';
-import GameContentEditor, { emptyGameContent } from './GameContentEditor';
+} from '../api';
+import GameContentEditor, { emptyGameContent } from '../GameContentEditor';
+import { gameTypeOptions } from '../gamificationGames';
+import { getErrorMessage } from '../courseEditor/courseFormat';
 
 interface QuestionDraft {
   text: string;
@@ -17,6 +17,7 @@ interface QuestionDraft {
 }
 
 const emptyQuestion: QuestionDraft = { text: '', optionsText: '', correctIndex: 0 };
+const usesQuestions = (type: GamificationGameType) => type === 'Quiz' || type === 'Scenario';
 
 function toDraft(question: GameQuestion): QuestionDraft {
   return { text: question.text, optionsText: question.options.join('\n'), correctIndex: question.correctIndex };
@@ -30,29 +31,26 @@ function toQuestion(draft: QuestionDraft): GameQuestion {
   };
 }
 
-export default function GameModulesPanel({
-  modules,
-  onChanged,
-  onError,
+/** Formulário de criação e edição de um jogo; usado dentro de um diálogo. */
+export default function GameModuleForm({
+  module,
+  onBusyChange,
+  onCancel,
+  onSaved,
 }: {
-  modules: GameModule[];
-  onChanged: (message: string) => Promise<void>;
-  onError: (message: string) => void;
+  module: GameModule | null;
+  onBusyChange: (busy: boolean) => void;
+  onCancel: () => void;
+  onSaved: (message: string) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState<GameModule | null>(null);
-  const [title, setTitle] = useState('');
-  const [gameType, setGameType] = useState<GamificationGameType>('Quiz');
-  const [questions, setQuestions] = useState<QuestionDraft[]>([{ ...emptyQuestion }]);
+  const [title, setTitle] = useState(module?.title ?? '');
+  const [gameType, setGameType] = useState<GamificationGameType>(module?.gameType ?? 'Quiz');
+  const [questions, setQuestions] = useState<QuestionDraft[]>(
+    module && module.questions.length > 0 ? module.questions.map(toDraft) : [{ ...emptyQuestion }],
+  );
+  const [content, setContent] = useState(module?.content ?? emptyGameContent);
   const [isSaving, setIsSaving] = useState(false);
-  const [content, setContent] = useState(emptyGameContent);
-
-  function startEdit(module: GameModule | null) {
-    setEditing(module);
-    setTitle(module?.title ?? '');
-    setGameType(module?.gameType ?? 'Quiz');
-    setContent(module?.content ?? emptyGameContent);
-    setQuestions(module && module.questions.length > 0 ? module.questions.map(toDraft) : [{ ...emptyQuestion }]);
-  }
+  const [error, setError] = useState('');
 
   function updateQuestion(index: number, patch: Partial<QuestionDraft>) {
     setQuestions((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
@@ -60,133 +58,98 @@ export default function GameModulesPanel({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    onError('');
+    setError('');
     setIsSaving(true);
+    onBusyChange(true);
     const data = {
       title: title.trim(),
       gameType,
-      questions: gameType === 'Quiz' || gameType === 'Scenario' ? questions.map(toQuestion) : [],
-      content: gameType === 'Quiz' || gameType === 'Scenario' ? null : {
+      questions: usesQuestions(gameType) ? questions.map(toQuestion) : [],
+      content: usesQuestions(gameType) ? null : {
         ...content,
         imageUrl: content.imageUrl?.trim() ?? null,
-        items: content.items?.map(item => item.trim()).filter(Boolean) ?? null,
-        pairs: content.pairs?.map(pair => ({ first: pair.first.trim(), second: pair.second.trim() })) ?? null,
+        items: content.items?.map((item) => item.trim()).filter(Boolean) ?? null,
+        pairs: content.pairs?.map((pair) => ({ first: pair.first.trim(), second: pair.second.trim() })) ?? null,
       },
     };
     try {
-      if (editing) {
-        await updateGameModule(editing.id, data);
-      } else {
-        await createGameModule(data);
-      }
-      const message = editing ? 'O módulo foi atualizado.' : `O módulo "${data.title}" foi criado.`;
-      startEdit(null);
-      await onChanged(message);
+      if (module) await updateGameModule(module.id, data);
+      else await createGameModule(data);
+      await onSaved(module ? `O jogo "${data.title}" foi atualizado.` : `O jogo "${data.title}" foi criado.`);
     } catch (saveError) {
-      onError(saveError instanceof Error ? saveError.message : 'Não foi possível salvar o módulo.');
+      setError(getErrorMessage(saveError));
     } finally {
       setIsSaving(false);
-    }
-  }
-
-  async function handleDelete(module: GameModule) {
-    onError('');
-    try {
-      await deleteGameModule(module.id);
-      if (editing?.id === module.id) startEdit(null);
-      await onChanged(`O módulo "${module.title}" foi removido.`);
-    } catch (deleteError) {
-      onError(deleteError instanceof Error ? deleteError.message : 'Não foi possível remover o módulo.');
+      onBusyChange(false);
     }
   }
 
   return (
-    <div className="management-grid">
-      <section aria-labelledby="game-module-form-title" className="form-card">
-        <h2 id="game-module-form-title">{editing ? 'Editar módulo' : 'Novo módulo de jogo'}</h2>
-        <p className="muted-copy">
-          Módulos podem entrar na trilha do curso ou parar um vídeo em uma minutagem. Não valem pontos e nunca bloqueiam o participante.
-        </p>
-        <form className="event-form event-form-single" onSubmit={handleSubmit}>
+    <form className="event-form event-form-single cat-game-form" onSubmit={handleSubmit}>
+      <p className="muted-copy">
+        Jogos entram na trilha do curso ou param um vídeo num momento escolhido. Não valem pontos e nunca bloqueiam o participante.
+      </p>
+      {error && <p className="form-error" role="alert">{error}</p>}
+      <div className="field">
+        <label htmlFor="game-module-title">Nome do jogo</label>
+        <input data-autofocus id="game-module-title" maxLength={200} onChange={(event) => setTitle(event.target.value)} required value={title} />
+      </div>
+      <div className="field">
+        <label htmlFor="game-module-type">Tipo de jogo</label>
+        <select id="game-module-type" onChange={(event) => setGameType(event.target.value as GamificationGameType)} value={gameType}>
+          {gameTypeOptions.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}{option.playable ? '' : ' (jogável em breve)'}
+            </option>
+          ))}
+        </select>
+        <span className="field-hint">{gameTypeOptions.find((option) => option.value === gameType)?.description}</span>
+      </div>
+
+      {usesQuestions(gameType) && questions.map((question, index) => (
+        <fieldset className="game-question-editor" key={index}>
+          <legend>Pergunta {index + 1}</legend>
           <div className="field">
-            <label htmlFor="game-module-title">Nome do módulo</label>
-            <input id="game-module-title" maxLength={200} onChange={(event) => setTitle(event.target.value)} required value={title} />
+            <label htmlFor={`game-question-text-${index}`}>Texto da pergunta {index + 1}</label>
+            <input id={`game-question-text-${index}`} maxLength={500} required value={question.text}
+              onChange={(event) => updateQuestion(index, { text: event.target.value })} />
           </div>
           <div className="field">
-            <label htmlFor="game-module-type">Tipo de jogo</label>
-            <select id="game-module-type" onChange={(event) => setGameType(event.target.value as GamificationGameType)} value={gameType}>
-              {gameTypeOptions.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}{option.playable ? '' : ' (jogável em breve)'}
-                </option>
+            <label htmlFor={`game-question-options-${index}`}>Alternativas da pergunta {index + 1}</label>
+            <textarea id={`game-question-options-${index}`} required rows={3} value={question.optionsText}
+              onChange={(event) => updateQuestion(index, { optionsText: event.target.value })} />
+            <span className="field-hint">Uma alternativa por linha (2 a 6).</span>
+          </div>
+          <div className="field">
+            <label htmlFor={`game-question-correct-${index}`}>Alternativa correta da pergunta {index + 1}</label>
+            <select id={`game-question-correct-${index}`} value={question.correctIndex}
+              onChange={(event) => updateQuestion(index, { correctIndex: Number(event.target.value) })}>
+              {question.optionsText.split('\n').map((option) => option.trim()).filter(Boolean).map((option, optionIndex) => (
+                <option key={optionIndex} value={optionIndex}>{option}</option>
               ))}
             </select>
           </div>
-          {(gameType === 'Quiz' || gameType === 'Scenario') && questions.map((question, index) => (
-            <fieldset className="game-question-editor" key={index}>
-              <legend>Pergunta {index + 1}</legend>
-              <div className="field">
-                <label htmlFor={`game-question-text-${index}`}>Texto da pergunta {index + 1}</label>
-                <input id={`game-question-text-${index}`} maxLength={500} onChange={(event) => updateQuestion(index, { text: event.target.value })} required value={question.text} />
-              </div>
-              <div className="field">
-                <label htmlFor={`game-question-options-${index}`}>Alternativas da pergunta {index + 1}</label>
-                <textarea id={`game-question-options-${index}`} onChange={(event) => updateQuestion(index, { optionsText: event.target.value })} required rows={3} value={question.optionsText} />
-                <span className="field-hint">Uma alternativa por linha (2 a 6).</span>
-              </div>
-              <div className="field">
-                <label htmlFor={`game-question-correct-${index}`}>Alternativa correta da pergunta {index + 1}</label>
-                <select id={`game-question-correct-${index}`} onChange={(event) => updateQuestion(index, { correctIndex: Number(event.target.value) })} value={question.correctIndex}>
-                  {question.optionsText.split('\n').map((option) => option.trim()).filter(Boolean).map((option, optionIndex) => (
-                    <option key={optionIndex} value={optionIndex}>{option}</option>
-                  ))}
-                </select>
-              </div>
-              {questions.length > 1 && (
-                <button className="button button-quiet" onClick={() => setQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))} type="button">
-                  Remover pergunta {index + 1}
-                </button>
-              )}
-            </fieldset>
-          ))}
-          {(gameType === 'Quiz' || gameType === 'Scenario') && questions.length < 50 && (
-            <button className="button button-secondary" onClick={() => setQuestions((current) => [...current, { ...emptyQuestion }])} type="button">
-              Adicionar pergunta
+          {questions.length > 1 && (
+            <button className="button button-quiet" type="button"
+              onClick={() => setQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))}>
+              Remover pergunta {index + 1}
             </button>
           )}
-          {gameType !== 'Quiz' && gameType !== 'Scenario' && <GameContentEditor type={gameType} content={content} onChange={setContent} />}
-          <div className="platform-course-card-actions">
-            <button className="button button-primary" disabled={isSaving} type="submit">
-              {isSaving ? 'Salvando...' : editing ? 'Salvar módulo' : 'Criar módulo'}
-            </button>
-            {editing && <button className="button button-quiet" onClick={() => startEdit(null)} type="button">Cancelar edição</button>}
-          </div>
-        </form>
-      </section>
+        </fieldset>
+      ))}
+      {usesQuestions(gameType) && questions.length < 50 && (
+        <button className="button button-secondary" onClick={() => setQuestions((current) => [...current, { ...emptyQuestion }])} type="button">
+          Adicionar pergunta
+        </button>
+      )}
+      {!usesQuestions(gameType) && <GameContentEditor content={content} onChange={setContent} type={gameType} />}
 
-      <section aria-labelledby="game-module-list-title" className="list-section">
-        <h2 id="game-module-list-title">Módulos cadastrados ({modules.length})</h2>
-        {modules.length === 0 ? (
-          <p className="compact-empty">Nenhum módulo ainda. Crie o primeiro ao lado.</p>
-        ) : (
-          <ul className="platform-video-order">
-            {modules.map((module) => (
-              <li key={module.id}>
-                <span>
-                  <strong>{module.title}</strong>
-                  <small>
-                    {gameTypeOptions.find((option) => option.value === module.gameType)?.label} · {module.questions.length} pergunta(s) · usado {module.usageCount}x
-                  </small>
-                </span>
-                <span className="platform-video-order-actions">
-                  <button className="button button-quiet" onClick={() => startEdit(module)} type="button" aria-label={`Editar módulo ${module.title}`}>Editar</button>
-                  <button className="button button-quiet" onClick={() => void handleDelete(module)} type="button" aria-label={`Remover módulo ${module.title}`}>Remover</button>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
+      <div className="course-dialog-actions">
+        <button className="button button-secondary" disabled={isSaving} onClick={onCancel} type="button">Cancelar</button>
+        <button className="button course-primary" disabled={isSaving} type="submit">
+          {isSaving ? 'Salvando...' : module ? 'Salvar jogo' : 'Criar jogo'}
+        </button>
+      </div>
+    </form>
   );
 }

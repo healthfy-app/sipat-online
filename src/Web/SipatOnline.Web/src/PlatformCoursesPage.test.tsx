@@ -17,7 +17,9 @@ vi.mock('./api', async (importOriginal) => {
   const original = await importOriginal<typeof import('./api')>();
   return {
     ...original,
+    createGameModule: vi.fn(),
     createPlatformCourse: vi.fn(),
+    deleteGameModule: vi.fn(),
     duplicatePlatformCourse: vi.fn(),
     listGameModules: vi.fn(),
     listPlatformCourses: vi.fn(),
@@ -284,13 +286,13 @@ describe('Platform course catalog', () => {
     expect(api.setPlatformCourseCover).not.toHaveBeenCalled();
   });
 
-  it('uploads a library video, clears the form and refreshes without errors', async () => {
+  it('uploads a library video from the videos tab, closes the dialog and refreshes', async () => {
     const user = userEvent.setup();
     vi.mocked(api.uploadPlatformVideo).mockResolvedValue(makeVideo('v-3', 'Boas-vindas'));
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
-    await user.click(await screen.findByRole('tab', { name: /Biblioteca de vídeos/ }));
+    await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+    await user.click(screen.getByRole('button', { name: '+ Enviar vídeo' }));
     await user.type(screen.getByLabelText('Título do vídeo'), 'Boas-vindas');
     await user.type(screen.getByLabelText('Duração (segundos)'), '90');
     await user.upload(
@@ -303,9 +305,74 @@ describe('Platform course catalog', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('O vídeo "Boas-vindas" foi enviado ao catálogo.');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Título do vídeo')).toHaveValue('');
+    expect(screen.queryByRole('dialog', { name: 'Enviar vídeo' })).not.toBeInTheDocument();
     expect(api.uploadPlatformVideo).toHaveBeenCalledWith('Boas-vindas', 90000, expect.any(File), undefined);
     await waitFor(() => expect(api.listPlatformCourses).toHaveBeenCalledTimes(2));
+  });
+
+  it('suggests the video title from the chosen file name', async () => {
+    const user = userEvent.setup();
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+    await user.click(screen.getByRole('button', { name: '+ Enviar vídeo' }));
+    await user.upload(
+      screen.getByLabelText('Arquivo de vídeo'),
+      new File(['video'], 'uso_de-epi.mp4', { type: 'video/mp4' }),
+    );
+
+    expect(screen.getByLabelText('Título do vídeo')).toHaveValue('Uso de epi');
+  });
+
+  it('sends people with an existing training to the video library', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listPlatformCourses).mockResolvedValue([]);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /Tenho um treinamento já existente/ }));
+    expect(screen.getByRole('tab', { name: /Vídeos/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Abertura')).toBeVisible();
+  });
+
+  it('creates a game from the games tab dialog', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.createGameModule).mockResolvedValue(memoryModule);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Jogos e perguntas/ }));
+    await user.click(screen.getByRole('button', { name: '+ Novo jogo' }));
+    const dialog = screen.getByRole('dialog', { name: 'Novo jogo' });
+    await user.type(within(dialog).getByLabelText('Nome do jogo'), 'Quiz de EPI');
+    await user.type(within(dialog).getByLabelText('Texto da pergunta 1'), 'Qual EPI protege a cabeça?');
+    await user.type(within(dialog).getByLabelText('Alternativas da pergunta 1'), 'Capacete{Enter}Luva');
+    await user.click(within(dialog).getByRole('button', { name: 'Criar jogo' }));
+
+    expect(api.createGameModule).toHaveBeenCalledWith({
+      title: 'Quiz de EPI',
+      gameType: 'Quiz',
+      questions: [{ text: 'Qual EPI protege a cabeça?', options: ['Capacete', 'Luva'], correctIndex: 0 }],
+      content: null,
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent('O jogo "Quiz de EPI" foi criado.');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('asks before removing a game that courses use', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listGameModules).mockResolvedValue([{ ...memoryModule, usageCount: 2 }]);
+    vi.mocked(api.deleteGameModule).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Jogos e perguntas/ }));
+    await user.click(screen.getByRole('button', { name: `Remover jogo ${memoryModule.title}` }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('2 cursos'));
+    expect(api.deleteGameModule).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: `Remover jogo ${memoryModule.title}` }));
+    expect(api.deleteGameModule).toHaveBeenCalledWith('g-1');
+    confirm.mockRestore();
   });
 
   it('filters courses by name and status', async () => {
@@ -332,7 +399,6 @@ describe('Platform course catalog', () => {
       .mockResolvedValueOnce([ergonomics, fire, copy]);
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
     await user.click(await screen.findByRole('button', { name: 'Duplicar curso Ergonomia' }));
 
     expect(api.duplicatePlatformCourse).toHaveBeenCalledWith('c-1');
@@ -345,7 +411,6 @@ describe('Platform course catalog', () => {
     vi.mocked(api.setPlatformCourseCover).mockResolvedValue({ ...ergonomics, coverUrl: '/cover?v=1' });
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
     await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
     await user.click(screen.getByRole('button', { name: 'Configurar' }));
     expect(screen.getByRole('heading', { name: 'Detalhes do curso' })).toBeVisible();
@@ -366,7 +431,6 @@ describe('Platform course catalog', () => {
     });
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
     await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
     await user.click(screen.getByRole('button', { name: 'Mover Abertura para baixo' }));
 
@@ -379,7 +443,6 @@ describe('Platform course catalog', () => {
     vi.mocked(api.updatePlatformCourse).mockResolvedValue({ ...fire, gamificationEnabled: true, gameType: 'Puzzle' });
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
     await user.click(await screen.findByRole('button', { name: 'Abrir curso Combate a incêndio' }));
     await user.click(screen.getByRole('button', { name: 'Configurar' }));
     await user.click(screen.getByLabelText(/Gamificação após os vídeos/));
@@ -436,6 +499,8 @@ describe('Platform course catalog', () => {
     await user.click(screen.getByRole('button', { name: 'Desktop' }));
     expect(screen.getByRole('button', { name: 'Desktop' })).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByRole('button', { name: 'Próximo: Configurar →' }));
+    expect(screen.getByRole('button', { name: 'Configurar' })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('button', { name: 'Editar' })).toHaveTextContent('1');
     expect(screen.getByLabelText('Nome do curso')).toHaveValue('Ergonomia');
     await user.click(screen.getByRole('button', { name: 'Próximo: Publicar →' }));
     const review = screen.getByRole('region', { name: 'Revisar e publicar' });
