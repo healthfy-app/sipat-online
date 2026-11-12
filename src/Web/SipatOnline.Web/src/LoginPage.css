@@ -493,3 +493,16 @@
     transform: none;
   }
 }
+
+/* Banner da empresa: vira o fundo do painel de marca, com véu escuro para o texto continuar legível */
+.login-brand-panel.has-banner {
+  background:
+    linear-gradient(180deg, rgb(8 26 21 / 52%), rgb(8 26 21 / 80%)),
+    var(--login-banner) center / cover no-repeat;
+}
+
+.login-brand-panel.has-banner::before,
+.login-brand-panel.has-banner::after,
+.login-brand-panel.has-banner .login-brand-art {
+  display: none;
+}

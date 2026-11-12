@@ -33,15 +33,36 @@ describe('company identity settings', () => {
     expect(screen.queryByRole('button', { name: 'Salvar identidade visual' })).not.toBeInTheDocument();
   });
 
-  it('blocks invalid HEX and insufficient contrast without calling the API', async () => {
+  it('blocks invalid HEX but accepts low-contrast colors', async () => {
     render(<TenantAppearancePage tenant={tenant} onSaved={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Cor principal (HEX)'), { target: { value: '#ZZZZZZ' } });
     expect(screen.getByLabelText('Cor principal (HEX)')).toHaveAttribute('aria-invalid', 'true');
     expect(screen.getByRole('button', { name: 'Salvar identidade visual' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Cor principal (HEX)'), { target: { value: '#777777' } });
-    expect(screen.getByText(/ajuste para atingir 4,5:1/)).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Salvar identidade visual' })).toBeDisabled();
+    expect(screen.queryByText(/contraste/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Salvar identidade visual' })).toBeEnabled();
     expect(saveTenantAppearance).not.toHaveBeenCalled();
+  });
+
+  it('publishes a login banner and rejects unsupported banner files', async () => {
+    const onSaved = vi.fn();
+    const banner = new File(['banner-content'], 'banner.png', { type: 'image/png' });
+    const saved = { ...tenant, bannerReference: '/api/tenant/banner/acme?v=1a' };
+    vi.mocked(saveTenantAppearance).mockResolvedValue(saved);
+    render(<TenantAppearancePage tenant={tenant} onSaved={onSaved} />);
+    const user = userEvent.setup({ applyAccept: false });
+    expect(screen.getByText(/Nenhum banner/)).toBeVisible();
+    await user.upload(screen.getByLabelText('Selecionar banner da entrada'), new File(['x'], 'animado.gif', { type: 'image/gif' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Selecione um banner PNG, JPEG ou WebP de até 1,5 MB.');
+    await user.upload(screen.getByLabelText('Selecionar banner da entrada'), banner);
+    await screen.findByText('banner.png · pronto para salvar');
+    expect(screen.getByRole('img', { name: 'Prévia do banner da entrada' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Salvar identidade visual' }));
+    await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
+    expect(saveTenantAppearance).toHaveBeenCalledWith({
+      primaryColor: '#123456', secondaryColor: '#FFFFFF', logoBase64: null, removeLogo: false,
+      bannerBase64: btoa('banner-content'), removeBanner: false,
+    });
   });
 
   it('publishes the chosen logo and colors together and updates the portal only after success', async () => {
@@ -59,6 +80,7 @@ describe('company identity settings', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
     expect(saveTenantAppearance).toHaveBeenCalledWith({
       primaryColor: '#234567', secondaryColor: '#FFFFFF', logoBase64: btoa('png-content'), removeLogo: false,
+      bannerBase64: null, removeBanner: false,
     });
     expect(await screen.findByText(/Identidade visual salva/)).toBeVisible();
   });
@@ -79,6 +101,7 @@ describe('company identity settings', () => {
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith({ ...tenant, logoReference: null }));
     expect(saveTenantAppearance).toHaveBeenLastCalledWith({
       primaryColor: '#123456', secondaryColor: '#FFFFFF', logoBase64: null, removeLogo: true,
+      bannerBase64: null, removeBanner: false,
     });
   });
 

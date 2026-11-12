@@ -375,7 +375,10 @@ function LoginPage({
       aria-label={tenant.tenantKey === 'platform' ? 'Acesso à plataforma' : 'Acesso ao portal da empresa'}
       className="login-layout"
     >
-      <div className="login-brand-panel">
+      <div
+        className={`login-brand-panel${tenant.bannerReference ? ' has-banner' : ''}`}
+        style={tenant.bannerReference ? ({ '--login-banner': `url("${tenant.bannerReference}")` } as React.CSSProperties) : undefined}
+      >
         <TenantIdentity tenant={tenant} compact={false} />
         <div className="login-intro">
           {tenant.tenantKey === 'platform' ? (

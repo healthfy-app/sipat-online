@@ -5,6 +5,7 @@ export interface TenantBranding {
   primaryColor: string;
   secondaryColor: string;
   customDomain: string | null;
+  bannerReference?: string | null;
 }
 
 export interface IdentitySession {
@@ -500,6 +501,8 @@ export interface TenantAppearanceData {
   secondaryColor: string;
   logoBase64?: string | null;
   removeLogo?: boolean;
+  bannerBase64?: string | null;
+  removeBanner?: boolean;
 }
 
 export function saveTenantAppearance(data: TenantAppearanceData): Promise<TenantBranding> {

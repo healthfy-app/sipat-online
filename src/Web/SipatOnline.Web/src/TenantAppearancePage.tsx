@@ -1,7 +1,28 @@
-import { useState, type FormEvent } from 'react';
+import { ImagePlus, Trash2 } from 'lucide-react';
+import { useState, type FormEvent, type ReactNode } from 'react';
 import { saveTenantAppearance, type TenantBranding } from './api';
-import { colorContrast, isBrandColor, tenantTheme } from './branding';
-import './TenantAppearancePage.css';
+import { isBrandColor, tenantTheme } from './branding';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Page, PageHeader } from '@/components/ui/page';
+import { cn } from '@/lib/utils';
+
+const maxLogoBytes = 256 * 1024;
+const maxBannerBytes = 1_500_000;
+const bannerTypes = ['image/png', 'image/jpeg', 'image/webp'];
+
+function readAsBase64(file: File, failure: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error(failure));
+    reader.onload = () => (typeof reader.result === 'string'
+      ? resolve(reader.result.slice(reader.result.indexOf(',') + 1))
+      : reject(new Error(failure)));
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function TenantAppearancePage({ tenant, onSaved }: {
   tenant: TenantBranding;
@@ -10,205 +31,334 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
   const [primary, setPrimary] = useState(tenant.primaryColor);
   const [secondary, setSecondary] = useState(tenant.secondaryColor);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
+  const [logoType, setLogoType] = useState('image/png');
   const [removeLogo, setRemoveLogo] = useState(false);
-  const [fileName, setFileName] = useState('');
+  const [logoName, setLogoName] = useState('');
+  const [bannerBase64, setBannerBase64] = useState<string | null>(null);
+  const [bannerType, setBannerType] = useState('image/png');
+  const [removeBanner, setRemoveBanner] = useState(false);
+  const [bannerName, setBannerName] = useState('');
   const [fileVersion, setFileVersion] = useState(0);
   const [busy, setBusy] = useState(false);
   const [reading, setReading] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+
   const colorsValid = isBrandColor(primary) && isBrandColor(secondary);
-  const contrast = colorsValid ? colorContrast(primary, secondary) : 0;
+  const hasBanner = Boolean(tenant.bannerReference);
   const changed = primary.toUpperCase() !== tenant.primaryColor.toUpperCase()
     || secondary.toUpperCase() !== tenant.secondaryColor.toUpperCase()
-    || logoBase64 !== null || (removeLogo && tenant.logoReference !== null);
-  const previewLogo = removeLogo ? null : logoBase64 ? `data:image/png;base64,${logoBase64}` : tenant.logoReference;
+    || logoBase64 !== null || (removeLogo && tenant.logoReference !== null)
+    || bannerBase64 !== null || (removeBanner && hasBanner);
+  const previewLogo = removeLogo ? null : logoBase64 ? `data:${logoType};base64,${logoBase64}` : tenant.logoReference;
+  const previewBanner = removeBanner ? null : bannerBase64 ? `data:${bannerType};base64,${bannerBase64}` : tenant.bannerReference ?? null;
 
   function reset() {
     setPrimary(tenant.primaryColor); setSecondary(tenant.secondaryColor);
-    setLogoBase64(null); setRemoveLogo(false); setFileName('');
-    setFileVersion(value => value + 1); setError(''); setNotice('');
+    setLogoBase64(null); setRemoveLogo(false); setLogoName('');
+    setBannerBase64(null); setRemoveBanner(false); setBannerName('');
+    setFileVersion((value) => value + 1); setError(''); setNotice('');
   }
 
   async function readLogo(file?: File) {
     setError(''); setNotice('');
     if (!file) return;
-    if (file.type !== 'image/png' || file.size < 1 || file.size > 256 * 1024) {
+    if (file.type !== 'image/png' || file.size < 1 || file.size > maxLogoBytes) {
       setError('Selecione uma logo PNG de até 256 KB. O arquivo anterior foi mantido.');
       return;
     }
     setReading(true);
     try {
-      const data = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('Não foi possível ler a logo. Selecione o arquivo novamente.'));
-        reader.onload = () => typeof reader.result === 'string'
-          ? resolve(reader.result) : reject(new Error('O arquivo da logo não pôde ser lido.'));
-        reader.readAsDataURL(file);
-      });
-      setLogoBase64(data.slice(data.indexOf(',') + 1));
-      setRemoveLogo(false); setFileName(file.name);
+      setLogoBase64(await readAsBase64(file, 'Não foi possível ler a logo. Selecione o arquivo novamente.'));
+      setLogoType(file.type); setRemoveLogo(false); setLogoName(file.name);
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Não foi possível ler a logo.');
     } finally { setReading(false); }
   }
 
+  async function readBanner(file?: File) {
+    setError(''); setNotice('');
+    if (!file) return;
+    if (!bannerTypes.includes(file.type) || file.size < 1 || file.size > maxBannerBytes) {
+      setError('Selecione um banner PNG, JPEG ou WebP de até 1,5 MB. O arquivo anterior foi mantido.');
+      return;
+    }
+    setReading(true);
+    try {
+      setBannerBase64(await readAsBase64(file, 'Não foi possível ler o banner. Selecione o arquivo novamente.'));
+      setBannerType(file.type); setRemoveBanner(false); setBannerName(file.name);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Não foi possível ler o banner.');
+    } finally { setReading(false); }
+  }
+
   async function save(event: FormEvent) {
     event.preventDefault();
-    if (!colorsValid || contrast < 4.5) {
-      setError('Ajuste as cores para garantir um contraste mínimo de 4,5:1.');
+    if (!colorsValid) {
+      setError('Use cores no formato #RRGGBB.');
       return;
     }
     setBusy(true); setError(''); setNotice('');
     try {
       const saved = await saveTenantAppearance({
         primaryColor: primary.toUpperCase(), secondaryColor: secondary.toUpperCase(),
-        logoBase64, removeLogo,
+        logoBase64, removeLogo, bannerBase64, removeBanner,
       });
       onSaved(saved); setPrimary(saved.primaryColor); setSecondary(saved.secondaryColor);
-      setLogoBase64(null); setRemoveLogo(false); setFileName('');
-      setFileVersion(value => value + 1);
+      setLogoBase64(null); setRemoveLogo(false); setLogoName('');
+      setBannerBase64(null); setRemoveBanner(false); setBannerName('');
+      setFileVersion((value) => value + 1);
       setNotice('Identidade visual salva. O login e o portal da empresa já usam a nova aparência.');
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Não foi possível salvar. Suas alterações continuam na prévia.');
     } finally { setBusy(false); }
   }
 
-  return <div className="page-content tenant-appearance-page">
-    <div className="page-heading appearance-page-heading">
-      <div>
-        <span className="appearance-eyebrow">PORTAL DA EMPRESA</span>
-        <h1>Identidade visual</h1>
-        <p className="muted-copy">Personalize a experiência de aprendizagem de {tenant.tenantName}.</p>
-      </div>
-    </div>
-    <form className="appearance-layout" onSubmit={event => void save(event)}>
-      <div className="appearance-settings">
-        <section className="appearance-section" aria-labelledby="appearance-logo-title">
-          <div className="appearance-section-heading">
-            <span aria-hidden="true" className="appearance-section-number">01</span>
-            <div>
-              <h2 id="appearance-logo-title">Logo da empresa</h2>
-              <p>Aparece na entrada e na navegação. Os certificados já emitidos não são alterados.</p>
-            </div>
-          </div>
-          <div className="appearance-logo-editor">
-            <div className="appearance-logo-sample">
-              <img src={previewLogo ?? '/favicon.svg'} alt="Prévia da logo da empresa" />
-              <span>PRÉVIA</span>
-            </div>
-            <div className="appearance-logo-controls">
-              <label
-                className="appearance-upload-dropzone"
-                htmlFor="appearance-logo"
-                onDragOver={event => event.preventDefault()}
-                onDrop={event => {
-                  event.preventDefault();
-                  void readLogo(event.dataTransfer.files[0]);
-                }}
-              >
-                <span aria-hidden="true" className="appearance-upload-icon">↑</span>
-                <strong>Escolher arquivo PNG</strong>
-                <span>Solte aqui ou procure no dispositivo · até 256 KB</span>
-                <input
-                  aria-label="Selecionar logo PNG"
-                  aria-describedby="appearance-logo-help"
-                  accept=".png,image/png"
-                  className="appearance-file-input"
-                  disabled={busy || reading}
-                  id="appearance-logo"
-                  key={fileVersion}
-                  onChange={event => void readLogo(event.target.files?.[0])}
-                  type="file"
+  const theme = tenantTheme(colorsValid ? primary : tenant.primaryColor, colorsValid ? secondary : tenant.secondaryColor);
+  const working = busy || reading;
+
+  return (
+    <div className="page-content">
+      <Page>
+        <PageHeader
+          description={`Personalize a experiência de aprendizagem de ${tenant.tenantName}.`}
+          eyebrow="PORTAL DA EMPRESA"
+          title="Identidade visual"
+        />
+
+        <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]" onSubmit={(event) => void save(event)}>
+          <div className="grid min-w-0 gap-4">
+            <Card aria-labelledby="appearance-logo-title" role="region">
+              <CardHeader>
+                <CardTitle id="appearance-logo-title">Logo da empresa</CardTitle>
+                <CardDescription>Aparece na entrada e na navegação. Os certificados já emitidos não são alterados.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-[8rem_minmax(0,1fr)]">
+                  <div className="relative grid aspect-square place-items-center overflow-hidden rounded-lg border border-border bg-[conic-gradient(#f1f4f2_25%,#fff_0_50%,#f1f4f2_0_75%,#fff_0)] bg-[length:14px_14px]">
+                    <img alt="Prévia da logo da empresa" className="max-h-[70%] max-w-[70%] object-contain" src={previewLogo ?? '/favicon.svg'} />
+                    <span className="absolute bottom-1.5 right-1.5 rounded bg-card/90 px-1.5 text-[0.625rem] font-bold tracking-wider text-muted-foreground">PRÉVIA</span>
+                  </div>
+                  <div className="grid content-start gap-2">
+                    <Dropzone
+                      accept=".png,image/png"
+                      ariaLabel="Selecionar logo PNG"
+                      disabled={working}
+                      fileName={logoName}
+                      hint="Solte aqui ou procure no dispositivo · PNG até 256 KB"
+                      id="appearance-logo"
+                      onFile={(file) => void readLogo(file)}
+                      resetKey={fileVersion}
+                      title="Escolher arquivo PNG"
+                    />
+                    {(previewLogo || logoBase64) && (
+                      <Button className="justify-self-start" disabled={working} size="sm" variant="ghost"
+                        onClick={() => { setRemoveLogo(true); setLogoBase64(null); setLogoName(''); setFileVersion((value) => value + 1); setNotice(''); }}>
+                        <Trash2 /> Remover logo
+                      </Button>
+                    )}
+                  </div>
+                </div>
+                <p className="m-0 text-xs text-muted-foreground" id="appearance-logo-help">PNG de até 2000 × 2000 px. Para melhores resultados, use fundo transparente.</p>
+              </CardContent>
+            </Card>
+
+            <Card aria-labelledby="appearance-banner-title" role="region">
+              <CardHeader>
+                <CardTitle id="appearance-banner-title">Banner da entrada</CardTitle>
+                <CardDescription>Imagem de fundo da tela de login da empresa. Sem banner, a entrada usa o fundo padrão.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="relative grid aspect-[16/7] place-items-center overflow-hidden rounded-lg border border-border bg-muted">
+                  {previewBanner
+                    ? <img alt="Prévia do banner da entrada" className="absolute inset-0 size-full object-cover" src={previewBanner} />
+                    : <span className="px-4 text-center text-sm text-muted-foreground">Nenhum banner. A entrada usa o fundo padrão.</span>}
+                </div>
+                <Dropzone
+                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                  ariaLabel="Selecionar banner da entrada"
+                  disabled={working}
+                  fileName={bannerName}
+                  hint="PNG, JPEG ou WebP até 1,5 MB · recomendado 1600 × 900 px"
+                  id="appearance-banner"
+                  onFile={(file) => void readBanner(file)}
+                  resetKey={fileVersion}
+                  title="Escolher imagem do banner"
                 />
-              </label>
-              {fileName && <p className="appearance-file-name" role="status">{fileName} · pronto para salvar</p>}
-              {(previewLogo || logoBase64) && <button className="button button-quiet appearance-remove-logo"
-                type="button" disabled={busy || reading}
-                onClick={() => { setRemoveLogo(true); setLogoBase64(null); setFileName(''); setFileVersion(value => value + 1); setNotice(''); }}>
-                Remover logo
-              </button>}
+                {previewBanner && (
+                  <Button className="justify-self-start" disabled={working} size="sm" variant="ghost"
+                    onClick={() => { setRemoveBanner(true); setBannerBase64(null); setBannerName(''); setFileVersion((value) => value + 1); setNotice(''); }}>
+                    <Trash2 /> Remover banner
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card aria-labelledby="appearance-colors-title" role="region">
+              <CardHeader>
+                <CardTitle id="appearance-colors-title">Cores do portal</CardTitle>
+                <CardDescription>Defina a cor de destaque e a cor do texto dos botões. A prévia acompanha suas alterações.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <ColorField disabled={busy} fallback={tenant.primaryColor} id="primary" label="Cor principal" onChange={setPrimary} value={primary} />
+                  <ColorField disabled={busy} fallback={tenant.secondaryColor} id="secondary" label="Texto dos botões" onChange={setSecondary} value={secondary} />
+                </div>
+                {!colorsValid && <p className="m-0 text-sm font-medium text-destructive" role="status">Use cores no formato #RRGGBB.</p>}
+              </CardContent>
+            </Card>
+
+            <div className="grid gap-3">
+              {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
+              {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
+              <p className={cn('m-0 inline-flex items-center gap-2 text-sm text-muted-foreground', changed && 'text-warning')} role="status">
+                <span aria-hidden="true">{changed ? '●' : '✓'}</span>
+                {changed ? 'Alterações não publicadas' : 'Identidade visual publicada'}
+              </p>
+              {changed && (
+                <div className="flex flex-wrap gap-2">
+                  <Button aria-busy={working} disabled={working || !colorsValid} type="submit">
+                    {busy ? 'Salvando...' : reading ? 'Lendo arquivo...' : 'Salvar identidade visual'}
+                  </Button>
+                  <Button disabled={working} onClick={reset} variant="outline">Descartar alterações</Button>
+                </div>
+              )}
             </div>
           </div>
-          <p className="field-hint" id="appearance-logo-help">PNG de até 2000 × 2000 px. Para melhores resultados, use fundo transparente.</p>
-        </section>
-        <section className="appearance-section" aria-labelledby="appearance-colors-title">
-          <div className="appearance-section-heading">
-            <span aria-hidden="true" className="appearance-section-number">02</span>
-            <div>
-              <h2 id="appearance-colors-title">Cores do portal</h2>
-              <p>Defina a cor de destaque e a cor do texto dos botões. A prévia acompanha suas alterações.</p>
+
+          <aside aria-label="Prévia da identidade visual" className="grid min-w-0 gap-4 xl:sticky xl:top-24">
+            <div className="flex items-start justify-between gap-3">
+              <div className="grid gap-1">
+                <h2 className="m-0 text-base font-semibold">Prévia ao vivo</h2>
+                <p className="m-0 text-sm text-muted-foreground">Veja como a identidade aparece para os participantes.</p>
+              </div>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-2.5 py-1 text-[0.6875rem] font-bold tracking-wider text-primary">
+                <span aria-hidden="true" className="size-1.5 rounded-full bg-primary" />AO VIVO
+              </span>
             </div>
-          </div>
-          <div className="appearance-color-grid">
-            <ColorField label="Cor principal" value={primary} fallback={tenant.primaryColor} onChange={setPrimary} disabled={busy} id="primary" />
-            <ColorField label="Texto dos botões" value={secondary} fallback={tenant.secondaryColor} onChange={setSecondary} disabled={busy} id="secondary" />
-          </div>
-          <p className={`appearance-contrast${colorsValid && contrast >= 4.5 ? '' : ' appearance-contrast-warning'}`} role="status">
-            <span aria-hidden="true">{colorsValid && contrast >= 4.5 ? '✓' : '!'}</span>
-            {colorsValid
-              ? `Contraste ${contrast.toFixed(2).replace('.', ',')}:1 · ${contrast >= 4.5 ? 'texto legível' : 'ajuste para atingir 4,5:1'}`
-              : 'Use cores no formato #RRGGBB.'}
-          </p>
-        </section>
-        <div className="appearance-save">
-          {error && <p className="form-error" role="alert">{error}</p>}
-          {notice && <p className="success-message" role="status">{notice}</p>}
-          <p className={`appearance-save-state${changed ? ' is-dirty' : ''}`} role="status">
-            <span aria-hidden="true">{changed ? '●' : '✓'}</span>
-            {changed ? 'Alterações não publicadas' : 'Identidade visual publicada'}
-          </p>
-          {changed && (
-            <div className="form-actions">
-              <button className="button button-primary" type="submit"
-                aria-busy={busy || reading}
-                disabled={busy || reading || !colorsValid || contrast < 4.5}>
-                {busy ? 'Salvando...' : reading ? 'Lendo logo...' : 'Salvar identidade visual'}
-              </button>
-              <button className="button button-secondary" type="button" disabled={busy || reading} onClick={reset}>
-                Descartar alterações
-              </button>
+
+            <div className="appearance-preview grid min-w-0 gap-3" style={theme}>
+              <PreviewFrame label="Entrada (login)">
+                <div className="grid min-h-44 grid-cols-[1.1fr_1fr]">
+                  <div
+                    className="relative flex flex-col justify-between gap-4 p-4 text-white"
+                    style={{
+                      background: previewBanner
+                        ? `linear-gradient(180deg, rgb(8 26 21 / 55%), rgb(8 26 21 / 78%)), url(${previewBanner}) center / cover no-repeat`
+                        : 'linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 22%, #0b241f), #0b241f)',
+                    }}
+                  >
+                    <span className="flex items-center gap-2 text-xs font-semibold">
+                      <img alt="" className="size-6 object-contain" src={previewLogo ?? '/favicon.svg'} />
+                      {tenant.tenantName}
+                    </span>
+                    <span className="text-base font-bold leading-tight">Aprender também faz parte de cuidar.</span>
+                  </div>
+                  <div className="grid content-center gap-2 bg-card p-4">
+                    <span className="text-[0.625rem] font-bold tracking-wider text-primary">ACESSO SEGURO</span>
+                    <span className="h-6 rounded border border-border" />
+                    <span className="h-6 rounded border border-border" />
+                    <span className="grid h-7 place-items-center rounded text-[0.6875rem] font-semibold"
+                      style={{ background: 'var(--brand-primary)', color: 'var(--brand-secondary)' }}>Entrar no portal</span>
+                  </div>
+                </div>
+              </PreviewFrame>
+
+              <PreviewFrame label="Portal do participante">
+                <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+                  <img alt="" className="size-6 object-contain" src={previewLogo ?? '/favicon.svg'} />
+                  <strong className="text-sm">{tenant.tenantName}</strong>
+                </div>
+                <div className="grid gap-2 p-4">
+                  <span className="text-xs font-semibold text-primary">Minha formação</span>
+                  <h3 className="m-0 text-xl font-semibold leading-tight">Aprender também faz parte de cuidar.</h3>
+                  <p className="m-0 text-sm text-muted-foreground">Os cursos e conteúdos da sua empresa, em um só lugar.</p>
+                  <span className="mt-1 inline-flex w-fit items-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold"
+                    style={{ background: 'var(--brand-primary)', color: 'var(--brand-secondary)' }}>
+                    Continuar curso <span aria-hidden="true">→</span>
+                  </span>
+                </div>
+              </PreviewFrame>
             </div>
-          )}
-        </div>
-      </div>
-      <aside className="appearance-preview-column" aria-label="Prévia da identidade visual">
-        <div className="appearance-preview-heading">
-          <div>
-            <h2>Prévia do portal</h2>
-            <p>Veja como a identidade aparece para os participantes.</p>
-          </div>
-          <span><span aria-hidden="true" />AO VIVO</span>
-        </div>
-        <div className="appearance-preview" style={tenantTheme(colorsValid ? primary : tenant.primaryColor, colorsValid ? secondary : tenant.secondaryColor)}>
-          <div className="appearance-preview-header">
-            <img src={previewLogo ?? '/favicon.svg'} alt="" />
-            <strong>{tenant.tenantName}</strong>
-          </div>
-          <div className="appearance-preview-content">
-            <span className="appearance-preview-section">Minha formação</span>
-            <h3>Aprender também faz parte de cuidar.</h3>
-            <p>Os cursos e conteúdos da sua empresa, em um só lugar.</p>
-            <span className="appearance-preview-button">Continuar curso <span aria-hidden="true">→</span></span>
-          </div>
-        </div>
-        <p className="appearance-preview-note">Nome, dados e certificados não mudam. A logo dos certificados é configurada separadamente pela plataforma.</p>
-      </aside>
-    </form>
-  </div>;
+            <p className="m-0 text-xs text-muted-foreground">Nome, dados e certificados não mudam. A logo dos certificados é configurada separadamente pela plataforma.</p>
+          </aside>
+        </form>
+      </Page>
+    </div>
+  );
+}
+
+function PreviewFrame({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <figure className="m-0 grid gap-1.5">
+      <figcaption className="text-[0.6875rem] font-bold uppercase tracking-wider text-muted-foreground">{label}</figcaption>
+      <div className="overflow-hidden rounded-lg border border-border bg-card shadow-card">{children}</div>
+    </figure>
+  );
+}
+
+function Dropzone({ id, ariaLabel, accept, title, hint, fileName, disabled, resetKey, onFile }: {
+  id: string; ariaLabel: string; accept: string; title: string; hint: string;
+  fileName: string; disabled: boolean; resetKey: number; onFile: (file?: File) => void;
+}) {
+  return (
+    <div className="grid gap-2">
+      <label
+        className={cn(
+          'relative m-0 grid cursor-pointer justify-items-start gap-0.5 rounded-lg border border-dashed border-input px-4 py-3.5 text-sm transition-colors',
+          'hover:bg-accent has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+          disabled && 'pointer-events-none opacity-60',
+        )}
+        htmlFor={id}
+        onDragOver={(event) => event.preventDefault()}
+        onDrop={(event) => { event.preventDefault(); onFile(event.dataTransfer.files[0]); }}
+      >
+        <span aria-hidden="true" className="mb-1 text-primary"><ImagePlus className="size-5" /></span>
+        <strong className="font-semibold">{title}</strong>
+        <span className="text-[0.8125rem] text-muted-foreground">{hint}</span>
+        <input
+          accept={accept}
+          aria-label={ariaLabel}
+          className="absolute inset-0 size-full cursor-pointer opacity-0"
+          disabled={disabled}
+          id={id}
+          key={resetKey}
+          onChange={(event) => onFile(event.target.files?.[0])}
+          type="file"
+        />
+      </label>
+      {fileName && <p className="m-0 text-sm text-primary" role="status">{fileName} · pronto para salvar</p>}
+    </div>
+  );
 }
 
 function ColorField({ label, value, fallback, onChange, disabled, id }: {
   label: string; value: string; fallback: string; onChange: (value: string) => void; disabled: boolean; id: string;
 }) {
-  return <div className="field appearance-color-field">
-    <label htmlFor={`appearance-${id}`}>{label}</label>
-    <div className="appearance-color-controls">
-      <input type="color" aria-label={`Selecionar ${label.toLowerCase()}`} disabled={disabled}
-        value={isBrandColor(value) ? value : fallback} onChange={event => onChange(event.target.value)} />
-      <input id={`appearance-${id}`} type="text" aria-label={`${label} (HEX)`} disabled={disabled} spellCheck={false}
-        value={value} maxLength={7} pattern="#[0-9a-fA-F]{6}" aria-invalid={!isBrandColor(value)}
-        onChange={event => onChange(event.target.value)} />
-    </div>
-  </div>;
+  return (
+    <Field htmlFor={`appearance-${id}`} label={label}>
+      <div className="flex items-center gap-2">
+        <input
+          aria-label={`Selecionar ${label.toLowerCase()}`}
+          className="m-0 size-9 min-h-9 shrink-0 cursor-pointer rounded-md border border-border bg-card p-0.5"
+          disabled={disabled}
+          onChange={(event) => onChange(event.target.value)}
+          type="color"
+          value={isBrandColor(value) ? value : fallback}
+        />
+        <Input
+          aria-invalid={!isBrandColor(value)}
+          aria-label={`${label} (HEX)`}
+          className="font-mono"
+          disabled={disabled}
+          id={`appearance-${id}`}
+          maxLength={7}
+          onChange={(event) => onChange(event.target.value)}
+          pattern="#[0-9a-fA-F]{6}"
+          spellCheck={false}
+          value={value}
+        />
+      </div>
+    </Field>
+  );
 }
