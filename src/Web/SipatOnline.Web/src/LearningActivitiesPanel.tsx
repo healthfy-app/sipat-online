@@ -129,7 +129,8 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
     </button>
     {notice && <p role="status">{notice}</p>}
     {activitiesOpen && (
-      <CourseDialog onClose={closeActivityList} title="Atividades para praticar" wide>
+      <CourseDialog className="learning-dialog learning-activities-dialog" onClose={closeActivityList} title="Atividades para praticar" wide>
+        <p className="learning-dialog-intro">Escolha uma atividade para revisar o conteúdo. Todas são opcionais e não bloqueiam seu progresso.</p>
         <div className="learning-activity-grid">
           {activities.map(activity => {
             const status = activity.outcome === 'completed'

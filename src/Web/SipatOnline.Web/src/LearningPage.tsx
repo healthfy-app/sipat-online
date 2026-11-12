@@ -1237,7 +1237,7 @@ function LearningTrackPage({
             </section>
           )}
           {selectedLesson && isLessonDetailsOpen && (
-            <CourseDialog onClose={closeLessonDetails} title="Informações da aula" wide>
+            <CourseDialog className="learning-dialog learning-details-dialog" onClose={closeLessonDetails} title="Informações da aula" wide>
               <div aria-label="Informações e recursos da aula" className="learning-lesson-tabs" role="tablist">
                 {lessonTabs.map((tab, index) => (
                   <button

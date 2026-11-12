@@ -184,6 +184,7 @@ describe('learning experience', () => {
 
     const dialog = screen.getByRole('dialog', { name: 'Informações da aula' });
     expect(dialog).toBeVisible();
+    expect(dialog).toHaveClass('learning-dialog', 'learning-details-dialog');
     expect(within(dialog).getByRole('tabpanel')).toHaveTextContent(lesson.description);
     await user.click(within(dialog).getByRole('tab', { name: 'Minhas anotações' }));
     expect(within(dialog).getByRole('tabpanel')).toHaveTextContent('Anotações ainda não estão disponíveis');

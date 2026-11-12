@@ -76,7 +76,10 @@ describe('course activities during playback', () => {
     const { video } = await setup([checkpoint]);
 
     await user.click(screen.getByRole('button', { name: 'Ver atividades' }));
-    expect(screen.getByRole('dialog', { name: 'Atividades para praticar' })).toBeVisible();
+    const dialog = screen.getByRole('dialog', { name: 'Atividades para praticar' });
+    expect(dialog).toBeVisible();
+    expect(dialog).toHaveClass('learning-dialog', 'learning-activities-dialog');
+    expect(dialog).toHaveTextContent('Todas são opcionais e não bloqueiam seu progresso.');
     expect(video.paused).toBe(true);
     expect(screen.getByRole('button', { name: 'Pratique segurança · Iniciar atividade' })).toBeVisible();
 

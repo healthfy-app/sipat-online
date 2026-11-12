@@ -1205,47 +1205,105 @@
   background: var(--learner-complete-bg);
 }
 
-.portal-layout-learner .learning-activity-grid {
+.course-dialog.learning-dialog {
+  --learner-forest: #12332c;
+  --learner-action: #0f7a3d;
+  --learner-canvas: #f4f6f5;
+  --learner-surface: #fff;
+  --learner-border: #dfe6e3;
+  --learner-control-border: #cdd7d3;
+  --learner-text-secondary: #3d514b;
+  --learner-complete-bg: #d6f3e1;
+  --learner-complete-text: #0b5a2c;
+  width: min(100%, 56rem);
+  padding: clamp(1.25rem, 3vw, 2rem);
+  border-color: var(--learner-border);
+  border-radius: 1.25rem;
+  color: var(--learner-forest);
+  background: var(--learner-surface);
+  font-family: 'Plus Jakarta Sans', Inter, Arial, sans-serif;
+}
+
+.learning-dialog .course-dialog-heading {
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.learning-dialog .course-dialog-heading h2 {
+  padding-top: 0.2rem;
+  font-size: 1.2rem;
+  letter-spacing: -0.02em;
+}
+
+.learning-dialog .course-dialog-close {
+  color: var(--learner-text-secondary);
+  background: var(--learner-canvas);
+  border-radius: 50%;
+}
+
+.learning-dialog .course-dialog-close:hover {
+  color: var(--learner-forest);
+  background: var(--learner-complete-bg);
+}
+
+.learning-dialog-intro {
+  max-width: 40rem;
+  margin: 0 0 1.25rem;
+  color: var(--learner-text-secondary);
+  font-size: 0.83rem;
+  line-height: 1.55;
+}
+
+.learning-dialog .learning-activity-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
   grid-auto-rows: 1fr;
   gap: 0.625rem;
 }
 
-.portal-layout-learner .learning-activity-grid .learning-activity-card {
+.learning-dialog .learning-activity-grid .learning-activity-card {
   display: flex;
-  min-height: 5rem;
-  flex-direction: column;
-  align-items: flex-start;
+  min-width: 0;
+  min-height: 5.5rem;
+  align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   width: 100%;
-  padding: 0.8rem;
+  padding: 1rem;
   border: 1px solid var(--learner-control-border);
   border-radius: 12px;
   color: var(--learner-forest);
-  background: var(--learner-surface);
+  background: var(--learner-canvas);
   font: inherit;
+  font-size: 0.85rem;
   text-align: left;
   cursor: pointer;
   transition: border-color 140ms ease, box-shadow 140ms ease, transform 140ms ease;
 }
 
-.portal-layout-learner .learning-activity-card:hover {
+.learning-dialog .learning-activity-card:hover {
   border-color: var(--learner-action);
+  background: var(--learner-surface);
   box-shadow: 0 3px 12px rgb(18 51 44 / 9%);
   transform: translateY(-1px);
 }
 
-.portal-layout-learner .learning-activity-title {
+.learning-dialog .learning-activity-card:focus-visible,
+.learning-dialog .learning-lesson-tabs button:focus-visible {
+  outline: 2px solid var(--learner-action);
+  outline-offset: 3px;
+}
+
+.learning-dialog .learning-activity-title {
   font-weight: 700;
   line-height: 1.45;
   overflow-wrap: anywhere;
 }
 
-.portal-layout-learner .learning-activity-status {
+.learning-dialog .learning-activity-status {
   display: inline-grid;
   min-height: 1.5rem;
+  flex-shrink: 0;
   place-items: center;
   padding: 0 0.55rem;
   border-radius: 999px;
@@ -1255,53 +1313,59 @@
   font-weight: 800;
 }
 
-.portal-layout-learner .learning-activity-status.is-completed,
-.portal-layout-learner .learning-activity-status.is-available {
+.learning-dialog .learning-activity-status.is-completed,
+.learning-dialog .learning-activity-status.is-available {
   width: 1.5rem;
   height: 1.5rem;
   padding: 0;
 }
 
-.portal-layout-learner .learning-activity-status.is-completed {
+.learning-dialog .learning-activity-status.is-completed {
   color: var(--learner-complete-text);
   background: var(--learner-complete-bg);
 }
 
-.portal-layout-learner .learning-activity-status.is-available {
+.learning-dialog .learning-activity-status.is-available {
   color: var(--learner-action);
   background: var(--learner-complete-bg);
 }
 
-.portal-layout-learner .learning-lesson-tabs {
+.course-dialog.learning-details-dialog {
+  width: min(100%, 44rem);
+}
+
+.learning-dialog .learning-lesson-tabs {
   display: flex;
   gap: 0.25rem;
-  padding: 0.5rem 0.75rem 0;
+  padding: 0.5rem 0 0;
   border-bottom: 1px solid var(--learner-border);
 }
 
-.portal-layout-learner .learning-lesson-tabs button {
+.learning-dialog .learning-lesson-tabs button {
   min-height: 44px;
+  flex: 0 0 auto;
   padding: 0.5rem 0.75rem;
   border: 0;
   border-bottom: 2px solid transparent;
   color: var(--learner-text-secondary);
   background: transparent;
+  font-family: inherit;
   font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
 }
 
-.portal-layout-learner .learning-lesson-tabs button[aria-selected="true"] {
+.learning-dialog .learning-lesson-tabs button[aria-selected="true"] {
   border-bottom-color: var(--learner-action);
   color: var(--learner-forest);
 }
 
-.portal-layout-learner .learning-lesson-tab-panel {
-  min-height: 9rem;
-  padding: 1rem;
+.learning-dialog .learning-lesson-tab-panel {
+  min-height: 10rem;
+  padding: 1.25rem 0 0;
 }
 
-.portal-layout-learner .learning-lesson-heading {
+.learning-dialog .learning-lesson-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1309,24 +1373,48 @@
   margin-bottom: 0.5rem;
 }
 
-.portal-layout-learner .learning-lesson-heading h3 {
+.learning-dialog .learning-lesson-heading h3 {
   margin: 0;
   color: var(--learner-forest);
   font-size: 1rem;
 }
 
-.portal-layout-learner .learning-lesson-description,
-.portal-layout-learner .learning-resource-unavailable {
+.learning-dialog .learning-lesson-description,
+.learning-dialog .learning-resource-unavailable {
+  margin: 0.75rem 0 1rem;
   color: var(--learner-text-secondary);
+  font-size: 0.875rem;
   line-height: 1.6;
 }
 
-.portal-layout-learner .learning-lesson-footer {
+.learning-dialog .learning-lesson-footer {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1rem;
   color: var(--learner-text-secondary);
   font-size: 0.8rem;
+}
+
+.learning-dialog .learning-lesson-footer span {
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.5rem;
+  background: var(--learner-canvas);
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .course-dialog.learning-dialog {
+    padding: 1.1rem;
+  }
+
+  .learning-dialog .learning-lesson-tabs {
+    overflow-x: auto;
+  }
+
+  .learning-dialog .learning-lesson-tabs button {
+    padding-inline: 0.6rem;
+    font-size: 0.76rem;
+  }
 }
 
 .portal-layout-learner .learning-course-sidebar {
@@ -1566,15 +1654,6 @@
     justify-content: center;
   }
 
-  .portal-layout-learner .learning-lesson-tabs {
-    overflow-x: auto;
-  }
-
-  .portal-layout-learner .learning-lesson-tabs button {
-    flex: 0 0 auto;
-    padding-inline: 0.5rem;
-    font-size: 0.76rem;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
