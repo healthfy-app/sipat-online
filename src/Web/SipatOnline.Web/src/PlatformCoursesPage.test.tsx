@@ -25,6 +25,7 @@ vi.mock('./api', async (importOriginal) => {
     listPlatformCourses: vi.fn(),
     listPlatformLibraryVideos: vi.fn(),
     setPlatformCourseCover: vi.fn(),
+    setPlatformCourseStructure: vi.fn(),
     setPlatformCourseVideos: vi.fn(),
     updatePlatformCourse: vi.fn(),
     uploadPlatformVideo: vi.fn(),
@@ -95,6 +96,7 @@ beforeEach(() => {
   vi.mocked(api.uploadPlatformVideo).mockReset();
   vi.mocked(api.duplicatePlatformCourse).mockReset();
   vi.mocked(api.setPlatformCourseVideos).mockReset();
+  vi.mocked(api.setPlatformCourseStructure).mockReset();
   vi.mocked(api.updatePlatformCourse).mockReset();
 });
 
@@ -425,7 +427,7 @@ describe('Platform course catalog', () => {
 
   it('reorders the videos of a course', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.setPlatformCourseVideos).mockResolvedValue({
+    vi.mocked(api.setPlatformCourseStructure).mockResolvedValue({
       ...ergonomics,
       videos: [closing, opening],
     });
@@ -434,8 +436,40 @@ describe('Platform course catalog', () => {
     await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
     await user.click(screen.getByRole('button', { name: 'Mover Abertura para baixo' }));
 
-    expect(api.setPlatformCourseVideos).toHaveBeenCalledWith('c-1', ['v-2', 'v-1']);
+    expect(api.setPlatformCourseStructure).toHaveBeenCalledWith('c-1', [
+      expect.objectContaining({
+        title: 'Aula 1',
+        videos: [{ videoId: 'v-2', title: null }, { videoId: 'v-1', title: null }],
+      }),
+    ]);
     expect(screen.getByRole('button', { name: 'Mover Abertura para cima' })).toBeDisabled();
+  });
+
+  it('edits lessons and course-only video titles straight from the outline tree', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.setPlatformCourseStructure).mockResolvedValue(ergonomics);
+    render(<PlatformCoursesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
+
+    const videoTitle = screen.getByLabelText('Título do vídeo 1');
+    await user.clear(videoTitle);
+    await user.type(videoTitle, 'Boas-vindas{Enter}');
+    expect(api.setPlatformCourseStructure).toHaveBeenLastCalledWith('c-1', [
+      expect.objectContaining({ videos: [{ videoId: 'v-1', title: 'Boas-vindas' }, { videoId: 'v-2', title: null }] }),
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Adicionar aula' }));
+    expect(api.setPlatformCourseStructure).toHaveBeenLastCalledWith('c-1', [
+      expect.objectContaining({ title: 'Aula 1' }),
+      { id: null, title: 'Aula 2', description: null, videos: [] },
+    ]);
+
+    const lessonName = screen.getByLabelText('Nome da aula 1');
+    await user.clear(lessonName);
+    await user.type(lessonName, 'Introdução{Enter}');
+    expect(api.setPlatformCourseStructure).toHaveBeenLastCalledWith('c-1', [
+      expect.objectContaining({ title: 'Introdução' }),
+    ]);
   });
 
   it('saves gamification and status changes of a course', async () => {
@@ -494,7 +528,7 @@ describe('Platform course catalog', () => {
     expect(await screen.findByRole('heading', { name: 'Ergonomia' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Editar' })).toHaveAttribute('aria-current', 'step');
     expect(screen.getByLabelText('Prévia de Abertura')).toHaveAttribute('src', '/videos/v-1');
-    await user.click(screen.getByRole('button', { name: 'Encerramento' }));
+    await user.click(screen.getByLabelText('Título do vídeo 2'));
     expect(screen.getByLabelText('Prévia de Encerramento')).toHaveAttribute('src', '/videos/v-2');
     await user.click(screen.getByRole('button', { name: 'Desktop' }));
     expect(screen.getByRole('button', { name: 'Desktop' })).toHaveAttribute('aria-pressed', 'true');

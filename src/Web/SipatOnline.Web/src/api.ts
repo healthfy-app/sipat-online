@@ -63,6 +63,21 @@ export interface PlatformCourse {
   videos: PlatformCourseVideo[];
   modules: CourseModulePlacement[];
   coverUrl: string | null;
+  lessons?: PlatformCourseLesson[];
+}
+
+export interface PlatformCourseLesson {
+  id: string;
+  title: string;
+  description: string | null;
+  videoIds: string[];
+}
+
+export interface CourseLessonDraft {
+  id: string | null;
+  title: string;
+  description: string | null;
+  videos: { videoId: string; title: string | null }[];
 }
 
 export interface CourseModulePlacement {
@@ -176,6 +191,8 @@ export interface PlatformCourseVideo {
   createdAt: string;
   fileUrl: string;
   checkpoints: VideoCheckpoint[];
+  lessonId?: string | null;
+  libraryTitle?: string | null;
 }
 
 export interface PlatformLibraryVideo {
@@ -599,6 +616,16 @@ export function setPlatformCourseVideos(
   return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/videos`, {
     method: 'PUT',
     body: JSON.stringify({ videoIds }),
+  });
+}
+
+export function setPlatformCourseStructure(
+  courseId: string,
+  lessons: CourseLessonDraft[],
+): Promise<PlatformCourse> {
+  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/structure`, {
+    method: "PUT",
+    body: JSON.stringify({ lessons }),
   });
 }
 
