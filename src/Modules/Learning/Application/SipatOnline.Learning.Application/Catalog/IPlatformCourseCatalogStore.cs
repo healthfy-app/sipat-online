@@ -44,6 +44,12 @@ public interface IPlatformCourseCatalogStore
 
     Task<PlatformCourseCover?> GetCoverAsync(Guid courseId, CancellationToken cancellationToken);
 
+    /// <summary>Replaces lessons and the videos inside them; returns false when a video does not exist.</summary>
+    Task<bool> SetCourseStructureAsync(
+        Guid courseId,
+        IReadOnlyList<CourseLessonDraft> lessons,
+        CancellationToken cancellationToken);
+
     /// <summary>Replaces the ordered video links of a course; returns false when a video does not exist.</summary>
     Task<bool> SetCourseVideosAsync(
         Guid courseId,

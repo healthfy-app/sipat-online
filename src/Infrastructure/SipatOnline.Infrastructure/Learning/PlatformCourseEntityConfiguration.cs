@@ -66,7 +66,30 @@ public sealed class PlatformCourseVideoLinkEntityConfiguration :
             .WithMany(video => video.CourseLinks)
             .HasForeignKey(link => link.VideoId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.Property(link => link.TitleOverride).HasMaxLength(200);
+        builder.HasOne<PlatformCourseLessonEntity>()
+            .WithMany()
+            .HasForeignKey(link => link.LessonId)
+            .OnDelete(DeleteBehavior.SetNull);
         builder.HasIndex(link => new { link.CourseId, link.Position });
+    }
+}
+
+public sealed class PlatformCourseLessonEntityConfiguration :
+    IEntityTypeConfiguration<PlatformCourseLessonEntity>
+{
+    public void Configure(EntityTypeBuilder<PlatformCourseLessonEntity> builder)
+    {
+        builder.ToTable("PlatformCourseLessons", "learning");
+        builder.HasKey(lesson => lesson.Id);
+        builder.Property(lesson => lesson.Id).ValueGeneratedNever();
+        builder.Property(lesson => lesson.Title).HasMaxLength(200).IsRequired();
+        builder.Property(lesson => lesson.Description).HasMaxLength(2000);
+        builder.HasOne(lesson => lesson.Course)
+            .WithMany(course => course.Lessons)
+            .HasForeignKey(lesson => lesson.CourseId)
+            .OnDelete(DeleteBehavior.Cascade);
+        builder.HasIndex(lesson => new { lesson.CourseId, lesson.Position });
     }
 }
 

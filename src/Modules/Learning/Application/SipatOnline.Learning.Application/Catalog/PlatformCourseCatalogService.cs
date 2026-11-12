@@ -180,7 +180,7 @@ public sealed class PlatformCourseCatalogService(
         await catalogStore.DuplicateCourseAsync(courseId, copy, cancellationToken);
         await WriteAuditAsync("learning.platform_course.duplicated", "platform_course", copy.Id, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
-        return Result<PlatformCourse>.Success(copy);
+        return Result<PlatformCourse>.Success(await catalogStore.FindCourseAsync(copy.Id, cancellationToken) ?? copy);
     }
 
     public async Task<Result<PlatformCourse>> SetVideosAsync(
@@ -223,6 +223,90 @@ public sealed class PlatformCourseCatalogService(
         }
 
         await WriteAuditAsync("learning.platform_course.videos_changed", "platform_course", courseId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        var refreshed = await catalogStore.FindCourseAsync(courseId, cancellationToken);
+        return refreshed is null
+            ? CourseNotFound<PlatformCourse>()
+            : Result<PlatformCourse>.Success(refreshed);
+    }
+
+    public async Task<Result<PlatformCourse>> SetStructureAsync(
+        Guid courseId,
+        IReadOnlyList<CourseLessonDraft>? lessons,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<PlatformCourse>.Failure(permission.Error);
+        }
+
+        if (lessons is null || lessons.Count > 100)
+        {
+            return Failure<PlatformCourse>(
+                "learning.platform_course.lessons_invalid",
+                "Informe de 0 a 100 aulas.");
+        }
+
+        var normalized = new List<CourseLessonDraft>(lessons.Count);
+        foreach (var lesson in lessons)
+        {
+            var title = lesson.Title?.Trim();
+            var description = string.IsNullOrWhiteSpace(lesson.Description) ? null : lesson.Description.Trim();
+            if (string.IsNullOrWhiteSpace(title) || title.Length > 200 || description?.Length > 2000 || lesson.Videos is null)
+            {
+                return Failure<PlatformCourse>(
+                    "learning.platform_course.lesson_invalid",
+                    "Cada aula precisa de um título de até 200 caracteres.");
+            }
+
+            var videos = new List<CourseLessonVideoDraft>(lesson.Videos.Count);
+            foreach (var video in lesson.Videos)
+            {
+                var titleOverride = string.IsNullOrWhiteSpace(video.TitleOverride) ? null : video.TitleOverride.Trim();
+                if (titleOverride?.Length > 200)
+                {
+                    return Failure<PlatformCourse>(
+                        "learning.platform_course.video_title_invalid",
+                        "O título do vídeo pode ter até 200 caracteres.");
+                }
+
+                videos.Add(new CourseLessonVideoDraft(video.VideoId, titleOverride));
+            }
+
+            normalized.Add(new CourseLessonDraft(lesson.Id, title, description, videos));
+        }
+
+        var allVideoIds = normalized.SelectMany(item => item.Videos).Select(item => item.VideoId).ToArray();
+        if (allVideoIds.Length != allVideoIds.Distinct().Count())
+        {
+            return Failure<PlatformCourse>(
+                "learning.platform_course.videos_invalid",
+                "Informe cada vídeo no máximo uma vez.");
+        }
+
+        var course = await catalogStore.FindCourseAsync(courseId, cancellationToken);
+        if (course is null)
+        {
+            return CourseNotFound<PlatformCourse>();
+        }
+
+        if (allVideoIds.Length == 0 && course.Status == PlatformCourseStatus.Published)
+        {
+            return Failure<PlatformCourse>(
+                "learning.platform_course.publish_requires_video",
+                "Um curso publicado precisa ter ao menos um vídeo.");
+        }
+
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        if (!await catalogStore.SetCourseStructureAsync(courseId, normalized, cancellationToken))
+        {
+            return Failure<PlatformCourse>(
+                "learning.platform_course.video_not_found",
+                "Um dos vídeos informados não foi encontrado.");
+        }
+
+        await WriteAuditAsync("learning.platform_course.structure_changed", "platform_course", courseId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         var refreshed = await catalogStore.FindCourseAsync(courseId, cancellationToken);
         return refreshed is null

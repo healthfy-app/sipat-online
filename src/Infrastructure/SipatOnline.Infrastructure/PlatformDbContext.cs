@@ -34,6 +34,8 @@ public sealed class PlatformDbContext(
     public DbSet<PlatformCourseVideoEntity> PlatformCourseVideos => Set<PlatformCourseVideoEntity>();
 
     public DbSet<PlatformCourseVideoLinkEntity> PlatformCourseVideoLinks => Set<PlatformCourseVideoLinkEntity>();
+
+    public DbSet<PlatformCourseLessonEntity> PlatformCourseLessons => Set<PlatformCourseLessonEntity>();
     public DbSet<PlatformCourseCoverEntity> PlatformCourseCovers => Set<PlatformCourseCoverEntity>();
     public DbSet<GameModuleEntity> GameModules => Set<GameModuleEntity>();
     public DbSet<PlatformCourseModuleLinkEntity> PlatformCourseModuleLinks => Set<PlatformCourseModuleLinkEntity>();

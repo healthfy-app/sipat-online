@@ -141,6 +141,32 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("SetPlatformCourseVideos");
 
+        catalog.MapPut("/courses/{courseId:guid}/structure", async (
+            Guid courseId,
+            SetPlatformCourseStructureRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var lessons = request.Lessons?
+                .Select(item => new CourseLessonDraft(
+                    item.Id,
+                    item.Title ?? string.Empty,
+                    item.Description,
+                    (item.Videos ?? []).Select(video => new CourseLessonVideoDraft(video.VideoId, video.Title)).ToArray()))
+                .ToArray();
+            var result = await catalogService.SetStructureAsync(courseId, lessons, cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("SetPlatformCourseStructure");
+
         catalog.MapPut("/courses/{courseId:guid}/cover", async (
             Guid courseId,
             HttpContext context,
@@ -453,7 +479,10 @@ public static class PlatformCourseCatalogEndpoints
             course.Modules.Select(item => new CourseModulePlacementDto(item.ModuleId, item.AfterVideoCount)).ToArray(),
             course.CoverContentType is null
                 ? null
-                : $"/api/platform/catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}");
+                : $"/api/platform/catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}",
+            (course.Lessons ?? [])
+                .Select(lesson => new PlatformCourseLessonDto(lesson.Id, lesson.Title, lesson.Description, lesson.VideoIds))
+                .ToArray());
 
     private static PlatformCourseVideoResponse ToResponse(PlatformCourseVideo video) =>
         new(
@@ -464,7 +493,9 @@ public static class PlatformCourseCatalogEndpoints
             video.DurationMilliseconds,
             video.CreatedAt,
             $"/api/platform/catalog/videos/{video.Id:D}/file",
-            video.Checkpoints.Select(item => new VideoCheckpointDto(item.TimeMilliseconds, item.ModuleId)).ToArray());
+            video.Checkpoints.Select(item => new VideoCheckpointDto(item.TimeMilliseconds, item.ModuleId)).ToArray(),
+            video.LessonId,
+            video.LibraryTitle);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -552,7 +583,16 @@ public sealed record PlatformCourseResponse(
     IReadOnlyList<PlatformCourseVideoResponse> Videos,
     string GameType,
     IReadOnlyList<CourseModulePlacementDto> Modules,
-    string? CoverUrl);
+    string? CoverUrl,
+    IReadOnlyList<PlatformCourseLessonDto>? Lessons = null);
+
+public sealed record PlatformCourseLessonDto(Guid Id, string Title, string? Description, IReadOnlyList<Guid> VideoIds);
+
+public sealed record SetPlatformCourseStructureRequest(IReadOnlyList<CourseLessonRequest>? Lessons);
+
+public sealed record CourseLessonRequest(Guid? Id, string? Title, string? Description, IReadOnlyList<CourseLessonVideoRequest>? Videos);
+
+public sealed record CourseLessonVideoRequest(Guid VideoId, string? Title);
 
 public sealed record CourseModulePlacementDto(Guid ModuleId, int AfterVideoCount);
 
@@ -587,4 +627,6 @@ public sealed record PlatformCourseVideoResponse(
     long DurationMilliseconds,
     DateTimeOffset CreatedAt,
     string FileUrl,
-    IReadOnlyList<VideoCheckpointDto> Checkpoints);
+    IReadOnlyList<VideoCheckpointDto> Checkpoints,
+    Guid? LessonId = null,
+    string? LibraryTitle = null);
