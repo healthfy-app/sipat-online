@@ -69,6 +69,32 @@ select[data-slot="select"] {
   background-size: 1rem;
 }
 
+/* ---------- Editor de cursos em tela cheia ---------- */
+
+html:has([data-course-editor]) { overflow: hidden; }
+
+/* o que fica atrás do editor não deve ser alcançado pelo teclado */
+.portal-layout.portal-layout-course-editor > .portal-header,
+.portal-layout.portal-layout-course-editor .sidebar { display: none; }
+
+/* o aviso de sucesso vira um toast enquanto o editor está aberto */
+.course-workspace:has([data-course-editor]) > .success-message {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  z-index: 30;
+  max-width: min(32rem, calc(100% - 2rem));
+  margin: 0;
+  padding: 0.625rem 1rem;
+  border: 0;
+  border-radius: 0.5rem;
+  color: #fff;
+  background: var(--ink, #0e2a22);
+  box-shadow: 0 12px 28px -12px rgb(14 42 34 / 50%);
+  font-size: 0.875rem;
+  transform: translateX(-50%);
+}
+
 @media (prefers-reduced-motion: reduce) {
   [data-slot] { animation: none !important; transition: none !important; }
 }

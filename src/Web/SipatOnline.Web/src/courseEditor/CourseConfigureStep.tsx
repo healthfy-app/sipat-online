@@ -1,8 +1,12 @@
 import type { FormEvent, Ref } from 'react';
-import type { GamificationGameType, PlatformCourse, PlatformCourseStatus } from '../api';
-import { gameTypeOptions } from '../gamificationGames';
+import type { GamificationGameType, PlatformCourse, PlatformCourseStatus } from '@/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, Switch } from '@/components/ui/field';
+import { Input, Textarea } from '@/components/ui/input';
+import { gameTypeOptions } from '@/gamificationGames';
 import { CourseCoverEditor } from './CourseMediaForms';
-import CourseStepHeading from './CourseStepHeading';
+import CourseStepHeading, { StepPage } from './CourseStepHeading';
 
 export interface CourseSettingsValues {
   title: string;
@@ -42,75 +46,67 @@ export default function CourseConfigureStep({
   }
 
   return (
-    <section aria-label="Configuração do curso" className="ce-page">
-      <CourseStepHeading
-        eyebrow="Etapa 2 · Configurar"
-        headingRef={headingRef}
-        status={status}
-        title="Detalhes do curso"
-      >
+    <StepPage label="Configuração do curso">
+      <CourseStepHeading eyebrow="Etapa 2 · Configurar" headingRef={headingRef} status={status} title="Detalhes do curso">
         Revise as informações e escolha como o curso será apresentado aos participantes.
       </CourseStepHeading>
 
-      <div className="ce-page-grid">
-        <form className="ce-card ce-settings-form" onSubmit={handleSubmit}>
-          <div className="ce-card-heading">
-            <h2>Informações e preferências</h2>
-            <p>O nome e a descrição ajudam as pessoas a identificar este curso no catálogo.</p>
-          </div>
-          <div className="field">
-            <label htmlFor="edit-course-title">Nome do curso</label>
-            <input disabled={busy} id="edit-course-title" maxLength={200} required value={values.title}
-              onChange={(event) => onChange({ title: event.target.value })} />
-          </div>
-          <div className="field">
-            <label htmlFor="edit-course-description">Descrição</label>
-            <textarea disabled={busy} id="edit-course-description" maxLength={2000} rows={4} value={values.description}
-              onChange={(event) => onChange({ description: event.target.value })} />
-          </div>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.85fr)]">
+        <Card>
+          <form className="contents" onSubmit={handleSubmit}>
+            <CardHeader>
+              <CardTitle as="h2">Informações e preferências</CardTitle>
+              <CardDescription>O nome e a descrição ajudam as pessoas a identificar este curso no catálogo.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Field htmlFor="edit-course-title" label="Nome do curso">
+                <Input disabled={busy} id="edit-course-title" maxLength={200} required value={values.title}
+                  onChange={(event) => onChange({ title: event.target.value })} />
+              </Field>
+              <Field htmlFor="edit-course-description" label="Descrição">
+                <Textarea className="min-h-28" disabled={busy} id="edit-course-description" maxLength={2000} rows={4} value={values.description}
+                  onChange={(event) => onChange({ description: event.target.value })} />
+              </Field>
+              <Switch checked={values.gamificationEnabled} description="Ative ou desative a experiência de jogo deste curso."
+                disabled={busy} id="edit-course-gamification" label="Gamificação após os vídeos"
+                onChange={(event) => onChange({ gamificationEnabled: event.target.checked })} />
 
-          <label className="ce-switch" htmlFor="edit-course-gamification">
-            <input checked={values.gamificationEnabled} disabled={busy} id="edit-course-gamification" type="checkbox"
-              onChange={(event) => onChange({ gamificationEnabled: event.target.checked })} />
-            <span className="ce-switch-track" aria-hidden="true" />
-            <span className="ce-switch-text">
-              <strong>Gamificação após os vídeos</strong>
-              <small>Ative ou desative a experiência de jogo deste curso.</small>
-            </span>
-          </label>
+              {values.gamificationEnabled && (
+                <fieldset className="m-0 grid grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-2 border-0 p-0">
+                  <legend className="mb-2 p-0 text-xs font-bold uppercase tracking-[0.06em]">Tipo de jogo</legend>
+                  {gameTypeOptions.map((option) => (
+                    <label
+                      className="m-0 flex cursor-pointer gap-2.5 rounded-md border border-border p-3 transition-colors hover:border-accent-foreground/25 has-[:checked]:border-primary has-[:checked]:bg-accent"
+                      key={option.value}
+                    >
+                      <input checked={values.gameType === option.value} className="mt-0.5 accent-[var(--brand-primary)]" disabled={busy}
+                        name="course-game-type" type="radio" value={option.value} onChange={() => onChange({ gameType: option.value })} />
+                      <span className="grid gap-0.5">
+                        <strong className="text-sm">{option.label}</strong>
+                        <small className="text-xs leading-snug text-muted-foreground">{option.description}</small>
+                        {!option.playable && <em className="text-[0.6875rem] font-semibold not-italic text-warning">Configurável agora · jogável em breve</em>}
+                      </span>
+                    </label>
+                  ))}
+                </fieldset>
+              )}
+            </CardContent>
+            <CardFooter>
+              <Button disabled={busy} type="submit">{isSaving ? 'Salvando...' : 'Salvar alterações'}</Button>
+            </CardFooter>
+          </form>
+        </Card>
 
-          {values.gamificationEnabled && (
-            <fieldset className="ce-game-types">
-              <legend>Tipo de jogo</legend>
-              {gameTypeOptions.map((option) => (
-                <label className="ce-game-option" key={option.value}>
-                  <input checked={values.gameType === option.value} disabled={busy} name="course-game-type" type="radio"
-                    value={option.value} onChange={() => onChange({ gameType: option.value })} />
-                  <span>
-                    <strong>{option.label}</strong>
-                    <small>{option.description}</small>
-                    {!option.playable && <em>Configurável agora · jogável em breve</em>}
-                  </span>
-                </label>
-              ))}
-            </fieldset>
-          )}
-
-          <div className="ce-card-actions">
-            <button className="ce-btn ce-btn-primary" disabled={busy} type="submit">
-              {isSaving ? 'Salvando...' : 'Salvar alterações'}
-            </button>
-          </div>
-        </form>
-
-        <aside aria-label="Foto do curso" className="ce-card ce-cover-card">
-          <div className="ce-card-heading">
-            <h2>Foto do curso</h2>
-            <p>Uma imagem ajuda a identificar o conteúdo no catálogo.</p>
-          </div>
-          <CourseCoverEditor course={course} onBusyChange={onBusyChange} onChanged={onChanged} onError={onError} />
-        </aside>
+        <Card aria-label="Foto do curso" role="complementary">
+          <CardHeader>
+            <CardTitle as="h2">Foto do curso</CardTitle>
+            <CardDescription>Uma imagem ajuda a identificar o conteúdo no catálogo.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CourseCoverEditor course={course} onBusyChange={onBusyChange} onChanged={onChanged} onError={onError} />
+          </CardContent>
+        </Card>
       </div>
-    </section>
+    </StepPage>
   );
 }

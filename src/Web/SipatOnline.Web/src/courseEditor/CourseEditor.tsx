@@ -7,7 +7,7 @@ import {
   type PlatformCourseStatus,
   type PlatformLibraryVideo,
 } from '../api';
-import CourseDialog from '../CourseDialog';
+import { Dialog } from '@/components/ui/dialog';
 import CourseGamesSection from '../CourseGamesSection';
 import AddVideoDialog from './AddVideoDialog';
 import CourseConfigureStep, { type CourseSettingsValues } from './CourseConfigureStep';
@@ -129,10 +129,12 @@ export default function CourseEditor({
 
   return (
     <CourseEditorFrame busy={busy} dirty={dirty} onBack={onBack} onSave={() => void saveCourse()} onStep={setStep} step={step}>
-      {error && !activeDialog && <p className="form-error ce-error" role="alert">{error}</p>}
+      {error && !activeDialog && (
+        <p className="fixed left-1/2 top-[4.75rem] z-[25] m-0 max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 rounded-md bg-destructive-soft px-4 py-2.5 text-sm font-medium text-destructive shadow-overlay" role="alert">{error}</p>
+      )}
 
       {step === 'edit' && (
-        <div className="ce-workspace">
+        <div className="grid min-h-0 grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)_minmax(16rem,20rem)] max-[1180px]:min-h-auto max-[1180px]:grid-cols-[minmax(15rem,18rem)_minmax(0,1fr)] max-[860px]:grid-cols-1">
           <CourseOutlinePanel
             busy={busy}
             course={course}
@@ -223,10 +225,10 @@ export default function CourseEditor({
       )}
 
       {activeDialog === 'games' && (
-        <CourseDialog onClose={() => setActiveDialog(null)} title="Atividades e perguntas" wide>
-          {error && <p className="form-error" role="alert">{error}</p>}
+        <Dialog onClose={() => setActiveDialog(null)} size="lg" title="Atividades e perguntas">
+          {error && <p className="m-0 mb-4 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
           <CourseGamesSection course={course} modules={modules} onChanged={onChanged} onError={onError} />
-        </CourseDialog>
+        </Dialog>
       )}
     </CourseEditorFrame>
   );

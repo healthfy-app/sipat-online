@@ -1,6 +1,9 @@
+import { ArrowLeft, ArrowRight, Monitor, Smartphone } from 'lucide-react';
 import { useState } from 'react';
-import InteractiveGame from '../InteractiveGame';
-import VideoPreview from '../VideoPreview';
+import { Button } from '@/components/ui/button';
+import InteractiveGame from '@/InteractiveGame';
+import { cn } from '@/lib/utils';
+import VideoPreview from '@/VideoPreview';
 import type { TrackItem } from './courseTrack';
 
 export type PreviewSize = 'phone' | 'desktop';
@@ -21,60 +24,67 @@ export default function CoursePreviewCanvas({
   const [replay, setReplay] = useState(0);
   const item = track[selectedIndex];
   const progress = track.length === 0 ? 0 : ((selectedIndex + 1) / track.length) * 100;
+  const desktop = size === 'desktop';
 
   return (
-    <section aria-label="Prévia do curso" className={`ce-canvas is-${size}`}>
-      <div aria-label="Tamanho da prévia" className="ce-canvas-toolbar" role="group">
-        <button aria-label="Celular" aria-pressed={size === 'phone'} className="ce-icon-btn" onClick={() => onSize('phone')}
-          title="Celular" type="button"><PhoneIcon /></button>
-        <button aria-label="Desktop" aria-pressed={size === 'desktop'} className="ce-icon-btn" onClick={() => onSize('desktop')}
-          title="Desktop" type="button"><DesktopIcon /></button>
+    <section
+      aria-label="Prévia do curso"
+      className={cn(
+        'relative flex min-h-0 min-w-0 flex-col items-center justify-[safe_center] gap-5 overflow-y-auto px-6 pb-6 pt-14',
+        'max-[1180px]:min-h-auto max-[1180px]:overflow-visible max-[860px]:order-first max-[860px]:px-4 max-[860px]:pb-4',
+      )}
+    >
+      <div aria-label="Tamanho da prévia" className="absolute right-4 top-3 flex gap-1.5" role="group">
+        <Button aria-label="Celular" aria-pressed={!desktop} onClick={() => onSize('phone')} size="icon-sm" title="Celular" variant={desktop ? 'outline' : 'default'}>
+          <Smartphone />
+        </Button>
+        <Button aria-label="Desktop" aria-pressed={desktop} onClick={() => onSize('desktop')} size="icon-sm" title="Desktop" variant={desktop ? 'default' : 'outline'}>
+          <Monitor />
+        </Button>
       </div>
 
-      <div className="ce-device">
-        <div aria-hidden="true" className="ce-device-progress"><span style={{ width: `${progress}%` }} /></div>
-        <header className="ce-device-header">
-          <span className="ce-device-brand">SIPAT Online</span>
-          {item && <span className="ce-device-count">{selectedIndex + 1} / {track.length}</span>}
+      <div
+        className={cn(
+          'flex flex-col overflow-hidden bg-[var(--learner-forest,#12332c)] text-white shadow-[0_24px_48px_-24px_rgb(14_42_34/0.45)]',
+          'transition-[width,border-radius,min-height] duration-300 ease-out-soft',
+          desktop
+            ? 'min-h-[min(30rem,calc(100dvh-12rem))] w-[min(100%,52rem)] rounded-lg'
+            : 'min-h-[min(40rem,calc(100dvh-12rem))] w-[min(100%,24rem)] rounded-[1.5rem] max-[860px]:min-h-[30rem]',
+        )}
+      >
+        <div aria-hidden="true" className="h-[5px] bg-white/15">
+          <span className="block h-full rounded-r-full bg-signal transition-[width] duration-300 ease-out-soft" style={{ width: `${progress}%` }} />
+        </div>
+        <header className="flex items-center justify-between gap-4 border-b border-white/12 px-4.5 py-3.5">
+          <span className="text-sm font-bold tracking-tight">SIPAT Online</span>
+          {item && <span className="rounded-sm bg-black/30 px-2 py-1 text-[0.8125rem] font-bold tabular-nums">{selectedIndex + 1} / {track.length}</span>}
         </header>
-        <div className={`ce-device-body${item?.kind === 'activity' ? ' is-activity' : ''}`}>
-          {!item && <p className="ce-device-empty">Adicione um vídeo para visualizar o conteúdo.</p>}
+        <div className={cn('flex flex-1 flex-col justify-center gap-4 p-5 text-center', item?.kind === 'activity' && 'justify-start p-3 text-left')}>
+          {!item && <p className="m-0 text-white/75">Adicione um vídeo para visualizar o conteúdo.</p>}
           {item?.kind === 'video' && <>
-            <h2>{item.video.title}</h2>
-            <VideoPreview key={item.video.id} src={item.video.fileUrl} title={`Prévia de ${item.video.title}`} />
+            <h2 className="m-0 text-[1.375rem] font-medium leading-snug text-white [text-wrap:balance]">{item.video.title}</h2>
+            <div className="[&_video]:max-h-96 [&_video]:w-full [&_video]:rounded-md [&_video]:bg-black [&_.video-preview-error]:text-white">
+              <VideoPreview key={item.video.id} src={item.video.fileUrl} title={`Prévia de ${item.video.title}`} />
+            </div>
           </>}
           {item?.kind === 'activity' && (
-            <div className="ce-device-sheet">
+            <div className="flex-1 overflow-auto rounded-xl bg-card p-4 text-foreground">
               <InteractiveGame key={`${item.key}-${replay}`} module={item.module} onClose={() => setReplay((value) => value + 1)} />
             </div>
           )}
         </div>
       </div>
 
-      <nav aria-label="Navegar na prévia" className="ce-canvas-nav">
-        <button aria-label="Item anterior" className="ce-round-btn" disabled={selectedIndex <= 0}
-          onClick={() => onSelectIndex(selectedIndex - 1)} type="button">←</button>
-        <button aria-label="Próximo item" className="ce-round-btn" disabled={selectedIndex >= track.length - 1}
-          onClick={() => onSelectIndex(selectedIndex + 1)} type="button">→</button>
+      <nav aria-label="Navegar na prévia" className="flex gap-4">
+        <Button aria-label="Item anterior" className="rounded-full" disabled={selectedIndex <= 0} onClick={() => onSelectIndex(selectedIndex - 1)}
+          size="icon-sm" variant="outline">
+          <ArrowLeft />
+        </Button>
+        <Button aria-label="Próximo item" className="rounded-full" disabled={selectedIndex >= track.length - 1} onClick={() => onSelectIndex(selectedIndex + 1)}
+          size="icon-sm" variant="outline">
+          <ArrowRight />
+        </Button>
       </nav>
     </section>
-  );
-}
-
-function PhoneIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
-      <rect height="13" rx="2" stroke="currentColor" strokeWidth="1.5" width="8" x="4" y="1.5" />
-      <path d="M7 12h2" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
-    </svg>
-  );
-}
-
-function DesktopIcon() {
-  return (
-    <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
-      <rect height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" width="13" x="1.5" y="2" />
-      <path d="M5.5 14h5M8 11v3" stroke="currentColor" strokeLinecap="round" strokeWidth="1.5" />
-    </svg>
   );
 }

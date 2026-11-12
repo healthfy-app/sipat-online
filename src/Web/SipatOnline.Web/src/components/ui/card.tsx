@@ -9,8 +9,8 @@ export function CardHeader({ className, ...props }: ComponentProps<'div'>) {
   return <div className={cn('grid gap-1 border-b border-border px-5 py-4', className)} data-slot="card-header" {...props} />;
 }
 
-export function CardTitle({ className, ...props }: ComponentProps<'h3'>) {
-  return <h3 className={cn('m-0 text-base font-semibold leading-snug', className)} data-slot="card-title" {...props} />;
+export function CardTitle({ className, as: Heading = 'h3', ...props }: ComponentProps<'h3'> & { as?: 'h2' | 'h3' | 'h4' }) {
+  return <Heading className={cn('m-0 text-base font-semibold leading-snug', className)} data-slot="card-title" {...props} />;
 }
 
 export function CardDescription({ className, ...props }: ComponentProps<'p'>) {

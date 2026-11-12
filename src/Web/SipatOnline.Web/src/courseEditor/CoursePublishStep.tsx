@@ -1,13 +1,24 @@
+import { Check, Minus, TriangleAlert } from 'lucide-react';
 import type { Ref } from 'react';
-import type { PlatformCourse, PlatformCourseStatus } from '../api';
+import type { PlatformCourse, PlatformCourseStatus } from '@/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import { pluralize } from './courseFormat';
-import CourseStepHeading from './CourseStepHeading';
+import CourseStepHeading, { StepPage } from './CourseStepHeading';
 
 interface ChecklistItem {
   label: string;
   state: 'ready' | 'required' | 'optional';
   text: string;
 }
+
+const checkStyles = {
+  ready: { mark: 'bg-primary text-primary-foreground', text: 'text-primary', icon: Check },
+  required: { mark: 'bg-destructive-soft text-destructive', text: 'text-destructive', icon: TriangleAlert },
+  optional: { mark: 'bg-warning-soft text-warning', text: 'text-warning', icon: Minus },
+};
 
 export default function CoursePublishStep({
   course,
@@ -41,60 +52,76 @@ export default function CoursePublishStep({
     { label: 'Foto do curso', state: course.coverUrl ? 'ready' : 'optional', text: course.coverUrl ? 'Adicionada' : 'Opcional' },
   ];
   const canPublish = hasVideos && title.trim() !== '' && description.trim() !== '';
+  const summary = [
+    { term: 'Título', value: title || 'Não informado' },
+    { term: 'Descrição', value: description || 'Sem descrição' },
+    { term: 'Vídeos', value: pluralize(course.videos.length, 'vídeo', 'vídeos') },
+    { term: 'Gamificação', value: gamificationEnabled ? 'Ativada após os vídeos' : 'Desativada' },
+  ];
 
   return (
-    <section aria-label="Revisar e publicar" className="ce-page">
+    <StepPage label="Revisar e publicar">
       <CourseStepHeading eyebrow="Etapa 3 · Publicar" headingRef={headingRef} status={status} title="Revisar e publicar">
         Confira os dados e os requisitos antes de disponibilizar o curso para as empresas.
       </CourseStepHeading>
 
-      <div className="ce-page-grid">
-        <section aria-labelledby="course-publish-details-title" className="ce-card">
-          <div className="ce-card-heading">
-            <h3 id="course-publish-details-title">Detalhes do curso</h3>
-            <p>Resumo das informações que serão exibidas no catálogo.</p>
-          </div>
-          <dl className="ce-summary">
-            <div><dt>Título</dt><dd>{title || 'Não informado'}</dd></div>
-            <div><dt>Descrição</dt><dd>{description || 'Sem descrição'}</dd></div>
-            <div><dt>Vídeos</dt><dd>{pluralize(course.videos.length, 'vídeo', 'vídeos')}</dd></div>
-            <div><dt>Gamificação</dt><dd>{gamificationEnabled ? 'Ativada após os vídeos' : 'Desativada'}</dd></div>
-          </dl>
-          <div className="ce-card-actions">
-            <button className="ce-btn" onClick={onReviewSettings} type="button">Revisar configurações</button>
-          </div>
-        </section>
+      <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.85fr)]">
+        <Card aria-labelledby="course-publish-details-title" role="region">
+          <CardHeader>
+            <CardTitle id="course-publish-details-title">Detalhes do curso</CardTitle>
+            <CardDescription>Resumo das informações que serão exibidas no catálogo.</CardDescription>
+          </CardHeader>
+          <CardContent className="py-1">
+            <dl className="m-0 grid">
+              {summary.map((row) => (
+                <div className="grid grid-cols-[minmax(7rem,0.6fr)_minmax(0,1.4fr)] gap-3 border-b border-border py-3 last:border-0 max-sm:grid-cols-1 max-sm:gap-0.5" key={row.term}>
+                  <dt className="text-[0.6875rem] font-bold uppercase leading-loose tracking-[0.06em] text-muted-foreground">{row.term}</dt>
+                  <dd className="m-0 font-medium leading-normal [overflow-wrap:anywhere]">{row.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+          <CardFooter>
+            <Button onClick={onReviewSettings} variant="outline">Revisar configurações</Button>
+          </CardFooter>
+        </Card>
 
-        <section aria-labelledby="course-publish-action-title" className="ce-card">
-          <div className="ce-card-heading ce-card-heading-row">
-            <div>
-              <h3 id="course-publish-action-title">Publicação no catálogo</h3>
-              <p>Ao publicar, o curso fica disponível no catálogo. Os vínculos e o progresso das empresas são preservados.</p>
+        <Card aria-labelledby="course-publish-action-title" role="region">
+          <CardHeader className="flex items-start justify-between gap-4">
+            <div className="grid gap-1">
+              <CardTitle id="course-publish-action-title">Publicação no catálogo</CardTitle>
+              <CardDescription>Ao publicar, o curso fica disponível no catálogo. Os vínculos e o progresso das empresas são preservados.</CardDescription>
             </div>
-            <span className={`ce-pill ${isPublished ? 'ce-pill-published' : 'ce-pill-draft'}`}>
-              {isPublished ? 'No catálogo' : 'Rascunho'}
-            </span>
-          </div>
-          <ul aria-label="Checklist de publicação" className="ce-checklist">
-            {checklist.map((item) => (
-              <li className={`is-${item.state}`} key={item.label}>
-                <span aria-hidden="true" className="ce-check-mark">{item.state === 'ready' ? '✓' : item.state === 'optional' ? '–' : '!'}</span>
-                <span className="ce-check-label">{item.label}</span>
-                <strong>{item.text}</strong>
-              </li>
-            ))}
-          </ul>
-          {!hasVideos && <p className="form-error" role="alert">Adicione ao menos um vídeo antes de publicar.</p>}
-          <div className="ce-card-actions">
-            <button className="ce-btn ce-btn-primary" disabled={busy || !canPublish} onClick={onPublish} type="button">
-              {isPublished ? 'Publicar alterações' : 'Publicar agora'}
-            </button>
-            {isPublished && (
-              <button className="ce-btn" disabled={busy} onClick={onUnpublish} type="button">Voltar a rascunho</button>
+            <Badge variant={isPublished ? 'default' : 'warning'}>{isPublished ? 'No catálogo' : 'Rascunho'}</Badge>
+          </CardHeader>
+          <CardContent>
+            <ul aria-label="Checklist de publicação" className="m-0 grid list-none gap-1.5 p-0">
+              {checklist.map((item) => {
+                const style = checkStyles[item.state];
+                const Icon = style.icon;
+                return (
+                  <li className="grid min-h-10 grid-cols-[1.375rem_minmax(0,1fr)_auto] items-center gap-2.5 rounded-md bg-background px-3 py-1.5" key={item.label}>
+                    <span aria-hidden="true" className={cn('grid size-[1.375rem] place-items-center rounded-full', style.mark)}><Icon className="size-3" /></span>
+                    <span className="text-sm">{item.label}</span>
+                    <strong className={cn('text-xs font-semibold', style.text)}>{item.text}</strong>
+                  </li>
+                );
+              })}
+            </ul>
+            {!hasVideos && (
+              <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">
+                Adicione ao menos um vídeo antes de publicar.
+              </p>
             )}
-          </div>
-        </section>
+          </CardContent>
+          <CardFooter>
+            <Button className="max-sm:flex-1" disabled={busy || !canPublish} onClick={onPublish}>
+              {isPublished ? 'Publicar alterações' : 'Publicar agora'}
+            </Button>
+            {isPublished && <Button className="max-sm:flex-1" disabled={busy} onClick={onUnpublish} variant="outline">Voltar a rascunho</Button>}
+          </CardFooter>
+        </Card>
       </div>
-    </section>
+    </StepPage>
   );
 }
