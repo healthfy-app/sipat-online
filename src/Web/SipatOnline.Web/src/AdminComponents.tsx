@@ -1,5 +1,11 @@
+/**
+ * Componentes de administração com a API antiga, agora montados sobre o design system
+ * (src/components/ui). As telas que ainda os importam herdam o visual novo sem mudar de código.
+ */
 import type { ReactNode } from 'react';
-import CourseDialog from './CourseDialog';
+import { Badge } from '@/components/ui/badge';
+import { PageHeader as UiPageHeader } from '@/components/ui/page';
+import { Sheet } from '@/components/ui/sheet';
 
 export function PageHeader({
   title,
@@ -15,18 +21,22 @@ export function PageHeader({
   actions?: ReactNode;
 }) {
   return (
-    <header className="page-heading admin-page-heading">
-      <div>
-        {eyebrow && <p className="eyebrow">{eyebrow}</p>}
-        <h1>{title}</h1>
-        {description && <p className="muted-copy">{description}</p>}
-        {meta && <div className="admin-page-meta">{meta}</div>}
-      </div>
-      {actions && <div className="admin-page-actions">{actions}</div>}
-    </header>
+    <UiPageHeader
+      actions={actions}
+      className="mb-1"
+      description={(description || meta) ? (
+        <span className="flex flex-wrap items-center gap-2">
+          {description}
+          {meta}
+        </span>
+      ) : undefined}
+      eyebrow={eyebrow}
+      title={title}
+    />
   );
 }
 
+/** Tabela com o visual do design system; recebe <thead>/<tbody> crus como filhos. */
 export function DataTable({
   label,
   className = '',
@@ -37,13 +47,26 @@ export function DataTable({
   children: ReactNode;
 }) {
   return (
-    <div className="admin-table-scroll">
-      <table aria-label={label} className={`data-table admin-data-table ${className}`.trim()}>
+    <div className="relative w-full overflow-x-auto rounded-lg bg-card shadow-card">
+      <table
+        aria-label={label}
+        className={[
+          'm-0 w-full border-collapse text-sm',
+          '[&_thead_tr]:border-b [&_thead_tr]:border-border',
+          '[&_th]:h-10 [&_th]:whitespace-nowrap [&_th]:bg-transparent [&_th]:px-4 [&_th]:text-left [&_th]:align-middle',
+          '[&_th]:text-[0.6875rem] [&_th]:font-semibold [&_th]:uppercase [&_th]:tracking-[0.06em] [&_th]:text-muted-foreground',
+          '[&_tbody_tr]:border-b [&_tbody_tr]:border-border [&_tbody_tr:last-child]:border-0 [&_tbody_tr]:transition-colors [&_tbody_tr:hover]:bg-muted/60',
+          '[&_td]:px-4 [&_td]:py-3 [&_td]:align-middle',
+          className,
+        ].join(' ')}
+      >
         {children}
       </table>
     </div>
   );
 }
+
+const chipVariants = { success: 'success', warning: 'warning', neutral: 'neutral', danger: 'destructive' } as const;
 
 export function StatusChip({
   children,
@@ -52,7 +75,7 @@ export function StatusChip({
   children: ReactNode;
   variant?: 'success' | 'warning' | 'neutral' | 'danger';
 }) {
-  return <span className={`admin-status-chip admin-status-${variant}`}>{children}</span>;
+  return <Badge variant={chipVariants[variant]}>{children}</Badge>;
 }
 
 export function FilterBar({
@@ -65,7 +88,11 @@ export function FilterBar({
   children: ReactNode;
 }) {
   return (
-    <div aria-label={label} className={`admin-filter-bar ${className}`.trim()} role="group">
+    <div
+      aria-label={label}
+      className={`grid grid-cols-[repeat(auto-fit,minmax(min(100%,14rem),1fr))] items-end gap-3 rounded-lg bg-card p-4 shadow-card ${className}`.trim()}
+      role="group"
+    >
       {children}
     </div>
   );
@@ -82,62 +109,5 @@ export function Drawer({
   children: ReactNode;
   busy?: boolean;
 }) {
-  return (
-    <CourseDialog busy={busy} drawer onClose={onClose} title={title}>
-      {children}
-    </CourseDialog>
-  );
-}
-
-export function CourseCard({
-  title,
-  description,
-  coverUrl,
-  statusLabel,
-  statusVariant,
-  optionLabel,
-  videoCount,
-  duration,
-  gamificationEnabled,
-  onOpen,
-  onDuplicate,
-}: {
-  title: string;
-  description?: string;
-  coverUrl: string;
-  statusLabel: string;
-  statusVariant: 'success' | 'neutral';
-  optionLabel?: string;
-  videoCount: number;
-  duration?: string;
-  gamificationEnabled: boolean;
-  onOpen: () => void;
-  onDuplicate: () => void;
-}) {
-  return (
-    <article className="admin-course-card">
-      <img alt="" className="admin-course-cover" decoding="async" loading="lazy" src={coverUrl} />
-      <div className="admin-course-card-content">
-        <div className="admin-course-badges">
-          <StatusChip variant={statusVariant}>{statusLabel}</StatusChip>
-          {optionLabel && <StatusChip>Opção {optionLabel}</StatusChip>}
-          {gamificationEnabled && <StatusChip>Gamificação</StatusChip>}
-        </div>
-        <h3>{title}</h3>
-        {description && <p className="admin-course-description">{description}</p>}
-        <p className="admin-course-meta">
-          {videoCount} {videoCount === 1 ? 'vídeo' : 'vídeos'}
-          {duration ? ` · ${duration}` : ''}
-        </p>
-        <div className="admin-course-actions">
-          <button aria-label={`Abrir curso ${title}`} className="button button-primary" onClick={onOpen} type="button">
-            Abrir
-          </button>
-          <button aria-label={`Duplicar curso ${title}`} className="button button-secondary" onClick={onDuplicate} type="button">
-            Duplicar
-          </button>
-        </div>
-      </div>
-    </article>
-  );
+  return <Sheet busy={busy} onClose={onClose} title={title}>{children}</Sheet>;
 }

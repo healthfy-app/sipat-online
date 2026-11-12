@@ -59,6 +59,7 @@
 
   @keyframes overlay-in { from { opacity: 0; } }
   @keyframes dialog-in { from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); } }
+  @keyframes sheet-in { from { transform: translateX(100%); } }
 }
 
 /* seta do select nativo do design system */
@@ -67,6 +68,52 @@ select[data-slot="select"] {
   background-position: right 0.625rem center;
   background-repeat: no-repeat;
   background-size: 1rem;
+}
+
+/* ---------- Ponte para as telas de gestão ainda não reescritas ----------
+ * As classes antigas (.button, .field, .form-card...) ganham as medidas e cores do design
+ * system, para todas as telas de gestão terem a mesma cara. A área do participante
+ * (.portal-layout-learner) e seus diálogos ficam de fora: continuam idênticos.
+ */
+:is(.portal-layout:not(.portal-layout-learner), body:not(:has(.portal-layout-learner)) .course-dialog-backdrop) {
+  & .button {
+    min-height: 2.25rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 120ms ease;
+  }
+  & .button:not(:disabled):active { transform: scale(0.97); }
+  & .button-primary { border-color: var(--brand-primary); color: #fff; background: var(--brand-primary); }
+  & .button-primary:hover:not(:disabled) { filter: none; background: color-mix(in srgb, var(--brand-primary) 90%, #000); }
+  & .button-secondary { border-color: var(--line); color: var(--ink); background: var(--surface); }
+  & .button-secondary:hover:not(:disabled) { border-color: color-mix(in srgb, var(--brand-primary) 25%, var(--line)); background: var(--green-soft); color: var(--brand-primary); }
+  & .button-quiet { color: var(--muted); }
+  & .button-quiet:hover:not(:disabled) { border-color: transparent; background: var(--green-soft); color: var(--brand-primary); }
+  & .button:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
+
+  & .field { gap: 0.375rem; }
+  & .field label { margin: 0; color: var(--ink); font-size: 0.8125rem; font-weight: 600; }
+  & .field :is(input, select, textarea) {
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+  }
+  & .field :is(input, select) { min-height: 2.25rem; padding: 0 0.75rem; }
+  & .field textarea { padding: 0.5rem 0.75rem; }
+  & .field :is(input, select, textarea):focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 15%, transparent);
+  }
+  & .field-hint { font-size: 0.75rem; }
+
+  & :is(.form-card, .list-section) {
+    border: 0;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px rgb(14 42 34 / 6%), 0 4px 14px -6px rgb(14 42 34 / 12%);
+  }
 }
 
 /* ---------- Editor de cursos em tela cheia ---------- */
