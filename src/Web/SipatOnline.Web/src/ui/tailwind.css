@@ -1,0 +1,66 @@
+/*
+ * Base do design system (shadcn/ui + Tailwind v4).
+ *
+ * Importa só o tema e os utilitários do Tailwind, sem o reset global (preflight):
+ * as telas que ainda usam o CSS antigo continuam exatamente iguais. Os utilitários
+ * ficam fora de @layer de propósito, para vencer as regras globais de elemento
+ * (button, input, h1...) que o CSS antigo ainda declara.
+ *
+ * As cores vêm dos tokens da marca SIPAT já definidos em styles.css (e da cor da
+ * empresa, quando o tema da empresa os sobrescreve).
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: 'Instrument Sans', system-ui, sans-serif;
+
+  --color-background: var(--canvas, #f3f5f4);
+  --color-foreground: var(--ink, #0e2a22);
+  --color-card: var(--surface, #fff);
+  --color-card-foreground: var(--ink, #0e2a22);
+  --color-popover: var(--surface, #fff);
+  --color-popover-foreground: var(--ink, #0e2a22);
+  --color-primary: var(--brand-primary, #14694b);
+  --color-primary-foreground: #fff;
+  --color-secondary: var(--surface-soft, #f3f5f4);
+  --color-secondary-foreground: var(--ink, #0e2a22);
+  --color-muted: var(--surface-soft, #f3f5f4);
+  --color-muted-foreground: var(--muted, #52635b);
+  --color-accent: var(--green-soft, #e9f3ee);
+  --color-accent-foreground: var(--brand-primary, #14694b);
+  --color-destructive: var(--danger, #b3261e);
+  --color-destructive-soft: var(--danger-soft, #fff6f4);
+  --color-success: #14683a;
+  --color-success-soft: #e2f1e7;
+  --color-warning: var(--signal-ink, #705300);
+  --color-warning-soft: var(--signal-soft, #fff5d9);
+  --color-signal: #ffd166;
+  --color-border: var(--line, #d5dbd8);
+  --color-input: var(--line-strong, #b7c9be);
+  --color-ring: var(--brand-primary, #14694b);
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --shadow-card: 0 1px 2px rgb(14 42 34 / 6%), 0 4px 14px -6px rgb(14 42 34 / 12%);
+  --shadow-card-hover: 0 2px 4px rgb(14 42 34 / 6%), 0 14px 28px -12px rgb(14 42 34 / 22%);
+  --shadow-panel: 0 2px 8px -2px rgb(14 42 34 / 18%);
+  --shadow-overlay: 0 24px 64px -16px rgb(14 42 34 / 35%);
+
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-overlay-in: overlay-in 160ms ease-out;
+  --animate-dialog-in: dialog-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes overlay-in { from { opacity: 0; } }
+  @keyframes dialog-in { from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot] { animation: none !important; transition: none !important; }
+}

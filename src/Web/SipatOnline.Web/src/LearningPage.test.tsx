@@ -124,7 +124,8 @@ describe('learning experience', () => {
     expect(screen.queryByRole('progressbar', { name: 'Progresso da trilha' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver certificado de Segurança no trabalho' }))
       .toHaveAttribute('href', '/learning/certificates');
-    expect(onSummary).toHaveBeenLastCalledWith({ percentage: 100, completed: 1, total: 1 });
+    // o resumo é enviado por um efeito: sob carga ele pode chegar depois do cabeçalho
+    await waitFor(() => expect(onSummary).toHaveBeenLastCalledWith({ percentage: 100, completed: 1, total: 1 }));
     expect(screen.queryByRole('tab', { name: /Em andamento/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('tab', { name: /Concluídos/ }));
     expect(screen.getByRole('link', { name: 'Ver certificado de Segurança no trabalho' })).toBeVisible();
