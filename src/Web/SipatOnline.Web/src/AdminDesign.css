@@ -517,32 +517,52 @@
   z-index: 19;
   top: 64px;
   display: flex;
-  min-height: 44px;
+  min-height: 40px;
   align-items: center;
   justify-content: space-between;
   gap: var(--admin-space-4);
-  padding: var(--admin-space-2) var(--admin-space-6);
-  border-bottom: 1px solid var(--admin-warning-border);
-  color: var(--admin-warning-ink);
-  background: var(--admin-warning-bg);
+  padding: 6px var(--admin-space-4);
+  color: #fff;
+  background: var(--learner-forest, #12332c);
   font-size: 13px;
 }
 
 .company-context-banner strong {
-  font-weight: 700;
+  font-weight: 600;
+}
+
+.company-context-banner strong::before {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: #ffd166;
+  content: "";
+}
+
+.company-context-banner > span > span {
+  color: rgb(255 255 255 / 70%);
 }
 
 .company-context-return {
   flex: 0 0 auto;
-  border-color: var(--admin-warning-action-border);
-  color: var(--admin-warning-ink);
-  background: var(--admin-surface);
+  min-height: 28px !important;
+  padding: 2px 12px !important;
+  border-color: rgb(255 255 255 / 30%) !important;
+  color: #fff !important;
+  background: transparent !important;
+  font-size: 13px !important;
   font-weight: 600;
 }
 
+.company-context-return:hover {
+  background: rgb(255 255 255 / 12%) !important;
+}
+
 .portal-layout-company-context .sidebar {
-  top: 108px;
-  height: calc(100vh - 100px);
+  top: 104px;
+  height: calc(100vh - 104px);
 }
 
 .company-summary-grid {

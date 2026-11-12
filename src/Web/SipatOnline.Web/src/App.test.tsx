@@ -88,7 +88,7 @@ describe('tenant portal', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(screen.getByRole('status', { name: 'Modo de administração da empresa' }))
-      .toHaveTextContent('MODO DONO · Administrando Acme');
+      .toHaveTextContent('Modo operador · Administrando Acme');
     expect(screen.getByRole('link', { name: 'Identidade visual' })).toHaveAttribute('href', '/admin/appearance');
     expect(screen.getByRole('link', { name: 'Voltar à plataforma' })).toHaveAttribute('href', '/platform');
     expect(screen.getByRole('link', { name: 'Trilhas e vídeos' })).toBeVisible();

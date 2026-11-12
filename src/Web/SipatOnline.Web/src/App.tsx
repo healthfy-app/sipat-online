@@ -97,12 +97,16 @@ export default function App() {
 
   if (state.status === 'error') {
     return (
-      <main className="standalone-message">
-        <div className="message-card" role="alert">
-          <p className="eyebrow">SIPAT ONLINE</p>
-          <h1>Este portal não está disponível</h1>
-          <p>{state.message}</p>
-          <a className="button button-secondary" href="/platform" onClick={clearCompanyAdministration}>
+      <main className="grid min-h-screen place-items-center bg-background p-4 text-foreground">
+        <div className="grid w-full max-w-md gap-3 rounded-xl bg-card p-8 shadow-card" role="alert">
+          <p className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-primary">SIPAT ONLINE</p>
+          <h1 className="m-0 text-2xl font-semibold leading-tight tracking-tight">Este portal não está disponível</h1>
+          <p className="m-0 text-muted-foreground">{state.message}</p>
+          <p className="m-0 text-sm text-muted-foreground">
+            Endereço acessado: <strong className="text-foreground">{window.location.host}</strong>. O endereço de cada empresa
+            começa pelo identificador dela. Confira se ele está escrito exatamente como foi cadastrado.
+          </p>
+          <a className="mt-2 inline-flex min-h-9 w-fit items-center rounded-md border border-border bg-card px-4 text-sm font-semibold text-foreground no-underline hover:bg-accent" href="/platform" onClick={clearCompanyAdministration}>
             Voltar ao início
           </a>
         </div>
@@ -560,7 +564,7 @@ function ProtectedPortal({
       {!isLearnerOnly && isPlatformCompanyContext && (
         <aside aria-label="Modo de administração da empresa" className="company-context-banner" role="status">
           <span>
-            <strong>MODO DONO · Administrando {tenant.tenantName}</strong>
+            <strong>Modo operador · Administrando {tenant.tenantName}</strong>
             <span> · Você está agindo em nome desta empresa.</span>
           </span>
           <a className="button button-secondary company-context-return" href="/platform" onClick={handleReturnToPlatform}>

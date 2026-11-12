@@ -46,7 +46,7 @@ export function EmptyState({ title, description, action, className }: {
 }) {
   return (
     <div className={cn('grid justify-items-center gap-3 rounded-lg border border-dashed border-border px-4 py-12 text-center', className)}>
-      <p className="m-0 font-semibold text-foreground">{title}</p>
+      <h3 className="m-0 text-base font-semibold text-foreground">{title}</h3>
       {description && <p className="m-0 max-w-md text-sm text-muted-foreground">{description}</p>}
       {action}
     </div>
