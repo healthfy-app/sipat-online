@@ -19,6 +19,30 @@ namespace SipatOnline.IntegrationTests;
 public sealed class CompanyAccessApiTests
 {
     [DockerFact]
+    public async Task Passwords_OnlyNeedSixCharacters_AndCanBeUsedToSignIn()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString(), true);
+        await InitializeAsync(factory);
+        using var owner = Client(factory, "ops.localhost");
+        await LoginAsync(owner, "platform-operator", "PlatformPassword123", true);
+        var company = await CreateCompanyAsync(owner, "simple-passwords");
+
+        // 5 caracteres: curto demais
+        using (var tooShort = await MutateAsync(owner, HttpMethod.Post, "/api/platform/users",
+            new CreatePlatformUserRequest(company.Id, "operador-5", "Operador Cinco", "abcde", "Participant")))
+            Assert.Equal(HttpStatusCode.BadRequest, tooShort.StatusCode);
+
+        // 6 caracteres, só minúsculas e sem número: aceita, e a pessoa consegue entrar
+        using (var simple = await MutateAsync(owner, HttpMethod.Post, "/api/platform/users",
+            new CreatePlatformUserRequest(company.Id, "operador-6", "Operador Seis", "abcdef", "Participant")))
+            Assert.Equal(HttpStatusCode.Created, simple.StatusCode);
+        using var participant = Client(factory, "simple-passwords.localhost");
+        await LoginAsync(participant, "operador-6", "abcdef");
+    }
+
+    [DockerFact]
     public async Task PortalBanner_IsStoredServedAndRemovedPerCompany_AndColorsAreNotContrastChecked()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
