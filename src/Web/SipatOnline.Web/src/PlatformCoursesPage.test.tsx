@@ -120,7 +120,7 @@ describe('Platform course catalog', () => {
   it('opens the details popup, traps keyboard focus and restores the trigger on Escape', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
-    const trigger = screen.getByRole('button', { name: '+ Criar curso' });
+    const trigger = screen.getByRole('button', { name: 'Criar curso' });
     await user.click(trigger);
 
     const dialog = screen.getByRole('dialog', { name: 'Detalhes do curso' });
@@ -139,13 +139,13 @@ describe('Platform course catalog', () => {
   it('cancels course creation without saving a draft', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar curso' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Curso não salvo');
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(api.createPlatformCourse).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: '+ Criar curso' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Criar curso' })).toHaveFocus();
   });
 
   it('prevents closing the popup while course creation is pending', async () => {
@@ -153,7 +153,7 @@ describe('Platform course catalog', () => {
     let finish!: (course: api.PlatformCourse) => void;
     vi.mocked(api.createPlatformCourse).mockReturnValue(new Promise(resolve => { finish = resolve; }));
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar curso' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Combate a incêndio');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
@@ -188,7 +188,7 @@ describe('Platform course catalog', () => {
     vi.mocked(api.createPlatformCourse).mockResolvedValue(fire);
     vi.mocked(api.setPlatformCourseCover).mockResolvedValue({ ...fire, coverUrl: '/new-cover.png' });
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar curso' }));
     const photo = new File(['cover'], 'capa.png', { type: 'image/png' });
     await user.upload(screen.getByLabelText('Adicionar capa'), photo);
     expect(await screen.findByAltText('Prévia da capa do curso')).toHaveAttribute('src', 'blob:course-cover');
@@ -212,7 +212,7 @@ describe('Platform course catalog', () => {
     const user = userEvent.setup();
     vi.mocked(api.createPlatformCourse).mockResolvedValue(fire);
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar curso' }));
     await user.selectOptions(screen.getByLabelText('Opção da grade'), '3');
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Qualidade do sono');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
@@ -245,7 +245,7 @@ describe('Platform course catalog', () => {
     const user = userEvent.setup();
     vi.mocked(api.createPlatformCourse).mockRejectedValue(new Error('Não foi possível criar o curso.'));
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar curso' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Segurança');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
@@ -262,7 +262,7 @@ describe('Platform course catalog', () => {
       .mockRejectedValueOnce(new Error('Falha no envio.'))
       .mockResolvedValueOnce({ ...fire, coverUrl: '/cover.png' });
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar curso' }));
     await user.upload(screen.getByLabelText('Adicionar capa'), new File(['cover'], 'capa.png', { type: 'image/png' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Combate a incêndio');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
@@ -277,7 +277,7 @@ describe('Platform course catalog', () => {
   it('rejects a cover larger than two megabytes before uploading', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar curso' }));
     await user.upload(screen.getByLabelText('Adicionar capa'),
       new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'grande.png', { type: 'image/png' }));
 
@@ -292,7 +292,7 @@ describe('Platform course catalog', () => {
     render(<PlatformCoursesPage />);
 
     await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
-    await user.click(screen.getByRole('button', { name: '+ Enviar vídeo' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar vídeo' }));
     await user.type(screen.getByLabelText('Título do vídeo'), 'Boas-vindas');
     await user.type(screen.getByLabelText('Duração (segundos)'), '90');
     await user.upload(
@@ -315,7 +315,7 @@ describe('Platform course catalog', () => {
     render(<PlatformCoursesPage />);
 
     await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
-    await user.click(screen.getByRole('button', { name: '+ Enviar vídeo' }));
+    await user.click(screen.getByRole('button', { name: 'Enviar vídeo' }));
     await user.upload(
       screen.getByLabelText('Arquivo de vídeo'),
       new File(['video'], 'uso_de-epi.mp4', { type: 'video/mp4' }),
@@ -340,7 +340,7 @@ describe('Platform course catalog', () => {
     render(<PlatformCoursesPage />);
 
     await user.click(await screen.findByRole('tab', { name: /Jogos e perguntas/ }));
-    await user.click(screen.getByRole('button', { name: '+ Novo jogo' }));
+    await user.click(screen.getByRole('button', { name: 'Novo jogo' }));
     const dialog = screen.getByRole('dialog', { name: 'Novo jogo' });
     await user.type(within(dialog).getByLabelText('Nome do jogo'), 'Quiz de EPI');
     await user.type(within(dialog).getByLabelText('Texto da pergunta 1'), 'Qual EPI protege a cabeça?');
@@ -670,7 +670,7 @@ describe('Platform course catalog', () => {
     const user = userEvent.setup();
     vi.mocked(api.createPlatformCourse).mockResolvedValue(fire);
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar curso' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Novo curso');
     await user.click(screen.getByLabelText('Gamificação após os vídeos'));
     await user.click(screen.getByRole('button', { name: 'Criar' }));

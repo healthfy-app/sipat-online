@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import {
   deleteGameModule,
@@ -5,18 +6,21 @@ import {
   type PlatformCourse,
   type PlatformCourseVideo,
   type PlatformLibraryVideo,
-} from '../api';
-import CourseDialog from '../CourseDialog';
-import LoadingState from '../LoadingState';
-import { VideoUploadForm } from '../courseEditor/CourseMediaForms';
-import { getErrorMessage, pluralize } from '../courseEditor/courseFormat';
+} from '@/api';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
+import { Page, PageHeader } from '@/components/ui/page';
+import { TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { VideoUploadForm } from '@/courseEditor/CourseMediaForms';
+import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
+import LoadingState from '@/LoadingState';
 import CourseStartOptions from './CourseStartOptions';
 import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
 import GameModuleForm from './GameModuleForm';
 import GameModulesPanel from './GameModulesPanel';
 import VideoLibraryPanel from './VideoLibraryPanel';
-import './CourseCatalog.css';
 
 type CatalogTab = 'courses' | 'videos' | 'modules';
 type CatalogDialog =
@@ -89,79 +93,63 @@ export default function CourseCatalog({
     }
   }
 
-  return (
-    <div className="cat-page">
-      <header className="cat-header">
-        <div className="cat-header-text">
-          <div className="cat-title-row">
-            <h1>Cursos</h1>
-            {import.meta.env.DEV && <span className="demo-presentation-badge">Apresentação demo</span>}
-          </div>
-          <p>{pluralize(courses.length, 'curso', 'cursos')} no catálogo da plataforma</p>
-        </div>
-        <div className="cat-header-actions">
-          {tab === 'courses' && (
-            <button className="cat-btn cat-btn-primary" onClick={() => setDialog({ kind: 'create' })} type="button">+ Criar curso</button>
-          )}
-          {tab === 'videos' && (
-            <button className="cat-btn cat-btn-primary" onClick={openUpload} type="button">+ Enviar vídeo</button>
-          )}
-          {tab === 'modules' && (
-            <button className="cat-btn cat-btn-primary" onClick={() => setDialog({ kind: 'game', module: null })} type="button">
-              + Novo jogo
-            </button>
-          )}
-        </div>
-      </header>
+  const primaryAction = {
+    courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar curso</Button>,
+    videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
+    modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
+  }[tab];
 
-      {showTabs && (
-        <div aria-label="Seções do catálogo" className="cat-tabs" role="tablist">
-          {tabs.map((item) => (
-            <button
-              aria-controls={`cat-panel-${item.id}`}
-              aria-selected={tab === item.id}
-              className="cat-tab"
-              id={`cat-tab-${item.id}`}
-              key={item.id}
-              onClick={() => setTab(item.id)}
-              role="tab"
-              type="button"
-            >
-              {item.label} <span className="cat-tab-count">{item.count}</span>
-            </button>
-          ))}
-        </div>
-      )}
+  const body = isLoading ? (
+    <LoadingState className="list-state">Carregando catálogo...</LoadingState>
+  ) : null;
+
+  return (
+    <Page>
+      <PageHeader
+        actions={primaryAction}
+        badge={import.meta.env.DEV ? <Badge variant="outline">Apresentação demo</Badge> : undefined}
+        description={`${pluralize(courses.length, 'curso', 'cursos')} no catálogo da plataforma`}
+        title="Cursos"
+      />
 
       {error && (
-        <div className="cat-error">
-          <p className="form-error" role="alert">{error}</p>
-          <button className="cat-btn" disabled={isLoading} onClick={onRetry} type="button">Tentar novamente</button>
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>
+          <Button disabled={isLoading} onClick={onRetry} variant="outline">Tentar novamente</Button>
         </div>
       )}
 
-      <div aria-labelledby={showTabs ? `cat-tab-${tab}` : undefined} className="cat-tabpanel" id={`cat-panel-${tab}`}
-        role={showTabs ? 'tabpanel' : undefined}>
-        {isLoading ? (
-          <LoadingState className="list-state">Carregando catálogo...</LoadingState>
-        ) : tab === 'courses' ? (
-          isEmptyCatalog ? (
-            <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
-          ) : courses.length > 0 && (
-            <CoursesPanel busy={busy} courses={courses} onDuplicate={onDuplicate} onOpen={onOpen} />
-          )
-        ) : tab === 'videos' ? (
-          <VideoLibraryPanel library={library} onUpload={openUpload} />
-        ) : (
-          <GameModulesPanel
-            busy={isDeleting}
-            modules={modules}
-            onCreate={() => setDialog({ kind: 'game', module: null })}
-            onDelete={(module) => void removeGame(module)}
-            onEdit={(module) => setDialog({ kind: 'game', module })}
-          />
+      <Tabs onValueChange={(value) => setTab(value as CatalogTab)} value={tab}>
+        {showTabs && (
+          <TabsList aria-label="Seções do catálogo">
+            {tabs.map((item) => (
+              <TabsTrigger key={item.id} value={item.id}>
+                {item.label} <TabCount>{item.count}</TabCount>
+              </TabsTrigger>
+            ))}
+          </TabsList>
         )}
-      </div>
+
+        <TabsContent value="courses">
+          {body ?? (isEmptyCatalog
+            ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
+            : courses.length > 0 && <CoursesPanel busy={busy} courses={courses} onDuplicate={onDuplicate} onOpen={onOpen} />)}
+        </TabsContent>
+        <TabsContent value="videos">
+          {body ?? <VideoLibraryPanel library={library} onUpload={openUpload} />}
+        </TabsContent>
+        <TabsContent value="modules">
+          {body ?? (
+            <GameModulesPanel
+              busy={isDeleting}
+              modules={modules}
+              onCreate={() => setDialog({ kind: 'game', module: null })}
+              onDelete={(module) => void removeGame(module)}
+              onEdit={(module) => setDialog({ kind: 'game', module })}
+            />
+          )}
+        </TabsContent>
+      </Tabs>
 
       {dialog?.kind === 'create' && (
         <CreateCourseDialog onClose={() => setDialog(null)} onCreated={async (course) => {
@@ -171,17 +159,17 @@ export default function CourseCatalog({
       )}
 
       {dialog?.kind === 'upload' && (
-        <CourseDialog busy={dialogBusy} onClose={() => setDialog(null)} title="Enviar vídeo">
-          {uploadError && <p className="form-error" role="alert">{uploadError}</p>}
+        <Dialog busy={dialogBusy} onClose={() => setDialog(null)} title="Enviar vídeo">
+          {uploadError && <p className="m-0 mb-4 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{uploadError}</p>}
           <VideoUploadForm onBusyChange={setDialogBusy} onError={setUploadError} onUploaded={async (video) => {
             setDialog(null);
             await onVideoUploaded(video);
           }} />
-        </CourseDialog>
+        </Dialog>
       )}
 
       {dialog?.kind === 'game' && (
-        <CourseDialog busy={dialogBusy} onClose={() => setDialog(null)} title={dialog.module ? 'Editar jogo' : 'Novo jogo'} wide>
+        <Dialog busy={dialogBusy} onClose={() => setDialog(null)} size="lg" title={dialog.module ? 'Editar jogo' : 'Novo jogo'}>
           <GameModuleForm
             module={dialog.module}
             onBusyChange={setDialogBusy}
@@ -191,8 +179,8 @@ export default function CourseCatalog({
               await onModulesChanged(message);
             }}
           />
-        </CourseDialog>
+        </Dialog>
       )}
-    </div>
+    </Page>
   );
 }

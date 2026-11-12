@@ -1,7 +1,11 @@
+import { ImagePlus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { createPlatformCourse, setPlatformCourseCover, type PlatformCourse } from '../api';
-import CourseDialog from '../CourseDialog';
-import { formatCourseOption, getErrorMessage, maxCoverBytes, type CourseOption } from '../courseEditor/courseFormat';
+import { createPlatformCourse, setPlatformCourseCover, type PlatformCourse } from '@/api';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogActions } from '@/components/ui/dialog';
+import { Field, Switch } from '@/components/ui/field';
+import { Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { formatCourseOption, getErrorMessage, maxCoverBytes, type CourseOption } from '@/courseEditor/courseFormat';
 
 const acceptedCoverTypes = ['image/png', 'image/jpeg', 'image/webp'];
 
@@ -54,15 +58,19 @@ export default function CreateCourseDialog({
   }
 
   return (
-    <CourseDialog busy={isSaving} onClose={onClose} title="Detalhes do curso">
-      <form className="course-create-form" onSubmit={handleSubmit}>
-        <label className="course-create-cover" htmlFor="create-course-cover">
-          {preview ? <img alt="Prévia da capa do curso" src={preview} /> : (
-            <span><span aria-hidden="true" className="course-upload-icon">↑</span>Adicionar capa</span>
-          )}
+    <Dialog busy={isSaving} onClose={onClose} title="Detalhes do curso">
+      <form className="grid gap-4" onSubmit={handleSubmit}>
+        <label
+          className="relative m-0 grid aspect-[16/7] cursor-pointer place-items-center overflow-hidden rounded-lg border border-dashed border-input bg-muted text-sm font-semibold text-primary transition-colors hover:bg-accent has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring"
+          htmlFor="create-course-cover"
+        >
+          {preview
+            ? <img alt="Prévia da capa do curso" className="absolute inset-0 size-full object-cover" src={preview} />
+            : <span className="grid justify-items-center gap-1.5"><ImagePlus className="size-6" />Adicionar capa</span>}
           <input
             accept={acceptedCoverTypes.join(',')}
             aria-label="Adicionar capa"
+            className="absolute inset-0 m-0 size-full cursor-pointer opacity-0"
             disabled={isSaving}
             id="create-course-cover"
             onChange={(event) => {
@@ -79,38 +87,32 @@ export default function CreateCourseDialog({
             type="file"
           />
         </label>
-        {error && <p className="form-error" role="alert">{error}</p>}
-        <div className="field">
-          <label htmlFor="platform-course-option">Opção da grade</label>
-          <select disabled={locked} id="platform-course-option" value={option}
+        {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
+        <Field htmlFor="platform-course-option" label="Opção da grade">
+          <NativeSelect disabled={locked} id="platform-course-option" value={option}
             onChange={(event) => setOption(event.target.value as CourseOption)}>
             <option value="1">Opção 1</option>
             <option value="2">Opção 2</option>
             <option value="3">Opção 3</option>
-          </select>
-        </div>
-        <div className="field">
-          <label htmlFor="platform-course-title">Título (obrigatório)</label>
-          <input data-autofocus disabled={locked} id="platform-course-title" maxLength={200} placeholder="Curso sem título"
+          </NativeSelect>
+        </Field>
+        <Field htmlFor="platform-course-title" label="Título (obrigatório)">
+          <Input data-autofocus disabled={locked} id="platform-course-title" maxLength={200} placeholder="Curso sem título"
             required value={title} onChange={(event) => setTitle(event.target.value)} />
-        </div>
-        <div className="field">
-          <label htmlFor="platform-course-description">Descrição</label>
-          <textarea disabled={locked} id="platform-course-description" maxLength={2000} placeholder="Adicione uma breve descrição"
+        </Field>
+        <Field htmlFor="platform-course-description" label="Descrição">
+          <Textarea disabled={locked} id="platform-course-description" maxLength={2000} placeholder="Adicione uma breve descrição"
             rows={2} value={description} onChange={(event) => setDescription(event.target.value)} />
-        </div>
-        <label className="platform-toggle">
-          <input checked={gamificationEnabled} disabled={locked} type="checkbox"
-            onChange={(event) => setGamificationEnabled(event.target.checked)} />
-          <span>Gamificação após os vídeos</span>
-        </label>
-        <div className="course-dialog-actions">
-          <button className="button button-secondary" disabled={isSaving} onClick={onClose} type="button">Cancelar</button>
-          <button className="button course-primary" disabled={isSaving} type="submit">
+        </Field>
+        <Switch checked={gamificationEnabled} disabled={locked} id="platform-course-gamification"
+          label="Gamificação após os vídeos" onChange={(event) => setGamificationEnabled(event.target.checked)} />
+        <DialogActions>
+          <Button disabled={isSaving} onClick={onClose} variant="outline">Cancelar</Button>
+          <Button disabled={isSaving} type="submit">
             {isSaving ? 'Salvando...' : createdCourse ? 'Tentar salvar capa' : 'Criar'}
-          </button>
-        </div>
+          </Button>
+        </DialogActions>
       </form>
-    </CourseDialog>
+    </Dialog>
   );
 }

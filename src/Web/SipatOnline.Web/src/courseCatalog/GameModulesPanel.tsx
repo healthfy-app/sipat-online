@@ -1,7 +1,12 @@
-import type { GameModule } from '../api';
-import { ActivityIcon } from '../courseEditor/CourseOutlinePanel';
-import { gameTypeLabel } from '../courseEditor/courseTrack';
-import { pluralize } from '../courseEditor/courseFormat';
+import { Puzzle } from 'lucide-react';
+import type { GameModule } from '@/api';
+import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/page';
+import { pluralize } from '@/courseEditor/courseFormat';
+import { gameTypeLabel } from '@/courseEditor/courseTrack';
+import { cn } from '@/lib/utils';
+
+const warmTypes = new Set(['RiskSpotting', 'Scenario']);
 
 export default function GameModulesPanel({
   modules,
@@ -17,46 +22,49 @@ export default function GameModulesPanel({
   onDelete: (module: GameModule) => void;
 }) {
   return (
-    <section aria-label="Jogos cadastrados" className="cat-panel">
-      <div className="cat-toolbar">
-        <p className="cat-toolbar-text">Jogos e perguntas para colocar entre os vídeos ou durante a reprodução.</p>
-        <span className="cat-result-count">{pluralize(modules.length, 'jogo', 'jogos')}</span>
+    <section aria-label="Jogos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <p className="m-0 text-sm text-muted-foreground">Jogos e perguntas para colocar entre os vídeos ou durante a reprodução.</p>
+        <span className="text-[0.8125rem] tabular-nums text-muted-foreground">{pluralize(modules.length, 'jogo', 'jogos')}</span>
       </div>
 
       {modules.length === 0 ? (
-        <div className="cat-empty">
-          <p>Nenhum jogo ainda.</p>
-          <button className="cat-btn cat-btn-primary" onClick={onCreate} type="button">Criar o primeiro jogo</button>
-        </div>
+        <EmptyState action={<Button onClick={onCreate}>Criar o primeiro jogo</Button>} title="Nenhum jogo ainda." />
       ) : (
-        <ul className="cat-game-list">
-          {modules.map((module) => {
-            const contentCount = module.questions.length > 0
-              ? pluralize(module.questions.length, 'pergunta', 'perguntas')
-              : null;
-            return (
-              <li className="cat-game" key={module.id}>
-                <span aria-hidden="true" className={`cat-game-icon is-${module.gameType.toLowerCase()}`}>
-                  <ActivityIcon />
+        <ul className="m-0 grid list-none overflow-hidden rounded-lg bg-card p-0 shadow-card">
+          {modules.map((module) => (
+            <li
+              className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3.5 border-b border-border px-4 py-3.5 transition-colors last:border-0 hover:bg-muted/60 max-sm:grid-cols-[auto_minmax(0,1fr)]"
+              key={module.id}
+            >
+              <span
+                aria-hidden="true"
+                className={cn(
+                  'grid size-9 place-items-center rounded-md',
+                  warmTypes.has(module.gameType) ? 'bg-warning-soft text-warning' : 'bg-accent text-accent-foreground',
+                )}
+              >
+                <Puzzle className="size-4" />
+              </span>
+              <div className="grid min-w-0 gap-0.5">
+                <strong className="truncate text-[0.9375rem] font-semibold">{module.title}</strong>
+                <span className="text-[0.8125rem] text-muted-foreground">
+                  {gameTypeLabel(module)}
+                  {module.questions.length > 0 && ` · ${pluralize(module.questions.length, 'pergunta', 'perguntas')}`}
+                  {' · '}
+                  {module.usageCount === 0 ? 'não usado em cursos' : `usado ${module.usageCount}×`}
                 </span>
-                <div className="cat-game-text">
-                  <strong>{module.title}</strong>
-                  <span>
-                    {gameTypeLabel(module)}
-                    {contentCount && ` · ${contentCount}`}
-                    {' · '}
-                    {module.usageCount === 0 ? 'não usado em cursos' : `usado ${module.usageCount}×`}
-                  </span>
-                </div>
-                <div className="cat-game-actions">
-                  <button aria-label={`Editar jogo ${module.title}`} className="cat-btn" disabled={busy}
-                    onClick={() => onEdit(module)} type="button">Editar</button>
-                  <button aria-label={`Remover jogo ${module.title}`} className="cat-btn cat-btn-danger" disabled={busy}
-                    onClick={() => onDelete(module)} type="button">Remover</button>
-                </div>
-              </li>
-            );
-          })}
+              </div>
+              <div className="flex gap-1.5 max-sm:col-span-2 max-sm:justify-end">
+                <Button aria-label={`Editar jogo ${module.title}`} disabled={busy} onClick={() => onEdit(module)} size="sm" variant="outline">
+                  Editar
+                </Button>
+                <Button aria-label={`Remover jogo ${module.title}`} disabled={busy} onClick={() => onDelete(module)} size="sm" variant="destructive">
+                  Remover
+                </Button>
+              </div>
+            </li>
+          ))}
         </ul>
       )}
     </section>

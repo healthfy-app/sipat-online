@@ -1,3 +1,6 @@
+import { FolderOpen, PenLine } from 'lucide-react';
+import type { ReactNode } from 'react';
+
 export default function CourseStartOptions({
   onReuse,
   onCreate,
@@ -6,42 +9,43 @@ export default function CourseStartOptions({
   onCreate: () => void;
 }) {
   return (
-    <section aria-label="Como deseja começar?" className="course-start-options">
-      <button className="course-start-option" onClick={onReuse} type="button">
-        <StartIcon kind="folder" />
-        <strong>Tenho um <span>treinamento já existente</span></strong>
-        <p>Envie os vídeos que você já tem para a biblioteca e monte o curso com eles.</p>
-        <span aria-hidden="true" className="course-start-arrow">→</span>
-      </button>
-      <button className="course-start-option course-start-option-new" onClick={onCreate} type="button">
-        <StartIcon kind="pencil" />
-        <strong>Quero <span>criar um treinamento</span></strong>
-        <p>Comece um curso com uma capa, um título e uma breve descrição.</p>
-        <span aria-hidden="true" className="course-start-arrow">→</span>
-      </button>
+    <section aria-label="Como deseja começar?" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
+      <StartOption
+        description="Envie os vídeos que você já tem para a biblioteca e monte o curso com eles."
+        icon={<FolderOpen className="size-6" />}
+        onClick={onReuse}
+        title={<>Tenho um <span className="text-primary">treinamento já existente</span></>}
+      />
+      <StartOption
+        description="Comece um curso com uma capa, um título e uma breve descrição."
+        icon={<PenLine className="size-6" />}
+        onClick={onCreate}
+        title={<>Quero <span className="text-primary">criar um treinamento</span></>}
+        warm
+      />
     </section>
   );
 }
 
-/* ilustrações nas cores da marca SIPAT: verde e amarelo de sinalização */
-function StartIcon({ kind }: { kind: 'folder' | 'pencil' }) {
+function StartOption({ icon, title, description, onClick, warm = false }: {
+  icon: ReactNode;
+  title: ReactNode;
+  description: string;
+  onClick: () => void;
+  warm?: boolean;
+}) {
   return (
-    <svg aria-hidden="true" className="course-start-icon" fill="none" viewBox="0 0 64 64">
-      {kind === 'folder' ? (
-        <>
-          <path d="M8 16a5 5 0 0 1 5-5h15l6 7h18a5 5 0 0 1 5 5v27H8Z" fill="#cce3d6" />
-          <path d="M17 23h29v22H17Z" fill="#fff" />
-          <path d="M23 29h17M23 35h13" stroke="#9cc7b0" strokeLinecap="round" strokeWidth="3" />
-          <path d="m8 50 9-21h43l-9 21Z" fill="#14694b" />
-        </>
-      ) : (
-        <>
-          <path d="m12 48 3-13L43 7a4 4 0 0 1 6 0l6 6a4 4 0 0 1 0 6L27 47Z" fill="#ffd166" />
-          <path d="m15 35 12 12-15 1Z" fill="#f3e3c3" />
-          <path d="m39 11 12 12" stroke="#14694b" strokeWidth="4" />
-          <path d="M7 56c10-8 12 6 22-1s12 0 23-5" stroke="#9cc7b0" strokeLinecap="round" strokeWidth="3" />
-        </>
-      )}
-    </svg>
+    <button
+      className="group relative m-0 grid min-h-0 cursor-pointer content-start justify-items-start gap-3 rounded-lg border-0 bg-card p-6 text-left font-[inherit] text-foreground shadow-card transition-[box-shadow,transform] duration-200 hover:-translate-y-0.5 hover:shadow-card-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring motion-reduce:hover:translate-y-0"
+      onClick={onClick}
+      type="button"
+    >
+      <span className={warm ? 'grid size-12 place-items-center rounded-lg bg-warning-soft text-warning' : 'grid size-12 place-items-center rounded-lg bg-accent text-accent-foreground'}>
+        {icon}
+      </span>
+      <strong className="text-lg font-semibold leading-snug">{title}</strong>
+      <p className="m-0 text-sm leading-relaxed text-muted-foreground">{description}</p>
+      <span aria-hidden="true" className="absolute right-5 top-6 text-lg text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary">→</span>
+    </button>
   );
 }

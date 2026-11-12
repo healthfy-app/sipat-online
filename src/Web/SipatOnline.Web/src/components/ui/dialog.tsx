@@ -1,6 +1,6 @@
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { X } from 'lucide-react';
-import { useContext, type ReactNode } from 'react';
+import { useContext, useEffect, useState, type ReactNode } from 'react';
 import { BrandThemeContext } from '@/branding';
 import { cn } from '@/lib/utils';
 
@@ -33,6 +33,11 @@ export function Dialog({
   children: ReactNode;
 }) {
   const theme = useContext(BrandThemeContext);
+  // o diálogo abre por estado (sem Trigger do Radix): guardamos quem tinha o foco para devolvê-lo ao fechar
+  const [returnFocus] = useState(() => document.activeElement as HTMLElement | null);
+  useEffect(() => () => {
+    if (returnFocus?.isConnected) returnFocus.focus();
+  }, [returnFocus]);
   return (
     <DialogPrimitive.Root open onOpenChange={(open) => { if (!open && !busy) onClose(); }}>
       <DialogPrimitive.Portal>
@@ -49,6 +54,7 @@ export function Dialog({
             className,
           )}
           data-slot="dialog"
+          onCloseAutoFocus={(event) => event.preventDefault()}
           onEscapeKeyDown={(event) => { if (busy) event.preventDefault(); }}
           onInteractOutside={(event) => { if (busy) event.preventDefault(); }}
           onOpenAutoFocus={(event) => {

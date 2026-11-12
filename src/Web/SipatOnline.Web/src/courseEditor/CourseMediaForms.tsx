@@ -5,8 +5,11 @@ import {
   uploadPlatformVideo,
   type PlatformCourse,
   type PlatformCourseVideo,
-} from '../api';
-import FilePicker from '../FilePicker';
+} from '@/api';
+import { Button } from '@/components/ui/button';
+import { Field } from '@/components/ui/field';
+import FilePicker from '@/components/ui/file-picker';
+import { Input } from '@/components/ui/input';
 import { getErrorMessage, maxCoverBytes, maxVideoBytes } from './courseFormat';
 
 export function CourseCoverEditor({
@@ -47,17 +50,20 @@ export function CourseCoverEditor({
   }
 
   return (
-    <div className="platform-cover-editor">
+    <div className="grid gap-3">
       {course.coverUrl ? (
-        <img alt="Foto atual do curso" className="platform-cover-preview" src={course.coverUrl} />
+        <img alt="Foto atual do curso" className="aspect-video w-full rounded-md object-cover" src={course.coverUrl} />
       ) : (
-        <div aria-label={`Prévia da capa de ${course.title}`} className="platform-cover-placeholder">
-          <span>PRÉVIA DA CAPA</span>
-          <strong>{course.title}</strong>
-          <small>Imagem opcional · formato 16:9</small>
+        <div
+          aria-label={`Prévia da capa de ${course.title}`}
+          className="grid aspect-video w-full content-center justify-items-center gap-1.5 overflow-hidden rounded-md border border-dashed border-input bg-[radial-gradient(ellipse_at_80%_10%,rgb(255_209_102/0.35),transparent_55%),linear-gradient(145deg,var(--green-soft),var(--canvas))] p-4 text-center"
+        >
+          <span className="text-[0.625rem] font-bold tracking-[0.1em] text-primary">PRÉVIA DA CAPA</span>
+          <strong className="max-w-full text-lg leading-tight [overflow-wrap:anywhere] [text-wrap:balance]">{course.title}</strong>
+          <small className="text-xs text-muted-foreground">Imagem opcional · formato 16:9</small>
         </div>
       )}
-      <div className="platform-course-card-actions">
+      <div className="flex flex-wrap items-center gap-2">
         <FilePicker
           accept="image/png,image/jpeg,image/webp"
           buttonLabel={course.coverUrl ? 'Trocar foto' : 'Escolher foto'}
@@ -66,17 +72,13 @@ export function CourseCoverEditor({
           onChange={handlePick}
         />
         {course.coverUrl && (
-          <button
-            className="button button-quiet"
-            disabled={isBusy}
-            onClick={() => void run(() => removePlatformCourseCover(course.id), 'A foto do curso foi removida.')}
-            type="button"
-          >
+          <Button disabled={isBusy} variant="ghost"
+            onClick={() => void run(() => removePlatformCourseCover(course.id), 'A foto do curso foi removida.')}>
             Remover foto
-          </button>
+          </Button>
         )}
       </div>
-      <span className="field-hint">PNG, JPEG ou WebP; até 2 MB. Formato 16:9 recomendado.</span>
+      <p className="m-0 text-xs text-muted-foreground">PNG, JPEG ou WebP; até 2 MB. Formato 16:9 recomendado.</p>
     </div>
   );
 }
@@ -158,46 +160,30 @@ export function VideoUploadForm({
   }
 
   return (
-    <form className="event-form event-form-single" onSubmit={handleUpload}>
-      <div className="field">
-        <label htmlFor={`platform-video-file-${idSuffix}`}>Arquivo de vídeo</label>
-        <FilePicker
-          accept="video/mp4,video/webm,.mp4,.webm"
-          buttonLabel="Escolher vídeo"
-          file={file}
-          id={`platform-video-file-${idSuffix}`}
-          onChange={chooseFile}
-          required
-        />
-        <span className="field-hint">MP4 ou WebM, até 250 MB. O título e a duração são preenchidos a partir do arquivo.</span>
+    <form className="grid gap-4" onSubmit={handleUpload}>
+      <Field hint="MP4 ou WebM, até 250 MB. O título e a duração são preenchidos a partir do arquivo."
+        htmlFor={`platform-video-file-${idSuffix}`} label="Arquivo de vídeo">
+        <FilePicker accept="video/mp4,video/webm,.mp4,.webm" buttonLabel="Escolher vídeo" file={file}
+          id={`platform-video-file-${idSuffix}`} onChange={chooseFile} required />
+      </Field>
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
+        <Field htmlFor={`platform-video-title-${idSuffix}`} label="Título do vídeo">
+          <Input id={`platform-video-title-${idSuffix}`} maxLength={200} required value={title}
+            onChange={(event) => setTitle(event.target.value)} />
+        </Field>
+        <Field htmlFor={`platform-video-duration-${idSuffix}`} label="Duração (segundos)">
+          <Input id={`platform-video-duration-${idSuffix}`} max={86400} min={0.001} required step="any" type="number"
+            value={duration} onChange={(event) => setDuration(event.target.value)} />
+        </Field>
       </div>
-      <div className="field">
-        <label htmlFor={`platform-video-title-${idSuffix}`}>Título do vídeo</label>
-        <input
-          id={`platform-video-title-${idSuffix}`}
-          maxLength={200}
-          onChange={(event) => setTitle(event.target.value)}
-          required
-          value={title}
-        />
-      </div>
-      <div className="field">
-        <label htmlFor={`platform-video-duration-${idSuffix}`}>Duração (segundos)</label>
-        <input
-          id={`platform-video-duration-${idSuffix}`}
-          max={86400}
-          min={0.001}
-          onChange={(event) => setDuration(event.target.value)}
-          required
-          step="any"
-          type="number"
-          value={duration}
-        />
-      </div>
-      <button className="button button-primary" disabled={isUploading || !file || tooLarge} type="submit">
+      {tooLarge && (
+        <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">
+          O arquivo excede o limite de 250 MB.
+        </p>
+      )}
+      <Button className="justify-self-end" disabled={isUploading || !file || tooLarge} type="submit">
         {isUploading ? 'Enviando vídeo...' : 'Enviar vídeo'}
-      </button>
-      {tooLarge && <p className="form-error" role="alert">O arquivo excede o limite de 250 MB.</p>}
+      </Button>
     </form>
   );
 }

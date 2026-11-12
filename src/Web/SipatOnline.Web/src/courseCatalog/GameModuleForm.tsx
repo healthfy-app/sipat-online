@@ -1,3 +1,4 @@
+import { Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import {
   createGameModule,
@@ -5,10 +6,14 @@ import {
   type GameModule,
   type GameQuestion,
   type GamificationGameType,
-} from '../api';
-import GameContentEditor, { emptyGameContent } from '../GameContentEditor';
-import { gameTypeOptions } from '../gamificationGames';
-import { getErrorMessage } from '../courseEditor/courseFormat';
+} from '@/api';
+import { Button } from '@/components/ui/button';
+import { DialogActions } from '@/components/ui/dialog';
+import { Field } from '@/components/ui/field';
+import { Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { getErrorMessage } from '@/courseEditor/courseFormat';
+import { gameTypeOptions } from '@/gamificationGames';
+import GameContentEditor, { emptyGameContent } from './GameContentEditor';
 
 interface QuestionDraft {
   text: string;
@@ -18,17 +23,14 @@ interface QuestionDraft {
 
 const emptyQuestion: QuestionDraft = { text: '', optionsText: '', correctIndex: 0 };
 const usesQuestions = (type: GamificationGameType) => type === 'Quiz' || type === 'Scenario';
+const optionLines = (text: string) => text.split('\n').map((option) => option.trim()).filter(Boolean);
 
 function toDraft(question: GameQuestion): QuestionDraft {
   return { text: question.text, optionsText: question.options.join('\n'), correctIndex: question.correctIndex };
 }
 
 function toQuestion(draft: QuestionDraft): GameQuestion {
-  return {
-    text: draft.text.trim(),
-    options: draft.optionsText.split('\n').map((option) => option.trim()).filter(Boolean),
-    correctIndex: draft.correctIndex,
-  };
+  return { text: draft.text.trim(), options: optionLines(draft.optionsText), correctIndex: draft.correctIndex };
 }
 
 /** Formulário de criação e edição de um jogo; usado dentro de um diálogo. */
@@ -85,71 +87,64 @@ export default function GameModuleForm({
   }
 
   return (
-    <form className="event-form event-form-single cat-game-form" onSubmit={handleSubmit}>
-      <p className="muted-copy">
+    <form className="grid gap-4" onSubmit={handleSubmit}>
+      <p className="m-0 text-sm text-muted-foreground">
         Jogos entram na trilha do curso ou param um vídeo num momento escolhido. Não valem pontos e nunca bloqueiam o participante.
       </p>
-      {error && <p className="form-error" role="alert">{error}</p>}
-      <div className="field">
-        <label htmlFor="game-module-title">Nome do jogo</label>
-        <input data-autofocus id="game-module-title" maxLength={200} onChange={(event) => setTitle(event.target.value)} required value={title} />
-      </div>
-      <div className="field">
-        <label htmlFor="game-module-type">Tipo de jogo</label>
-        <select id="game-module-type" onChange={(event) => setGameType(event.target.value as GamificationGameType)} value={gameType}>
-          {gameTypeOptions.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}{option.playable ? '' : ' (jogável em breve)'}
-            </option>
-          ))}
-        </select>
-        <span className="field-hint">{gameTypeOptions.find((option) => option.value === gameType)?.description}</span>
+      {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field htmlFor="game-module-title" label="Nome do jogo">
+          <Input data-autofocus id="game-module-title" maxLength={200} required value={title} onChange={(event) => setTitle(event.target.value)} />
+        </Field>
+        <Field hint={gameTypeOptions.find((option) => option.value === gameType)?.description} htmlFor="game-module-type" label="Tipo de jogo">
+          <NativeSelect id="game-module-type" value={gameType} onChange={(event) => setGameType(event.target.value as GamificationGameType)}>
+            {gameTypeOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}{option.playable ? '' : ' (jogável em breve)'}
+              </option>
+            ))}
+          </NativeSelect>
+        </Field>
       </div>
 
       {usesQuestions(gameType) && questions.map((question, index) => (
-        <fieldset className="game-question-editor" key={index}>
-          <legend>Pergunta {index + 1}</legend>
-          <div className="field">
-            <label htmlFor={`game-question-text-${index}`}>Texto da pergunta {index + 1}</label>
-            <input id={`game-question-text-${index}`} maxLength={500} required value={question.text}
+        <fieldset className="m-0 grid gap-3 rounded-lg border border-border p-4" key={index}>
+          <legend className="px-1 text-[0.8125rem] font-semibold">Pergunta {index + 1}</legend>
+          <Field htmlFor={`game-question-text-${index}`} label={`Texto da pergunta ${index + 1}`}>
+            <Input id={`game-question-text-${index}`} maxLength={500} required value={question.text}
               onChange={(event) => updateQuestion(index, { text: event.target.value })} />
-          </div>
-          <div className="field">
-            <label htmlFor={`game-question-options-${index}`}>Alternativas da pergunta {index + 1}</label>
-            <textarea id={`game-question-options-${index}`} required rows={3} value={question.optionsText}
+          </Field>
+          <Field hint="Uma alternativa por linha (2 a 6)." htmlFor={`game-question-options-${index}`} label={`Alternativas da pergunta ${index + 1}`}>
+            <Textarea id={`game-question-options-${index}`} required rows={3} value={question.optionsText}
               onChange={(event) => updateQuestion(index, { optionsText: event.target.value })} />
-            <span className="field-hint">Uma alternativa por linha (2 a 6).</span>
-          </div>
-          <div className="field">
-            <label htmlFor={`game-question-correct-${index}`}>Alternativa correta da pergunta {index + 1}</label>
-            <select id={`game-question-correct-${index}`} value={question.correctIndex}
+          </Field>
+          <Field htmlFor={`game-question-correct-${index}`} label={`Alternativa correta da pergunta ${index + 1}`}>
+            <NativeSelect id={`game-question-correct-${index}`} value={question.correctIndex}
               onChange={(event) => updateQuestion(index, { correctIndex: Number(event.target.value) })}>
-              {question.optionsText.split('\n').map((option) => option.trim()).filter(Boolean).map((option, optionIndex) => (
+              {optionLines(question.optionsText).map((option, optionIndex) => (
                 <option key={optionIndex} value={optionIndex}>{option}</option>
               ))}
-            </select>
-          </div>
+            </NativeSelect>
+          </Field>
           {questions.length > 1 && (
-            <button className="button button-quiet" type="button"
+            <Button className="justify-self-start" size="sm" variant="ghost"
               onClick={() => setQuestions((current) => current.filter((_, itemIndex) => itemIndex !== index))}>
               Remover pergunta {index + 1}
-            </button>
+            </Button>
           )}
         </fieldset>
       ))}
       {usesQuestions(gameType) && questions.length < 50 && (
-        <button className="button button-secondary" onClick={() => setQuestions((current) => [...current, { ...emptyQuestion }])} type="button">
-          Adicionar pergunta
-        </button>
+        <Button className="justify-self-start" variant="outline" onClick={() => setQuestions((current) => [...current, { ...emptyQuestion }])}>
+          <Plus /> Adicionar pergunta
+        </Button>
       )}
       {!usesQuestions(gameType) && <GameContentEditor content={content} onChange={setContent} type={gameType} />}
 
-      <div className="course-dialog-actions">
-        <button className="button button-secondary" disabled={isSaving} onClick={onCancel} type="button">Cancelar</button>
-        <button className="button course-primary" disabled={isSaving} type="submit">
-          {isSaving ? 'Salvando...' : module ? 'Salvar jogo' : 'Criar jogo'}
-        </button>
-      </div>
+      <DialogActions>
+        <Button disabled={isSaving} onClick={onCancel} variant="outline">Cancelar</Button>
+        <Button disabled={isSaving} type="submit">{isSaving ? 'Salvando...' : module ? 'Salvar jogo' : 'Criar jogo'}</Button>
+      </DialogActions>
     </form>
   );
 }

@@ -39,9 +39,7 @@ export function NativeSelect({ className, ...props }: ComponentProps<'select'>) 
     <select
       className={cn(
         fieldControl,
-        'h-9 min-h-9 cursor-pointer appearance-none bg-no-repeat py-0 pl-3 pr-9',
-        'bg-[length:1rem] bg-[position:right_0.625rem_center]',
-        "bg-[url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16'%3E%3Cpath stroke='%2352635b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m4 6 4 4 4-4'/%3E%3C/svg%3E\")]",
+        'h-9 min-h-9 cursor-pointer appearance-none py-0 pl-3 pr-9',
         className,
       )}
       data-slot="select"
