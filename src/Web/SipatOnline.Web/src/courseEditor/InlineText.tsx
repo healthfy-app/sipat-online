@@ -33,15 +33,14 @@ export default function InlineText({
     <input
       aria-label={label}
       className={cn(
-        'm-0 min-h-0 w-full min-w-0 truncate rounded-sm border border-transparent bg-transparent px-1.5 py-1 text-sm leading-snug text-foreground',
-        'hover:border-input focus:border-ring focus:bg-card focus:outline-none disabled:opacity-60',
+        'm-0 h-8! min-h-0! w-full min-w-0 truncate rounded-sm! border! border-transparent! bg-transparent! px-1.5! py-0! text-sm leading-snug text-foreground shadow-none!',
+        'hover:border-input! focus:border-ring! focus:bg-card! focus:outline-none! focus-visible:outline-none! disabled:opacity-60',
         className,
       )}
       disabled={disabled}
       maxLength={200}
       onBlur={commit}
       onChange={(event) => setDraft(event.target.value)}
-      onClick={(event) => event.stopPropagation()}
       onKeyDown={(event) => {
         if (event.key === 'Enter') event.currentTarget.blur();
         if (event.key === 'Escape') {
