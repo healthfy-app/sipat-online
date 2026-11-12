@@ -461,7 +461,7 @@ describe('tenant portal', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', { name: 'Empresas' })).toBeVisible();
-    expect(screen.getByRole('link', { name: '+ Nova empresa' })).toHaveAttribute('href', '/platform/companies');
+    expect(screen.getByRole('button', { name: 'Nova empresa' })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Cadastrar empresa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Painel' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Usuários' })).toHaveAttribute('href', '/platform/users');

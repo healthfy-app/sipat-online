@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
@@ -9,11 +9,13 @@ vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
   getPlatformCompanyEmployees: vi.fn(),
   getPlatformDashboard: vi.fn(),
+  listPlatformUsers: vi.fn(),
 }));
 
 afterEach(cleanup);
 
 beforeEach(() => {
+  vi.mocked(api.listPlatformUsers).mockResolvedValue({ offset: 0, limit: 50, totalCount: 0, items: [] });
   vi.mocked(api.getPlatformDashboard).mockResolvedValue([{
     id: 'company-1',
     key: 'acme',
@@ -69,7 +71,8 @@ describe('Platform company employees', () => {
       .toHaveAttribute('aria-valuenow', '50');
     expect(screen.getByText('Ativo')).toBeInTheDocument();
     expect(screen.getByText('Identificador · acme')).toBeInTheDocument();
-    expect(screen.getByText('Administradores')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Resumo da empresa' })).getByText('Administradores')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Administradores/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ver histórico' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Administrar empresa' }))
       .toHaveAttribute('href', '/admin/dashboard?companyId=company-1');
