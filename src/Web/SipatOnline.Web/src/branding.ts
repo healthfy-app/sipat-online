@@ -28,7 +28,18 @@ export function tenantTheme(chosenPrimary: string, secondary: string): CSSProper
     accent = `#${[1, 3, 5].map(index => Math.floor(parseInt(accent.slice(index, index + 2), 16) * 0.85)
       .toString(16).padStart(2, '0')).join('')}`;
   }
+  // the participant area keeps SIPAT green unless the company chose its own color; then it follows that color
+  const custom = primary.toLowerCase() !== sipatPrimary.toLowerCase();
+  const learner: Record<string, string> = custom ? {
+    '--learner-forest-custom': `color-mix(in srgb, ${primary} 30%, #000)`,
+    '--learner-deep-custom': `color-mix(in srgb, ${primary} 20%, #000)`,
+    '--learner-action-custom': accent,
+    '--learner-highlight-custom': `color-mix(in srgb, ${primary} 45%, #fff)`,
+    '--learner-complete-bg-custom': `color-mix(in srgb, ${primary} 14%, #fff)`,
+    '--learner-complete-text-custom': `color-mix(in srgb, ${accent} 80%, #000)`,
+  } : {};
   return {
+    ...learner,
     '--brand-primary': primary,
     '--brand-secondary': secondary,
     '--green': accent,

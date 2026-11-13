@@ -1206,15 +1206,15 @@
 }
 
 .course-dialog.learning-dialog {
-  --learner-forest: #12332c;
-  --learner-action: #0f7a3d;
+  --learner-forest: var(--learner-forest-custom, #12332c);
+  --learner-action: var(--learner-action-custom, #0f7a3d);
   --learner-canvas: #f4f6f5;
   --learner-surface: #fff;
   --learner-border: #dfe6e3;
   --learner-control-border: #cdd7d3;
   --learner-text-secondary: #3d514b;
-  --learner-complete-bg: #d6f3e1;
-  --learner-complete-text: #0b5a2c;
+  --learner-complete-bg: var(--learner-complete-bg-custom, #d6f3e1);
+  --learner-complete-text: var(--learner-complete-text-custom, #0b5a2c);
   width: min(100%, 56rem);
   padding: clamp(1.25rem, 3vw, 2rem);
   border-color: var(--learner-border);
