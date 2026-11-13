@@ -4043,10 +4043,10 @@ select:focus-visible,
 }
 
 .portal-layout-learner {
-  --learner-forest: var(--learner-forest-custom, #12332c);
-  --learner-deep: var(--learner-deep-custom, #0b241f);
-  --learner-action: var(--learner-action-custom, #0f7a3d);
-  --learner-highlight: var(--learner-highlight-custom, #7fe0a6);
+  --learner-forest: #12332c;
+  --learner-deep: #0b241f;
+  --learner-action: #0f7a3d;
+  --learner-highlight: #7fe0a6;
   --learner-progress-accent: #ffd166;
   --learner-canvas: #f4f6f5;
   --learner-surface: #ffffff;
@@ -4055,8 +4055,8 @@ select:focus-visible,
   --learner-text-secondary: #3d514b;
   --learner-text-muted: #4a5d56;
   --learner-progress-track: #e3e9e6;
-  --learner-complete-bg: var(--learner-complete-bg-custom, #d6f3e1);
-  --learner-complete-text: var(--learner-complete-text-custom, #0b5a2c);
+  --learner-complete-bg: #d6f3e1;
+  --learner-complete-text: #0b5a2c;
   --learner-in-progress-bg: #fff3cf;
   --learner-in-progress-text: #5a4300;
   --learner-font: 'Plus Jakarta Sans', Inter, Arial, sans-serif;
