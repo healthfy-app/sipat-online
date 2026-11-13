@@ -1,8 +1,11 @@
 import type { GameModule, PlatformCourse, PlatformCourseVideo } from '../api';
 import { gameTypeOptions } from '../gamificationGames';
 
+/** A game that pauses a video at a given moment, with its module already resolved. */
+export interface PreviewCheckpoint { id: string; timeMilliseconds: number; module: GameModule }
+
 export type TrackItem =
-  | { kind: 'video'; key: string; title: string; video: PlatformCourseVideo; videoIndex: number }
+  | { kind: 'video'; key: string; title: string; video: PlatformCourseVideo; videoIndex: number; checkpoints: PreviewCheckpoint[] }
   | { kind: 'activity'; key: string; title: string; module: GameModule; afterVideoCount: number };
 
 /**
@@ -30,7 +33,11 @@ export function buildTrack(course: PlatformCourse, modules: GameModule[]): Track
   const items: TrackItem[] = [];
   course.videos.forEach((video, videoIndex) => {
     items.push(...activitiesAt(videoIndex));
-    items.push({ kind: 'video', key: `video-${video.id}`, title: video.title, video, videoIndex });
+    const checkpoints = video.checkpoints.flatMap((checkpoint, index) => {
+      const module = moduleById.get(checkpoint.moduleId);
+      return module ? [{ id: `${video.id}-${index}-${module.id}`, timeMilliseconds: checkpoint.timeMilliseconds, module }] : [];
+    });
+    items.push({ kind: 'video', key: `video-${video.id}`, title: video.title, video, videoIndex, checkpoints });
   });
   items.push(...activitiesAt(lastSlot));
   return items;
