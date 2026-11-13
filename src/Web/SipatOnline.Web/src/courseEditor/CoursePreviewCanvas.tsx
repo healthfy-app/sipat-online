@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, Monitor, Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import InteractiveGame from '@/InteractiveGame';
+import GamePlayer from '@/GamePlayer';
 import { cn } from '@/lib/utils';
 import VideoPreview from '@/VideoPreview';
 import type { TrackItem } from './courseTrack';
@@ -68,8 +68,8 @@ export default function CoursePreviewCanvas({
             </div>
           </>}
           {item?.kind === 'activity' && (
-            <div className="flex-1 overflow-auto rounded-xl bg-card p-4 text-foreground">
-              <InteractiveGame key={`${item.key}-${replay}`} module={item.module} onClose={() => setReplay((value) => value + 1)} />
+            <div className="flex-1 overflow-auto text-foreground">
+              <GamePlayer key={`${item.key}-${replay}`} module={item.module} onClose={() => setReplay((value) => value + 1)} />
             </div>
           )}
         </div>

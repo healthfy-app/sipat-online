@@ -9,6 +9,7 @@ import {
   type PlatformCourseVideo,
 } from './api';
 import GamePlayer from './GamePlayer';
+import GameStage from '@/games/GameStage';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -191,7 +192,9 @@ export default function CourseGamesSection({
           </div>
         )}
       </Step>
-      {previewing && <GamePlayer module={previewing} onClose={() => setPreviewing(null)} />}
+      {previewing && <GameStage label={previewing.title} onClose={() => setPreviewing(null)}>
+        <GamePlayer module={previewing} onClose={() => setPreviewing(null)} />
+      </GameStage>}
     </section>
   );
 }

@@ -216,14 +216,6 @@
   }
 }
 
-.game-player { border: 1px solid var(--border, var(--line-strong)); border-radius: 0.875rem; padding: 1rem; margin-top: 1rem; background: var(--surface); }
-.game-options { display: grid; gap: .5rem; margin: .75rem 0; }
-.game-option { text-align: left; padding: .65rem .85rem; border: 1px solid var(--line-strong); border-radius: 0.625rem; background: var(--surface); cursor: pointer; }
-.game-option.is-correct { border-color: var(--green); background: var(--green-soft); }
-.game-option.is-wrong { border-color: var(--danger); }
-.game-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
-.game-actions .button { min-width: 0; max-width: 100%; white-space: normal; overflow-wrap: break-word; }
-.game-question-editor { border: 1px solid var(--line-strong); border-radius: 0.75rem; padding: .75rem; }
 
 .file-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .file-picker-input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; clip: rect(0 0 0 0); }

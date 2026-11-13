@@ -2,7 +2,9 @@ import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getLearningActivities, saveLearningActivityOutcome, type LearningActivity } from './api';
 import CourseDialog from './CourseDialog';
 import GamePlayer from './GamePlayer';
-import type { GameOutcome } from './InteractiveGame';
+import { Button } from '@/components/ui/button';
+import type { GameOutcome } from '@/games/gameKit';
+import GameStage from '@/games/GameStage';
 
 export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosition, playbackKey, videoRef }: {
   trackId: string; lessonId: string | null; playbackKey: string | undefined;
@@ -156,14 +158,15 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
         </div>
       </CourseDialog>
     )}
-    {active && <CourseDialog busy={busy} onClose={() => void close('skipped')} title={active.module.title}>
+    {active && <GameStage busy={busy} label={active.module.title} onClose={() => void close('skipped')}>
       <GamePlayer key={active.id} module={active.module} onClose={outcome => void close(outcome)} />
-      {saveError && <div role="alert"><p>{saveError}</p>
-        <button className="button button-quiet" onClick={() => {
+      {saveError && <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-destructive-soft px-4 py-3 font-sans text-sm text-destructive" role="alert">
+        <p className="m-0">{saveError}</p>
+        <Button onClick={() => {
           boundary.current = null; activeRef.current = null; setActive(null);
           setNotice('A atividade não foi registrada. Use Reproduzir para continuar o vídeo.');
-        }} type="button">Fechar sem registrar</button>
+        }} size="sm" variant="outline">Fechar sem registrar</Button>
       </div>}
-    </CourseDialog>}
+    </GameStage>}
   </section>;
 }
