@@ -59,17 +59,17 @@ export default function QuizGame({ module, score, onProgress, onFinish }: {
   }
 
   const reduced = prefersReducedMotion();
-  return <div className="grid gap-4 p-4 sm:p-6" key={index}>
+  return <div className="grid gap-4 p-4 @lg:p-6" key={index}>
     <motion.div animate={{ opacity: 1, y: 0 }} className={cn('rounded-2xl', scenario ? 'game-scene p-5 text-white' : 'bg-muted p-5')}
       initial={reduced ? false : { opacity: 0, y: 12 }} transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}>
       <p className={cn('m-0 mb-2 text-xs font-semibold tracking-[0.08em] uppercase', scenario ? 'text-signal' : 'text-muted-foreground')}>
         {scenario ? <span className="inline-flex items-center gap-1.5"><ShieldAlert aria-hidden="true" className="size-4" />Situação {index + 1} de {questions.length}</span>
           : `Pergunta ${index + 1} de ${questions.length}`}
       </p>
-      <h4 className={cn('m-0 text-lg leading-snug font-semibold outline-none sm:text-xl', scenario && 'text-white')} ref={heading} tabIndex={-1}>{question.text}</h4>
+      <h4 className={cn('m-0 text-lg leading-snug font-semibold outline-none @lg:text-xl', scenario && 'text-white')} ref={heading} tabIndex={-1}>{question.text}</h4>
       {scenario && <p className="m-0 mt-2 text-sm text-white/75">O que você faz?</p>}
     </motion.div>
-    <div aria-label="Alternativas" className="grid gap-2 sm:grid-cols-2" role="group">
+    <div aria-label="Alternativas" className="grid gap-2 @lg:grid-cols-2" role="group">
       {question.options.map((option, optionIndex) => {
         const isAnswer = optionIndex === question.correctIndex;
         const isPicked = optionIndex === selected;

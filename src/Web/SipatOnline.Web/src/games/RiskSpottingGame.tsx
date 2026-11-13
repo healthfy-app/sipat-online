@@ -72,7 +72,7 @@ export default function RiskSpottingGame({ module, score, onProgress, onFinish }
   }
 
   const allFound = found.length === risks.length;
-  return <div className="grid gap-3 p-4 sm:grid-cols-[minmax(0,1fr)_13rem] sm:p-5">
+  return <div className="grid gap-3 p-4 @2xl:grid-cols-[minmax(0,1fr)_13rem] @lg:p-5">
     <div className="grid min-w-0 gap-2">
       <p className="m-0 text-sm text-muted-foreground">Encontre os riscos na imagem. Você também pode usar Tab e Enter para identificá-los.</p>
       <div className={cn('risk-scene relative w-full overflow-hidden rounded-xl bg-black select-none', !allFound && 'is-searching')}

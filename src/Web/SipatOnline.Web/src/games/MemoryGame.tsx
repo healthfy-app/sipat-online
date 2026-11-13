@@ -79,14 +79,14 @@ export default function MemoryGame({ module, score, onProgress, onFinish }: {
     if (revealedRef.current.length === 2) setMoves(value => value + 1);
   }
 
-  const columns = cards.length <= 8 ? 'grid-cols-2 sm:grid-cols-4' : cards.length <= 12 ? 'grid-cols-3 sm:grid-cols-4' : 'grid-cols-3 sm:grid-cols-5';
-  return <div className="grid gap-3 p-4 sm:p-5">
+  const columns = cards.length <= 6 ? 'grid-cols-3' : cards.length <= 8 ? 'grid-cols-2 @md:grid-cols-4' : cards.length <= 12 ? 'grid-cols-3 @lg:grid-cols-4' : 'grid-cols-3 @lg:grid-cols-5';
+  return <div className="grid gap-3 p-4 @lg:p-5">
     <div className="flex flex-wrap items-baseline justify-between gap-2">
       <p className="m-0 text-sm text-muted-foreground">Associe cada equipamento à sua proteção. As duas cartas de um par se complementam; não têm o mesmo texto.</p>
       <p className="m-0 text-sm font-medium tabular-nums">{moves} {moves === 1 ? 'jogada' : 'jogadas'}</p>
     </div>
     <p className="sr-only">{matched.length / 2} de {pairs.length} pares encontrados</p>
-    <div className={cn('memory-board grid gap-2.5 sm:gap-3', columns)}>
+    <div className={cn('memory-board grid gap-2.5 @lg:gap-3', columns)}>
       {cards.map((card, position) => {
         const isMatched = matched.includes(card);
         const visible = revealed.includes(card) || isMatched;
@@ -97,7 +97,7 @@ export default function MemoryGame({ module, score, onProgress, onFinish }: {
         return <button
           aria-label={visible ? `${text}${isMatched ? ', par encontrado' : ''}` : `Revelar carta ${position + 1}`}
           aria-pressed={visible}
-          className={cn('memory-card group relative aspect-[3/4] min-w-0 rounded-xl border-0 bg-transparent p-0 sm:aspect-[4/5]',
+          className={cn('memory-card group relative aspect-[3/4] min-w-0 rounded-xl border-0 bg-transparent p-0 @lg:aspect-[4/5]',
             visible && 'is-revealed', isMatched && 'is-matched', shaking.includes(card) && 'is-shaking')}
           disabled={visible || revealed.length === 2} key={card} onClick={() => flip(card)} type="button">
           <span className="memory-card-inner absolute inset-0">
@@ -110,7 +110,7 @@ export default function MemoryGame({ module, score, onProgress, onFinish }: {
                 isMatched ? 'bg-success text-white' : isFirst ? 'bg-accent text-accent-foreground' : 'bg-warning-soft text-warning')}>
                 {isMatched ? <Check className="size-5" /> : <Icon className="size-5" />}
               </span>
-              <span className="text-[0.8125rem] leading-tight font-semibold [overflow-wrap:anywhere] sm:text-sm">{text}</span>
+              <span className="text-[0.8125rem] leading-tight font-semibold [overflow-wrap:anywhere] @lg:text-sm">{text}</span>
             </span>
           </span>
         </button>;

@@ -1,4 +1,4 @@
-import { Plus } from 'lucide-react';
+import { ArrowLeft, Play, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import {
   createGameModule,
@@ -14,6 +14,7 @@ import { Input, NativeSelect, Textarea } from '@/components/ui/input';
 import { getErrorMessage } from '@/courseEditor/courseFormat';
 import { gameTypeOptions } from '@/gamificationGames';
 import GameContentEditor, { emptyGameContent } from './GameContentEditor';
+import LazyGamePlayer from '@/games/LazyGamePlayer';
 
 interface QuestionDraft {
   text: string;
@@ -53,17 +54,14 @@ export default function GameModuleForm({
   const [content, setContent] = useState(module?.content ?? emptyGameContent);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  const [testing, setTesting] = useState(false);
 
   function updateQuestion(index: number, patch: Partial<QuestionDraft>) {
     setQuestions((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setError('');
-    setIsSaving(true);
-    onBusyChange(true);
-    const data = {
+  function draftData() {
+    return {
       title: title.trim(),
       gameType,
       questions: usesQuestions(gameType) ? questions.map(toQuestion) : [],
@@ -74,6 +72,30 @@ export default function GameModuleForm({
         pairs: content.pairs?.map((pair) => ({ first: pair.first.trim(), second: pair.second.trim() })) ?? null,
       },
     };
+  }
+
+  if (testing) {
+    const data = draftData();
+    return (
+      <div className="grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="m-0 text-sm text-muted-foreground">Teste com o que está no formulário agora. Nada é salvo.</p>
+          <Button onClick={() => setTesting(false)} size="sm" variant="outline"><ArrowLeft /> Voltar à edição</Button>
+        </div>
+        <LazyGamePlayer
+          module={{ ...data, title: data.title || 'Jogo sem nome', id: module?.id ?? 'draft', createdAt: '', usageCount: 0 }}
+          onClose={() => setTesting(false)}
+        />
+      </div>
+    );
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError('');
+    setIsSaving(true);
+    onBusyChange(true);
+    const data = draftData();
     try {
       if (module) await updateGameModule(module.id, data);
       else await createGameModule(data);
@@ -89,7 +111,8 @@ export default function GameModuleForm({
   return (
     <form className="grid gap-4" onSubmit={handleSubmit}>
       <p className="m-0 text-sm text-muted-foreground">
-        Jogos entram na trilha do curso ou param um vídeo num momento escolhido. Não valem pontos e nunca bloqueiam o participante.
+        Jogos entram na trilha do curso ou param um vídeo num momento escolhido. O participante vê pontos e estrelas só como
+        incentivo (nada é salvo) e sempre pode pular.
       </p>
       {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
       <div className="grid gap-4 sm:grid-cols-2">
@@ -142,6 +165,7 @@ export default function GameModuleForm({
       {!usesQuestions(gameType) && <GameContentEditor content={content} onChange={setContent} type={gameType} />}
 
       <DialogActions>
+        <Button className="sm:mr-auto" disabled={isSaving} onClick={() => setTesting(true)} variant="ghost"><Play /> Testar jogo</Button>
         <Button disabled={isSaving} onClick={onCancel} variant="outline">Cancelar</Button>
         <Button disabled={isSaving} type="submit">{isSaving ? 'Salvando...' : module ? 'Salvar jogo' : 'Criar jogo'}</Button>
       </DialogActions>

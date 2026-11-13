@@ -49,7 +49,7 @@ export default function OrderingGame({ module, score, onProgress, onFinish }: {
     }
   }
 
-  return <div className="grid gap-3 p-4 sm:p-5">
+  return <div className="grid gap-3 p-4 @lg:p-5">
     <p className="m-0 text-sm text-muted-foreground">Organize as etapas na ordem correta. Arraste pela alça (ou foque nela e use Espaço e as setas).</p>
     <DndContext collisionDetection={closestCenter} onDragEnd={drop} sensors={sensors}>
       <SortableContext items={order.map(String)} strategy={verticalListSortingStrategy}>

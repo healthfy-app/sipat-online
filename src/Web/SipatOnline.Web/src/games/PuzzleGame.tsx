@@ -76,7 +76,7 @@ export default function PuzzleGame({ module, score, onProgress, onFinish }: {
     backgroundPosition: `${(piece % columns) / (columns - 1) * 100}% ${Math.floor(piece / columns) / (columns - 1) * 100}%`,
   });
 
-  return <div className="grid gap-3 p-4 sm:p-5">
+  return <div className="grid gap-3 p-4 @lg:p-5">
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="m-0 text-sm text-muted-foreground">Arraste uma peça sobre outra, ou selecione duas peças para trocar de lugar e reconstruir a imagem.</p>
       <div className="flex items-center gap-2">

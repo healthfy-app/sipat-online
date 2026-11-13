@@ -10,20 +10,22 @@ import './games.css';
 
 export interface HudProgress { done: number; total: number; label: string }
 
+const singular: Record<string, string> = { perguntas: 'pergunta', 'situações': 'situação', riscos: 'risco', pares: 'par' };
+
 /** Frame shared by every game: branded header, opening screen, live scoreboard and result. */
 export function GameFrame({ module, titleId, onSkip, showSkip, children }: {
   module: GameModule; titleId: string; onSkip: () => void; showSkip: boolean; children: ReactNode;
 }) {
   const look = gameLooks[module.gameType];
   const Icon = look.icon;
-  return <section aria-labelledby={titleId} className="game-frame flex min-w-0 flex-col overflow-hidden rounded-2xl bg-card font-sans text-foreground shadow-overlay">
-    <header className="game-frame-header relative flex items-center gap-3 overflow-hidden px-4 py-3.5 text-white sm:px-5">
+  return <section aria-labelledby={titleId} className="game-frame @container flex min-w-0 flex-col overflow-hidden rounded-2xl bg-card font-sans text-foreground shadow-overlay">
+    <header className="game-frame-header relative flex items-center gap-3 overflow-hidden px-4 py-3.5 text-white @lg:px-5">
       <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-white/12 ring-1 ring-white/20">
         <Icon className="size-5" />
       </span>
       <div className="min-w-0 flex-1">
         <p className="m-0 text-[0.6875rem] font-semibold tracking-[0.08em] text-signal uppercase">{look.label}</p>
-        <h3 className="m-0 truncate text-base leading-tight font-semibold text-white sm:text-lg" id={titleId}>{module.title}</h3>
+        <h3 className="m-0 truncate text-base leading-tight font-semibold text-white @lg:text-lg" id={titleId}>{module.title}</h3>
       </div>
       {showSkip && <Button className="text-white/80 hover:bg-white/12 hover:text-white" onClick={onSkip} size="sm" variant="ghost">Pular</Button>}
     </header>
@@ -34,7 +36,7 @@ export function GameFrame({ module, titleId, onSkip, showSkip, children }: {
 export function GameIntro({ module, onStart }: { module: GameModule; onStart: () => void }) {
   const look = gameLooks[module.gameType];
   const Icon = look.icon;
-  return <div className="game-intro grid justify-items-center gap-5 px-5 py-8 text-center sm:px-10">
+  return <div className="game-intro grid justify-items-center gap-5 px-5 py-8 text-center @lg:px-10">
     <span aria-hidden="true" className="game-intro-badge grid size-20 place-items-center rounded-3xl text-white">
       <Icon className="size-9" strokeWidth={1.75} />
     </span>
@@ -75,7 +77,7 @@ export function GameHud({ score, streak, lastGain, gainId, seconds, progress }: 
 }) {
   const percent = progress && progress.total ? Math.round(progress.done / progress.total * 100) : 0;
   return <div className="border-b border-border bg-card">
-    <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 sm:px-5">
+    <div className="flex flex-wrap items-center gap-2 px-4 py-2.5 @lg:px-5">
       <span className="relative inline-flex items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-sm font-semibold text-accent-foreground tabular-nums">
         <Trophy aria-hidden="true" className="size-4" />
         <span aria-label={`${score} pontos`}>{score}</span>
@@ -94,7 +96,7 @@ export function GameHud({ score, streak, lastGain, gainId, seconds, progress }: 
       <span className="ml-auto inline-flex items-center gap-1.5 text-sm text-muted-foreground tabular-nums">
         <Timer aria-hidden="true" className="size-4" /><span aria-label={`Tempo ${formatSeconds(seconds)}`}>{formatSeconds(seconds)}</span>
       </span>
-      {progress && <span className="text-sm font-medium tabular-nums">{progress.done} de {progress.total} {progress.label}</span>}
+      {progress && <span className="text-sm font-medium tabular-nums">{progress.done} de {progress.total} {progress.total === 1 ? singular[progress.label] ?? progress.label : progress.label}</span>}
     </div>
     {progress && <div aria-hidden="true" className="h-1 bg-muted">
       <div className="h-full bg-primary transition-[width] duration-500 ease-out-soft" style={{ width: `${percent}%` }} />
@@ -108,7 +110,7 @@ export function GameVictory({ result, onContinue, onReplay }: { result: GameResu
   const total = result.hits + result.misses;
   const accuracy = total ? Math.round(result.hits / total * 100) : 100;
   const celebrate = result.stars >= 2 && !prefersReducedMotion();
-  return <div className="game-victory relative grid justify-items-center gap-5 overflow-hidden px-5 py-8 text-center sm:px-10" role="status">
+  return <div className="game-victory relative grid justify-items-center gap-5 overflow-hidden px-5 py-8 text-center @lg:px-10" role="status">
     {celebrate && <Confetti />}
     <div aria-label={`${result.stars} de 3 estrelas`} className="flex items-end gap-2" role="img">
       {[1, 2, 3].map(position => {
