@@ -197,14 +197,24 @@ export interface ProgramDay {
 export interface SipatProgram { id: string; title: string; days: ProgramDay[]; createdAt: string }
 export interface SipatProgramData { title: string; days: ProgramDay[] }
 
-export function listSipatPrograms(): Promise<SipatProgram[]> {
-  return requestJson<SipatProgram[]>('/api/platform/catalog/programs');
+/** Programs saved before days held videos come back without lists; they read as days with nothing in them. */
+function tidyProgram(program: SipatProgram): SipatProgram {
+  return {
+    ...program,
+    days: (program.days ?? []).map(day => ({
+      ...day, title: day.title ?? '', date: day.date ?? null, subject: day.subject ?? null,
+      videoIds: day.videoIds ?? [], gameIds: day.gameIds ?? [],
+    })),
+  };
 }
-export function createSipatProgram(data: SipatProgramData): Promise<SipatProgram> {
-  return requestJson<SipatProgram>('/api/platform/catalog/programs', { method: 'POST', body: JSON.stringify(data) });
+export async function listSipatPrograms(): Promise<SipatProgram[]> {
+  return (await requestJson<SipatProgram[]>('/api/platform/catalog/programs')).map(tidyProgram);
 }
-export function updateSipatProgram(programId: string, data: SipatProgramData): Promise<SipatProgram> {
-  return requestJson<SipatProgram>(`/api/platform/catalog/programs/${programId}`, { method: 'PUT', body: JSON.stringify(data) });
+export async function createSipatProgram(data: SipatProgramData): Promise<SipatProgram> {
+  return tidyProgram(await requestJson<SipatProgram>('/api/platform/catalog/programs', { method: 'POST', body: JSON.stringify(data) }));
+}
+export async function updateSipatProgram(programId: string, data: SipatProgramData): Promise<SipatProgram> {
+  return tidyProgram(await requestJson<SipatProgram>(`/api/platform/catalog/programs/${programId}`, { method: 'PUT', body: JSON.stringify(data) }));
 }
 export async function deleteSipatProgram(programId: string): Promise<void> {
   await request(`/api/platform/catalog/programs/${programId}`, { method: 'DELETE' });
