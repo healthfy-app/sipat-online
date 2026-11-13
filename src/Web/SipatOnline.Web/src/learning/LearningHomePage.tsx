@@ -253,7 +253,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
         </div>
         <h3><Link to={getTrackPath(track, tracks)}>{title}</Link></h3>
         <div className="learning-catalog-course-progress">
-          <span>{track.completedLessonCount} de {track.lessonCount} aulas{started && !completed ? ` · ${percentage}%` : ''}</span>
+          <span>{track.completedLessonCount} de {track.lessonCount} vídeos{started && !completed ? ` · ${percentage}%` : ''}</span>
         </div>
         <ProgressBar value={percentage} label={`Progresso de ${title}`} />
         <Link
@@ -320,9 +320,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
               </div>
               <div className="learning-catalog-progress">
                 <h2>Sua formação</h2>
-                <p>{completedCourses} de {tracks.length} cursos concluídos · {totalLessons} aulas</p>
+                <p>{completedCourses} de {tracks.length} cursos concluídos · {totalLessons} vídeos</p>
                 <p className="learning-catalog-first-note">
-                  Dê o primeiro passo. Cada aula é curta e você pode pausar quando quiser.
+                  Dê o primeiro passo. Cada vídeo é curto e você pode pausar quando quiser.
                 </p>
               </div>
             </div>
@@ -380,7 +380,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                         ? <p role="status">{resumeError} Abra o curso para continuar.</p>
                         : <p>{resumeTrack ? 'Continue seu curso no seu ritmo.' : 'Comece por este curso para avançar na formação.'}</p>}
                   <Link className="learning-catalog-feature-action" to={continuePath}>
-                    {resumeTrack ? 'Continuar aula' : 'Começar curso'} <span aria-hidden="true">→</span>
+                    {resumeTrack ? 'Continuar vídeo' : 'Começar curso'} <span aria-hidden="true">→</span>
                   </Link>
                 </>
               )}
@@ -435,7 +435,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                           <span>{isComplete
                             ? 'Concluído'
                             : isCurrent
-                              ? `Em andamento · ${track.completedLessonCount} de ${track.lessonCount} aulas`
+                              ? `Em andamento · ${track.completedLessonCount} de ${track.lessonCount} vídeos`
                               : 'A seguir'}</span>
                         </Link>
                       </li>

@@ -543,7 +543,7 @@ export default function LearningTrackPage({
   const hasSections = new Set(experience.lessons.map((lesson) => lesson.sectionTitle).filter(Boolean)).size > 1;
   const isTrackComplete = completedLessons === experience.lessons.length && experience.lessons.length > 0;
   const lessonTabs = [
-    { id: 'about', label: 'Sobre a aula' },
+    { id: 'about', label: 'Sobre o vídeo' },
     { id: 'notes', label: 'Minhas anotações' },
     { id: 'materials', label: 'Materiais' },
   ] as const;
@@ -579,7 +579,7 @@ export default function LearningTrackPage({
         <div className="learning-course-header-progress">
           <div className="learning-course-header-copy">
             <h1>{trackTitle}</h1>
-            <span>{completedLessons} de {experience.lessons.length} aulas · {getTrackProgress(experience.track)}%</span>
+            <span>{completedLessons} de {experience.lessons.length} vídeos · {getTrackProgress(experience.track)}%</span>
           </div>
           <ProgressBar value={getTrackProgress(experience.track)} label="Progresso do curso" />
         </div>
@@ -661,7 +661,7 @@ export default function LearningTrackPage({
                 onClick={() => previousLesson && selectLesson(previousLesson)}
                 type="button"
               >
-                ← Aula anterior
+                ← Vídeo anterior
               </button>
               <span className={`learning-status${selectedLesson.isCompleted ? ' is-complete' : ''}`}>
                 <span aria-hidden="true">{selectedLesson.isCompleted ? '✓' : '○'}</span>
@@ -677,7 +677,7 @@ export default function LearningTrackPage({
                 onClick={() => nextLesson && selectLesson(nextLesson)}
                 type="button"
               >
-                Próxima aula <span aria-hidden="true">→</span>
+                Próximo vídeo <span aria-hidden="true">→</span>
               </button>
             </div>
           )}
@@ -699,7 +699,7 @@ export default function LearningTrackPage({
         <aside aria-label="Conteúdo e avaliação do curso" className="learning-course-sidebar">
           <section aria-labelledby="learning-curriculum-title" className="learning-curriculum-card">
             <div className="learning-curriculum-heading">
-              <h2 id="learning-curriculum-title">Conteúdo do curso</h2>
+              <h2 id="learning-curriculum-title">Vídeos do dia</h2>
               <span className="learning-curriculum-count">{completedLessons}/{experience.lessons.length}</span>
             </div>
             <ol className="learning-lesson-list">
@@ -751,13 +751,13 @@ export default function LearningTrackPage({
           {selectedLesson && (
             <section aria-label="Informações da aula" className="learning-lesson-details learning-lesson-info-launcher">
               <div className="learning-lesson-info-intro">
-                <h2>Sobre a aula</h2>
+                <h2>Sobre o vídeo</h2>
                 <p>Descrição, anotações e materiais</p>
               </div>
               <button
                 aria-expanded={isLessonDetailsOpen}
                 aria-haspopup="dialog"
-                aria-label="Ver detalhes da aula"
+                aria-label="Ver detalhes do vídeo"
                 className="learning-activities-open"
                 onClick={openLessonDetails}
                 type="button"
@@ -795,7 +795,7 @@ export default function LearningTrackPage({
                 {activeLessonTab === 'about' && (
                   <>
                     <div className="learning-lesson-heading">
-                      <h3>Sobre a aula</h3>
+                      <h3>Sobre o vídeo</h3>
                     </div>
                     {selectedLesson.description && <p className="learning-lesson-description">{selectedLesson.description}</p>}
                     <div className="learning-lesson-footer">
@@ -820,9 +820,9 @@ export default function LearningTrackPage({
             <h2 id="learning-final-quiz-title">Quiz final</h2>
             <p>{isTrackComplete
               ? 'O quiz ainda não está disponível para este curso.'
-              : 'Conclua todas as aulas para liberar o quiz final.'}</p>
+              : 'Conclua todos os vídeos para liberar o quiz final.'}</p>
             <button className="button button-secondary" disabled type="button">
-              {isTrackComplete ? 'Quiz indisponível' : 'Libera ao concluir as aulas'}
+              {isTrackComplete ? 'Quiz indisponível' : 'Libera ao concluir os vídeos'}
             </button>
           </section>
         </aside>

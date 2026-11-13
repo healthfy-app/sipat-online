@@ -72,7 +72,7 @@ export default function BuilderGrid({ days, catalog, onChange, onPick }: {
     const subject = catalog.subjects.find(item => item.id !== 'none' && item.title === title);
     if (!subject) { patchDay(index, { subject: '' }); return; }
     const day = days[index];
-    const generic = !day.title.trim() || /^Dia d+$/.test(day.title.trim());
+    const generic = !day.title.trim() || /^Dia [0-9]+$/.test(day.title.trim());
     patchDay(index, { subject: subject.title, videos: subject.videoIds.slice(0, maxVideoRows), ...(generic ? { title: subject.title } : {}) });
   };
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));

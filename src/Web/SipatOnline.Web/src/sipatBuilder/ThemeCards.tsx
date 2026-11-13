@@ -36,7 +36,7 @@ export function ThemeTray({ subjects }: { subjects: Subject[] }) {
 function TrayCard({ subject }: { subject: Subject }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `theme:${subject.id}`, data: { subject } });
   return <div className={cn('flex w-60 items-center gap-2.5 rounded-xl border border-border bg-card p-2 transition-shadow hover:shadow-card-hover', isDragging && 'opacity-40')} ref={setNodeRef}>
-    <button aria-label={`Arrastar o tema ${subject.title}`} className="grid size-7 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
+    <button aria-label={`Arrastar o tema ${subject.title}`} className="grid size-7 min-h-0 shrink-0 cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
     <Cover className="size-10" subject={subject} />
     <div className="grid min-w-0 flex-1 gap-0.5">
       <strong className="truncate text-[0.8125rem] leading-tight" title={subject.title}>{subject.title}</strong>

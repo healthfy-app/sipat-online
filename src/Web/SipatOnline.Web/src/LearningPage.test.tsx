@@ -142,7 +142,7 @@ describe('learning experience', () => {
       lessons: [{ ...lesson, lastPlaybackPositionMilliseconds: 1500, watchedPercentage: 30 }],
     });
     renderAt('/learning');
-    expect(await screen.findByRole('link', { name: /Continuar aula/ }))
+    expect(await screen.findByRole('link', { name: /Continuar vídeo/ }))
       .toBeVisible();
     const hero = screen.getByRole('region', { name: 'Formação em andamento' });
     // the greeting lives inside the green card, with the course to continue shown as a cover
@@ -150,7 +150,7 @@ describe('learning experience', () => {
     expect(hero.querySelector('.learning-hero-cover')).toBeInTheDocument();
     expect(hero.querySelector('.learning-completion-illustration')).toBeNull();
     expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
-    await waitFor(() => expect(screen.getByRole('link', { name: /Continuar aula/ }))
+    await waitFor(() => expect(screen.getByRole('link', { name: /Continuar vídeo/ }))
       .toHaveAttribute('href', '/learning/tracks/ergonomia?lesson=lesson-1'));
     expect(screen.getByText('Passo 2 de 2 · 70% da formação')).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Progresso da trilha' })).toHaveAttribute('aria-valuenow', '70');
@@ -172,7 +172,7 @@ describe('learning experience', () => {
 
   it('hides the section heading for a course with a single section', async () => {
     await playableCourse([{ ...lesson, sectionTitle: 'Aula 1' }]);
-    await screen.findByText('Conteúdo do curso');
+    await screen.findByText('Vídeos do dia');
     expect(screen.queryByText('Aula 1')).not.toBeInTheDocument();
   });
 
@@ -186,7 +186,7 @@ describe('learning experience', () => {
     const { container } = await playableCourse([completedLesson]);
 
     expect(container.querySelector('.learning-lesson-navigation .learning-status')).toHaveTextContent('Concluída');
-    await user.click(screen.getByRole('button', { name: 'Ver detalhes da aula' }));
+    await user.click(screen.getByRole('button', { name: 'Ver detalhes do vídeo' }));
     const lessonDetails = screen.getByRole('dialog', { name: 'Informações da aula' });
     expect(lessonDetails.querySelector('.learning-lesson-heading .learning-status')).not.toBeInTheDocument();
   });
@@ -199,7 +199,7 @@ describe('learning experience', () => {
     expect(container.querySelector('.learning-course-sidebar .learning-lesson-info-launcher'))
       .toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Minhas anotações' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Ver detalhes da aula' }));
+    await user.click(screen.getByRole('button', { name: 'Ver detalhes do vídeo' }));
     expect(video.pause).toHaveBeenCalledOnce();
 
     const dialog = screen.getByRole('dialog', { name: 'Informações da aula' });
@@ -243,9 +243,9 @@ describe('learning experience', () => {
     atTime(video, 0); fireEvent.playing(video);
     atTime(video, 4.5); fireEvent.pause(video);
     await waitFor(() => expect(screen.getByRole('progressbar', { name: 'Progresso do curso' })).toHaveAttribute('aria-valuenow', '100'));
-    await user.click(screen.getByRole('button', { name: 'Ver detalhes da aula' }));
+    await user.click(screen.getByRole('button', { name: 'Ver detalhes do vídeo' }));
     expect(screen.getByText('90% assistido')).toBeVisible();
-    expect(screen.getByText('1 de 1 aulas · 100%')).toBeVisible();
+    expect(screen.getByText('1 de 1 vídeos · 100%')).toBeVisible();
     expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 4500, 4500);
   });
 
@@ -328,9 +328,9 @@ describe('learning experience', () => {
     atTime(video, 2); fireEvent.pause(video);
     expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 2000, 2000);
     atTime(video, 3.9); fireEvent.ended(video);
-    await user.click(screen.getByRole('button', { name: /Próxima aula/ }));
+    await user.click(screen.getByRole('button', { name: /Próximo vídeo/ }));
     expect(startPlayback).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole('button', { name: /Próxima aula/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Próximo vídeo/ })).toBeDisabled();
     finish(progress(2000));
     await waitFor(() => expect(container.querySelector('video')).toHaveAttribute('src', 'https://media.example.test/lesson-2.mp4'));
     expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 3900, 3900);
@@ -423,7 +423,7 @@ describe('learning experience', () => {
     renderAt('/learning');
     expect(await screen.findByRole('progressbar', { name: 'Progresso da trilha' })).toHaveAttribute('aria-valuenow', '50');
     expect(screen.getByText('Passo 2 de 3 · 50% da formação')).toBeVisible();
-    await waitFor(() => expect(screen.getByRole('link', { name: /Continuar aula/ }))
+    await waitFor(() => expect(screen.getByRole('link', { name: /Continuar vídeo/ }))
       .toHaveAttribute('href', '/learning/tracks/ergonomia?lesson=lesson-1'));
     await user.click(screen.getByRole('tab', { name: /Em andamento/ }));
     expect(screen.getByRole('link', { name: 'Continuar curso Ergonomia' })).toBeVisible();

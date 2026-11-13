@@ -131,7 +131,7 @@ export default function TrailPath({ days, allTracks, flow = 'right' }: {
               <Icon aria-hidden="true" />
               <span className="learning-trail-course-title">{getTrackDisplayTitle(track.title)}</span>
               <span className="learning-trail-course-state">
-                {done ? 'Concluído' : started ? `${track.completedLessonCount} de ${track.lessonCount} aulas` : isNext ? 'Próximo' : 'Para fazer'}
+                {done ? 'Concluído' : started ? `${track.completedLessonCount} de ${track.lessonCount} vídeos` : isNext ? 'Próximo' : 'Para fazer'}
               </span>
             </Link>
           </li>;
