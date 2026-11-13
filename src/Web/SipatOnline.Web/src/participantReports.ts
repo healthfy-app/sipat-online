@@ -22,7 +22,7 @@ export function companyReportCsv(
   participants: readonly ParticipantAccount[],
   participation: readonly LearningParticipantProgress[],
 ): string {
-  const header = ['Login', 'Nome', 'Conta', 'Trilha', 'Aulas', 'Aulas concluídas', 'Tempo assistido', 'Progresso', 'Data de conclusão', 'Último acesso'];
+  const header = ['Login', 'Nome', 'Conta', 'Dia', 'Vídeos', 'Vídeos concluídos', 'Tempo assistido', 'Progresso', 'Data de conclusão', 'Último acesso'];
   const rows = participants.flatMap((participant) => {
     const tracks = participation.filter((row) => row.participantId === participant.id);
     const account = participant.isActive ? 'Ativo' : 'Inativo';
@@ -40,7 +40,7 @@ export function companyReportCsv(
 
 /** Relatório da pessoa: uma linha por vídeo de cada trilha. */
 export function participantReportCsv(report: LearningParticipantReport): string {
-  const header = ['Login', 'Nome', 'Trilha', 'Aula', 'Vídeo', 'Duração', 'Tempo assistido', 'Assistido', 'Situação', 'Concluído em'];
+  const header = ['Login', 'Nome', 'Dia', 'Posição', 'Vídeo', 'Duração', 'Tempo assistido', 'Assistido', 'Situação', 'Concluído em'];
   const rows = report.tracks.flatMap((experience) => experience.lessons.map((lesson) => [
     report.loginIdentifier, report.displayName, experience.track.title, lesson.sectionTitle ?? '', lesson.title,
     formatWatchTime(lesson.durationMilliseconds), formatWatchTime(lesson.watchedMilliseconds),

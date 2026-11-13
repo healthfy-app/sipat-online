@@ -89,16 +89,15 @@ public sealed class SipatPlanService(
         var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token);
         if (!cleaned.IsSuccess) return cleaned;
 
-        if (!capabilities.CustomizeGrid)
+        // the videos of a day come from the assuntos the company's plan can use
+        var excluded = await plans.ExcludedSubjectsAsync(await plans.CurrentAsync(token), token);
+        if (excluded.Count > 0)
         {
-            // without personalization every day is one of the ready grades: the videos of a ready theme, as they are
-            var ready = (await catalog.ListAsync(token))
-                .Where(course => course.Status == PlatformCourseStatus.Published && SipatOnline.Infrastructure.Tenancy.CompanyPlans.IsReadyTheme(course.Description))
-                .Select(course => course.Videos.Select(video => video.Id).ToArray())
-                .ToList();
-            var outside = cleaned.Value.FirstOrDefault(day => !ready.Any(videos => videos.SequenceEqual(day.VideoIds)));
+            var blocked = (await catalog.ListAsync(token)).Where(course => excluded.Contains(course.Id)).SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
+            var allowed = (await catalog.ListAsync(token)).Where(course => !excluded.Contains(course.Id)).SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
+            var outside = cleaned.Value.FirstOrDefault(day => day.VideoIds.Any(id => blocked.Contains(id) && !allowed.Contains(id)));
             if (outside is not null)
-                return Failure<IReadOnlyList<ProgramDay>>("sipat.grid_not_allowed", $"O dia \"{outside.Title}\" não usa uma das grades prontas. Escolha os temas das opções de grade disponíveis.");
+                return Failure<IReadOnlyList<ProgramDay>>("sipat.subject_not_allowed", $"O dia \"{outside.Title}\" usa um assunto que não está disponível para a sua empresa.");
         }
 
         var now = clock.GetUtcNow();
@@ -155,7 +154,7 @@ public sealed class SipatPlanService(
         if (sipat.Status != SipatEventStatus.Published)
         {
             var other = await db.SipatEvents.AsNoTracking()
-                .Where(item => item.TenantId == sipat.TenantId && item.Id != sipatId && item.Status == SipatEventStatus.Published)
+                .Where(item => item.TenantId == sipat.TenantId && item.Id != sipatId && item.Status == SipatEventStatus.Published && item.EndsAt > clock.GetUtcNow())
                 .Select(item => item.Title).FirstOrDefaultAsync(token);
             if (other is not null)
                 return Failure<ProgramApplication>("sipat.already_published", $"Já existe uma SIPAT publicada: \"{other}\". Cancele-a antes de publicar outra.");

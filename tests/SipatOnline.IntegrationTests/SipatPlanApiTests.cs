@@ -33,7 +33,7 @@ public sealed class SipatPlanApiTests
 
         // the administrator sees what a day can be made of, read only
         var catalog = await Get(admin, "/api/admin/sipat-catalog");
-        Assert.Equal(2, catalog.GetProperty("videos").GetArrayLength());
+        Assert.Empty(catalog.GetProperty("videos").EnumerateArray()); // videos outside a published assunto are not offered
 
         // a SIPAT starts as a draft, with the days of a week
         var start = new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero);

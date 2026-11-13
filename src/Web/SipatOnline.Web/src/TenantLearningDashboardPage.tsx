@@ -15,10 +15,10 @@ import { cn } from '@/lib/utils';
 import LoadingState from './LoadingState';
 
 const statusLabels: Record<ParticipantProgressStatus, string> = {
-  completed: 'Concluíram todas as trilhas',
+  completed: 'Concluíram todos os dias',
   'in-progress': 'Em andamento',
   'not-started': 'Ainda não iniciaram',
-  'no-tracks': 'Sem trilhas atribuídas',
+  'no-tracks': 'Sem dias da SIPAT',
   inactive: 'Participantes inativos',
 };
 
@@ -73,7 +73,7 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
               <Link className={buttonVariants()} to="/admin/learning">Ver participantes</Link>
             </>
           )}
-          description="Acompanhe o progresso dos participantes e das trilhas da sua empresa."
+          description="Acompanhe o progresso dos colaboradores e dos dias da SIPAT da sua empresa."
           eyebrow="GESTÃO DA EMPRESA"
           title="Visão geral"
         />
@@ -92,8 +92,8 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
             <section aria-label="Indicadores de aprendizagem da empresa" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-4">
               <SummaryCard label="Participantes ativos" value={overview.activeParticipantCount.toLocaleString('pt-BR')} />
               <SummaryCard
-                label="Atribuições de trilhas"
-                note={`${pluralize(overview.trackProgress.length, 'trilha distinta', 'trilhas distintas')} · ${pluralize(overview.completedTrackCount, 'atribuição concluída', 'atribuições concluídas')}`}
+                label="Dias entregues"
+                note={`${pluralize(overview.trackProgress.length, 'dia distinto', 'dias distintos')} · ${pluralize(overview.completedTrackCount, 'dia concluído', 'dias concluídos')}`}
                 value={overview.assignedTrackCount.toLocaleString('pt-BR')}
               />
               <SummaryCard
@@ -113,18 +113,18 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                   <p className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-warning">PRÓXIMO PASSO</p>
                   <h2 className="m-0 text-base font-semibold" id="tenant-dashboard-next-step">
                     {noTracksCount > 0
-                      ? `Libere trilhas para ${pluralize(noTracksCount, 'participante', 'participantes')}`
+                      ? `Entregue a SIPAT a ${pluralize(noTracksCount, 'colaborador', 'colaboradores')}`
                       : `Acompanhe ${pluralize(notStartedCount, 'participante', 'participantes')} sem início`}
                   </h2>
                   <p className="m-0 text-sm text-muted-foreground">
                     {noTracksCount > 0
-                      ? 'Esses participantes ainda não têm uma trilha atribuída.'
-                      : 'Veja quem já tem trilhas liberadas e ainda não iniciou.'}
+                      ? 'Esses colaboradores ainda não receberam nenhum dia da SIPAT.'
+                      : 'Veja quem já recebeu os dias da SIPAT e ainda não iniciou.'}
                   </p>
                 </div>
                 <Link className={buttonVariants()} to={`/admin/learning?status=${nextStepStatus}`}>
                   {noTracksCount > 0
-                    ? readOnly ? 'Ver participantes sem trilhas' : 'Escolher participantes'
+                    ? readOnly ? 'Ver colaboradores sem dias da SIPAT' : 'Escolher participantes'
                     : readOnly ? 'Ver acompanhamento' : 'Acompanhar progresso'}
                   <ArrowRight />
                 </Link>
@@ -144,9 +144,9 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                 )}
               </Panel>
 
-              <Panel count={`${overview.trackProgress.length} trilhas`} id="track-progress-title" title="Conclusão média por trilha">
+              <Panel count={`${overview.trackProgress.length} dias`} id="track-progress-title" title="Conclusão média por dia">
                 {overview.trackProgress.length === 0 ? (
-                  <EmptyState description="Quando as trilhas forem liberadas, a evolução média aparecerá aqui." title="Nenhuma trilha atribuída" />
+                  <EmptyState description="Quando a SIPAT for publicada, a evolução média de cada dia aparecerá aqui." title="Nenhum dia entregue" />
                 ) : (
                   <ul className="m-0 grid list-none gap-4 p-0">
                     {[...overview.trackProgress]
@@ -171,7 +171,7 @@ export default function TenantLearningDashboardPage({ readOnly = false }: { read
                   </ul>
                 )}
                 {overview.trackProgress.length > 5 && (
-                  <Link className={buttonVariants({ variant: 'ghost', size: 'sm' })} to="/admin/learning">Ver todas as trilhas</Link>
+                  <Link className={buttonVariants({ variant: 'ghost', size: 'sm' })} to="/admin/learning">Ver todos os colaboradores</Link>
                 )}
               </Panel>
             </section>

@@ -22,9 +22,10 @@ import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
 import GameModuleForm from './GameModuleForm';
 import GameModulesPanel from './GameModulesPanel';
+import PlanSubjectsPanel from './PlanSubjectsPanel';
 import VideoLibraryPanel from './VideoLibraryPanel';
 
-type CatalogTab = 'courses' | 'videos' | 'modules';
+type CatalogTab = 'courses' | 'videos' | 'modules' | 'plans';
 type CatalogDialog =
   | { kind: 'create' }
   | { kind: 'upload' }
@@ -74,6 +75,7 @@ export default function CourseCatalog({
     { id: 'courses', label: 'Assuntos', count: courses.length },
     { id: 'videos', label: 'Vídeos', count: library.length },
     { id: 'modules', label: 'Jogos e perguntas', count: modules.length },
+    { id: 'plans', label: 'Planos', count: 4 },
   ];
 
   function openUpload() {
@@ -83,7 +85,7 @@ export default function CourseCatalog({
 
   async function removeGame(module: GameModule) {
     const usage = module.usageCount > 0
-      ? ` Ele está em ${pluralize(module.usageCount, 'assunto', 'assuntos')} e sairá da trilha desses cursos.`
+      ? ` Ele está em ${pluralize(module.usageCount, 'assunto', 'assuntos')} e sairá desses assuntos.`
       : '';
     if (!window.confirm(`Remover o jogo "${module.title}"?${usage}`)) return;
     onError('');
@@ -128,6 +130,7 @@ export default function CourseCatalog({
 
   const primaryAction = {
     courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar assunto</Button>,
+    plans: <span />,
     videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
     modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
   }[tab];
@@ -167,6 +170,9 @@ export default function CourseCatalog({
           {body ?? (isEmptyCatalog
             ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
             : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} courses={courses} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
+        </TabsContent>
+        <TabsContent value="plans">
+          {body ?? <PlanSubjectsPanel />}
         </TabsContent>
         <TabsContent value="videos">
           {body ?? <VideoLibraryPanel busy={isDeleting} library={library} onDelete={(item) => void removeVideo(item)} onUpload={openUpload} />}

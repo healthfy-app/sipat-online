@@ -167,7 +167,7 @@ export default function CourseEditor({
     setIsMediaBusy(true);
     try {
       await setPlatformCourseModules(course.id, [...course.modules, { moduleId, afterVideoCount: activityPosition }]);
-      await onChanged('A atividade foi adicionada à trilha.');
+      await onChanged('A atividade foi adicionada ao assunto.');
       setActivityPosition(null);
     } catch (activityError) {
       onError(getErrorMessage(activityError));

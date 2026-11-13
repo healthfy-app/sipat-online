@@ -833,6 +833,18 @@ export function changeCompanyPlan(companyId: string, plan: CompanyPlan): Promise
 export interface CompanyCapabilities {
   customizeGrid: boolean; customBranding: boolean; customCertificate: boolean; quizzes: boolean; internalVideos: boolean; plan?: CompanyPlan | null;
 }
+/** Which assuntos each plan cannot use (everything not listed is available). */
+export interface PlanSubjects {
+  courses: { id: string; title: string; description: string | null; videoCount: number }[];
+  excluded: Record<string, string[]>;
+}
+export function getPlanSubjects(): Promise<PlanSubjects> {
+  return requestJson<PlanSubjects>('/api/platform/catalog/plan-subjects');
+}
+export async function setPlanSubjects(plan: CompanyPlan, excludedCourseIds: string[]): Promise<void> {
+  await request(`/api/platform/catalog/plan-subjects/${plan}`, { method: 'PUT', body: JSON.stringify({ excludedCourseIds }) });
+}
+
 export function getCompanyCapabilities(): Promise<CompanyCapabilities> {
   return requestJson<CompanyCapabilities>('/api/admin/capabilities');
 }
@@ -917,6 +929,16 @@ export function renameUser(userId: string, displayName: string): Promise<Partici
     method: 'PUT',
     body: JSON.stringify({ displayName }),
   });
+}
+
+/** The administrator changes the registration (login) a collaborator signs in with. */
+export function changeEmployeeLogin(userId: string, loginIdentifier: string): Promise<{ loginIdentifier: string }> {
+  return requestJson<{ loginIdentifier: string }>(`/api/admin/users/${userId}/login`, { method: 'PUT', body: JSON.stringify({ loginIdentifier }) });
+}
+
+/** The administrator sets a new password for a collaborator. */
+export async function resetEmployeePassword(userId: string, newPassword: string): Promise<void> {
+  await request(`/api/admin/users/${userId}/password`, { method: 'PUT', body: JSON.stringify({ newPassword }) });
 }
 
 export function changeUserStatus(userId: string, isActive: boolean): Promise<ParticipantAccount> {

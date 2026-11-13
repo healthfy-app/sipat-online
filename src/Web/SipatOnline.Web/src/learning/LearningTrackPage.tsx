@@ -519,7 +519,7 @@ export default function LearningTrackPage({
   }
 
   if (isLoading) {
-    return <LoadingState className="learning-state">Carregando a trilha...</LoadingState>;
+    return <LoadingState className="learning-state">Carregando o dia...</LoadingState>;
   }
 
   if (error || !experience) {
@@ -527,7 +527,7 @@ export default function LearningTrackPage({
       <main className="learning-page">
         <Link className="learning-back-to-courses" to="/learning">← Meus cursos</Link>
         <div className="learning-state learning-error" role="alert">
-          <p>{error || 'Não foi possível carregar esta trilha.'}</p>
+          <p>{error || 'Não foi possível carregar este dia.'}</p>
           <div className="learning-state-actions">
             <button className="button button-secondary" onClick={() => setRetry((value) => value + 1)} type="button">
               Tentar novamente
@@ -602,7 +602,7 @@ export default function LearningTrackPage({
               <>
                 <SipatPlayer key={`${selectedLesson?.id}-${playbackSession.sessionId}`} lock={{ furthest: furthestRef, onBlocked: () => setSeekNotice(true) }} markers={markers} videoRef={videoRef}>
                 <video
-                  aria-label={selectedLesson?.title ?? 'Vídeo da trilha'}
+                  aria-label={selectedLesson?.title ?? 'Vídeo do dia'}
                   className="learning-video"
                   disablePictureInPicture
                   slot="media"

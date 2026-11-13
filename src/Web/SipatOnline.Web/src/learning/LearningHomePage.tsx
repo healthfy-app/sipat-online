@@ -299,7 +299,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
         </p>
       </header>}
 
-      {isLoading && <LoadingState className="learning-state">Carregando suas trilhas...</LoadingState>}
+      {isLoading && <LoadingState className="learning-state">Carregando a sua SIPAT...</LoadingState>}
       {error && (
         <div className="learning-state learning-error" role="alert">
           <p>{error}</p>
@@ -311,9 +311,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
       {!isLoading && !error && tracks.length === 0 && (
         <section className="learning-empty">
           <span aria-hidden="true" className="learning-empty-mark">✓</span>
-          <h2>Você ainda não tem uma trilha atribuída</h2>
+          <h2>Você ainda não tem uma SIPAT disponível</h2>
           <p>
-            Quando a administração da sua empresa disponibilizar uma trilha, ela aparecerá aqui.
+            Quando a sua empresa publicar a SIPAT, os dias aparecerão aqui.
           </p>
         </section>
       )}
@@ -442,7 +442,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                   <h2 id="learning-journey-title">Sua trilha</h2>
                   <span>Passo {currentStepNumber} de {tracks.length} · {overallProgress}% da formação</span>
                 </div>
-                <ProgressBar label="Progresso da trilha" value={overallProgress} />
+                <ProgressBar label="Progresso da SIPAT" value={overallProgress} />
                 <ol aria-label="Etapas da formação" className="learning-journey-steps">
                   {tracks.map((track, index) => {
                     const percentage = getTrackProgress(track);

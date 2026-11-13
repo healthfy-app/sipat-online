@@ -18,6 +18,26 @@ public sealed class TenantPlanService(PlatformDbContext db, ITenantContext tenan
 
     public async Task<CompanyCapabilities> CapabilitiesAsync(CancellationToken token) => CompanyCapabilities.For(await CurrentAsync(token));
 
+    /// <summary>The assuntos a plan cannot use. Everything else in the catalog is available to it.</summary>
+    public async Task<IReadOnlySet<Guid>> ExcludedSubjectsAsync(CompanyPlan plan, CancellationToken token) =>
+        (await db.PlanSubjectExclusions.AsNoTracking().Where(item => item.Plan == (int)plan).Select(item => item.CourseId).ToListAsync(token)).ToHashSet();
+
+    /// <summary>The operator decides which assuntos of the catalog a plan cannot use.</summary>
+    public async Task<Result<bool>> SetExcludedSubjectsAsync(CompanyPlan plan, IReadOnlyCollection<Guid> courseIds, CancellationToken token)
+    {
+        if (!actor.IsInRole(PlatformRoles.PlatformOperator) || tenantContext.CurrentTenantId is not null)
+            return Result<bool>.Failure(new DomainError("tenant.plan.forbidden", "Somente a operação pode alterar o que cada plano oferece."));
+        var wanted = courseIds.Distinct().ToHashSet();
+        var current = await db.PlanSubjectExclusions.Where(item => item.Plan == (int)plan).ToListAsync(token);
+        db.PlanSubjectExclusions.RemoveRange(current.Where(item => !wanted.Contains(item.CourseId)));
+        var known = current.Select(item => item.CourseId).ToHashSet();
+        foreach (var id in wanted.Where(id => !known.Contains(id)))
+            db.PlanSubjectExclusions.Add(new PlanSubjectExclusionEntity { Plan = (int)plan, CourseId = id });
+        await db.SaveChangesAsync(token);
+        await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", null, "plan.subjects.changed", "plan", plan.ToString(), clock.GetUtcNow()), token);
+        return Result<bool>.Success(true);
+    }
+
     public async Task<Result<CompanyPlan>> SetAsync(Guid tenantId, CompanyPlan plan, CancellationToken token)
     {
         if (!actor.IsInRole(PlatformRoles.PlatformOperator) || tenantContext.CurrentTenantId is not null)

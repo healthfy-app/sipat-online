@@ -120,7 +120,7 @@ describe('learning experience', () => {
     expect(screen.queryByRole('link', { name: 'Ver certificados' })).not.toBeInTheDocument();
     expect(screen.queryByText('Formação concluída. Parabéns por chegar até aqui!')).not.toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Sua trilha' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('progressbar', { name: 'Progresso da trilha' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('progressbar', { name: 'Progresso da SIPAT' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Ver certificado de Segurança no trabalho' }))
       .toHaveAttribute('href', '/learning/certificates');
     // o resumo é enviado por um efeito: sob carga ele pode chegar depois do cabeçalho
@@ -153,7 +153,7 @@ describe('learning experience', () => {
     await waitFor(() => expect(screen.getByRole('link', { name: /Continuar vídeo/ }))
       .toHaveAttribute('href', '/learning/tracks/ergonomia?lesson=lesson-1'));
     expect(screen.getByText('Passo 2 de 2 · 70% da formação')).toBeVisible();
-    expect(screen.getByRole('progressbar', { name: 'Progresso da trilha' })).toHaveAttribute('aria-valuenow', '70');
+    expect(screen.getByRole('progressbar', { name: 'Progresso da SIPAT' })).toHaveAttribute('aria-valuenow', '70');
     await user.click(screen.getByRole('tab', { name: /Em andamento/ }));
     expect(screen.getAllByRole('article')).toHaveLength(1);
     expect(screen.getByRole('link', { name: 'Continuar curso Ergonomia' })).toBeVisible();
@@ -421,7 +421,7 @@ describe('learning experience', () => {
       lessons: [{ ...lesson, lastPlaybackPositionMilliseconds: 1500, watchedPercentage: 30 }],
     });
     renderAt('/learning');
-    expect(await screen.findByRole('progressbar', { name: 'Progresso da trilha' })).toHaveAttribute('aria-valuenow', '50');
+    expect(await screen.findByRole('progressbar', { name: 'Progresso da SIPAT' })).toHaveAttribute('aria-valuenow', '50');
     expect(screen.getByText('Passo 2 de 3 · 50% da formação')).toBeVisible();
     await waitFor(() => expect(screen.getByRole('link', { name: /Continuar vídeo/ }))
       .toHaveAttribute('href', '/learning/tracks/ergonomia?lesson=lesson-1'));
@@ -475,9 +475,9 @@ describe('learning experience', () => {
     const user = userEvent.setup();
     listAssignedTracks.mockRejectedValueOnce(new Error('Cursos indisponíveis.')).mockResolvedValueOnce([trackCard]);
     renderAt('/learning');
-    expect(screen.getByText('Carregando suas trilhas...')).toBeVisible();
+    expect(screen.getByText('Carregando a sua SIPAT...')).toBeVisible();
     expect(await screen.findByRole('alert')).toHaveTextContent('Cursos indisponíveis.');
-    expect(screen.queryByText('Você ainda não tem uma trilha atribuída')).not.toBeInTheDocument();
+    expect(screen.queryByText('Você ainda não tem uma SIPAT disponível')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
     expect(await screen.findByRole('link', { name: 'Começar curso Segurança no trabalho' })).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -703,7 +703,7 @@ describe('learning experience', () => {
     renderAt('/learning');
 
     expect(await screen.findByRole('heading', {
-      name: 'Você ainda não tem uma trilha atribuída',
+      name: 'Você ainda não tem uma SIPAT disponível',
     })).toBeVisible();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });

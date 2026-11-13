@@ -71,7 +71,7 @@ export default function CourseGamesSection({
       </header>
 
       <Step
-        description="Ela aparece na trilha do participante na posição escolhida."
+        description="Ela aparece para o participante na posição escolhida."
         icon={<Puzzle />}
         id="course-games-track-title"
         number={1}
@@ -110,7 +110,7 @@ export default function CourseGamesSection({
                       aria-label={`Remover atividade ${found?.title ?? ''} do curso`}
                       onClick={() => void savePlacements(
                         course.modules.filter((_, itemIndex) => itemIndex !== index),
-                        'A atividade foi removida da trilha.',
+                        'A atividade foi removida do assunto.',
                       )}
                       size="sm"
                       variant="destructive"
@@ -150,12 +150,12 @@ export default function CourseGamesSection({
                 const id = moduleId;
                 void savePlacements(
                   [...course.modules, { moduleId: id, afterVideoCount: afterCount }],
-                  'A atividade foi adicionada à trilha.',
+                  'A atividade foi adicionada ao assunto.',
                 ).then((saved) => { if (saved) setModuleId(''); });
               }}
               variant="outline"
             >
-              <Plus /> Adicionar à trilha
+              <Plus /> Adicionar ao assunto
             </Button>
           </div>
         )}

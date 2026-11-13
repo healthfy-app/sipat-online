@@ -16,6 +16,7 @@ import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
+import { phaseLabel, sipatPhase } from './sipatPhase';
 import {
   addDays, buildCatalog, dayDuration, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay,
   type Catalog, type DaySlots,
@@ -28,12 +29,6 @@ function download(name: string, text: string) {
   document.body.append(link); link.click(); link.remove();
   URL.revokeObjectURL(url);
 }
-
-const statusBadge: Record<SipatEvent['status'], { text: string; variant: 'success' | 'warning' | 'neutral' }> = {
-  Draft: { text: 'Rascunho', variant: 'warning' },
-  Published: { text: 'Publicada', variant: 'success' },
-  Cancelled: { text: 'Cancelada', variant: 'neutral' },
-};
 
 /**
  * One SIPAT of a company: a week of training. It is built as a draft (start date, days, a theme for each day),
@@ -192,7 +187,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
 
   const template = () => download('modelo-sipat.csv', sampleCsv(catalog));
   const sources = others.filter(item => item.id !== sipat?.id && (plans.find(plan => plan.sipatEventId === item.id)?.days ?? 0) > 0);
-  const label = sipat ? statusBadge[sipat.status] : null;
+  const label = sipat ? phaseLabel[sipatPhase(sipat, days.filter(day => day.videos.some(Boolean)).length)] : null;
 
   return <Page className="builder-page">
     <Link className="inline-flex items-center gap-1.5 justify-self-start text-sm font-medium text-muted-foreground no-underline hover:text-foreground" to={basePath}>
@@ -252,7 +247,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
             <button className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-primary" onClick={() => void copyFrom(item.id)} type="button">
               <span className="grid"><strong className="text-sm">{item.title}</strong>
                 <span className="text-xs text-muted-foreground">{new Date(item.startsAt).getUTCFullYear()} · {plan ? `${pluralize(plan.days, 'dia', 'dias')} · ${pluralize(plan.videos, 'vídeo', 'vídeos')}` : ''}</span></span>
-              <Badge variant={statusBadge[item.status].variant}>{statusBadge[item.status].text}</Badge>
+              <Badge variant={phaseLabel[sipatPhase(item, plan?.days ?? 0)].variant}>{phaseLabel[sipatPhase(item, plan?.days ?? 0)].text}</Badge>
             </button>
           </li>;
         })}

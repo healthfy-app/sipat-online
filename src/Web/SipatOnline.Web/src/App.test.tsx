@@ -342,7 +342,7 @@ describe('tenant portal', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', {
-      name: 'Você ainda não tem uma trilha atribuída',
+      name: 'Você ainda não tem uma SIPAT disponível',
     })).toBeVisible();
     expect(screen.queryByRole('navigation', { name: 'Navegação principal' }))
       .not.toBeInTheDocument();

@@ -27,7 +27,7 @@ export default function ParticipantOutcomesPanel({ participantId, companyId }: {
         <p>{data.completedActivities} atividades concluídas · {data.skippedActivities} puladas</p>
         <p className="muted-copy">Jogos são opcionais e não alteram a elegibilidade do certificado.</p>
         <h3>Certificados emitidos</h3>
-        {!data.certificates.length && <p>Nenhum certificado emitido. A conclusão dos cursos continua no acompanhamento de trilhas.</p>}
+        {!data.certificates.length && <p>Nenhum certificado emitido. A conclusão dos dias continua no acompanhamento dos colaboradores.</p>}
         {data.certificates.map(certificate => <article className="form-card" key={certificate.id}>
           <strong>{certificate.eventTitle}</strong>
           <p>Emitido em {new Date(certificate.issuedAt).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}{certificate.isDemonstration ? ' · Demonstrativo' : ''}</p>

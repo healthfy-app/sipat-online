@@ -27,7 +27,7 @@ import SipatsPage from './sipatBuilder/SipatsPage';
 import CompanyContext from './companies/CompanyContext';
 import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
-import LearningManagementPage from './LearningManagementPage';
+import CollaboratorsPage from './collaborators/CollaboratorsPage';
 import TenantLearningDashboardPage from './TenantLearningDashboardPage';
 import PlatformCompaniesPage from './PlatformCompaniesPage';
 import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
@@ -215,7 +215,7 @@ export default function App() {
               path="/admin/learning"
               element={
                 state.session && canViewCompany(state.session) ? (
-                  <LearningManagementPage readOnly={!hasAdminRole(state.session)} />
+                  <CollaboratorsPage readOnly={!hasAdminRole(state.session)} />
                 ) : (
                   <AccessDenied />
                 )
@@ -679,7 +679,7 @@ function ProtectedPortal({
                 {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
               </>}
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
-                {hasAdminRole(session) ? 'Participantes e trilhas' : 'Acompanhamento'}
+                {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}
               </NavLink>
             </>
           )}

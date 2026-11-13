@@ -583,10 +583,10 @@ describe('Platform course catalog', () => {
     expect(within(dialog).getByText('Sem pontos · nunca bloqueia o progresso')).toBeVisible();
     expect(within(dialog).getByLabelText('Atividade')).toBeVisible();
     expect(within(dialog).getByLabelText('Quando exibir')).toHaveValue('2');
-    expect(within(dialog).getByRole('button', { name: 'Adicionar à trilha' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Adicionar ao assunto' })).toBeDisabled();
 
     await user.selectOptions(within(dialog).getByLabelText('Atividade'), 'g-1');
-    expect(within(dialog).getByRole('button', { name: 'Adicionar à trilha' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Adicionar ao assunto' })).toBeEnabled();
     const firstVideo = within(dialog).getByText('Vídeo 1 · Abertura').closest('details')!;
     expect(firstVideo).not.toHaveAttribute('open');
     await user.click(within(dialog).getByText('Vídeo 1 · Abertura'));

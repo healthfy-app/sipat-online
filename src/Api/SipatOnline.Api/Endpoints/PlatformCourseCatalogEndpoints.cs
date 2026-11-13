@@ -519,6 +519,61 @@ public static class PlatformCourseCatalogEndpoints
         return endpoints;
     }
 
+    /// <summary>Which assuntos each plan can use, for the operator: everything is available unless taken out.</summary>
+    public static IEndpointRouteBuilder MapPlanSubjectEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/platform/catalog/plan-subjects")
+            .WithTags("Plan subjects")
+            .RequireAuthorization("ManagePlatform");
+
+        group.MapGet("/", async (
+            IPlatformCourseCatalogStore courses,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
+            CancellationToken cancellationToken) =>
+        {
+            var published = (await courses.ListAsync(cancellationToken))
+                .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
+                .Select(course => new PlanSubjectCourse(course.Id, course.Title, course.Description, course.Videos.Count))
+                .ToArray();
+            var excluded = new Dictionary<string, IReadOnlyList<Guid>>();
+            foreach (var plan in Enum.GetValues<SipatOnline.Infrastructure.Tenancy.CompanyPlan>())
+            {
+                excluded[plan.ToString()] = (await plans.ExcludedSubjectsAsync(plan, cancellationToken)).ToArray();
+            }
+
+            return Results.Ok(new PlanSubjectsResponse(published, excluded));
+        })
+        .WithName("GetPlanSubjects");
+
+        group.MapPut("/{plan}", async (
+            string plan,
+            SetPlanSubjectsRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            if (!SipatOnline.Infrastructure.Tenancy.CompanyPlans.TryParse(plan, out var parsed))
+            {
+                return Results.Problem(statusCode: 400, title: "tenant.plan.invalid", detail: "Escolha um plano válido: Bronze, Prata, Ouro ou Diamante.");
+            }
+
+            var result = await plans.SetExcludedSubjectsAsync(parsed, request.ExcludedCourseIds ?? [], cancellationToken);
+            return result.IsSuccess
+                ? Results.NoContent()
+                : Results.Problem(statusCode: 403, title: result.Error.Code, detail: result.Error.Message);
+        })
+        .WithName("SetPlanSubjects");
+
+        return endpoints;
+    }
+
     /// <summary>The catalog as the company's administrator sees it: what a day of a SIPAT can be made of, read only.</summary>
     public static IEndpointRouteBuilder MapSipatCatalogEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -533,10 +588,10 @@ public static class PlatformCourseCatalogEndpoints
             CancellationToken cancellationToken) =>
         {
             var capabilities = await plans.CapabilitiesAsync(cancellationToken);
+            var excluded = await plans.ExcludedSubjectsAsync(await plans.CurrentAsync(cancellationToken), cancellationToken);
             var themes = (await courses.ListAsync(cancellationToken))
                 .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
-                // a company that cannot personalize picks among the ready grades only
-                .Where(course => capabilities.CustomizeGrid || SipatOnline.Infrastructure.Tenancy.CompanyPlans.IsReadyTheme(course.Description))
+                .Where(course => !excluded.Contains(course.Id))
                 .Select(course => ToResponse(course) with
                 {
                     CoverUrl = course.CoverContentType is null
@@ -546,7 +601,7 @@ public static class PlatformCourseCatalogEndpoints
                 .ToArray();
             var offered = themes.SelectMany(theme => theme.Videos.Select(video => video.Id)).ToHashSet();
             var videos = (await courses.ListVideosAsync(cancellationToken))
-                .Where(item => capabilities.CustomizeGrid || offered.Contains(item.Video.Id))
+                .Where(item => offered.Contains(item.Video.Id))
                 .Select(item => new PlatformLibraryVideoResponse(ToResponse(item.Video), item.CourseCount))
                 .ToArray();
             var games = capabilities.Quizzes
@@ -734,6 +789,12 @@ public sealed record UpdatePlatformCourseRequest(
 public sealed record SetPlatformCourseVideosRequest(IReadOnlyList<Guid>? VideoIds);
 
 public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Video, int CourseCount);
+
+public sealed record PlanSubjectsResponse(IReadOnlyList<PlanSubjectCourse> Courses, IReadOnlyDictionary<string, IReadOnlyList<Guid>> Excluded);
+
+public sealed record PlanSubjectCourse(Guid Id, string Title, string? Description, int VideoCount);
+
+public sealed record SetPlanSubjectsRequest(IReadOnlyList<Guid>? ExcludedCourseIds);
 
 public sealed record SipatCatalogResponse(
     IReadOnlyList<PlatformCourseResponse> Courses,

@@ -47,7 +47,7 @@ public sealed class CompanyPlanApiTests
         using var admin = Client(factory, "acme-plano.localhost");
         await Send(admin, HttpMethod.Post, "/api/identity/login", new LoginRequest("acme-admin", "AdminPassword123"), HttpStatusCode.NoContent);
 
-        // Bronze: ready grades only, no quiz, no own identity; the company is never told its plan
+        // Bronze: every assunto is available, no quiz and no own identity; the company is never told its plan
         var capabilities = await Get(admin, "/api/admin/capabilities");
         Assert.False(capabilities.GetProperty("customizeGrid").GetBoolean());
         Assert.False(capabilities.GetProperty("customBranding").GetBoolean());
@@ -55,20 +55,36 @@ public sealed class CompanyPlanApiTests
         Assert.Equal(JsonValueKind.Null, capabilities.GetProperty("plan").ValueKind);
 
         var catalog = await Get(admin, "/api/admin/sipat-catalog");
-        Assert.Equal(["Ergonomia"], catalog.GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()));
-        Assert.Equal(readyVideo, Assert.Single(catalog.GetProperty("videos").EnumerateArray()).GetProperty("video").GetProperty("id").GetGuid());
+        Assert.Equal(["Ergonomia", "Tema avulso"], catalog.GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()).Order());
+        Assert.Equal(2, catalog.GetProperty("videos").GetArrayLength());
 
         var start = new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero);
         var sipat = await Send(admin, HttpMethod.Post, "/api/admin/sipats", new { title = "SIPAT 2026", description = (string?)null, startsAt = start, endsAt = start.AddDays(1) }, HttpStatusCode.Created);
         var sipatId = sipat.GetProperty("id").GetGuid();
-        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Fora da grade", freeVideo) } }, HttpStatusCode.BadRequest);
         await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Grade pronta", readyVideo) } });
+
+        // the operator takes the loose assunto out of Bronze: the company stops seeing it and cannot save a day with it
+        var matrix = await Get(operatorClient, "/api/platform/catalog/plan-subjects");
+        Assert.Equal(2, matrix.GetProperty("courses").GetArrayLength());
+        Assert.Empty(matrix.GetProperty("excluded").GetProperty("Bronze").EnumerateArray());
+        var looseId = matrix.GetProperty("courses").EnumerateArray().Single(item => item.GetProperty("title").GetString() == "Tema avulso").GetProperty("id").GetGuid();
+        using (var removed = await Raw(operatorClient, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = new[] { looseId } }))
+            Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.Equal(["Ergonomia"], (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()));
+        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Assunto fora do plano", freeVideo) } }, HttpStatusCode.BadRequest);
+        // other plans keep it
+        Assert.Single((await Get(operatorClient, "/api/platform/catalog/plan-subjects")).GetProperty("excluded").GetProperty("Bronze").EnumerateArray());
+        using (var back = await Raw(operatorClient, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = Array.Empty<Guid>() }))
+            Assert.Equal(HttpStatusCode.NoContent, back.StatusCode);
+        Assert.Equal(2, (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").GetArrayLength());
+        // a company cannot change what a plan offers
+        using (var denied = await Raw(admin, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = new[] { looseId } }))
+            Assert.NotEqual(HttpStatusCode.NoContent, denied.StatusCode);
         await Send(admin, HttpMethod.Put, "/api/tenant/branding/appearance", new { primaryColor = "#123456", secondaryColor = "#FFFFFF" }, HttpStatusCode.Forbidden);
 
         // the operator moves the company to Prata: the whole catalog and personalized grids, still no own identity
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Prata" });
         Assert.True((await Get(admin, "/api/admin/capabilities")).GetProperty("customizeGrid").GetBoolean());
-        Assert.Equal(2, (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").GetArrayLength());
         await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Tema avulso", freeVideo) } });
         await Send(admin, HttpMethod.Put, "/api/tenant/branding/appearance", new { primaryColor = "#123456", secondaryColor = "#FFFFFF" }, HttpStatusCode.Forbidden);
 
@@ -79,6 +95,25 @@ public sealed class CompanyPlanApiTests
         Assert.NotEqual(HttpStatusCode.Forbidden, branding.StatusCode);
 
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Platina" }, HttpStatusCode.BadRequest);
+
+        // the administrator corrects a collaborator: registration and password, only for participants
+        var ana = await Send(admin, HttpMethod.Post, "/api/admin/users", new { loginIdentifier = "ana.lima", displayName = "Ana Lima", initialPassword = "SenhaInicial123", role = "Participant" }, HttpStatusCode.Created);
+        var anaId = ana.GetProperty("id").GetGuid();
+        var other = await Send(admin, HttpMethod.Post, "/api/admin/users", new { loginIdentifier = "bia.souza", displayName = "Bia Souza", initialPassword = "SenhaInicial123", role = "Participant" }, HttpStatusCode.Created);
+        var changed = await Send(admin, HttpMethod.Put, $"/api/admin/users/{anaId}/login", new { loginIdentifier = "ana.lima.2" });
+        Assert.Equal("ana.lima.2", changed.GetProperty("loginIdentifier").GetString());
+        var taken = await Send(admin, HttpMethod.Put, $"/api/admin/users/{anaId}/login", new { loginIdentifier = "bia.souza" }, HttpStatusCode.Conflict);
+        Assert.Equal("identity.login_identifier.duplicate", taken.GetProperty("code").GetString());
+        await Send(admin, HttpMethod.Put, $"/api/admin/users/{anaId}/password", new { newPassword = "NovaSenha456" }, HttpStatusCode.NoContent);
+        await Send(admin, HttpMethod.Put, $"/api/admin/users/{anaId}/password", new { newPassword = "" }, HttpStatusCode.BadRequest);
+        using (var signIn = Client(factory, "acme-plano.localhost"))
+        {
+            await Send(signIn, HttpMethod.Post, "/api/identity/login", new LoginRequest("ana.lima", "NovaSenha456"), HttpStatusCode.Unauthorized);
+            await Send(signIn, HttpMethod.Post, "/api/identity/login", new LoginRequest("ana.lima.2", "NovaSenha456"), HttpStatusCode.NoContent);
+        }
+        // administrators are not touched here
+        var adminId = (await Get(admin, "/api/identity/session")).GetProperty("id").GetGuid();
+        await Send(admin, HttpMethod.Put, $"/api/admin/users/{adminId}/password", new { newPassword = "OutraSenha789" }, HttpStatusCode.NotFound);
 
         // the administrator cannot change the plan
         await Send(admin, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Diamante" }, HttpStatusCode.NotFound);

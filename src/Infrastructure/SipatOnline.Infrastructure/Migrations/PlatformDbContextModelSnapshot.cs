@@ -292,6 +292,19 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("Users", "identity");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity", b =>
+                {
+                    b.Property<int>("Plan")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Plan", "CourseId");
+
+                    b.ToTable("PlanSubjectExclusions", "tenancy");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatPlanEntity", b =>
                 {
                     b.Property<Guid>("SipatEventId")

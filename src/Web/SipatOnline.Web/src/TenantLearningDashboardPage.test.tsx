@@ -46,8 +46,8 @@ describe('tenant learning dashboard', () => {
     expect(await screen.findByRole('img', { name: 'Distribuição do progresso de 3 participantes' })).toBeVisible();
     expect(screen.getByText('Participantes ativos')).toBeVisible();
     expect(screen.queryByText(/contas no total/)).not.toBeInTheDocument();
-    expect(screen.getByText('1 trilha distinta · 1 atribuição concluída')).toBeVisible();
-    expect(screen.getByText('Concluíram todas as trilhas')).toBeVisible();
+    expect(screen.getByText('1 dia distinto · 1 dia concluído')).toBeVisible();
+    expect(screen.getByText('Concluíram todos os dias')).toBeVisible();
     expect(screen.getByText('Em andamento')).toBeVisible();
     expect(screen.getByText('Participantes inativos')).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Ergonomia: 70% de progresso médio' })).toHaveValue(70);
@@ -76,7 +76,7 @@ describe('tenant learning dashboard', () => {
     expect(await screen.findByText('Participantes ativos')).toBeVisible();
     expect(screen.queryByRole('img', { name: 'Distribuição do progresso de 2 participantes' })).not.toBeInTheDocument();
     expect(within(screen.getByRole('list', { name: 'Legenda do progresso' }))
-      .getByText('Sem trilhas atribuídas')).toBeVisible();
+      .getByText('Sem dias da SIPAT')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Escolher participantes' }))
       .toHaveAttribute('href', '/admin/learning?status=no-tracks');
   });
@@ -121,7 +121,7 @@ describe('tenant learning dashboard', () => {
 
     expect(await screen.findByRole('heading', { name: 'Ainda não há participantes' })).toBeVisible();
     expect(screen.queryByRole('img', { name: 'Distribuição do progresso de 0 participantes' })).not.toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Nenhuma trilha atribuída' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Nenhum dia entregue' })).toBeVisible();
   });
 
   it('reports load failures instead of rendering a successful-looking empty dashboard', async () => {

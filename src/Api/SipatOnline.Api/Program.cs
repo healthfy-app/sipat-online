@@ -117,6 +117,7 @@ app.MapTenantAppearanceEndpoints();
 app.MapSipatEventEndpoints();
 app.MapSipatPlanEndpoints();
 app.MapSipatCatalogEndpoints();
+app.MapPlanSubjectEndpoints();
 app.MapLearningEndpoints();
 app.MapLearningEngagementEndpoints();
 

@@ -8,12 +8,7 @@ import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import { cn } from '@/lib/utils';
-
-const statusLabel: Record<SipatEvent['status'], { text: string; variant: 'success' | 'warning' | 'neutral' }> = {
-  Draft: { text: 'Rascunho', variant: 'warning' },
-  Published: { text: 'Publicada', variant: 'success' },
-  Cancelled: { text: 'Cancelada', variant: 'neutral' },
-};
+import { phaseLabel, sipatPhase } from './sipatPhase';
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 
@@ -51,10 +46,10 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
       <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2 xl:grid-cols-3">
         {items.map(event => {
           const plan = plans.find(item => item.sipatEventId === event.id);
-          const label = statusLabel[event.status];
+          const label = phaseLabel[sipatPhase(event, plan?.days ?? 0)];
           return <li key={event.id}>
             <Link aria-label={`Abrir ${event.title}`} className={cn('grid h-full gap-3 rounded-2xl border bg-card p-4 text-foreground no-underline shadow-card transition-shadow hover:shadow-card-hover',
-              event.status === 'Published' ? 'border-primary/40' : 'border-border')} to={`${basePath}/${event.id}`}>
+              event.status === 'Published' && new Date(event.endsAt) > new Date() ? 'border-primary/40' : 'border-border')} to={`${basePath}/${event.id}`}>
               <div className="flex items-start justify-between gap-2">
                 <strong className="text-base leading-snug">{event.title}</strong>
                 <Badge variant={label.variant}>{label.text}</Badge>
