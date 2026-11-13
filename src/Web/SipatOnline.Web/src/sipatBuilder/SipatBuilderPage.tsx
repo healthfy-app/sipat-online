@@ -113,7 +113,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     if (!name.trim()) list.push('Dê um nome à SIPAT.');
     days.forEach((day, index) => {
       if (!day.title.trim()) list.push(`O dia ${index + 1} precisa de um título.`);
-      if (!day.videos.some(Boolean)) list.push(`O dia ${index + 1} precisa de um tema com vídeos.`);
+      if (!day.videos.some(Boolean)) list.push(`O dia ${index + 1} precisa de um assunto com vídeos.`);
       if (day.date && !isValidDate(day.date)) list.push(`A data do dia ${index + 1} é inválida.`);
     });
     return list;
@@ -175,7 +175,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       const base = isValidDate(startDate) ? startDate : null;
       setDays(copied.map((day, index) => ({ ...day, date: base ? addDays(base, index) : '' })));
       setStage('grid'); setDirty(true);
-      setNotice('Dias copiados. Defina as datas e confira os temas antes de publicar.');
+      setNotice('Dias copiados. Defina as datas e confira os assuntos antes de publicar.');
       if (isNew) navigate(`${basePath}/${target}`, { replace: true });
     } catch (failure) {
       setError(getErrorMessage(failure));
@@ -207,7 +207,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         <Button disabled={busy || days.length === 0} onClick={() => (problems().length > 0 ? setError(problems().join(' ')) : setConfirmingLaunch(true))}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
       </>}
       badge={<>{label && <Badge variant={label.variant}>{label.text}</Badge>}{dirty && <Badge variant="outline">Alterações não salvas</Badge>}</>}
-      description={stage === 'setup' ? 'Defina quando começa, quantos dias tem e o tema de cada dia.' : 'Cada coluna é um dia. Arraste um tema para cada dia e confira os vídeos e os jogos.'}
+      description={stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}
       eyebrow="SIPAT"
       title={isNew && stage === 'setup' ? 'Nova SIPAT' : name || 'SIPAT'}
     />
@@ -215,7 +215,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Esta SIPAT foi cancelada e não pode mais ser alterada. Use "Duplicar" em uma nova SIPAT para reaproveitar os dias.</p>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
-    {catalog.subjects.length === 0 && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">O acervo ainda não tem temas publicados. Peça à operação para publicar os temas.</p>}
+    {catalog.subjects.length === 0 && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">O acervo ainda não tem assuntos publicados. Peça à operação para publicar os assuntos.</p>}
 
     {stage === 'setup'
       ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={() => setImporting(true)} onName={setName} onStart={start}
@@ -244,7 +244,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${pluralize(imported.length, 'dia importado', 'dias importados')}. Revise e salve.`); }}
       onTemplate={template} />}
 
-    {copying && <Dialog description="Escolha a SIPAT de onde vêm os temas. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outra SIPAT">
+    {copying && <Dialog description="Escolha a SIPAT de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outra SIPAT">
       <ul className="m-0 grid max-h-72 list-none gap-2 overflow-auto p-0">
         {sources.map(item => {
           const plan = plans.find(entry => entry.sipatEventId === item.id);
@@ -261,7 +261,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     </Dialog>}
 
     {confirmingLaunch && <Dialog description={published
-      ? 'Os dias que ninguém começou são atualizados com os temas atuais. Os que já têm progresso ficam como estão.'
+      ? 'Os dias que ninguém começou são atualizados com os assuntos atuais. Os que já têm progresso ficam como estão.'
       : 'Ao publicar, cada dia é entregue aos participantes ativos da empresa. Só uma SIPAT fica publicada por vez.'}
       onClose={() => setConfirmingLaunch(false)} title={published ? 'Atualizar os dias da SIPAT?' : 'Publicar a SIPAT?'}>
       <DialogActions>

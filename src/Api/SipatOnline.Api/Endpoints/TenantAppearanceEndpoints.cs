@@ -40,6 +40,7 @@ public static class TenantAppearanceEndpoints
         endpoints.MapPut("/api/tenant/branding/appearance", async (
             TenantAppearanceRequest request, HttpContext context, IAntiforgery antiforgery,
             ITenantContext tenant, ICurrentActor actor, PlatformDbContext db, IAuditTrail audit,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             TimeProvider clock, ILoggerFactory logs, CancellationToken token) =>
         {
             try { await antiforgery.ValidateRequestAsync(context); }
@@ -47,6 +48,8 @@ public static class TenantAppearanceEndpoints
             {
                 return Results.Problem(statusCode: 400, detail: "Token antifalsificação inválido. Recarregue a página.");
             }
+            if (!(await plans.CapabilitiesAsync(token)).CustomBranding)
+                return Results.Problem(statusCode: 403, title: "tenant.branding.unavailable", detail: "A personalização da identidade visual não está disponível para a sua empresa.");
             if (tenant.CurrentTenantId is not { } companyId || string.IsNullOrWhiteSpace(actor.UserId)) return Results.Forbid();
             if (request.RemoveLogo && request.LogoBase64 is not null)
                 return Results.Problem(statusCode: 400, detail: "Escolha entre enviar uma logo ou remover a atual.");

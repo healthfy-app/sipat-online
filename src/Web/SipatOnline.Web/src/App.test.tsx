@@ -146,7 +146,7 @@ describe('tenant portal', () => {
     vi.stubGlobal('fetch', fetch);
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(role === 'ClientAdmin' ? 3 : 2);
     expect(screen.queryByRole('navigation', { name: 'Etapas do curso' })).not.toBeInTheDocument();
   });
 
@@ -303,7 +303,7 @@ describe('tenant portal', () => {
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
     expect(screen.getByRole('link', { name: 'SIPATs' })).toHaveAttribute('href', '/admin/sipats');
     expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(8));
   });
 
   it('shows the learner portal without the administration sidebar for participants', async () => {

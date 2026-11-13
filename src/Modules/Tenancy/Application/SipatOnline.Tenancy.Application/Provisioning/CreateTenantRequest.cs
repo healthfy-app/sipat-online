@@ -5,4 +5,5 @@ public sealed record CreateTenantRequest(
     string? Name,
     string? AdminLoginIdentifier,
     string? AdminDisplayName,
-    string? AdminPassword);
+    string? AdminPassword,
+    string? Plan = null);

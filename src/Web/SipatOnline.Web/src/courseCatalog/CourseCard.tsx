@@ -49,7 +49,7 @@ export default function CourseCard({
         <h3 className="m-0 min-h-[2.7em] text-[0.9375rem] font-semibold leading-[1.35]">
           {/* o botão cobre o card inteiro: um clique em qualquer lugar abre o curso */}
           <button
-            aria-label={`Abrir tema ${course.title}`}
+            aria-label={`Abrir assunto ${course.title}`}
             className="m-0 line-clamp-2 min-h-0 w-full cursor-pointer border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none after:absolute after:inset-0 after:content-['']"
             data-open=""
             onClick={onOpen}
@@ -70,23 +70,23 @@ export default function CourseCard({
         </span>
         <div className="flex items-center">
         <Button
-          aria-label={`Duplicar tema ${course.title}`}
+          aria-label={`Duplicar assunto ${course.title}`}
           className="relative z-10"
           disabled={busy}
           onClick={onDuplicate}
           size="icon-sm"
-          title="Duplicar tema"
+          title="Duplicar assunto"
           variant="ghost"
         >
           <Copy />
         </Button>
         <Button
-          aria-label={`Excluir tema ${course.title}`}
+          aria-label={`Excluir assunto ${course.title}`}
           className="relative z-10"
           disabled={busy}
           onClick={onDelete}
           size="icon-sm"
-          title="Excluir tema"
+          title="Excluir assunto"
           variant="ghost"
         >
           <Trash2 />

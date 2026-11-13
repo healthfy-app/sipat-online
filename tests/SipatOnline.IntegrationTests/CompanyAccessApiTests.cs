@@ -450,7 +450,7 @@ public sealed class CompanyAccessApiTests
     private static async Task<TenantSummary> CreateCompanyAsync(HttpClient owner, string key)
     {
         using var response = await MutateAsync(owner, HttpMethod.Post, "/api/platform/companies",
-            new CreateTenantRequest(key, "Context Company", "client-admin", "Company Admin", "CompanyAdminPassword123"));
+            new CreateTenantRequest(key, "Context Company", "client-admin", "Company Admin", "CompanyAdminPassword123", "Diamante"));
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         var company = await response.Content.ReadFromJsonAsync<TenantSummary>();
         Assert.NotNull(company);

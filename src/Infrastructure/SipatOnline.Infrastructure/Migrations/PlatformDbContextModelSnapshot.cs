@@ -895,6 +895,9 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<int>("Plan")
+                        .HasColumnType("integer");
+
                     b.Property<byte[]>("PortalBannerData")
                         .HasColumnType("bytea");
 

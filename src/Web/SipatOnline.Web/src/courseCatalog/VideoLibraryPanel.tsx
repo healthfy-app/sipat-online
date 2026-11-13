@@ -20,7 +20,7 @@ export default function VideoLibraryPanel({
   return (
     <section aria-label="Vídeos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <p className="m-0 text-sm text-muted-foreground">Vídeos reutilizáveis em qualquer tema do acervo.</p>
+        <p className="m-0 text-sm text-muted-foreground">Vídeos reutilizáveis em qualquer assunto do acervo.</p>
         <span className="text-[0.8125rem] tabular-nums text-muted-foreground">{pluralize(library.length, 'vídeo', 'vídeos')}</span>
       </div>
 
@@ -42,7 +42,7 @@ export default function VideoLibraryPanel({
                 </p>
                 <div className="mt-1 flex items-center justify-between gap-2">
                   <Badge variant={courseCount === 0 ? 'warning' : 'default'}>
-                    {courseCount === 0 ? 'Ainda não usado em temas' : `Usado em ${pluralize(courseCount, 'tema', 'temas')}`}
+                    {courseCount === 0 ? 'Ainda não usado em assuntos' : `Usado em ${pluralize(courseCount, 'assunto', 'assuntos')}`}
                   </Badge>
                   <Button aria-label={`Excluir vídeo ${video.title}`} disabled={busy} onClick={() => onDelete(item)} size="icon-sm" title="Excluir vídeo" variant="ghost"><Trash2 /></Button>
                 </div>

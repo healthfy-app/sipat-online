@@ -83,7 +83,7 @@ export default function BuilderGrid({ days, catalog, onChange, canEditThemes = t
                   <span className="text-xs font-medium text-muted-foreground capitalize">{shortDate(day.date)}</span>
                 </div>
                 <Input aria-label={`Título do dia ${index + 1}`} className="font-medium" maxLength={160}
-                  onChange={event => patchDay(index, { title: event.target.value })} placeholder="Tema ou slogan do dia" value={day.title} />
+                  onChange={event => patchDay(index, { title: event.target.value })} placeholder="Slogan do dia" value={day.title} />
               </div>;
             })}
 

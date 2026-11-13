@@ -17,7 +17,7 @@ export default function BuilderSetup({ name, dayCount, startDate, onName, onDayC
       <p className="m-0 text-[0.6875rem] font-bold tracking-[0.08em] text-primary uppercase">Nova SIPAT</p>
       <h2 className="m-0 text-2xl font-semibold tracking-tight" id="builder-setup-title">Vamos montar a SIPAT</h2>
       <p className="m-0 text-sm text-muted-foreground">
-        Uma SIPAT é uma semana de treinamento. Diga quando começa e quantos dias tem; depois você escolhe o tema de cada dia.
+        Uma SIPAT é uma semana de treinamento. Diga quando começa e quantos dias tem; depois você escolhe o assunto de cada dia.
       </p>
     </header>
 

@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getPlatformDashboard, type PlatformCompanyOverview } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { PlanBadge } from './PlanSelect';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
@@ -132,6 +133,7 @@ export default function CompaniesPage() {
             <TableHeader>
               <TableRow>
                 {sortable('name', 'Empresa')}
+                <TableHead className="max-lg:hidden" scope="col">Plano</TableHead>
                 {sortable('participants', 'Participantes', 'max-md:hidden')}
                 {sortable('status', 'Status', 'max-sm:hidden')}
                 <TableHead className="w-12"><span className="sr-only">Ações</span></TableHead>
@@ -156,6 +158,7 @@ export default function CompaniesPage() {
                       </div>
                     </div>
                   </TableCell>
+                  <TableCell className="max-lg:hidden"><PlanBadge plan={company.plan ?? 'Diamante'} /></TableCell>
                   <TableCell className="tabular-nums max-md:hidden">{company.employeeCount.toLocaleString('pt-BR')}</TableCell>
                   <TableCell className="max-sm:hidden">
                     <Badge variant={company.isActive ? 'success' : 'neutral'}>{company.isActive ? 'Ativa' : 'Inativa'}</Badge>

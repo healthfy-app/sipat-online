@@ -23,7 +23,11 @@ export interface PlatformCompany {
   isActive: boolean;
 }
 
+/** The plans sold on the site. The company is never shown its own plan; only the operator sees and changes it. */
+export type CompanyPlan = 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
+
 export interface PlatformCompanyOverview extends PlatformCompany {
+  plan?: CompanyPlan;
   employeeCount: number;
   administratorCount: number;
   totalUserCount: number;
@@ -303,6 +307,7 @@ export interface PlatformCompanyData {
   adminLoginIdentifier: string;
   adminDisplayName: string;
   adminPassword: string;
+  plan?: CompanyPlan;
 }
 
 export interface PlatformUserSummary {
@@ -818,6 +823,18 @@ export function setVideoCheckpoints(
     method: 'PUT',
     body: JSON.stringify({ items }),
   });
+}
+
+export function changeCompanyPlan(companyId: string, plan: CompanyPlan): Promise<{ plan: CompanyPlan }> {
+  return requestJson<{ plan: CompanyPlan }>(`/api/platform/companies/${companyId}/plan`, { method: 'PUT', body: JSON.stringify({ plan }) });
+}
+
+/** What the company can do (never the name of its plan, unless the operator is the one asking). */
+export interface CompanyCapabilities {
+  customizeGrid: boolean; customBranding: boolean; customCertificate: boolean; quizzes: boolean; internalVideos: boolean; plan?: CompanyPlan | null;
+}
+export function getCompanyCapabilities(): Promise<CompanyCapabilities> {
+  return requestJson<CompanyCapabilities>('/api/admin/capabilities');
 }
 
 export function createPlatformCompany(data: PlatformCompanyData): Promise<PlatformCompany> {

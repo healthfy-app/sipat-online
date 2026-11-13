@@ -131,12 +131,15 @@ public static class LearningEngagementEndpoints
         });
         platform.MapPut("/certificate-logo", async (Guid companyId, HttpContext context, IAntiforgery antiforgery,
             LearningDistributionService service, PlatformDbContext db, ICurrentActor actor,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             IAuditTrail audit, TimeProvider clock, ILoggerFactory logs, CancellationToken token) =>
         {
             var csrf = await ValidateAsync(antiforgery, context);
             if (csrf is not null) return csrf;
             var access = await service.GetAsync(companyId, token);
             if (!access.IsSuccess) return Problem(access.Error);
+            if (!SipatOnline.Infrastructure.Tenancy.CompanyCapabilities.For(await plans.GetAsync(companyId, token)).CustomCertificate)
+                return Results.Problem(statusCode: 403, title: "tenant.certificate.unavailable", detail: "O certificado personalizado não está disponível no plano desta empresa.");
             const int maximum = 256 * 1024;
             if (context.Request.ContentLength > maximum) return Results.Problem(statusCode: 413, detail: "A logo deve ter até 256 KB.");
             var buffer = new byte[maximum + 1];

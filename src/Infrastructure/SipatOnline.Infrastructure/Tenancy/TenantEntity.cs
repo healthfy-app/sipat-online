@@ -30,4 +30,7 @@ public sealed class TenantEntity
     public DateTimeOffset CreatedAt { get; set; }
 
     public bool IsActive { get; set; }
+
+    /// <summary>The plan the company bought (see <see cref="CompanyPlan"/>). Companies created before plans existed keep every feature.</summary>
+    public int Plan { get; set; } = (int)CompanyPlan.Diamante;
 }

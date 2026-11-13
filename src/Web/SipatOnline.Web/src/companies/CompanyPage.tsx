@@ -145,7 +145,7 @@ export default function CompanyPage() {
             actions={(
               <>
                 <a className={buttonVariants({ variant: 'default' })} href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}><LogIn /> Entrar como administrador</a>
-                <CompanyCertificateLogoPanel companyId={companyId} />
+                {(overview?.plan === undefined || overview.plan === 'Ouro' || overview.plan === 'Diamante') && <CompanyCertificateLogoPanel companyId={companyId} />}
               </>
             )}
             badge={overview && <Badge variant={overview.isActive ? 'success' : 'neutral'}>{overview.isActive ? 'Ativa' : 'Inativa'}</Badge>}

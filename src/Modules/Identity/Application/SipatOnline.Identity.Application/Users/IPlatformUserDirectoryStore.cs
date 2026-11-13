@@ -40,7 +40,8 @@ public sealed record PlatformCompanyOverview(
     DateTimeOffset CreatedAt,
     int EmployeeCount,
     int AdministratorCount,
-    int TotalUserCount);
+    int TotalUserCount,
+    string Plan = "Diamante");
 
 public sealed record PlatformCompanyEmployeePage(
     Guid CompanyId,

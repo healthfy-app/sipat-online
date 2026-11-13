@@ -529,10 +529,14 @@ public static class PlatformCourseCatalogEndpoints
         group.MapGet("/", async (
             IPlatformCourseCatalogStore courses,
             IGameModuleStore modules,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             CancellationToken cancellationToken) =>
         {
+            var capabilities = await plans.CapabilitiesAsync(cancellationToken);
             var themes = (await courses.ListAsync(cancellationToken))
                 .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
+                // a company that cannot personalize picks among the ready grades only
+                .Where(course => capabilities.CustomizeGrid || SipatOnline.Infrastructure.Tenancy.CompanyPlans.IsReadyTheme(course.Description))
                 .Select(course => ToResponse(course) with
                 {
                     CoverUrl = course.CoverContentType is null
@@ -540,12 +544,14 @@ public static class PlatformCourseCatalogEndpoints
                         : $"/api/admin/sipat-catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}"
                 })
                 .ToArray();
+            var offered = themes.SelectMany(theme => theme.Videos.Select(video => video.Id)).ToHashSet();
             var videos = (await courses.ListVideosAsync(cancellationToken))
+                .Where(item => capabilities.CustomizeGrid || offered.Contains(item.Video.Id))
                 .Select(item => new PlatformLibraryVideoResponse(ToResponse(item.Video), item.CourseCount))
                 .ToArray();
-            var games = (await modules.ListAsync(cancellationToken))
-                .Select(item => ToResponse(item.Module, item.UsageCount))
-                .ToArray();
+            var games = capabilities.Quizzes
+                ? (await modules.ListAsync(cancellationToken)).Select(item => ToResponse(item.Module, item.UsageCount)).ToArray()
+                : [];
             return Results.Ok(new SipatCatalogResponse(themes, videos, games));
         })
         .WithName("GetSipatCatalog");

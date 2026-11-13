@@ -14,6 +14,20 @@ public static class SipatPlanEndpoints
             .WithTags("SIPAT plan")
             .RequireAuthorization("ManageTenantSipats");
 
+        group.MapGet("/capabilities", async (
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans, HttpContext context, CancellationToken token) =>
+        {
+            var plan = await plans.CurrentAsync(token);
+            var capabilities = SipatOnline.Infrastructure.Tenancy.CompanyCapabilities.For(plan);
+            // the plan name is for the operator; the company only sees what it can do
+            return Results.Ok(new
+            {
+                capabilities.CustomizeGrid, capabilities.CustomBranding, capabilities.CustomCertificate, capabilities.Quizzes, capabilities.InternalVideos,
+                plan = context.User.IsInRole(SipatOnline.BuildingBlocks.Application.PlatformRoles.PlatformOperator) ? plan.ToString() : null
+            });
+        })
+        .WithName("GetCompanyCapabilities");
+
         group.MapGet("/sipat-plans", async (SipatPlanService service, CancellationToken token) =>
         {
             var result = await service.SummariesAsync(token);

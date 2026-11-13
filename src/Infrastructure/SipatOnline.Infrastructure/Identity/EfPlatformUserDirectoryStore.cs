@@ -44,7 +44,8 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
                     dbContext.UserRoles.Any(userRole =>
                         userRole.UserId == user.Id &&
                         administratorRoleIds.Contains(userRole.RoleId))),
-                TotalUserCount = dbContext.Users.Count(user => user.TenantId == tenant.Id)
+                TotalUserCount = dbContext.Users.Count(user => user.TenantId == tenant.Id),
+                tenant.Plan
             })
             .OrderByDescending(company => company.EmployeeCount)
             .ThenBy(company => company.Name)
@@ -59,7 +60,8 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
             company.CreatedAt,
             company.EmployeeCount,
             company.AdministratorCount,
-            company.TotalUserCount)).ToArray();
+            company.TotalUserCount,
+            Enum.IsDefined(typeof(SipatOnline.Infrastructure.Tenancy.CompanyPlan), company.Plan) ? ((SipatOnline.Infrastructure.Tenancy.CompanyPlan)company.Plan).ToString() : "Bronze")).ToArray();
     }
 
     public async Task<IReadOnlyList<Guid>?> SetEmployeesActiveAsync(

@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import PlanSelect from './PlanSelect';
 import { getErrorMessage } from '@/courseEditor/courseFormat';
 
-const emptyForm: PlatformCompanyData = { key: '', name: '', adminLoginIdentifier: '', adminDisplayName: '', adminPassword: '' };
+const emptyForm: PlatformCompanyData = { key: '', name: '', adminLoginIdentifier: '', adminDisplayName: '', adminPassword: '', plan: 'Bronze' };
 
 /** Sugere o identificador do portal a partir do nome (sem acentos, minúsculo, com hífens). */
 function suggestKey(name: string) {
@@ -27,7 +28,7 @@ export default function CreateCompanyDialog({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const update = (field: keyof PlatformCompanyData, value: string) => setForm((current) => ({ ...current, [field]: value }));
+  const update = (field: Exclude<keyof PlatformCompanyData, 'plan'>, value: string) => setForm((current) => ({ ...current, [field]: value }));
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -68,6 +69,11 @@ export default function CreateCompanyDialog({
               title="Use letras, números e hífen; não comece ou termine com hífen." value={form.key}
               onChange={(event) => { setKeyEdited(true); update('key', event.target.value); }} />
           </Field>
+        </fieldset>
+        <fieldset className="m-0 grid gap-3 border-0 p-0">
+          <legend className="mb-3 p-0 text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground">Plano contratado</legend>
+          <PlanSelect disabled={isSaving} id="company-plan" onChange={(plan) => setForm((current) => ({ ...current, plan }))} value={form.plan ?? 'Bronze'} />
+          <p className="m-0 text-xs text-muted-foreground">O plano define o que a empresa pode personalizar. Ela não vê o nome do plano; só as opções que ele libera.</p>
         </fieldset>
         <fieldset className="m-0 grid gap-4 border-0 p-0 sm:grid-cols-2">
           <legend className="mb-3 p-0 text-xs font-bold uppercase tracking-[0.06em] text-muted-foreground">Administrador</legend>

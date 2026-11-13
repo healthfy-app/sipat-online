@@ -92,10 +92,15 @@ describe('Platform companies', () => {
     await user.type(within(dialog).getByLabelText('Nome do administrador'), 'Bruno');
     await user.type(within(dialog).getByLabelText('Login do administrador'), 'bruno');
     await user.type(within(dialog).getByLabelText('Senha inicial temporária'), 'SenhaSegura123!');
+    // the plan starts on the smallest one and is picked from a list with each plan's medal and what it adds
+    expect(within(dialog).getByRole('combobox', { name: /Plano: Bronze/ })).toBeVisible();
+    await user.click(within(dialog).getByRole('combobox', { name: /Plano: Bronze/ }));
+    await user.click(await screen.findByRole('option', { name: /Ouro.*logo, cores e certificado personalizados/ }));
+    expect(within(dialog).getByRole('combobox', { name: /Plano: Ouro/ })).toBeVisible();
     await user.click(within(dialog).getByRole('button', { name: 'Cadastrar empresa' }));
 
     expect(api.createPlatformCompany).toHaveBeenCalledWith({
-      key: 'gama-ltda', name: 'Gama Ltda', adminLoginIdentifier: 'bruno', adminDisplayName: 'Bruno', adminPassword: 'SenhaSegura123!',
+      key: 'gama-ltda', name: 'Gama Ltda', adminLoginIdentifier: 'bruno', adminDisplayName: 'Bruno', adminPassword: 'SenhaSegura123!', plan: 'Ouro',
     });
     expect(await screen.findByRole('status')).toHaveTextContent('Gama Ltda foi cadastrada');
   });

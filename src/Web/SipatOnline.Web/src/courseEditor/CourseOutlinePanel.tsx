@@ -56,7 +56,7 @@ export default function CourseOutlinePanel({
         <CourseThumb coverUrl={course.coverUrl} title={title} />
         <div className="grid min-w-0 flex-1 gap-1">
           <h1 className="m-0 text-sm font-semibold leading-snug focus:outline-none" ref={headingRef} tabIndex={-1}>
-            <InlineText className="font-semibold" disabled={busy} label="Renomear tema" onCommit={actions.onTitle} value={title || course.title} />
+            <InlineText className="font-semibold" disabled={busy} label="Renomear assunto" onCommit={actions.onTitle} value={title || course.title} />
           </h1>
           <div className="flex flex-wrap items-center gap-2 px-1.5 text-xs text-muted-foreground">
             <Badge variant={status === 'Published' ? 'default' : 'warning'}>{statusLabels[status]}</Badge>
@@ -66,7 +66,7 @@ export default function CourseOutlinePanel({
       </header>
 
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
-        <h2 className="m-0 text-xs font-medium text-muted-foreground" id="ce-track-title">Vídeos do tema</h2>
+        <h2 className="m-0 text-xs font-medium text-muted-foreground" id="ce-track-title">Vídeos do assunto</h2>
         <div className="flex gap-1.5">
           <Button aria-label="Gerenciar atividades" disabled={busy} onClick={actions.onManageActivities} size="icon-sm" title="Atividades e perguntas" variant="outline">
             <Puzzle />
@@ -77,7 +77,7 @@ export default function CourseOutlinePanel({
 
       {flatItems.length === 0 ? (
         <div className="m-4 grid justify-items-start gap-3 rounded-md border border-dashed border-input p-4 text-sm leading-relaxed text-muted-foreground">
-          <p className="m-0">Este tema ainda não tem vídeos. Escolha os vídeos do dia na biblioteca.</p>
+          <p className="m-0">Este assunto ainda não tem vídeos. Escolha os vídeos do dia na biblioteca.</p>
           <Button disabled={busy} onClick={() => actions.onAddVideo('')} size="sm">Adicionar vídeo</Button>
         </div>
       ) : (
@@ -88,7 +88,7 @@ export default function CourseOutlinePanel({
               {formatDuration(totalMilliseconds)}{activityCount > 0 && ` · ${pluralize(activityCount, 'atividade', 'atividades')}`}
             </span>
           </div>
-                  <ol aria-label="Vídeos do tema" className="m-0 mt-1 grid list-none gap-0.5 p-0">
+                  <ol aria-label="Vídeos do assunto" className="m-0 mt-1 grid list-none gap-0.5 p-0">
                     {flatItems.map((item) => {
                       const selected = item.key === selectedKey;
                       const flatIndex = item.kind === 'video' ? flatVideoIds.indexOf(item.video.id) : -1;
@@ -175,7 +175,7 @@ export default function CourseOutlinePanel({
       )}
 
       <footer className="mt-auto flex border-t border-border px-4 py-3">
-        <Button disabled={busy} onClick={actions.onDuplicate} size="sm" variant="outline">Duplicar tema</Button>
+        <Button disabled={busy} onClick={actions.onDuplicate} size="sm" variant="outline">Duplicar assunto</Button>
       </footer>
     </section>
   );

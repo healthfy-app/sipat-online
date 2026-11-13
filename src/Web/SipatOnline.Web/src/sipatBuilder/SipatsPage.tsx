@@ -45,7 +45,7 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
     <PageHeader actions={create} description="Cada SIPAT é uma semana de treinamento. Só uma fica publicada por vez; as dos anos anteriores continuam no histórico." eyebrow="Programação" title="SIPATs" />
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {!events && !error && <LoadingState>Carregando as SIPATs...</LoadingState>}
-    {events && events.length === 0 && <EmptyState action={<Link className={buttonVariants()} to={`${basePath}/nova`}>Criar a primeira SIPAT</Link>} description="Defina a data de início, quantos dias e o tema de cada dia." title="Nenhuma SIPAT ainda." />}
+    {events && events.length === 0 && <EmptyState action={<Link className={buttonVariants()} to={`${basePath}/nova`}>Criar a primeira SIPAT</Link>} description="Defina a data de início, quantos dias e o assunto de cada dia." title="Nenhuma SIPAT ainda." />}
     {years.map(([year, items]) => <section aria-label={`SIPATs de ${year}`} className="grid gap-3" key={year}>
       <h2 className="m-0 text-sm font-semibold tracking-wide text-muted-foreground">{year}</h2>
       <ul className="m-0 grid list-none gap-3 p-0 md:grid-cols-2 xl:grid-cols-3">

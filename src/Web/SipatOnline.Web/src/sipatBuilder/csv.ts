@@ -53,7 +53,7 @@ export function sampleCsv(catalog: Catalog): string {
   const games = [...catalog.games.values()];
   const day = (index: number): DaySlots => {
     const planned = newDay(index, `2026-11-${String(9 + index).padStart(2, '0')}`);
-    planned.title = `Dia ${index + 1} · Escreva o tema ou slogan`;
+    planned.title = `Dia ${index + 1} · Escreva o slogan`;
     videos.slice(index * 3, index * 3 + 3).forEach((video, slot) => { planned.videos[slot] = video.id; });
     if (games[index]) planned.games[0] = games[index].id;
     return planned;
@@ -118,7 +118,7 @@ export function csvToPlan(text: string, catalog: Catalog): ImportResult {
 
   const header = rows[0].map(cell => normalize(cell));
   const find = (predicate: (name: string) => boolean) => header.findIndex(predicate);
-  const titleColumn = find(name => name.startsWith('titulo') || name.includes('slogan') || name.includes('tema'));
+  const titleColumn = find(name => name.startsWith('titulo') || name.includes('slogan'));
   const dateColumn = find(name => name === 'data' || name.startsWith('data '));
   const subjectColumn = find(name => name.startsWith('assunto'));
   const videoColumns = header.flatMap((name, index) => (/^video\s*\d*$/.test(name) ? [index] : []));

@@ -160,6 +160,7 @@ public static class PlatformEndpoints
             HttpContext context,
             IAntiforgery antiforgery,
             TenantProvisioningService tenantProvisioningService,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService planService,
             CancellationToken cancellationToken) =>
         {
             var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
@@ -168,12 +169,49 @@ public static class PlatformEndpoints
                 return antiforgeryResult;
             }
 
+            if (request.Plan is not null && !SipatOnline.Infrastructure.Tenancy.CompanyPlans.TryParse(request.Plan, out _))
+            {
+                return Results.Problem(statusCode: 400, title: "tenant.plan.invalid", detail: "Escolha um plano válido: Bronze, Prata, Ouro ou Diamante.");
+            }
+
             var result = await tenantProvisioningService.CreateAsync(request, cancellationToken);
-            return result.IsSuccess
-                ? Results.Created($"/api/platform/companies/{result.Value.Id:D}", result.Value)
-                : ToProblem(result.Error);
+            if (!result.IsSuccess)
+            {
+                return ToProblem(result.Error);
+            }
+
+            // a company created without a plan starts on the smallest one
+            SipatOnline.Infrastructure.Tenancy.CompanyPlans.TryParse(request.Plan, out var plan);
+            await planService.SetAsync(result.Value.Id, plan, cancellationToken);
+            return Results.Created($"/api/platform/companies/{result.Value.Id:D}", result.Value);
         })
         .WithName("ProvisionCompany");
+
+        companies.MapPut("/{tenantId:guid}/plan", async (
+            Guid tenantId,
+            ChangeCompanyPlanRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService planService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            if (!SipatOnline.Infrastructure.Tenancy.CompanyPlans.TryParse(request.Plan, out var plan))
+            {
+                return Results.Problem(statusCode: 400, title: "tenant.plan.invalid", detail: "Escolha um plano válido: Bronze, Prata, Ouro ou Diamante.");
+            }
+
+            var result = await planService.SetAsync(tenantId, plan, cancellationToken);
+            return result.IsSuccess
+                ? Results.Ok(new { plan = result.Value.ToString() })
+                : Results.Problem(statusCode: result.Error.Code == "tenant.plan.not_found" ? 404 : 403, title: result.Error.Code, detail: result.Error.Message);
+        })
+        .WithName("ChangeCompanyPlan");
 
         platform.MapGet("/users", async (
             int? offset,
@@ -277,5 +315,7 @@ public sealed record CreatePlatformUserRequest(
     string DisplayName,
     string InitialPassword,
     string Role);
+
+public sealed record ChangeCompanyPlanRequest(string? Plan);
 
 public sealed record ChangeEmployeesStatusRequest(IReadOnlyList<Guid>? UserIds, bool IsActive);

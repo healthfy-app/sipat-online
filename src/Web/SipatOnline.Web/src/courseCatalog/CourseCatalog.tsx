@@ -71,7 +71,7 @@ export default function CourseCatalog({
   const isEmptyCatalog = !isLoading && !error && courses.length === 0;
   const showTabs = !isEmptyCatalog || tab !== 'courses';
   const tabs: { id: CatalogTab; label: string; count: number }[] = [
-    { id: 'courses', label: 'Temas', count: courses.length },
+    { id: 'courses', label: 'Assuntos', count: courses.length },
     { id: 'videos', label: 'Vídeos', count: library.length },
     { id: 'modules', label: 'Jogos e perguntas', count: modules.length },
   ];
@@ -83,7 +83,7 @@ export default function CourseCatalog({
 
   async function removeGame(module: GameModule) {
     const usage = module.usageCount > 0
-      ? ` Ele está em ${pluralize(module.usageCount, 'tema', 'temas')} e sairá da trilha desses cursos.`
+      ? ` Ele está em ${pluralize(module.usageCount, 'assunto', 'assuntos')} e sairá da trilha desses cursos.`
       : '';
     if (!window.confirm(`Remover o jogo "${module.title}"?${usage}`)) return;
     onError('');
@@ -99,12 +99,12 @@ export default function CourseCatalog({
   }
 
   async function removeCourse(course: PlatformCourse) {
-    if (!window.confirm(`Excluir o tema "${course.title}"? As empresas que já receberam esta SIPAT continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
+    if (!window.confirm(`Excluir o assunto "${course.title}"? As empresas que já receberam esta SIPAT continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
     onError('');
     setIsDeleting(true);
     try {
       await deletePlatformCourse(course.id);
-      await onProgramsChanged(`O tema "${course.title}" foi excluído.`);
+      await onProgramsChanged(`O assunto "${course.title}" foi excluído.`);
     } catch (deleteError) {
       onError(getErrorMessage(deleteError));
     } finally {
@@ -127,7 +127,7 @@ export default function CourseCatalog({
   }
 
   const primaryAction = {
-    courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar tema</Button>,
+    courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar assunto</Button>,
     videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
     modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
   }[tab];
@@ -141,7 +141,7 @@ export default function CourseCatalog({
       <PageHeader
         actions={primaryAction}
         badge={import.meta.env.DEV ? <Badge variant="outline">Apresentação demo</Badge> : undefined}
-        description={`${pluralize(courses.length, 'tema', 'temas')} no acervo da plataforma`}
+        description={`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}
         title="Biblioteca"
       />
 

@@ -48,6 +48,7 @@ public sealed class SipatPlanService(
     IPlatformCourseCatalogStore catalog,
     IGameModuleStore games,
     LearningDistributionService distribution,
+    SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
     IAuditTrail audit,
     TimeProvider clock)
 {
@@ -80,8 +81,25 @@ public sealed class SipatPlanService(
         if (sipat.Status == SipatEventStatus.Cancelled)
             return Failure<IReadOnlyList<ProgramDay>>("sipat.cancelled", "Esta SIPAT foi cancelada e não pode mais ser alterada.");
 
+        var capabilities = await plans.CapabilitiesAsync(token);
+        // the quiz at the end of each module is part of the top plan only
+        if (!capabilities.Quizzes && days is not null)
+            days = days.Select(day => day with { GameIds = [] }).ToArray();
+
         var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token);
         if (!cleaned.IsSuccess) return cleaned;
+
+        if (!capabilities.CustomizeGrid)
+        {
+            // without personalization every day is one of the ready grades: the videos of a ready theme, as they are
+            var ready = (await catalog.ListAsync(token))
+                .Where(course => course.Status == PlatformCourseStatus.Published && SipatOnline.Infrastructure.Tenancy.CompanyPlans.IsReadyTheme(course.Description))
+                .Select(course => course.Videos.Select(video => video.Id).ToArray())
+                .ToList();
+            var outside = cleaned.Value.FirstOrDefault(day => !ready.Any(videos => videos.SequenceEqual(day.VideoIds)));
+            if (outside is not null)
+                return Failure<IReadOnlyList<ProgramDay>>("sipat.grid_not_allowed", $"O dia \"{outside.Title}\" não usa uma das grades prontas. Escolha os temas das opções de grade disponíveis.");
+        }
 
         var now = clock.GetUtcNow();
         var plan = await db.SipatPlans.SingleOrDefaultAsync(item => item.SipatEventId == sipatId, token);

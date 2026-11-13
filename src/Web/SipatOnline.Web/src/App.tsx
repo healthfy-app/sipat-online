@@ -13,6 +13,8 @@ import {
 import {
   ApiError,
   configureCompanyAdministration,
+  getCompanyCapabilities,
+  type CompanyCapabilities,
   getCompanyAdministrationId,
   getSession,
   getTenantBranding,
@@ -513,6 +515,14 @@ function ProtectedPortal({
   const [error, setError] = useState('');
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null);
+  // what the company can do (its plan is never shown): the menu offers only what is available
+  const [capabilities, setCapabilities] = useState<CompanyCapabilities | null>(null);
+  useEffect(() => {
+    if (!session || !(hasAdminRole(session) || (session.roles.includes('PlatformOperator') && getCompanyAdministrationId() !== null))) return;
+    let current = true;
+    getCompanyCapabilities().then(result => { if (current) setCapabilities(result); }).catch(() => undefined);
+    return () => { current = false; };
+  }, [session]);
 
   if (!session) {
     return <Navigate to="/login" replace />;
@@ -666,7 +676,7 @@ function ProtectedPortal({
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
               {hasAdminRole(session) && <>
                 <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">SIPATs</NavLink>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>
+                {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
               </>}
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
                 {hasAdminRole(session) ? 'Participantes e trilhas' : 'Acompanhamento'}

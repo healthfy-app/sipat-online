@@ -19,16 +19,16 @@ const summary = (subject: Subject) => `${subject.videoIds.length} ${subject.vide
 export function ThemeTray({ subjects }: { subjects: Subject[] }) {
   const [query, setQuery] = useState('');
   const shown = useMemo(() => subjects.filter(subject => normalize(subject.title).includes(normalize(query))), [subjects, query]);
-  return <section aria-label="Temas do acervo" className="grid gap-2 rounded-2xl border border-border bg-card p-3 shadow-card">
+  return <section aria-label="Assuntos do acervo" className="grid gap-2 rounded-2xl border border-border bg-card p-3 shadow-card">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="m-0 flex items-center gap-2 text-sm font-semibold"><Layers aria-hidden="true" className="size-4" /> Temas do acervo <span className="font-normal text-muted-foreground">· arraste para um dia</span></h2>
+      <h2 className="m-0 flex items-center gap-2 text-sm font-semibold"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo <span className="font-normal text-muted-foreground">· arraste para um dia</span></h2>
       <label className="relative">
         <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input aria-label="Buscar tema" className="h-9 w-56 pl-8" onChange={event => setQuery(event.target.value)} placeholder="Buscar tema" value={query} />
+        <Input aria-label="Buscar assunto" className="h-9 w-56 pl-8" onChange={event => setQuery(event.target.value)} placeholder="Buscar assunto" value={query} />
       </label>
     </div>
     {shown.length === 0
-      ? <p className="m-0 py-3 text-sm text-muted-foreground">{subjects.length === 0 ? 'Ainda não há temas no acervo. Crie em Biblioteca.' : 'Nenhum tema encontrado.'}</p>
+      ? <p className="m-0 py-3 text-sm text-muted-foreground">{subjects.length === 0 ? 'Ainda não há assuntos no acervo. Crie em Biblioteca.' : 'Nenhum assunto encontrado.'}</p>
       : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">{shown.map(subject => <li className="shrink-0" key={subject.id}><TrayCard subject={subject} /></li>)}</ul>}
   </section>;
 }
@@ -36,7 +36,7 @@ export function ThemeTray({ subjects }: { subjects: Subject[] }) {
 function TrayCard({ subject }: { subject: Subject }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `theme:${subject.id}`, data: { subject } });
   return <div className={cn('flex w-60 items-center gap-2.5 rounded-xl border border-border bg-card p-2 transition-shadow hover:shadow-card-hover', isDragging && 'opacity-40')} ref={setNodeRef}>
-    <button aria-label={`Arrastar o tema ${subject.title}`} className="grid size-7 min-h-0 shrink-0 cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
+    <button aria-label={`Arrastar o assunto ${subject.title}`} className="grid size-7 min-h-0 shrink-0 cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
     <Cover className="size-10" subject={subject} />
     <div className="grid min-w-0 flex-1 gap-0.5">
       <strong className="truncate text-[0.8125rem] leading-tight" title={themeLabel(subject)}>{subject.title}</strong>
@@ -55,14 +55,14 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId(dayIndex) });
   const frame = cn('grid content-start gap-2 rounded-xl border p-2 transition-colors', isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : 'border-border bg-card');
-  const chooser = <select aria-label={`Tema do dia ${dayIndex + 1}`} className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onChange={event => onChoose(event.target.value)} value={subject?.id ?? ''}>
-    <option value="">{subject ? 'Trocar tema' : 'Escolher tema'}</option>
+  const chooser = <select aria-label={`Assunto do dia ${dayIndex + 1}`} className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onChange={event => onChoose(event.target.value)} value={subject?.id ?? ''}>
+    <option value="">{subject ? 'Trocar assunto' : 'Escolher assunto'}</option>
     {themes.map(item => <option key={item.id} value={item.id}>{themeLabel(item)}</option>)}
   </select>;
   if (!subject && videoIds.length === 0) {
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
       <Layers aria-hidden="true" className="mx-auto size-6 text-muted-foreground" />
-      <p className="m-0 text-xs text-muted-foreground">Arraste um tema para este dia</p>
+      <p className="m-0 text-xs text-muted-foreground">Arraste um assunto para este dia</p>
       {chooser}
     </div>;
   }
@@ -76,9 +76,9 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
             Editar vídeos e jogos <ExternalLink aria-hidden="true" className="size-3" />
           </a>}
         </div>
-        <button aria-label={`Tirar o tema do dia ${dayIndex + 1}`} className="grid size-7 min-h-0 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted" onClick={onClear} type="button"><X className="size-4" /></button>
+        <button aria-label={`Tirar o assunto do dia ${dayIndex + 1}`} className="grid size-7 min-h-0 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted" onClick={onClear} type="button"><X className="size-4" /></button>
       </div>
-      : <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">Vídeos vindos de uma importação. Arraste um tema para trocar.</p>}
+      : <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">Vídeos vindos de uma importação. Arraste um assunto para trocar.</p>}
 
     <div aria-label={`Conteúdo do dia ${dayIndex + 1}`} className="grid max-h-72 gap-1 overflow-y-auto pr-0.5" role="group">
       <ol className="m-0 grid list-none gap-1 p-0">
