@@ -1,7 +1,8 @@
-import { ChevronRight, Search, UserPlus } from 'lucide-react';
+import { ChevronRight, LogIn, Search, UserPlus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
+  changePlatformCompanyEmployeesStatus,
   getPlatformCompanyEmployees,
   getPlatformDashboard,
   listPlatformUsers,
@@ -12,7 +13,7 @@ import {
 import CompanyCertificateLogoPanel from '@/CompanyCertificateLogoPanel';
 import CompanyLearningPanel from '@/CompanyLearningPanel';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader, Stat } from '@/components/ui/page';
 import CompanySipatTab from './CompanySipatTab';
@@ -42,6 +43,9 @@ export default function CompanyPage() {
   const [notice, setNotice] = useState('');
   const [addingAdmin, setAddingAdmin] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [reload, setReload] = useState(0);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isChangingStatus, setIsChangingStatus] = useState(false);
 
   useEffect(() => {
     let current = true;
@@ -80,7 +84,41 @@ export default function CompanyPage() {
       })
       .finally(() => { if (current) setIsLoading(false); });
     return () => { current = false; };
-  }, [companyId, includeInactive, offset, search]);
+  }, [companyId, includeInactive, offset, search, reload]);
+
+  const pageIds = page?.items.map((employee) => employee.id) ?? [];
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+
+  function toggleOne(id: string) {
+    setSelected((current) => {
+      const next = new Set(current);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
+  }
+
+  async function changeStatus(isActive: boolean) {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const verb = isActive ? 'reativar' : 'inativar';
+    const target = ids.length === 1 ? 'o participante escolhido' : `os ${ids.length} participantes escolhidos`;
+    if (!window.confirm(`Deseja ${verb} ${target}? ${isActive ? 'Eles voltam a acessar a plataforma.' : 'Eles deixam de acessar a plataforma, mas o histórico é mantido.'}`)) return;
+    setIsChangingStatus(true);
+    setError('');
+    try {
+      const result = await changePlatformCompanyEmployeesStatus(companyId, ids, isActive);
+      setNotice(result.changed === 0
+        ? 'Nada mudou: os participantes escolhidos já estavam nesse estado.'
+        : `${result.changed} ${result.changed === 1 ? 'participante' : 'participantes'} ${isActive ? 'reativado' : 'inativado'}${result.changed === 1 ? '' : 's'}.`);
+      setSelected(new Set());
+      setReload((value) => value + 1);
+      setRefreshKey((value) => value + 1);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : 'Não foi possível alterar os participantes.');
+    } finally {
+      setIsChangingStatus(false);
+    }
+  }
 
   function handleSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -108,6 +146,7 @@ export default function CompanyPage() {
           <PageHeader
             actions={(
               <>
+                <a className={buttonVariants({ variant: 'default' })} href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}><LogIn /> Entrar como administrador</a>
                 <CompanyLearningPanel companyId={companyId} />
                 <CompanyCertificateLogoPanel companyId={companyId} />
               </>
@@ -162,6 +201,13 @@ export default function CompanyPage() {
               </label>
             </section>
 
+            {selected.size > 0 && <div aria-label="Ações para os selecionados" className="flex flex-wrap items-center gap-2 rounded-lg bg-accent px-3 py-2" role="group">
+              <strong className="text-sm">{selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}</strong>
+              <Button disabled={isChangingStatus} onClick={() => void changeStatus(false)} size="sm" variant="outline">Inativar</Button>
+              <Button disabled={isChangingStatus} onClick={() => void changeStatus(true)} size="sm" variant="outline">Reativar</Button>
+              <Button disabled={isChangingStatus} onClick={() => setSelected(new Set())} size="sm" variant="ghost">Limpar seleção</Button>
+            </div>}
+
             {isLoading ? (
               <LoadingState className="list-state">Carregando participantes...</LoadingState>
             ) : page && page.items.length > 0 ? (
@@ -169,6 +215,10 @@ export default function CompanyPage() {
                 <Table aria-label="Participantes da empresa">
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-10" scope="col">
+                        <input aria-label="Selecionar todos desta página" checked={allSelected} className="size-4 accent-[var(--brand-primary)]" type="checkbox"
+                          onChange={() => setSelected(allSelected ? new Set() : new Set(pageIds))} />
+                      </TableHead>
                       <TableHead scope="col">Nome</TableHead>
                       <TableHead className="max-sm:hidden" scope="col">Login</TableHead>
                       <TableHead scope="col">Conclusão</TableHead>
@@ -178,7 +228,11 @@ export default function CompanyPage() {
                   </TableHeader>
                   <TableBody>
                     {page.items.map((employee) => (
-                      <TableRow key={employee.id}>
+                      <TableRow data-state={selected.has(employee.id) ? 'selected' : undefined} key={employee.id}>
+                        <TableCell>
+                          <input aria-label={`Selecionar ${employee.displayName}`} checked={selected.has(employee.id)} className="size-4 accent-[var(--brand-primary)]" type="checkbox"
+                            onChange={() => toggleOne(employee.id)} />
+                        </TableCell>
                         <TableCell className="font-semibold">{employee.displayName}</TableCell>
                         <TableCell className="text-muted-foreground max-sm:hidden">{employee.loginIdentifier}</TableCell>
                         <TableCell>

@@ -118,6 +118,31 @@ public static class PlatformEndpoints
         })
         .WithName("ListPlatformCompanyEmployees");
 
+        companies.MapPut("/{tenantId:guid}/employees/status", async (
+            Guid tenantId,
+            ChangeEmployeesStatusRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformUserDirectoryService userDirectoryService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await userDirectoryService.ChangeCompanyEmployeesStatusAsync(
+                tenantId,
+                request.UserIds,
+                request.IsActive,
+                cancellationToken);
+            return result.IsSuccess
+                ? Results.Ok(result.Value)
+                : ToProblem(result.Error);
+        })
+        .WithName("ChangePlatformCompanyEmployeesStatus");
+
         platform.MapGet("/dashboard", async (
             PlatformUserDirectoryService userDirectoryService,
             CancellationToken cancellationToken) =>
@@ -252,3 +277,5 @@ public sealed record CreatePlatformUserRequest(
     string DisplayName,
     string InitialPassword,
     string Role);
+
+public sealed record ChangeEmployeesStatusRequest(IReadOnlyList<Guid>? UserIds, bool IsActive);

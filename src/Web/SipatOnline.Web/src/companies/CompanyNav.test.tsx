@@ -17,6 +17,5 @@ describe('company sidebar', () => {
     expect(screen.getByRole('link', { name: 'Construção SIPAT' })).toHaveClass('active');
     expect(screen.getByRole('link', { name: 'Participantes' })).toHaveAttribute('href', '/platform/companies/c-1/participantes');
     expect(screen.getByRole('link', { name: 'Administradores' })).toHaveAttribute('href', '/platform/companies/c-1/administradores');
-    expect(screen.getByRole('link', { name: /Ver como o cliente/ })).toHaveAttribute('href', '/admin/dashboard?companyId=c-1');
   });
 });

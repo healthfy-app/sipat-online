@@ -635,6 +635,15 @@ export function getPlatformDashboard(): Promise<PlatformCompanyOverview[]> {
   return requestJson<PlatformCompanyOverview[]>('/api/platform/dashboard');
 }
 
+export interface PlatformEmployeeStatusChange { requested: number; changed: number }
+
+/** The operator activates or deactivates participants of one company, one or many at a time. */
+export function changePlatformCompanyEmployeesStatus(companyId: string, userIds: string[], isActive: boolean): Promise<PlatformEmployeeStatusChange> {
+  return requestJson<PlatformEmployeeStatusChange>(`/api/platform/companies/${encodeURIComponent(companyId)}/employees/status`, {
+    method: 'PUT', body: JSON.stringify({ userIds, isActive }),
+  });
+}
+
 export function getPlatformCompanyEmployees(
   companyId: string,
   options: { offset?: number; limit?: number; search?: string; includeInactive?: boolean } = {},

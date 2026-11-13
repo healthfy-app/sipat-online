@@ -11,6 +11,7 @@ vi.mock('./api', async (importOriginal) => ({
   getPlatformDashboard: vi.fn(),
   listPlatformUsers: vi.fn(),
   listSipatPrograms: vi.fn(),
+  changePlatformCompanyEmployeesStatus: vi.fn(),
 }));
 
 /** the company opens on its SIPAT builder; these tests are about the participants */
@@ -67,6 +68,27 @@ function employeePage(overrides: Partial<api.PlatformCompanyEmployeePage> = {}):
 }
 
 describe('Platform company employees', () => {
+  it('deactivates the chosen participants after asking, and reloads the list', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
+    vi.mocked(api.changePlatformCompanyEmployeesStatus).mockResolvedValue({ requested: 1, changed: 1 });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPage();
+    await openParticipants();
+
+    await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Ana Silva' }));
+    expect(screen.getByText('1 selecionado')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Inativar' }));
+    expect(api.changePlatformCompanyEmployeesStatus).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: 'Inativar' }));
+    expect(api.changePlatformCompanyEmployeesStatus).toHaveBeenCalledWith('company-1', ['employee-1'], false);
+    expect(await screen.findByRole('status')).toHaveTextContent('1 participante inativado.');
+    expect(screen.queryByText('1 selecionado')).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
   it('shows employee name, registration, completion and active status', async () => {
     vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
     renderPage();

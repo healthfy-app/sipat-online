@@ -1,4 +1,4 @@
-import { ArrowLeft, ExternalLink } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { getPlatformDashboard } from '@/api';
@@ -29,6 +29,5 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
     <NavLink className={link(inSipat)} end to={base}>Construção SIPAT</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/participantes`}>Participantes</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/administradores`}>Administradores</NavLink>
-    <a className="sidebar-link" href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}>Ver como o cliente <ExternalLink aria-hidden="true" className="ml-1 inline size-3.5" /></a>
   </>;
 }
