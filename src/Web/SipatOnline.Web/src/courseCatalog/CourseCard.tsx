@@ -47,7 +47,7 @@ export default function CourseCard({
         <h3 className="m-0 min-h-[2.7em] text-[0.9375rem] font-semibold leading-[1.35]">
           {/* o botão cobre o card inteiro: um clique em qualquer lugar abre o curso */}
           <button
-            aria-label={`Abrir curso ${course.title}`}
+            aria-label={`Abrir tema ${course.title}`}
             className="m-0 line-clamp-2 min-h-0 w-full cursor-pointer border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none after:absolute after:inset-0 after:content-['']"
             data-open=""
             onClick={onOpen}
@@ -67,12 +67,12 @@ export default function CourseCard({
           Abrir editor →
         </span>
         <Button
-          aria-label={`Duplicar curso ${course.title}`}
+          aria-label={`Duplicar tema ${course.title}`}
           className="relative z-10"
           disabled={busy}
           onClick={onDuplicate}
           size="sm"
-          title="Duplicar curso"
+          title="Duplicar tema"
           variant="ghost"
         >
           <Copy /> Duplicar

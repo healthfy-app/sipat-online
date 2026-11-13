@@ -1,24 +1,19 @@
-import { ArrowDown, ArrowUp, Clock, Film, Gamepad2, ListChecks, Plus, Trash2, X } from 'lucide-react';
+import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { ArrowDown, ArrowUp, Clock, Film, Gamepad2, Plus, Trash2, X } from 'lucide-react';
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input, NativeSelect } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import type { PickTarget } from './ContentPicker';
 import {
   addDays, dayDuration, formatClock, formatSpan, maxDays, maxGameRows, maxVideoRows, newDay, normalize, shortDate,
   type Catalog, type DaySlots,
+  subjectColor,
 } from './model';
+import { dropId, ThemeSlot, ThemeTray } from './ThemeCards';
 import './builder.css';
 
-const palette = ['#2563eb', '#d97706', '#059669', '#7c3aed', '#dc2626', '#0d9488', '#db2777', '#4f46e5'];
-
-/** The same subject always gets the same color, like the colored blocks of the sheet. */
-export function subjectColor(subject: string): string {
-  if (!subject.trim()) return '#94a3b8';
-  let hash = 0;
-  for (const char of normalize(subject)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
-  return palette[hash % palette.length];
-}
+export { subjectColor };
 
 type Kind = 'videos' | 'games';
 const lastFilled = (days: DaySlots[], kind: Kind) =>
@@ -45,7 +40,7 @@ export default function BuilderGrid({ days, catalog, onChange, onPick }: {
   const videoRows = Math.min(maxVideoRows, Math.max(3, lastFilled(days, 'videos') + 2));
   const gameRows = Math.min(maxGameRows, Math.max(1, lastFilled(days, 'games') + 2));
   const totalRows = 2 + videoRows + gameRows + 1;
-  const subjects = catalog.subjects.filter(subject => subject.id !== 'none').map(subject => subject.title);
+  const themes = catalog.subjects.filter(subject => subject.id !== 'none');
   const canAddDay = days.length < maxDays;
   const layout = {
     '--columns': `8.5rem repeat(${days.length}, minmax(16rem, 1fr))${canAddDay ? ' 7rem' : ''}`,
@@ -72,21 +67,27 @@ export default function BuilderGrid({ days, catalog, onChange, onPick }: {
     onChange([...days, newDay(days.length, last?.date ? addDays(last.date, 1) : '')]);
   };
   const removeDay = (index: number) => onChange(days.filter((_, position) => position !== index));
-  const fillWithSubject = (index: number, videoIds: string[]) => {
+  /** A theme brings its videos (in its order) and, when the day still has the default title, its name. */
+  const applyTheme = (index: number, title: string) => {
+    const subject = catalog.subjects.find(item => item.id !== 'none' && item.title === title);
+    if (!subject) { patchDay(index, { subject: '' }); return; }
     const day = days[index];
-    const have = new Set(day.videos.filter(Boolean));
-    const incoming = videoIds.filter(id => !have.has(id));
-    const slots = [...day.videos];
-    for (const id of incoming) {
-      const free = slots.findIndex(value => !value);
-      if (free >= 0) slots[free] = id; else if (slots.length < maxVideoRows) slots.push(id);
-    }
-    patchDay(index, { videos: slots });
+    const generic = !day.title.trim() || /^Dia d+$/.test(day.title.trim());
+    patchDay(index, { subject: subject.title, videos: subject.videoIds.slice(0, maxVideoRows), ...(generic ? { title: subject.title } : {}) });
+  };
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  const onDragEnd = ({ active, over }: DragEndEvent) => {
+    const subject = active.data.current?.subject as { title: string } | undefined;
+    const target = typeof over?.id === 'string' ? days.findIndex((_, index) => dropId(index) === over.id) : -1;
+    if (subject && target >= 0) applyTheme(target, subject.title);
   };
 
   const column = (index: number): CSSProperties => ({ '--i': index } as CSSProperties);
 
-  return <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+  return <DndContext onDragEnd={onDragEnd} sensors={sensors}>
+  <div className="grid gap-4">
+  <ThemeTray subjects={themes} />
+  <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
     <div className="overflow-x-auto" ref={scroller}>
       <div className="grid min-w-full [grid-template-columns:var(--columns)]" role="table" style={layout}>
         {/* day headers */}
@@ -114,20 +115,14 @@ export default function BuilderGrid({ days, catalog, onChange, onPick }: {
           Dia
         </button>}
 
-        {/* subject */}
-        <Label>Assunto principal</Label>
+        {/* theme */}
+        <Label>Tema</Label>
         {days.map((day, index) => {
           const subject = catalog.subjects.find(item => item.id !== 'none' && normalize(item.title) === normalize(day.subject));
-          const missing = subject ? subject.videoIds.filter(id => !day.videos.includes(id)).length : 0;
-          return <div className="builder-col grid content-start gap-1.5 border-r border-b border-border p-2.5" key={day.key} style={column(index)}>
-            <NativeSelect aria-label={`Assunto principal do dia ${index + 1}`} onChange={event => patchDay(index, { subject: event.target.value })} value={day.subject}>
-              <option value="">Sem assunto definido</option>
-              {day.subject && !subjects.includes(day.subject) && <option value={day.subject}>{day.subject}</option>}
-              {subjects.map(title => <option key={title} value={title}>{title}</option>)}
-            </NativeSelect>
-            {subject && missing > 0 && <button className="flex items-center gap-1.5 rounded-md px-1 py-0.5 text-left text-xs font-medium text-primary hover:underline" onClick={() => fillWithSubject(index, subject.videoIds)} type="button">
-              <ListChecks aria-hidden="true" className="size-3.5 shrink-0" />Usar os vídeos deste assunto ({Math.min(missing, maxVideoRows)})
-            </button>}
+          const outside = subject ? day.videos.filter((id): id is string => !!id).some(id => !subject.videoIds.includes(id)) || day.videos.filter(Boolean).length !== subject.videoIds.length : false;
+          return <div className="builder-col grid content-start border-r border-b border-border p-2.5" key={day.key} style={column(index)}>
+            <ThemeSlot dayIndex={index} hasVideosOutsideTheme={outside} onChoose={title => applyTheme(index, title)} onClear={() => patchDay(index, { subject: '' })}
+              subject={subject} subjects={themes} />
           </div>;
         })}
 
@@ -180,7 +175,9 @@ export default function BuilderGrid({ days, catalog, onChange, onPick }: {
         })}
       </div>
     </div>
-  </div>;
+  </div>
+  </div>
+  </DndContext>;
 }
 
 /** Row label of the board, sticky so it stays visible while the days scroll sideways. */

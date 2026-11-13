@@ -76,8 +76,8 @@ export default function CourseCatalog({
   const isEmptyCatalog = !isLoading && !error && courses.length === 0;
   const showTabs = !isEmptyCatalog || tab !== 'courses';
   const tabs: { id: CatalogTab; label: string; count: number }[] = [
-    { id: 'courses', label: 'Cursos', count: courses.length },
-    { id: 'programs', label: 'Programas', count: programs.length },
+    { id: 'courses', label: 'Temas', count: courses.length },
+    { id: 'programs', label: 'SIPATs prontas', count: programs.length },
     { id: 'videos', label: 'Vídeos', count: library.length },
     { id: 'modules', label: 'Jogos e perguntas', count: modules.length },
   ];
@@ -89,7 +89,7 @@ export default function CourseCatalog({
 
   async function removeGame(module: GameModule) {
     const usage = module.usageCount > 0
-      ? ` Ele está em ${pluralize(module.usageCount, 'curso', 'cursos')} e sairá da trilha desses cursos.`
+      ? ` Ele está em ${pluralize(module.usageCount, 'tema', 'temas')} e sairá da trilha desses cursos.`
       : '';
     if (!window.confirm(`Remover o jogo "${module.title}"?${usage}`)) return;
     onError('');
@@ -119,7 +119,7 @@ export default function CourseCatalog({
   }
 
   const primaryAction = {
-    courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar curso</Button>,
+    courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar tema</Button>,
     programs: <Button onClick={() => navigate('/platform/sipat-builder')}><Plus /> Montar SIPAT</Button>,
     videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
     modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
@@ -134,8 +134,8 @@ export default function CourseCatalog({
       <PageHeader
         actions={primaryAction}
         badge={import.meta.env.DEV ? <Badge variant="outline">Apresentação demo</Badge> : undefined}
-        description={`${pluralize(courses.length, 'curso', 'cursos')} no catálogo da plataforma`}
-        title="Cursos"
+        description={`${pluralize(courses.length, 'tema', 'temas')} no acervo da plataforma`}
+        title="Biblioteca"
       />
 
       {error && (

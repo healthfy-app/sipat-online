@@ -8,7 +8,7 @@ export const maxGameRows = 5;
 export const maxDays = 14;
 
 export interface CatalogVideo { id: string; title: string; durationMs: number; code: string | null }
-export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number }
+export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; coverUrl: string | null }
 export interface Catalog {
   videos: Map<string, CatalogVideo>;
   subjects: Subject[];
@@ -33,11 +33,11 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
     const ids = course.videos.map(video => video.id).filter(id => videos.has(id));
     if (ids.length === 0) continue;
     ids.forEach(id => used.add(id));
-    subjects.push({ id: course.id, title: course.title, videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
   }
   const loose = [...videos.keys()].filter(id => !used.has(id));
   if (loose.length > 0) {
-    subjects.push({ id: 'none', title: 'Sem assunto', videoIds: loose, totalMs: loose.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    subjects.push({ id: 'none', title: 'Sem assunto', coverUrl: null, videoIds: loose, totalMs: loose.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
   }
   subjects.sort((a, b) => (a.id === 'none' ? 1 : b.id === 'none' ? -1 : a.title.localeCompare(b.title, 'pt-BR')));
   return { videos, subjects, games: new Map(games.map(game => [game.id, game])) };
@@ -131,4 +131,14 @@ export function shortDate(date: string): string {
 
 export function normalize(text: string): string {
   return text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+const palette = ['#2563eb', '#d97706', '#059669', '#7c3aed', '#dc2626', '#0d9488', '#db2777', '#4f46e5'];
+
+/** The same theme always gets the same color, like the colored blocks of the sheet. */
+export function subjectColor(subject: string): string {
+  if (!subject.trim()) return '#94a3b8';
+  let hash = 0;
+  for (const char of normalize(subject)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return palette[hash % palette.length];
 }
