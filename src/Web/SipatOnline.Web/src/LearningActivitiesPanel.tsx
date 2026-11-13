@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getLearningActivities, saveLearningActivityOutcome, type LearningActivity } from './api';
 import CourseDialog from './CourseDialog';
-import GamePlayer from './GamePlayer';
+import GamePlayer from '@/games/LazyGamePlayer';
 import { Button } from '@/components/ui/button';
 import type { GameOutcome } from '@/games/gameKit';
 import GameStage from '@/games/GameStage';

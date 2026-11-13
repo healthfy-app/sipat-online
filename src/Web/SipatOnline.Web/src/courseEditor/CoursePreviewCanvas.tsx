@@ -1,7 +1,7 @@
 import { ArrowLeft, ArrowRight, Monitor, Smartphone } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import GamePlayer from '@/GamePlayer';
+import GamePlayer from '@/games/LazyGamePlayer';
 import { cn } from '@/lib/utils';
 import VideoPreview from '@/VideoPreview';
 import type { TrackItem } from './courseTrack';

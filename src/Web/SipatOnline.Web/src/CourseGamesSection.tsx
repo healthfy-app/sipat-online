@@ -8,7 +8,7 @@ import {
   type PlatformCourse,
   type PlatformCourseVideo,
 } from './api';
-import GamePlayer from './GamePlayer';
+import GamePlayer from '@/games/LazyGamePlayer';
 import GameStage from '@/games/GameStage';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

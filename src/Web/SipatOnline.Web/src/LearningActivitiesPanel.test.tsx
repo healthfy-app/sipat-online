@@ -46,7 +46,8 @@ describe('course activities during playback', () => {
     video.currentTime = 2; fireEvent.timeUpdate(video);
     expect(await screen.findByRole('dialog')).toHaveAccessibleName('Pratique segurança');
     expect(video.paused).toBe(true);
-    await user.click(screen.getByRole('button', { name: 'Começar' }));
+    // The game chunk loads on demand; the first import is slow when the whole suite runs.
+    await user.click(await screen.findByRole('button', { name: 'Começar' }, { timeout: 5000 }));
     await user.click(screen.getByRole('button', { name: 'Usar EPI' }));
     await user.click(screen.getByRole('button', { name: 'Ver resultado' }));
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
