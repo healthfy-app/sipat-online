@@ -740,7 +740,7 @@ describe('learning experience', () => {
     expect(within(others).getByRole('heading', { name: 'Curso avulso' })).toBeVisible();
   });
 
-  it('draws the trail as one open node per day, in program order, with the courses of the chosen day', async () => {
+  it('draws the trail as one open node per day and lists the courses of a day in a window', async () => {
     const user = userEvent.setup();
     const later = { ...trackCard, id: 'later', title: 'Alongamento', progressPercentage: 20, dayTitle: 'Dia 2 · Saúde', dayPosition: 2, coursePosition: 1 };
     const doneOne = { ...trackCard, id: 'done', title: 'Uso de EPI', lessonCount: 2, completedLessonCount: 2, progressPercentage: 100, dayTitle: 'Dia 1 · Segurança', dayPosition: 1, coursePosition: 1 };
@@ -756,18 +756,20 @@ describe('learning experience', () => {
     expect(days.every(day => !(day as HTMLButtonElement).disabled)).toBe(true);
     expect(days[0]).toHaveAttribute('aria-current', 'step');
     expect(days[1]).not.toHaveAttribute('aria-current');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
-    const panel = document.getElementById('learning-trail-panel')!;
-    expect(within(panel).getByRole('heading', { name: 'Dia 1 · Segurança' })).toBeVisible();
-    expect(within(panel).getByRole('link', { name: /Uso de EPI/ })).toBeVisible();
-    expect(within(panel).getByRole('link', { name: /Começar: Sinalização/ })).toHaveAttribute('href', '/learning/tracks/sinalizacao');
+    await user.click(days[0]);
+    const first = await screen.findByRole('dialog', { name: 'Dia 1 · Segurança' });
+    expect(within(first).getByText('1 de 2 cursos concluídos')).toBeVisible();
+    expect(within(first).getByRole('link', { name: /Uso de EPI.*Concluído/ })).toHaveAttribute('href', '/learning/tracks/uso-de-epi');
+    // the course still to do is marked as the next one
+    expect(within(first).getByRole('link', { name: /Sinalização.*Próximo/ })).toHaveAttribute('href', '/learning/tracks/sinalizacao');
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
 
     await user.click(days[1]);
-    expect(days[1]).toHaveAttribute('aria-pressed', 'true');
-    // the panel is recreated for each day, so look it up again
-    const second = document.getElementById('learning-trail-panel')!;
-    expect(within(second).getByRole('heading', { name: 'Dia 2 · Saúde' })).toBeVisible();
-    expect(within(second).getByRole('link', { name: /Continuar: Alongamento/ })).toHaveAttribute('href', '/learning/tracks/alongamento');
+    const second = await screen.findByRole('dialog', { name: 'Dia 2 · Saúde' });
+    expect(within(second).getByRole('link', { name: /Alongamento.*0 de 1 aulas/ })).toHaveAttribute('href', '/learning/tracks/alongamento');
   });
 
   it('keeps the plain list when no course belongs to a day, and hides days emptied by a filter', async () => {
