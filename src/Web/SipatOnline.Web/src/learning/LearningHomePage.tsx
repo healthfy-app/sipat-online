@@ -28,6 +28,7 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import ProgressBar from './ProgressBar';
+import './CourseCards.css';
 
 export default function LearningHomePage({ participantName, setSummary }: {
   participantName?: string;
@@ -464,7 +465,11 @@ export default function LearningHomePage({ participantName, setSummary }: {
                     return <article className="learning-catalog-course" key={track.id}>
                       <div className={`learning-catalog-artwork${isRecommended ? ' is-recommended' : ''}`} data-artwork={getTrackArtwork(track.title)}>
                         <img alt="" decoding="async" loading="lazy" src={track.coverUrl ?? getCourseCover(track.title)} />
-                        {isRecommended && <span className="is-recommended">Comece por aqui</span>}
+                        {isRecommended
+                          ? <span className="is-recommended">Comece por aqui</span>
+                          : <span aria-hidden="true" className={`learning-catalog-course-state is-${completed ? 'done' : started ? 'progress' : 'new'}`}>
+                              {completed ? 'Concluído' : started ? 'Em andamento' : 'Para fazer'}
+                            </span>}
                       </div>
                       <div className="learning-catalog-course-content">
                         <div className="learning-catalog-course-metadata">
@@ -489,7 +494,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                         <ProgressBar value={percentage} label={`Progresso de ${title}`} />
                         <Link
                           aria-label={`${completed ? 'Ver certificado de' : started ? 'Continuar curso' : 'Começar curso'} ${title}`}
-                          className={`learning-catalog-course-action${isRecommended && !started ? ' is-primary' : ''}${completed ? ' is-complete' : ''}`}
+                          className={`learning-catalog-course-action${isRecommended && !started ? ' is-primary' : ''}${completed ? ' is-complete' : ''}${started && !completed ? ' is-started' : ''}`}
                           to={completed ? '/learning/certificates' : getTrackPath(track, tracks)}
                         >
                           {completed ? 'Ver certificado' : started ? 'Continuar de onde parou' : 'Começar curso'}
