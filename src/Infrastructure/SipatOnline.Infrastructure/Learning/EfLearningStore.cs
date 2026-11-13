@@ -423,7 +423,9 @@ public sealed class EfLearningStore(
             hasCover ? $"/api/learning/tracks/{trackId:D}/cover" : null,
             trackEntity.DayTitle,
             trackEntity.DayPosition,
-            trackEntity.CoursePosition);
+            trackEntity.CoursePosition,
+            trackEntity.DayDate,
+            totalDuration);
 
         return new LearningExperience(card, lessons);
     }

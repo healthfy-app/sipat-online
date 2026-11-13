@@ -178,7 +178,9 @@ public static class LearningEngagementEndpoints
             var csrf = await ValidateAsync(antiforgery, context);
             if (csrf is not null) return csrf;
             var result = await service.ApplyProgramAsync(companyId, sipatId, programId, token);
-            return result.IsSuccess ? Results.Ok(new { courses = result.Value }) : Problem(result.Error);
+            return result.IsSuccess
+                ? Results.Ok(new { days = result.Value.Days, created = result.Value.Created, updated = result.Value.Updated, kept = result.Value.Kept })
+                : Problem(result.Error);
         });
         platform.MapGet("/participants/{participantId:guid}/outcomes", async (Guid companyId, Guid participantId,
             LearningDistributionService service, PlatformDbContext db, CancellationToken token) =>

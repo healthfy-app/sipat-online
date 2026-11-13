@@ -3,8 +3,18 @@ using SipatOnline.BuildingBlocks.Domain;
 
 namespace SipatOnline.Learning.Application.Catalog;
 
-/// <summary>One day of a program: a free title ("Dia 1 · Segurança no chão de fábrica") and its courses, in order.</summary>
-public sealed record ProgramDay(string Title, IReadOnlyList<Guid> CourseIds);
+/// <summary>
+/// One day of a SIPAT program, as in the "Seletor de módulos" sheet: a title or slogan, an optional date,
+/// a main subject, the videos picked for the day (in order) and the games, quizzes or forms.
+/// <paramref name="Id"/> is stable across edits, so applying the program again finds the same day.
+/// </summary>
+public sealed record ProgramDay(
+    Guid Id,
+    string Title,
+    DateOnly? Date,
+    string? Subject,
+    IReadOnlyList<Guid> VideoIds,
+    IReadOnlyList<Guid> GameIds);
 
 /// <summary>A SIPAT program built once by the operator and applied to any company's SIPAT.</summary>
 public sealed record SipatProgram(Guid Id, string Title, IReadOnlyList<ProgramDay> Days, DateTimeOffset CreatedAt);
@@ -27,14 +37,17 @@ public sealed class SipatProgramService(
     ICurrentActor currentActor,
     ISipatProgramStore programStore,
     IPlatformCourseCatalogStore catalogStore,
+    IGameModuleStore gameStore,
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
     TimeProvider timeProvider)
 {
     public const int MaximumTitleLength = 200;
-    public const int MaximumDayTitleLength = 120;
+    public const int MaximumDayTitleLength = 160;
+    public const int MaximumSubjectLength = 120;
     public const int MaximumDays = 14;
-    public const int MaximumCoursesPerDay = 20;
+    public const int MaximumVideosPerDay = 10;
+    public const int MaximumGamesPerDay = 5;
 
     public async Task<Result<IReadOnlyList<SipatProgram>>> ListAsync(CancellationToken cancellationToken)
     {
@@ -101,27 +114,39 @@ public sealed class SipatProgramService(
             return Failure("learning.program.days_invalid", $"O programa precisa ter de 1 a {MaximumDays} dias.");
 
         var cleaned = new List<ProgramDay>(days.Count);
-        var seen = new HashSet<Guid>();
         foreach (var day in days)
         {
             var dayTitle = day.Title?.Trim();
             if (string.IsNullOrWhiteSpace(dayTitle) || dayTitle.Length > MaximumDayTitleLength)
-                return Failure("learning.program.day_title_invalid", "Cada dia precisa de um título de até 120 caracteres.");
+                return Failure("learning.program.day_title_invalid", $"Cada dia precisa de um título de até {MaximumDayTitleLength} caracteres.");
 
-            var courseIds = day.CourseIds ?? [];
-            if (courseIds.Count is 0 or > MaximumCoursesPerDay)
-                return Failure("learning.program.day_courses_invalid", $"O dia \"{dayTitle}\" precisa ter de 1 a {MaximumCoursesPerDay} cursos.");
+            var subject = string.IsNullOrWhiteSpace(day.Subject) ? null : day.Subject.Trim();
+            if (subject is { Length: > MaximumSubjectLength })
+                return Failure("learning.program.subject_invalid", $"O assunto do dia \"{dayTitle}\" pode ter até {MaximumSubjectLength} caracteres.");
 
-            foreach (var courseId in courseIds)
+            var videoIds = day.VideoIds ?? [];
+            if (videoIds.Count is 0 or > MaximumVideosPerDay)
+                return Failure("learning.program.day_videos_invalid", $"O dia \"{dayTitle}\" precisa ter de 1 a {MaximumVideosPerDay} vídeos.");
+            if (videoIds.Distinct().Count() != videoIds.Count)
+                return Failure("learning.program.video_repeated", $"O dia \"{dayTitle}\" tem um vídeo repetido.");
+            foreach (var videoId in videoIds)
             {
-                if (!seen.Add(courseId))
-                    return Failure("learning.program.course_repeated", "Um curso só pode aparecer uma vez no programa.");
-                if (await catalogStore.FindCourseAsync(courseId, cancellationToken) is null)
-                    return Failure("learning.program.course_not_found", "Um dos cursos escolhidos não existe mais.");
+                if (await catalogStore.FindVideoAsync(videoId, cancellationToken) is null)
+                    return Failure("learning.program.video_not_found", $"Um dos vídeos do dia \"{dayTitle}\" não existe mais.");
             }
 
-            cleaned.Add(new ProgramDay(dayTitle, courseIds.ToArray()));
+            var gameIds = day.GameIds ?? [];
+            if (gameIds.Count > MaximumGamesPerDay || gameIds.Distinct().Count() != gameIds.Count)
+                return Failure("learning.program.day_games_invalid", $"O dia \"{dayTitle}\" pode ter até {MaximumGamesPerDay} jogos, sem repetir.");
+            if (!await gameStore.AllExistAsync(gameIds.ToArray(), cancellationToken))
+                return Failure("learning.program.game_not_found", $"Um dos jogos do dia \"{dayTitle}\" não existe mais.");
+
+            // a day keeps its id across edits; a new day gets one here
+            cleaned.Add(new ProgramDay(day.Id == Guid.Empty ? Guid.NewGuid() : day.Id, dayTitle, day.Date, subject, videoIds.ToArray(), gameIds.ToArray()));
         }
+
+        if (cleaned.Select(day => day.Id).Distinct().Count() != cleaned.Count)
+            return Failure("learning.program.day_repeated", "Dois dias do programa têm o mesmo identificador.");
 
         return Result<(string, IReadOnlyList<ProgramDay>)>.Success((normalizedTitle, cleaned));
     }

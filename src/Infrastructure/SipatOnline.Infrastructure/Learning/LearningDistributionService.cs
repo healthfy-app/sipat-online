@@ -12,6 +12,7 @@ namespace SipatOnline.Infrastructure.Learning;
 
 public sealed record DistributionEvent(Guid Id, string Title);
 public sealed record DistributionCourse(Guid TrackId, Guid? SourceCourseId, string Title, Guid SipatEventId);
+public sealed record ProgramApplication(int Days, int Created, int Updated, int Kept);
 public sealed record CompanyLearningCatalog(IReadOnlyList<DistributionEvent> Events, IReadOnlyList<DistributionCourse> Courses);
 
 public sealed class LearningDistributionService(PlatformDbContext db, ICurrentActor actor, ITenantContext context,
@@ -43,6 +44,12 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var course = await catalog.FindCourseAsync(courseId, token);
         if (course is null || course.Status != PlatformCourseStatus.Published || course.Videos.Count == 0)
             return Failure<Guid>("learning.course_invalid", "Escolha um curso publicado com vídeos.");
+        return await CreateTrackFromCourseAsync(tenantId, sipatId, course, token);
+    }
+
+    /// <summary>Creates the company's track from a course, whether it comes from the catalog or was built for a program day.</summary>
+    private async Task<Result<Guid>> CreateTrackFromCourseAsync(Guid tenantId, Guid sipatId, PlatformCourse course, CancellationToken token)
+    {
         var snapshot = await CreateSnapshotAsync(course, token);
         if (!snapshot.IsSuccess) return Result<Guid>.Failure(snapshot.Error);
         var now = clock.GetUtcNow();
@@ -103,47 +110,103 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
     }
 
     /// <summary>
-    /// Applies a whole program to a company's SIPAT: every course is distributed (an existing
-    /// distribution is reused, so applying twice creates nothing new) and tagged with its day.
+    /// Applies a whole program to a company's SIPAT: each day becomes one track made of the videos picked for
+    /// it, with the day's games delivered after the last video. Applying again is safe: a day nobody has started
+    /// is refreshed with the program's current content, and a day with progress is left as it is.
     /// </summary>
-    public async Task<Result<int>> ApplyProgramAsync(Guid tenantId, Guid sipatId, Guid programId, CancellationToken token)
+    public async Task<Result<ProgramApplication>> ApplyProgramAsync(Guid tenantId, Guid sipatId, Guid programId, CancellationToken token)
     {
         var access = await GetAsync(tenantId, token);
-        if (!access.IsSuccess) return Result<int>.Failure(access.Error);
+        if (!access.IsSuccess) return Result<ProgramApplication>.Failure(access.Error);
         var program = await programs.FindAsync(programId, token);
-        if (program is null) return Failure<int>("learning.program_not_found", "O programa não foi encontrado.");
+        if (program is null) return Failure<ProgramApplication>("learning.program_not_found", "O programa não foi encontrado.");
         if (!access.Value.Events.Any(item => item.Id == sipatId))
-            return Failure<int>("learning.sipat_not_found", "Escolha uma SIPAT publicada desta empresa.");
+            return Failure<ProgramApplication>("learning.sipat_not_found", "Escolha uma SIPAT publicada desta empresa.");
 
-        // check everything before creating anything, so a program is never applied halfway
-        foreach (var courseId in program.Days.SelectMany(day => day.CourseIds))
+        // build and check every day before touching anything, so a program is never applied halfway
+        var now = clock.GetUtcNow();
+        var courses = new List<PlatformCourse>(program.Days.Count);
+        foreach (var day in program.Days)
         {
-            var course = await catalog.FindCourseAsync(courseId, token);
-            if (course is null || course.Status != PlatformCourseStatus.Published || course.Videos.Count == 0)
-                return Failure<int>("learning.program_course_invalid",
-                    $"O curso \"{course?.Title ?? courseId.ToString("D")}\" precisa estar publicado e ter vídeos antes de aplicar o programa.");
+            var videos = new List<PlatformCourseVideo>(day.VideoIds.Count);
+            foreach (var videoId in day.VideoIds)
+            {
+                var video = await catalog.FindVideoAsync(videoId, token);
+                if (video is null)
+                    return Failure<ProgramApplication>("learning.program_video_invalid", $"Um vídeo do dia \"{day.Title}\" não existe mais. Revise o programa.");
+                videos.Add(video);
+            }
+            var placements = day.GameIds.Select(gameId => new CourseModulePlacement(gameId, videos.Count)).ToArray();
+            var course = new PlatformCourse(day.Id, day.Title, day.Subject, now, PlatformCourseStatus.Published, true, videos, placements);
+            var snapshot = await CreateSnapshotAsync(course, token);
+            if (!snapshot.IsSuccess) return Result<ProgramApplication>.Failure(snapshot.Error);
+            courses.Add(course);
         }
 
-        var applied = 0;
-        for (var dayIndex = 0; dayIndex < program.Days.Count; dayIndex++)
+        int created = 0, updated = 0, kept = 0;
+        for (var index = 0; index < courses.Count; index++)
         {
-            var day = program.Days[dayIndex];
-            for (var courseIndex = 0; courseIndex < day.CourseIds.Count; courseIndex++)
+            var course = courses[index];
+            var day = program.Days[index];
+            var track = await db.LearningTracks.SingleOrDefaultAsync(
+                item => item.TenantId == tenantId && item.SipatEventId == sipatId && item.SourceCourseId == course.Id, token);
+            if (track is null)
             {
-                var trackId = await DistributeAsync(tenantId, sipatId, day.CourseIds[courseIndex], token);
-                if (!trackId.IsSuccess) return Result<int>.Failure(trackId.Error);
-                var track = await db.LearningTracks.SingleAsync(item => item.Id == trackId.Value && item.TenantId == tenantId, token);
-                track.DayTitle = day.Title;
-                track.DayPosition = dayIndex + 1;
-                track.CoursePosition = courseIndex + 1;
-                applied++;
+                var trackId = await CreateTrackFromCourseAsync(tenantId, sipatId, course, token);
+                if (!trackId.IsSuccess) return Result<ProgramApplication>.Failure(trackId.Error);
+                track = await db.LearningTracks.SingleAsync(item => item.Id == trackId.Value && item.TenantId == tenantId, token);
+                created++;
             }
+            else if (await RefreshDayTrackAsync(track, course, token)) updated++;
+            else kept++;
+
+            track.DayTitle = day.Title;
+            track.DayPosition = index + 1;
+            track.CoursePosition = 1;
+            track.DayDate = day.Date;
         }
 
         await db.SaveChangesAsync(token);
         await audit.WriteAsync(new AuditRecord(actor.UserId!, new TenantId(tenantId), "learning.program.applied",
             "sipat_program", programId.ToString("D"), clock.GetUtcNow()), token);
-        return Result<int>.Success(applied);
+        return Result<ProgramApplication>.Success(new ProgramApplication(courses.Count, created, updated, kept));
+    }
+
+    /// <summary>Replaces the lessons and activities of a day's track, unless some participant already has progress in it.</summary>
+    private async Task<bool> RefreshDayTrackAsync(LearningTrackEntity track, PlatformCourse course, CancellationToken token)
+    {
+        if (track.CurrentRevisionId is not Guid revisionId) return false;
+        if (await db.LearningProgress.AnyAsync(item => item.TrackId == track.Id, token)) return false;
+
+        var snapshot = await CreateSnapshotAsync(course, token);
+        if (!snapshot.IsSuccess) return false;
+        var entity = await db.LearningContentSnapshots.SingleAsync(item => item.RevisionId == revisionId, token);
+        var current = await db.LearningLessons.Where(item => item.RevisionId == revisionId).ToListAsync(token);
+        var fresh = current.Count == course.Videos.Count
+            && current.OrderBy(item => item.Position).Select(item => item.ProviderAssetReference)
+                .SequenceEqual(course.Videos.Select(video => $"catalog:{video.Id:D}"));
+
+        track.Title = course.Title;
+        track.Description = course.Description;
+        entity.ContentJson = JsonSerializer.Serialize(snapshot.Value, EfLearningEngagementStore.JsonOptions);
+        if (fresh) return true;
+
+        var scratch = LearningTrackRevision.CreateDraft(track.Id, new TenantId(track.TenantId), 1, clock.GetUtcNow()).Value;
+        foreach (var video in course.Videos) scratch.AddLesson(video.Title, null, $"catalog:{video.Id:D}", video.DurationMilliseconds);
+        db.LearningLessons.RemoveRange(current);
+        db.LearningLessons.AddRange(scratch.Lessons.Select(item => new LearningLessonEntity
+        {
+            Id = item.Id,
+            TenantId = track.TenantId,
+            TrackId = track.Id,
+            RevisionId = revisionId,
+            Title = item.Title,
+            Description = item.Description,
+            Position = item.Position,
+            ProviderAssetReference = item.ProviderAssetReference,
+            DurationMilliseconds = item.DurationMilliseconds
+        }));
+        return true;
     }
 
     public async Task<Result<LearningContentSnapshot>> CreateSnapshotAsync(PlatformCourse course, CancellationToken token)

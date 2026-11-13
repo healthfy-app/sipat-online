@@ -490,6 +490,7 @@ namespace SipatOnline.Infrastructure.Migrations
                 {
                     b.Property<Guid?>("SourceCourseId").HasColumnType("uuid");
                     b.Property<int?>("CoursePosition").HasColumnType("integer");
+                    b.Property<DateOnly?>("DayDate").HasColumnType("date");
                     b.Property<int?>("DayPosition").HasColumnType("integer");
                     b.Property<string>("DayTitle").HasMaxLength(120).HasColumnType("character varying(120)");
                     b.Property<Guid>("Id")

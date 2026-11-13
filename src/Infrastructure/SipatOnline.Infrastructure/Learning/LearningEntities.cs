@@ -14,6 +14,8 @@ public sealed class LearningTrackEntity
 
     public int? DayPosition { get; set; }
 
+    public DateOnly? DayDate { get; set; }
+
     public int? CoursePosition { get; set; }
 
     public string Title { get; set; } = string.Empty;

@@ -574,10 +574,10 @@ public static class PlatformCourseCatalogEndpoints
         questions?.Select(item => new GameQuestion(item.Text ?? string.Empty, item.Options ?? [], item.CorrectIndex)).ToArray();
 
     private static ProgramResponse ToProgramResponse(SipatProgram program) =>
-        new(program.Id, program.Title, program.Days.Select(day => new ProgramDayDto(day.Title, day.CourseIds)).ToArray(), program.CreatedAt);
+        new(program.Id, program.Title, program.Days.Select(day => new ProgramDayDto(day.Id, day.Title, day.Date, day.Subject, day.VideoIds, day.GameIds)).ToArray(), program.CreatedAt);
 
     private static IReadOnlyList<ProgramDay>? ToProgramDays(IReadOnlyList<ProgramDayDto>? days) =>
-        days?.Select(day => new ProgramDay(day.Title ?? string.Empty, day.CourseIds ?? [])).ToArray();
+        days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, day.Date, day.Subject, day.VideoIds ?? [], day.GameIds ?? [])).ToArray();
 
     private static GameModuleResponse ToResponse(GameModule module, int usageCount) =>
         new(
@@ -597,6 +597,8 @@ public static class PlatformCourseCatalogEndpoints
             "learning.platform_course.not_found" or
                 "learning.game_module.not_found" or
                 "learning.program.not_found" or
+                "learning.program.video_not_found" or
+                "learning.program.game_not_found" or
                 "learning.platform_course.cover_not_found" or
                 "learning.platform_course.video_not_found" => StatusCodes.Status404NotFound,
             "learning.platform_course.storage_unconfigured" or
@@ -688,7 +690,13 @@ public sealed record GameModuleResponse(
     int UsageCount,
     GameContent? Content = null);
 
-public sealed record ProgramDayDto(string? Title, IReadOnlyList<Guid>? CourseIds);
+public sealed record ProgramDayDto(
+    Guid? Id,
+    string? Title,
+    DateOnly? Date,
+    string? Subject,
+    IReadOnlyList<Guid>? VideoIds,
+    IReadOnlyList<Guid>? GameIds);
 
 public sealed record SaveProgramRequest(string? Title, IReadOnlyList<ProgramDayDto>? Days);
 

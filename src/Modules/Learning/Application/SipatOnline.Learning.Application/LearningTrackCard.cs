@@ -12,7 +12,9 @@ public sealed record LearningTrackCard(
     string? CoverUrl = null,
     string? DayTitle = null,
     int? DayPosition = null,
-    int? CoursePosition = null);
+    int? CoursePosition = null,
+    DateOnly? DayDate = null,
+    long DurationMilliseconds = 0);
 
 public sealed record LearningLessonProgress(
     Guid Id,

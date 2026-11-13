@@ -124,44 +124,6 @@ public sealed class LearningEngagementApiTests
             var trackId = association.GetProperty("trackId").GetGuid();
             var repeated = await Call(platform, $"{companyPath}/sipats/{sipatId}/courses/{courseId}", HttpMethod.Post, new { });
             Assert.Equal(trackId, repeated.GetProperty("trackId").GetGuid());
-            var program = await Call(platform, "/api/platform/catalog/programs", HttpMethod.Post, new
-            {
-                title = "SIPAT 2026",
-                days = new[] { new { title = "Dia 1 · Segurança no chão de fábrica", courseIds = new[] { courseId } } }
-            }, HttpStatusCode.Created);
-            var programId = program.GetProperty("id").GetGuid();
-            Assert.Equal("Dia 1 · Segurança no chão de fábrica", program.GetProperty("days")[0].GetProperty("title").GetString());
-            await Call(platform, "/api/platform/catalog/programs", HttpMethod.Post, new
-            {
-                title = "Curso repetido",
-                days = new[] { new { title = "Dia 1", courseIds = new[] { courseId, courseId } } }
-            }, HttpStatusCode.BadRequest);
-            await Call(platform, "/api/platform/catalog/programs", HttpMethod.Post, new
-            {
-                title = "Dia sem título",
-                days = new[] { new { title = "  ", courseIds = new[] { courseId } } }
-            }, HttpStatusCode.BadRequest);
-            var applied = await Call(platform, $"{companyPath}/sipats/{sipatId}/programs/{programId}", HttpMethod.Post, new { });
-            Assert.Equal(1, applied.GetProperty("courses").GetInt32());
-            var reapplied = await Call(platform, $"{companyPath}/sipats/{sipatId}/programs/{programId}", HttpMethod.Post, new { });
-            Assert.Equal(1, reapplied.GetProperty("courses").GetInt32());
-            var dayCards = await participant.GetFromJsonAsync<JsonElement>("/api/learning/tracks");
-            Assert.Equal(1, dayCards.GetArrayLength());
-            Assert.Equal(trackId, dayCards[0].GetProperty("id").GetGuid());
-            Assert.Equal("Dia 1 · Segurança no chão de fábrica", dayCards[0].GetProperty("dayTitle").GetString());
-            Assert.Equal(1, dayCards[0].GetProperty("dayPosition").GetInt32());
-            Assert.Equal(1, dayCards[0].GetProperty("coursePosition").GetInt32());
-            await Call(platform, $"/api/platform/catalog/programs/{programId}", HttpMethod.Put, new
-            {
-                title = "SIPAT 2026 (revisado)",
-                days = new[] { new { title = "Dia 1 · Saúde", courseIds = new[] { courseId } } }
-            });
-            await Call(platform, $"{companyPath}/sipats/{sipatId}/programs/{Guid.NewGuid()}", HttpMethod.Post, new { }, HttpStatusCode.NotFound);
-            await Call(participant, "/api/platform/catalog/programs", HttpMethod.Post, new
-            {
-                title = "Sem permissão",
-                days = new[] { new { title = "Dia 1", courseIds = new[] { courseId } } }
-            }, HttpStatusCode.NotFound);
             var activities = await participant.GetFromJsonAsync<JsonElement>($"/api/learning/tracks/{trackId}/activities");
             Assert.Equal(8, activities.GetProperty("items").GetArrayLength());
             Assert.Equal(moduleIds, activities.GetProperty("items").EnumerateArray().Take(7).Select(item => item.GetProperty("module").GetProperty("id").GetGuid()));
@@ -274,6 +236,79 @@ public sealed class LearningEngagementApiTests
             Assert.True(afterRestart.GetProperty("lessons")[0].GetProperty("isCompleted").GetBoolean());
             Assert.Equal(900, afterRestart.GetProperty("lessons")[0].GetProperty("lastPlaybackPositionMilliseconds").GetInt64());
             Assert.Equal(1, await db.ParticipationCertificates.CountAsync());
+
+            // programs: each day becomes its own track, so this runs after the certificate flow above
+            var program = await Call(platform, "/api/platform/catalog/programs", HttpMethod.Post, new
+            {
+                title = "SIPAT 2026",
+                days = new[]
+                {
+                    new
+                    {
+                        id = (Guid?)null, title = "Dia 1 · Segurança no chão de fábrica", date = "2026-11-09", subject = "Segurança",
+                        videoIds = new[] { videoId }, gameIds = new[] { moduleIds[0] }
+                    }
+                }
+            }, HttpStatusCode.Created);
+            var programId = program.GetProperty("id").GetGuid();
+            var day = program.GetProperty("days")[0];
+            Assert.Equal("Dia 1 · Segurança no chão de fábrica", day.GetProperty("title").GetString());
+            Assert.Equal("2026-11-09", day.GetProperty("date").GetString());
+            var dayId = day.GetProperty("id").GetGuid();
+            Assert.NotEqual(Guid.Empty, dayId);
+            await Call(platform, "/api/platform/catalog/programs", HttpMethod.Post, new
+            {
+                title = "Vídeo repetido",
+                days = new[] { new { id = (Guid?)null, title = "Dia 1", date = (string?)null, subject = (string?)null, videoIds = new[] { videoId, videoId }, gameIds = Array.Empty<Guid>() } }
+            }, HttpStatusCode.BadRequest);
+            await Call(platform, "/api/platform/catalog/programs", HttpMethod.Post, new
+            {
+                title = "Dia sem título",
+                days = new[] { new { id = (Guid?)null, title = "  ", date = (string?)null, subject = (string?)null, videoIds = new[] { videoId }, gameIds = Array.Empty<Guid>() } }
+            }, HttpStatusCode.BadRequest);
+            await Call(platform, "/api/platform/catalog/programs", HttpMethod.Post, new
+            {
+                title = "Dia sem vídeos",
+                days = new[] { new { id = (Guid?)null, title = "Dia 1", date = (string?)null, subject = (string?)null, videoIds = Array.Empty<Guid>(), gameIds = Array.Empty<Guid>() } }
+            }, HttpStatusCode.BadRequest);
+            await Call(platform, "/api/platform/catalog/programs", HttpMethod.Post, new
+            {
+                title = "Vídeo que não existe",
+                days = new[] { new { id = (Guid?)null, title = "Dia 1", date = (string?)null, subject = (string?)null, videoIds = new[] { Guid.NewGuid() }, gameIds = Array.Empty<Guid>() } }
+            }, HttpStatusCode.NotFound);
+            var applied = await Call(platform, $"{companyPath}/sipats/{sipatId}/programs/{programId}", HttpMethod.Post, new { });
+            Assert.Equal(1, applied.GetProperty("days").GetInt32());
+            Assert.Equal(1, applied.GetProperty("created").GetInt32());
+            var reapplied = await Call(platform, $"{companyPath}/sipats/{sipatId}/programs/{programId}", HttpMethod.Post, new { });
+            Assert.Equal(0, reapplied.GetProperty("created").GetInt32());
+            Assert.Equal(1, reapplied.GetProperty("updated").GetInt32());
+            var cards = await participant.GetFromJsonAsync<JsonElement>("/api/learning/tracks");
+            var dayCard = cards.EnumerateArray().Single(card => card.GetProperty("dayTitle").ValueKind == JsonValueKind.String);
+            Assert.Equal("Dia 1 · Segurança no chão de fábrica", dayCard.GetProperty("title").GetString());
+            Assert.Equal("Dia 1 · Segurança no chão de fábrica", dayCard.GetProperty("dayTitle").GetString());
+            Assert.Equal(1, dayCard.GetProperty("dayPosition").GetInt32());
+            Assert.Equal("2026-11-09", dayCard.GetProperty("dayDate").GetString());
+            Assert.Equal(1, dayCard.GetProperty("lessonCount").GetInt32());
+            Assert.Equal(1000, dayCard.GetProperty("durationMilliseconds").GetInt64());
+            var dayTrackId = dayCard.GetProperty("id").GetGuid();
+            var dayActivities = await participant.GetFromJsonAsync<JsonElement>($"/api/learning/tracks/{dayTrackId}/activities");
+            Assert.Equal(moduleIds[0], dayActivities.GetProperty("items")[0].GetProperty("module").GetProperty("id").GetGuid());
+            await Call(platform, $"/api/platform/catalog/programs/{programId}", HttpMethod.Put, new
+            {
+                title = "SIPAT 2026 (revisado)",
+                days = new[] { new { id = (Guid?)dayId, title = "Dia 1 · Saúde", date = "2026-11-10", subject = (string?)"Saúde", videoIds = new[] { videoId }, gameIds = Array.Empty<Guid>() } }
+            });
+            await Call(platform, $"{companyPath}/sipats/{sipatId}/programs/{programId}", HttpMethod.Post, new { });
+            var renamed = (await participant.GetFromJsonAsync<JsonElement>("/api/learning/tracks")).EnumerateArray()
+                .Single(card => card.GetProperty("id").GetGuid() == dayTrackId);
+            Assert.Equal("Dia 1 · Saúde", renamed.GetProperty("dayTitle").GetString());
+            Assert.Equal("2026-11-10", renamed.GetProperty("dayDate").GetString());
+            await Call(platform, $"{companyPath}/sipats/{sipatId}/programs/{Guid.NewGuid()}", HttpMethod.Post, new { }, HttpStatusCode.NotFound);
+            await Call(participant, "/api/platform/catalog/programs", HttpMethod.Post, new
+            {
+                title = "Sem permissão",
+                days = new[] { new { title = "Dia 1", videoIds = new[] { videoId } } }
+            }, HttpStatusCode.NotFound);
         }
         finally { await storage.DeleteAsync(videoId, CancellationToken.None); }
     }
