@@ -18,6 +18,10 @@ vi.mock('./api', async (importOriginal) => {
   return {
     ...original,
     createGameModule: vi.fn(),
+    createSipatProgram: vi.fn(),
+    deleteSipatProgram: vi.fn(),
+    listSipatPrograms: vi.fn(),
+    updateSipatProgram: vi.fn(),
     createPlatformCourse: vi.fn(),
     deleteGameModule: vi.fn(),
     duplicatePlatformCourse: vi.fn(),
@@ -89,6 +93,10 @@ beforeEach(() => {
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:course-cover') });
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
   vi.mocked(api.listGameModules).mockReset().mockResolvedValue([]);
+  vi.mocked(api.listSipatPrograms).mockReset().mockResolvedValue([]);
+  vi.mocked(api.createSipatProgram).mockReset();
+  vi.mocked(api.updateSipatProgram).mockReset();
+  vi.mocked(api.deleteSipatProgram).mockReset();
   vi.mocked(api.listPlatformCourses).mockReset().mockResolvedValue([ergonomics, fire]);
   vi.mocked(api.listPlatformLibraryVideos).mockReset().mockResolvedValue([
     { video: opening, courseCount: 1 },
@@ -731,5 +739,67 @@ describe('Platform course catalog', () => {
     expect(api.createPlatformCourse).toHaveBeenCalledWith({
       title: 'Novo curso', description: 'Opção 1', gamificationEnabled: true,
     });
+  });
+
+  it('builds a program with titled days and ordered courses', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.createSipatProgram).mockResolvedValue({ id: 'p-1', title: 'SIPAT 2026', days: [], createdAt: '2026-11-13T12:00:00Z' });
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Programas/ }));
+    await user.click(screen.getByRole('button', { name: 'Criar o primeiro programa' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Novo programa' });
+    await user.type(within(dialog).getByLabelText('Nome do programa'), 'SIPAT 2026');
+    await user.clear(within(dialog).getByLabelText('Título do dia 1'));
+    await user.type(within(dialog).getByLabelText('Título do dia 1'), 'Dia 1 · Segurança');
+    await user.selectOptions(within(dialog).getByLabelText('Adicionar curso ao dia 1'), 'c-1');
+    expect(within(dialog).getByText('Ergonomia')).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Adicionar dia' }));
+    await user.selectOptions(within(dialog).getByLabelText('Adicionar curso ao dia 2'), 'c-2');
+    expect(within(dialog).getByText(/Rascunho: publique antes de aplicar/)).toBeVisible();
+    await user.click(within(dialog).getByRole('button', { name: 'Criar programa' }));
+
+    expect(api.createSipatProgram).toHaveBeenCalledWith({
+      title: 'SIPAT 2026',
+      days: [{ title: 'Dia 1 · Segurança', courseIds: ['c-1'] }, { title: 'Dia 2', courseIds: ['c-2'] }],
+    });
+  });
+
+  it('does not save a program with an empty day and does not offer a course twice', async () => {
+    const user = userEvent.setup();
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Programas/ }));
+    await user.click(screen.getByRole('button', { name: 'Criar o primeiro programa' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Novo programa' });
+    await user.type(within(dialog).getByLabelText('Nome do programa'), 'Programa vazio');
+    await user.click(within(dialog).getByRole('button', { name: 'Criar programa' }));
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Cada dia precisa de pelo menos um curso');
+    expect(api.createSipatProgram).not.toHaveBeenCalled();
+
+    await user.selectOptions(within(dialog).getByLabelText('Adicionar curso ao dia 1'), 'c-1');
+    expect(within(dialog).queryByRole('option', { name: 'Ergonomia' })).not.toBeInTheDocument();
+  });
+
+  it('lists programs with their days and asks before removing one', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listSipatPrograms).mockResolvedValue([{
+      id: 'p-1', title: 'SIPAT 2026', createdAt: '2026-11-13T12:00:00Z',
+      days: [{ title: 'Dia 1 · Segurança', courseIds: ['c-1'] }, { title: 'Dia 2 · Saúde', courseIds: ['c-2', 'gone'] }],
+    }]);
+    vi.mocked(api.deleteSipatProgram).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Programas/ }));
+    expect(screen.getByText('2 dias · 3 cursos')).toBeVisible();
+    expect(screen.getByText('Dia 1 · Segurança')).toBeVisible();
+    expect(screen.getByText(/Combate a incêndio · Curso removido/)).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Remover programa SIPAT 2026' }));
+    expect(api.deleteSipatProgram).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: 'Remover programa SIPAT 2026' }));
+    expect(api.deleteSipatProgram).toHaveBeenCalledWith('p-1');
+    confirm.mockRestore();
   });
 });

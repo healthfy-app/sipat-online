@@ -2,10 +2,12 @@ import { Plus } from 'lucide-react';
 import { useState } from 'react';
 import {
   deleteGameModule,
+  deleteSipatProgram,
   type GameModule,
   type PlatformCourse,
   type PlatformCourseVideo,
   type PlatformLibraryVideo,
+  type SipatProgram,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,18 +22,22 @@ import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
 import GameModuleForm from './GameModuleForm';
 import GameModulesPanel from './GameModulesPanel';
+import ProgramForm from './ProgramForm';
+import ProgramsPanel from './ProgramsPanel';
 import VideoLibraryPanel from './VideoLibraryPanel';
 
-type CatalogTab = 'courses' | 'videos' | 'modules';
+type CatalogTab = 'courses' | 'programs' | 'videos' | 'modules';
 type CatalogDialog =
   | { kind: 'create' }
   | { kind: 'upload' }
-  | { kind: 'game'; module: GameModule | null };
+  | { kind: 'game'; module: GameModule | null }
+  | { kind: 'program'; program: SipatProgram | null };
 
 export default function CourseCatalog({
   courses,
   library,
   modules,
+  programs,
   isLoading,
   error,
   busy,
@@ -41,11 +47,13 @@ export default function CourseCatalog({
   onCreated,
   onVideoUploaded,
   onModulesChanged,
+  onProgramsChanged,
   onError,
 }: {
   courses: PlatformCourse[];
   library: PlatformLibraryVideo[];
   modules: GameModule[];
+  programs: SipatProgram[];
   isLoading: boolean;
   error: string;
   busy: boolean;
@@ -55,6 +63,7 @@ export default function CourseCatalog({
   onCreated: (course: PlatformCourse) => Promise<void>;
   onVideoUploaded: (video: PlatformCourseVideo) => Promise<void>;
   onModulesChanged: (message: string) => Promise<void>;
+  onProgramsChanged: (message: string) => Promise<void>;
   onError: (message: string) => void;
 }) {
   const [tab, setTab] = useState<CatalogTab>('courses');
@@ -67,6 +76,7 @@ export default function CourseCatalog({
   const showTabs = !isEmptyCatalog || tab !== 'courses';
   const tabs: { id: CatalogTab; label: string; count: number }[] = [
     { id: 'courses', label: 'Cursos', count: courses.length },
+    { id: 'programs', label: 'Programas', count: programs.length },
     { id: 'videos', label: 'Vídeos', count: library.length },
     { id: 'modules', label: 'Jogos e perguntas', count: modules.length },
   ];
@@ -93,8 +103,23 @@ export default function CourseCatalog({
     }
   }
 
+  async function removeProgram(program: SipatProgram) {
+    if (!window.confirm(`Remover o programa "${program.title}"? As empresas que já o receberam continuam com seus cursos.`)) return;
+    onError('');
+    setIsDeleting(true);
+    try {
+      await deleteSipatProgram(program.id);
+      await onProgramsChanged(`O programa "${program.title}" foi removido.`);
+    } catch (deleteError) {
+      onError(getErrorMessage(deleteError));
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   const primaryAction = {
     courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar curso</Button>,
+    programs: <Button onClick={() => setDialog({ kind: 'program', program: null })}><Plus /> Novo programa</Button>,
     videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
     modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
   }[tab];
@@ -135,6 +160,18 @@ export default function CourseCatalog({
             ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
             : courses.length > 0 && <CoursesPanel busy={busy} courses={courses} onDuplicate={onDuplicate} onOpen={onOpen} />)}
         </TabsContent>
+        <TabsContent value="programs">
+          {body ?? (
+            <ProgramsPanel
+              busy={isDeleting}
+              courses={courses}
+              onCreate={() => setDialog({ kind: 'program', program: null })}
+              onDelete={(program) => void removeProgram(program)}
+              onEdit={(program) => setDialog({ kind: 'program', program })}
+              programs={programs}
+            />
+          )}
+        </TabsContent>
         <TabsContent value="videos">
           {body ?? <VideoLibraryPanel library={library} onUpload={openUpload} />}
         </TabsContent>
@@ -165,6 +202,21 @@ export default function CourseCatalog({
             setDialog(null);
             await onVideoUploaded(video);
           }} />
+        </Dialog>
+      )}
+
+      {dialog?.kind === 'program' && (
+        <Dialog busy={dialogBusy} onClose={() => setDialog(null)} size="lg" title={dialog.program ? 'Editar programa' : 'Novo programa'}>
+          <ProgramForm
+            courses={courses}
+            onBusyChange={setDialogBusy}
+            onCancel={() => setDialog(null)}
+            onSaved={async (message) => {
+              setDialog(null);
+              await onProgramsChanged(message);
+            }}
+            program={dialog.program}
+          />
         </Dialog>
       )}
 

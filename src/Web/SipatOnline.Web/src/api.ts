@@ -180,6 +180,27 @@ export interface CompanyLearningCatalog {
 export function requestCompanyLearning(companyId: string): Promise<CompanyLearningCatalog> {
   return requestJson(`/api/platform/companies/${companyId}/learning`);
 }
+/** A day of a SIPAT program: a free title and its courses, in order. */
+export interface ProgramDay { title: string; courseIds: string[] }
+export interface SipatProgram { id: string; title: string; days: ProgramDay[]; createdAt: string }
+export interface SipatProgramData { title: string; days: ProgramDay[] }
+
+export function listSipatPrograms(): Promise<SipatProgram[]> {
+  return requestJson<SipatProgram[]>('/api/platform/catalog/programs');
+}
+export function createSipatProgram(data: SipatProgramData): Promise<SipatProgram> {
+  return requestJson<SipatProgram>('/api/platform/catalog/programs', { method: 'POST', body: JSON.stringify(data) });
+}
+export function updateSipatProgram(programId: string, data: SipatProgramData): Promise<SipatProgram> {
+  return requestJson<SipatProgram>(`/api/platform/catalog/programs/${programId}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function deleteSipatProgram(programId: string): Promise<void> {
+  await request(`/api/platform/catalog/programs/${programId}`, { method: 'DELETE' });
+}
+export function applyProgramToCompany(companyId: string, sipatId: string, programId: string): Promise<{ courses: number }> {
+  return requestJson(`/api/platform/companies/${companyId}/learning/sipats/${sipatId}/programs/${programId}`, { method: 'POST', body: '{}' });
+}
+
 export function distributeCompanyCourse(companyId: string, sipatId: string, courseId: string): Promise<{ trackId: string }> {
   return requestJson(`/api/platform/companies/${companyId}/learning/sipats/${sipatId}/courses/${courseId}`, {
     method: 'POST', body: '{}',
@@ -357,6 +378,10 @@ export interface LearningTrackCard {
   completedLessonCount: number;
   progressPercentage: number;
   coverUrl?: string | null;
+  /** Day of the SIPAT program this course belongs to; absent when it was distributed on its own. */
+  dayTitle?: string | null;
+  dayPosition?: number | null;
+  coursePosition?: number | null;
 }
 
 export interface ParticipantOutcomes {

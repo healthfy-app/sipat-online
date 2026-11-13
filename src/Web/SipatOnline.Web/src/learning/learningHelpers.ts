@@ -195,3 +195,56 @@ export function getLearningErrorMessage(error: unknown): string {
 
   return error instanceof Error ? error.message : 'Não foi possível concluir a solicitação. Tente novamente.';
 }
+
+export interface DayGroup {
+  key: string;
+  /** 1-based position in the program; null for courses that are not part of a day. */
+  position: number | null;
+  title: string;
+  tracks: LearningTrackCard[];
+  completed: number;
+  total: number;
+  percentage: number;
+}
+
+/**
+ * Groups courses by the day of the SIPAT program they belong to, in program order. `visible` are the
+ * courses that pass the filters; progress counts every course of the day so filtering does not change it.
+ * Returns null when no course has a day, and the page keeps its plain list.
+ */
+export function groupTracksByDay(visible: LearningTrackCard[], all: LearningTrackCard[]): DayGroup[] | null {
+  if (!all.some(track => track.dayTitle)) return null;
+  const keyOf = (track: LearningTrackCard) => (track.dayTitle ? `${track.dayPosition ?? 0}|${track.dayTitle}` : 'none');
+  const groups = new Map<string, DayGroup>();
+  for (const track of all) {
+    const key = keyOf(track);
+    const group = groups.get(key) ?? {
+      key, position: track.dayTitle ? track.dayPosition ?? null : null,
+      title: track.dayTitle ?? 'Outros cursos', tracks: [], completed: 0, total: 0, percentage: 0,
+    };
+    group.total += 1;
+    group.completed += getTrackProgress(track) === 100 ? 1 : 0;
+    group.percentage += getTrackProgress(track);
+    groups.set(key, group);
+  }
+  for (const group of groups.values()) group.percentage = Math.round(group.percentage / group.total);
+  for (const track of visible) groups.get(keyOf(track))?.tracks.push(track);
+  return [...groups.values()]
+    .filter(group => group.tracks.length > 0)
+    .map(group => ({ ...group, tracks: [...group.tracks].sort((a, b) => (a.coursePosition ?? 0) - (b.coursePosition ?? 0)) }))
+    .sort((a, b) => (a.position ?? Number.MAX_SAFE_INTEGER) - (b.position ?? Number.MAX_SAFE_INTEGER));
+}
+
+/**
+ * Orders courses as the SIPAT program does (day, then course in the day); courses that belong to no
+ * day keep their original order after them. Without any day the list is returned as it came.
+ */
+export function sortTracksByProgram(tracks: LearningTrackCard[]): LearningTrackCard[] {
+  if (!tracks.some(track => track.dayTitle)) return tracks;
+  const rank = (track: LearningTrackCard) => (track.dayTitle ? track.dayPosition ?? 0 : Number.MAX_SAFE_INTEGER);
+  return tracks
+    .map((track, index) => ({ track, index }))
+    .sort((a, b) => rank(a.track) - rank(b.track)
+      || (a.track.coursePosition ?? 0) - (b.track.coursePosition ?? 0) || a.index - b.index)
+    .map(item => item.track);
+}

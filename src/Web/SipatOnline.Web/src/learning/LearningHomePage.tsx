@@ -20,6 +20,8 @@ import {
   getTrackPath,
   getTrackProgress,
   getOverallProgress,
+  groupTracksByDay,
+  sortTracksByProgram,
   formatDuration,
   getLearningErrorMessage,
   type CourseCategory,
@@ -27,6 +29,7 @@ import {
   type LearningSummary,
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
+import DayHeader from './DayHeader';
 import ProgressBar from './ProgressBar';
 import './CourseCards.css';
 
@@ -118,7 +121,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
     listAssignedLearningTracks()
       .then((items) => {
         if (active) {
-          setTracks(items);
+          setTracks(sortTracksByProgram(items));
         }
       })
       .catch((loadError: unknown) => {
@@ -210,6 +213,56 @@ export default function LearningHomePage({ participantName, setSummary }: {
     { value: 'all', label: 'Todas as categorias' },
     ...courseCategories.map(value => ({ value, label: value })),
   ] as const;
+
+  const dayGroups = groupTracksByDay(visibleTracks, tracks);
+  const renderCourse = (track: LearningTrackCard) => {
+    const percentage = getTrackProgress(track);
+    const completed = percentage === 100;
+    const started = percentage > 0;
+    const isRecommended = !startedAnyCourse && track.id === recommendedTrack?.id;
+    const categoryLabel = getCourseCategory(track);
+    const title = getTrackDisplayTitle(track.title);
+    return <article className="learning-catalog-course" key={track.id}>
+      <div className={`learning-catalog-artwork${isRecommended ? ' is-recommended' : ''}`} data-artwork={getTrackArtwork(track.title)}>
+        <img alt="" decoding="async" loading="lazy" src={track.coverUrl ?? getCourseCover(track.title)} />
+        {isRecommended
+          ? <span className="is-recommended">Comece por aqui</span>
+          : <span aria-hidden="true" className={`learning-catalog-course-state is-${completed ? 'done' : started ? 'progress' : 'new'}`}>
+              {completed ? 'Concluído' : started ? 'Em andamento' : 'Para fazer'}
+            </span>}
+      </div>
+      <div className="learning-catalog-course-content">
+        <div className="learning-catalog-course-metadata">
+          <span
+            aria-hidden={!categoryLabel}
+            className={`learning-catalog-course-category${categoryLabel ? '' : ' is-empty'}`}
+          >
+            {categoryLabel ?? ''}
+          </span>
+          <span className="learning-catalog-video-count">
+            <svg aria-hidden="true" viewBox="0 0 16 16">
+              <rect height="10" rx="2" width="10" x="1" y="3" />
+              <path d="m11 6 4-2v8l-4-2" />
+            </svg>
+            {track.lessonCount} {track.lessonCount === 1 ? 'vídeo' : 'vídeos'}
+          </span>
+        </div>
+        <h3><Link to={getTrackPath(track, tracks)}>{title}</Link></h3>
+        <div className="learning-catalog-course-progress">
+          <span>{track.completedLessonCount} de {track.lessonCount} aulas{started && !completed ? ` · ${percentage}%` : ''}</span>
+        </div>
+        <ProgressBar value={percentage} label={`Progresso de ${title}`} />
+        <Link
+          aria-label={`${completed ? 'Ver certificado de' : started ? 'Continuar curso' : 'Começar curso'} ${title}`}
+          className={`learning-catalog-course-action${isRecommended && !started ? ' is-primary' : ''}${completed ? ' is-complete' : ''}${started && !completed ? ' is-started' : ''}`}
+          to={completed ? '/learning/certificates' : getTrackPath(track, tracks)}
+        >
+          {completed ? 'Ver certificado' : started ? 'Continuar de onde parou' : 'Começar curso'}
+          <span aria-hidden="true">→</span>
+        </Link>
+      </div>
+    </article>;
+  };
 
   return (
     <main className={`learning-page learning-catalog${startedAnyCourse ? ' is-returning' : ''}`}>
@@ -454,56 +507,14 @@ export default function LearningHomePage({ participantName, setSummary }: {
           >
             {visibleTracks.length === 0
               ? <p className="learning-state" role="status">Nenhum curso corresponde à sua busca ou filtro.</p>
-              : <div className="learning-catalog-grid">
-                  {visibleTracks.map(track => {
-                    const percentage = getTrackProgress(track);
-                    const completed = percentage === 100;
-                    const started = percentage > 0;
-                    const isRecommended = !startedAnyCourse && track.id === recommendedTrack?.id;
-                    const categoryLabel = getCourseCategory(track);
-                    const title = getTrackDisplayTitle(track.title);
-                    return <article className="learning-catalog-course" key={track.id}>
-                      <div className={`learning-catalog-artwork${isRecommended ? ' is-recommended' : ''}`} data-artwork={getTrackArtwork(track.title)}>
-                        <img alt="" decoding="async" loading="lazy" src={track.coverUrl ?? getCourseCover(track.title)} />
-                        {isRecommended
-                          ? <span className="is-recommended">Comece por aqui</span>
-                          : <span aria-hidden="true" className={`learning-catalog-course-state is-${completed ? 'done' : started ? 'progress' : 'new'}`}>
-                              {completed ? 'Concluído' : started ? 'Em andamento' : 'Para fazer'}
-                            </span>}
-                      </div>
-                      <div className="learning-catalog-course-content">
-                        <div className="learning-catalog-course-metadata">
-                          <span
-                            aria-hidden={!categoryLabel}
-                            className={`learning-catalog-course-category${categoryLabel ? '' : ' is-empty'}`}
-                          >
-                            {categoryLabel ?? ''}
-                          </span>
-                          <span className="learning-catalog-video-count">
-                            <svg aria-hidden="true" viewBox="0 0 16 16">
-                              <rect height="10" rx="2" width="10" x="1" y="3" />
-                              <path d="m11 6 4-2v8l-4-2" />
-                            </svg>
-                            {track.lessonCount} {track.lessonCount === 1 ? 'vídeo' : 'vídeos'}
-                          </span>
-                        </div>
-                        <h3><Link to={getTrackPath(track, tracks)}>{title}</Link></h3>
-                        <div className="learning-catalog-course-progress">
-                          <span>{track.completedLessonCount} de {track.lessonCount} aulas{started && !completed ? ` · ${percentage}%` : ''}</span>
-                        </div>
-                        <ProgressBar value={percentage} label={`Progresso de ${title}`} />
-                        <Link
-                          aria-label={`${completed ? 'Ver certificado de' : started ? 'Continuar curso' : 'Começar curso'} ${title}`}
-                          className={`learning-catalog-course-action${isRecommended && !started ? ' is-primary' : ''}${completed ? ' is-complete' : ''}${started && !completed ? ' is-started' : ''}`}
-                          to={completed ? '/learning/certificates' : getTrackPath(track, tracks)}
-                        >
-                          {completed ? 'Ver certificado' : started ? 'Continuar de onde parou' : 'Começar curso'}
-                          <span aria-hidden="true">→</span>
-                        </Link>
-                      </div>
-                    </article>;
-                  })}
-                </div>}
+              : dayGroups
+                ? <div className="learning-days">
+                    {dayGroups.map((group, dayIndex) => <section aria-labelledby={`learning-day-${dayIndex}`} className="learning-day" key={group.key}>
+                      <DayHeader group={group} titleId={`learning-day-${dayIndex}`} />
+                      <div className="learning-catalog-grid">{group.tracks.map(renderCourse)}</div>
+                    </section>)}
+                  </div>
+                : <div className="learning-catalog-grid">{visibleTracks.map(renderCourse)}</div>}
           </div>
         </section>
       </>}

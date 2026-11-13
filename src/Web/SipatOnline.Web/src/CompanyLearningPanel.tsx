@@ -1,5 +1,8 @@
 import { useState } from 'react';
-import { listPlatformCourses, requestCompanyLearning, distributeCompanyCourse, type PlatformCourse, type CompanyLearningCatalog } from './api';
+import {
+  applyProgramToCompany, listPlatformCourses, listSipatPrograms, requestCompanyLearning, distributeCompanyCourse,
+  type PlatformCourse, type CompanyLearningCatalog, type SipatProgram,
+} from './api';
 import CourseDialog from './CourseDialog';
 
 export default function CompanyLearningPanel({ companyId }: { companyId: string }) {
@@ -8,19 +11,32 @@ export default function CompanyLearningPanel({ companyId }: { companyId: string 
   const [courses, setCourses] = useState<PlatformCourse[]>([]);
   const [sipatId, setSipatId] = useState('');
   const [courseId, setCourseId] = useState('');
+  const [programs, setPrograms] = useState<SipatProgram[]>([]);
+  const [programId, setProgramId] = useState('');
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   async function load() {
     setOpen(true); setBusy(true); setError('');
     try {
-      const [learning, available] = await Promise.all([requestCompanyLearning(companyId), listPlatformCourses()]);
+      const [learning, available, programList] = await Promise.all([requestCompanyLearning(companyId), listPlatformCourses(), listSipatPrograms()]);
+      setPrograms(programList);
       setCatalog(learning); setCourses(available.filter(course => course.status === 'Published' && course.videos.length > 0));
       setSipatId(current => current || learning.events[0]?.id || '');
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Não foi possível carregar os cursos.'); }
     finally { setBusy(false); }
   }
   const available = courses.filter(course => !catalog?.courses.some(item => item.sourceCourseId === course.id && item.sipatEventId === sipatId));
+  async function applyProgram() {
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = await applyProgramToCompany(companyId, sipatId, programId);
+      setCatalog(await requestCompanyLearning(companyId));
+      setProgramId('');
+      setNotice(`Programa aplicado: ${result.courses} ${result.courses === 1 ? 'curso organizado' : 'cursos organizados'} nos dias da SIPAT. Aplicar de novo não cria nada em duplicidade.`);
+    } catch (failure) { setError(failure instanceof Error ? failure.message : 'Não foi possível aplicar o programa.'); }
+    finally { setBusy(false); }
+  }
   async function associate() {
     setBusy(true); setError(''); setNotice('');
     try {
@@ -45,6 +61,15 @@ export default function CompanyLearningPanel({ companyId }: { companyId: string 
           <select disabled={busy || !sipatId} id="distribution-course" onChange={event => setCourseId(event.target.value)} required value={courseId}>
             <option value="">Selecione</option>{available.map(course => <option key={course.id} value={course.id}>{course.title}</option>)}
           </select></div>
+        {programs.length > 0 && <fieldset className="field" style={{ border: '1px solid var(--line)', borderRadius: '0.5rem', padding: '0.75rem' }}>
+          <legend>Aplicar um programa inteiro</legend>
+          <label htmlFor="distribution-program">Programa com dias</label>
+          <select disabled={busy || !sipatId} id="distribution-program" onChange={event => setProgramId(event.target.value)} value={programId}>
+            <option value="">Selecione</option>{programs.map(program => <option key={program.id} value={program.id}>{program.title}</option>)}
+          </select>
+          <p className="field-hint">Associa todos os cursos do programa a esta SIPAT e organiza o participante por dia. Todos os cursos precisam estar publicados e ter vídeos.</p>
+          <button className="button button-primary" disabled={busy || !sipatId || !programId} onClick={() => void applyProgram()} type="button">Aplicar programa</button>
+        </fieldset>}
         <p className="field-hint">Cria uma versão para esta empresa e atribui aos participantes ativos. Alterações futuras no catálogo não mudam esta versão automaticamente.</p>
         <button className="button button-primary" disabled={busy || !sipatId || !courseId} type="submit">Associar curso aos participantes</button>
         {!catalog.events.length && <p>Cadastre e publique uma SIPAT no portal da empresa antes de associar cursos.</p>}
