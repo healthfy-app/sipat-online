@@ -1,8 +1,8 @@
-import { ArrowLeft, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, Rocket, Save } from 'lucide-react';
+import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, Rocket, Save } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  copySipatPlan, createSipatEvent, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, saveSipatPlan, updateSipatEvent,
+  cancelSipatEvent, copySipatPlan, createSipatEvent, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, saveSipatPlan, updateSipatEvent,
   type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -156,6 +156,19 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     } finally { setBusy(false); }
   }
 
+  async function cancelThis() {
+    if (!sipat) return;
+    if (!window.confirm(`Cancelar a "${sipat.title}"? Ela deixa de aparecer para os participantes e não pode mais ser alterada nem publicada. Para reaproveitar os dias, use "Duplicar" em uma nova SIPAT.`)) return;
+    setBusy(true); setError('');
+    try {
+      const cancelled = await cancelSipatEvent(sipat.id);
+      setSipat(cancelled); setDirty(false);
+      setNotice('SIPAT cancelada.');
+    } catch (failure) {
+      setError(getErrorMessage(failure));
+    } finally { setBusy(false); }
+  }
+
   async function copyFrom(sourceId: string) {
     setCopying(false);
     setBusy(true); setError('');
@@ -195,6 +208,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     </Link>
     <PageHeader
       actions={stage === 'grid' && !cancelled && <>
+        {sipat && <Button disabled={busy} onClick={() => void cancelThis()} variant="ghost"><Ban /> Cancelar SIPAT</Button>}
         {sources.length > 0 && <Button disabled={busy} onClick={() => setCopying(true)} variant="outline"><Copy /> Duplicar de outra SIPAT</Button>}
         <Button onClick={() => setImporting(true)} variant="outline"><FileSpreadsheet /> Importar CSV</Button>
         <Button disabled={days.length === 0} onClick={() => download(`${(name || 'sipat').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.csv`, planToCsv(days, catalog))} variant="outline"><FileDown /> Exportar CSV</Button>

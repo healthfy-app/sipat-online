@@ -813,4 +813,16 @@ describe('learning experience', () => {
     expect(within(years).getByRole('button', { name: /SIPAT de demonstração 2026/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(years).getByRole('button', { name: /SIPAT Novembro 2026/ })).toHaveAttribute('aria-pressed', 'false');
   });
+
+  it('does not show the days of a cancelled SIPAT', async () => {
+    const live = { ...trackCard, id: 'a', sipatEventId: 'sipat-live', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    const gone = { ...trackCard, id: 'b', sipatEventId: 'sipat-old', title: 'Teste antigo', sipatTitle: 'SIPAT de teste', sipatStartsAt: '2026-11-11T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Cancelled' as const };
+    listAssignedTracks.mockResolvedValue([gone, live]);
+    getAssignedTrack.mockResolvedValue({ track: live, lessons: [lesson] });
+    renderAt('/learning');
+
+    expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
+    expect(screen.queryByRole('navigation', { name: 'SIPATs' })).not.toBeInTheDocument();
+    expect(screen.queryByText('Teste antigo')).not.toBeInTheDocument();
+  });
 });
