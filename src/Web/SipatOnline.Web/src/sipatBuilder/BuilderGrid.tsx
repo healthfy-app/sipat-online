@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
-  addDays, dayDuration, formatClock, formatSpan, maxDays, maxVideoRows, newDay, normalize, shortDate, subjectColor,
+  addDays, dayDuration, formatClock, formatSpan, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay,
   type Catalog, type DaySlots,
 } from './model';
 import { DayBox, dropId, ThemeTray } from './ThemeCards';
@@ -45,8 +45,8 @@ export default function BuilderGrid({ days, catalog, onChange }: {
   const removeDay = (index: number) => onChange(days.filter((_, position) => position !== index));
 
   /** A theme brings its videos (in its order), its games and, when the day still has the default title, its name. */
-  const applyTheme = (index: number, title: string) => {
-    const subject = themes.find(item => item.title === title);
+  const applyTheme = (index: number, themeId: string) => {
+    const subject = themes.find(item => item.id === themeId);
     if (!subject) { patchDay(index, { subject: '', videos: [], games: [] }); return; }
     const day = days[index];
     const generic = !day.title.trim() || /^Dia [0-9]+$/.test(day.title.trim());
@@ -57,9 +57,9 @@ export default function BuilderGrid({ days, catalog, onChange }: {
   };
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const onDragEnd = ({ active, over }: DragEndEvent) => {
-    const subject = active.data.current?.subject as { title: string } | undefined;
+    const subject = active.data.current?.subject as { id: string } | undefined;
     const target = typeof over?.id === 'string' ? days.findIndex((_, index) => dropId(index) === over.id) : -1;
-    if (subject && target >= 0) applyTheme(target, subject.title);
+    if (subject && target >= 0) applyTheme(target, subject.id);
   };
   const column = (index: number): CSSProperties => ({ '--i': index } as CSSProperties);
 
@@ -88,9 +88,9 @@ export default function BuilderGrid({ days, catalog, onChange }: {
             })}
 
             {days.map((day, index) => {
-              const subject = themes.find(item => normalize(item.title) === normalize(day.subject));
+              const subject = themeOfDay(themes, day);
               return <Cell index={index} key={`box-${day.key}`} row={2}>
-                <DayBox catalog={catalog} dayIndex={index} gameIds={filled(day.games)} onChoose={title => applyTheme(index, title)}
+                <DayBox catalog={catalog} dayIndex={index} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
                   onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)} />
               </Cell>;
             })}

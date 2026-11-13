@@ -1,4 +1,5 @@
 import type { GameModule, PlatformCourse, PlatformLibraryVideo, ProgramDay } from '@/api';
+import { getCourseOption } from '@/courseEditor/courseFormat';
 
 /** Rows shown for videos and games in the planner, as in the sheet (VÍDEO 1 to 5, and the games slots). */
 export const defaultVideoRows = 5;
@@ -8,7 +9,7 @@ export const maxGameRows = 5;
 export const maxDays = 14;
 
 export interface CatalogVideo { id: string; title: string; durationMs: number; code: string | null }
-export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; coverUrl: string | null; gameIds: string[] }
+export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; coverUrl: string | null; gameIds: string[]; option: string | null }
 export interface Catalog {
   videos: Map<string, CatalogVideo>;
   subjects: Subject[];
@@ -35,11 +36,11 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
     if (ids.length === 0) continue;
     ids.forEach(id => used.add(id));
     const gameIds = [...new Set([...(course.modules ?? [])].sort((a, b) => a.afterVideoCount - b.afterVideoCount).map(placement => placement.moduleId))].filter(id => gameMap.has(id));
-    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, gameIds, videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, gameIds, option: getCourseOption(course.description), videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
   }
   const loose = [...videos.keys()].filter(id => !used.has(id));
   if (loose.length > 0) {
-    subjects.push({ id: 'none', title: 'Sem assunto', coverUrl: null, gameIds: [], videoIds: loose, totalMs: loose.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    subjects.push({ id: 'none', title: 'Sem assunto', coverUrl: null, gameIds: [], option: null, videoIds: loose, totalMs: loose.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
   }
   subjects.sort((a, b) => (a.id === 'none' ? 1 : b.id === 'none' ? -1 : a.title.localeCompare(b.title, 'pt-BR')));
   return { videos, subjects, games: gameMap };
@@ -143,4 +144,21 @@ export function subjectColor(subject: string): string {
   let hash = 0;
   for (const char of normalize(subject)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return palette[hash % palette.length];
+}
+
+/** Themes may share a title (the same subject in option 1, 2 and 3): the label tells them apart. */
+export function themeLabel(subject: Subject): string {
+  return subject.option ? `${subject.title} · Opção ${subject.option}` : subject.title;
+}
+
+/**
+ * The theme a day was built from. A day stores only the subject title, so when several themes share it the one
+ * whose videos the day actually holds wins.
+ */
+export function themeOfDay(themes: Subject[], day: Pick<DaySlots, 'subject' | 'videos'>): Subject | undefined {
+  const candidates = themes.filter(item => normalize(item.title) === normalize(day.subject));
+  if (candidates.length <= 1) return candidates[0];
+  const held = new Set(day.videos.filter(Boolean));
+  const overlap = (item: Subject) => item.videoIds.filter(id => held.has(id)).length;
+  return candidates.reduce((best, item) => (overlap(item) > overlap(best) ? item : best));
 }

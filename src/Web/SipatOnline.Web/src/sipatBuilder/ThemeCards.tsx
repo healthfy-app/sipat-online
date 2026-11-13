@@ -3,7 +3,7 @@ import { ExternalLink, Gamepad2, GripVertical, Layers, Search, X } from 'lucide-
 import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { formatClock, formatSpan, normalize, subjectColor, type Catalog, type Subject } from './model';
+import { formatClock, formatSpan, normalize, subjectColor, themeLabel, type Catalog, type Subject } from './model';
 
 export const dropId = (dayIndex: number) => `theme-day-${dayIndex}`;
 
@@ -39,8 +39,8 @@ function TrayCard({ subject }: { subject: Subject }) {
     <button aria-label={`Arrastar o tema ${subject.title}`} className="grid size-7 min-h-0 shrink-0 cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
     <Cover className="size-10" subject={subject} />
     <div className="grid min-w-0 flex-1 gap-0.5">
-      <strong className="truncate text-[0.8125rem] leading-tight" title={subject.title}>{subject.title}</strong>
-      <span className="text-xs text-muted-foreground">{summary(subject)}</span>
+      <strong className="truncate text-[0.8125rem] leading-tight" title={themeLabel(subject)}>{subject.title}</strong>
+      <span className="text-xs text-muted-foreground">{subject.option ? `Opção ${subject.option} · ` : ''}{summary(subject)}</span>
     </div>
   </div>;
 }
@@ -55,9 +55,9 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId(dayIndex) });
   const frame = cn('grid content-start gap-2 rounded-xl border p-2 transition-colors', isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : 'border-border bg-card');
-  const chooser = <select aria-label={`Tema do dia ${dayIndex + 1}`} className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onChange={event => onChoose(event.target.value)} value={subject?.title ?? ''}>
+  const chooser = <select aria-label={`Tema do dia ${dayIndex + 1}`} className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onChange={event => onChoose(event.target.value)} value={subject?.id ?? ''}>
     <option value="">{subject ? 'Trocar tema' : 'Escolher tema'}</option>
-    {themes.map(item => <option key={item.id} value={item.title}>{item.title}</option>)}
+    {themes.map(item => <option key={item.id} value={item.id}>{themeLabel(item)}</option>)}
   </select>;
   if (!subject && videoIds.length === 0) {
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
@@ -71,7 +71,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       ? <div className="flex items-center gap-2.5">
         <Cover className="size-11" subject={subject} />
         <div className="grid min-w-0 flex-1 gap-0.5">
-          <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={subject.title}>{subject.title}</strong>
+          <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={themeLabel(subject)}>{subject.title}{subject.option ? <span className="ml-1 font-normal text-muted-foreground">· Opção {subject.option}</span> : null}</strong>
           <a className="inline-flex items-center gap-1 justify-self-start text-xs font-semibold text-primary hover:underline" href={`/platform/courses/${subject.id}/edit`} rel="noreferrer" target="_blank">
             Editar vídeos e jogos <ExternalLink aria-hidden="true" className="size-3" />
           </a>

@@ -65,7 +65,7 @@ export default function CourseCard({
       </div>
 
       <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border py-2 pl-4 pr-2">
-        <span aria-hidden="true" className="text-[0.8125rem] font-semibold text-muted-foreground transition-colors group-hover:text-primary">
+        <span aria-hidden="true" className="whitespace-nowrap text-[0.8125rem] font-semibold text-muted-foreground transition-colors group-hover:text-primary">
           Abrir editor →
         </span>
         <div className="flex items-center">
@@ -74,11 +74,11 @@ export default function CourseCard({
           className="relative z-10"
           disabled={busy}
           onClick={onDuplicate}
-          size="sm"
+          size="icon-sm"
           title="Duplicar tema"
           variant="ghost"
         >
-          <Copy /> Duplicar
+          <Copy />
         </Button>
         <Button
           aria-label={`Excluir tema ${course.title}`}
