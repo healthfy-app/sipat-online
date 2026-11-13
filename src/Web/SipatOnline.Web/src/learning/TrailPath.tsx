@@ -25,10 +25,10 @@ function stateOf(day: DayGroup, index: number, currentIndex: number): StepState 
 
 /**
  * "Sua trilha" as a path: one node per day of the SIPAT program, winding along the page. `flow` says which
- * way it walks (left by default: day 1 starts at the right end). Every day is open: tapping one opens a
+ * way it walks (right by default: day 1 starts at the left end). Every day is open: tapping one opens a
  * window that only lists the courses of that day, each one a link.
  */
-export default function TrailPath({ days, allTracks, flow = 'left' }: {
+export default function TrailPath({ days, allTracks, flow = 'right' }: {
   days: DayGroup[]; allTracks: LearningTrackCard[]; flow?: 'left' | 'right';
 }) {
   const firstOpen = days.findIndex(day => day.completed < day.total);
