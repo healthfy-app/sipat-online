@@ -12,7 +12,36 @@ const tenant: TenantBranding = {
 };
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
+/** jsdom draws nothing: a fake image and canvas stand in to measure how bright the banner is */
+function stubBannerBrightness(level: number) {
+  const channel = Math.round(level * 255);
+  vi.stubGlobal('Image', class { onload: (() => void) | null = null; set src(_value: string) { queueMicrotask(() => this.onload?.()); } });
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
+    drawImage: vi.fn(),
+    getImageData: () => ({ data: new Uint8ClampedArray(24 * 24 * 4).fill(channel) }),
+  } as unknown as CanvasRenderingContext2D);
+}
+
 describe('company identity settings', () => {
+  it('previews the login with the banner blurred, and warns when the image is very bright', async () => {
+    stubBannerBrightness(0.95);
+    render(<TenantAppearancePage tenant={{ ...tenant, bannerReference: '/api/tenant/banner/acme?v=1' }} onSaved={vi.fn()} />);
+    const layer = screen.getByTestId('login-preview-banner');
+    expect(layer.getAttribute('style')).toContain('blur(');
+    expect(await screen.findByText(/Esta imagem é muito clara/)).toBeVisible();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('does not warn about a dark banner', async () => {
+    stubBannerBrightness(0.2);
+    render(<TenantAppearancePage tenant={{ ...tenant, bannerReference: '/api/tenant/banner/acme?v=1' }} onSaved={vi.fn()} />);
+    await screen.findByTestId('login-preview-banner');
+    await waitFor(() => expect(screen.queryByText(/Esta imagem é muito clara/)).not.toBeInTheDocument());
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
   it('previews picker and HEX changes locally and discards without publishing', async () => {
     render(<TenantAppearancePage tenant={tenant} onSaved={vi.fn()} />);
     const user = userEvent.setup();

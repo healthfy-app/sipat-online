@@ -1,5 +1,5 @@
 import { ImagePlus, Trash2 } from 'lucide-react';
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { saveTenantAppearance, type TenantBranding } from './api';
 import { isBrandColor, tenantTheme } from './branding';
 import { Button } from '@/components/ui/button';
@@ -52,6 +52,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
     || bannerBase64 !== null || (removeBanner && hasBanner);
   const previewLogo = removeLogo ? null : logoBase64 ? `data:${logoType};base64,${logoBase64}` : tenant.logoReference;
   const previewBanner = removeBanner ? null : bannerBase64 ? `data:${bannerType};base64,${bannerBase64}` : tenant.bannerReference ?? null;
+  const bannerBright = useBannerBrightness(previewBanner);
 
   function reset() {
     setPrimary(tenant.primaryColor); setSecondary(tenant.secondaryColor);
@@ -185,6 +186,11 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
                   resetKey={fileVersion}
                   title="Escolher imagem do banner"
                 />
+                {bannerBright !== null && bannerBright > 0.7 && (
+                  <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">
+                    Esta imagem é muito clara. O painel de entrada escurece o fundo, mas o texto pode ficar menos legível. Confira a prévia ao lado.
+                  </p>
+                )}
                 {previewBanner && (
                   <Button className="justify-self-start" disabled={working} size="sm" variant="ghost"
                     onClick={() => { setRemoveBanner(true); setBannerBase64(null); setBannerName(''); setFileVersion((value) => value + 1); setNotice(''); }}>
@@ -241,13 +247,15 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
               <PreviewFrame label="Entrada (login)">
                 <div className="grid min-h-44 grid-cols-[1.1fr_1fr]">
                   <div
-                    className="relative flex flex-col justify-between gap-4 p-4 text-white"
+                    className="relative isolate flex flex-col justify-between gap-4 overflow-hidden p-4 text-white"
                     style={{
                       background: previewBanner
-                        ? `linear-gradient(180deg, rgb(8 26 21 / 55%), rgb(8 26 21 / 78%)), url(${previewBanner}) center / cover no-repeat`
+                        ? '#0b241f'
                         : 'linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 22%, #0b241f), #0b241f)',
                     }}
                   >
+                    {previewBanner && <span aria-hidden="true" className="absolute -inset-3 -z-10" data-testid="login-preview-banner"
+                      style={{ background: `linear-gradient(180deg, rgb(8 26 21 / 55%), rgb(8 26 21 / 82%)), url(${previewBanner}) center / cover no-repeat`, filter: 'blur(6px) saturate(1.05)' }} />}
                     <span className="flex items-center gap-2 text-xs font-semibold">
                       <img alt="" className="size-6 object-contain" src={previewLogo ?? '/favicon.svg'} />
                       {tenant.tenantName}
@@ -361,4 +369,31 @@ function ColorField({ label, value, fallback, onChange, disabled, id }: {
       </div>
     </Field>
   );
+}
+
+/** Average brightness of the banner, 0 (black) to 1 (white); null while unknown or when the image cannot be read. */
+function useBannerBrightness(source: string | null): number | null {
+  const [brightness, setBrightness] = useState<number | null>(null);
+  useEffect(() => {
+    setBrightness(null);
+    if (!source) return;
+    let current = true;
+    const image = new Image();
+    image.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 24; canvas.height = 24;
+        const context = canvas.getContext('2d');
+        if (!context) return;
+        context.drawImage(image, 0, 0, 24, 24);
+        const { data } = context.getImageData(0, 0, 24, 24);
+        let total = 0;
+        for (let index = 0; index < data.length; index += 4) total += (0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2]) / 255;
+        if (current) setBrightness(total / (data.length / 4));
+      } catch { /* a banner from another origin cannot be measured: no warning */ }
+    };
+    image.src = source;
+    return () => { current = false; };
+  }, [source]);
+  return brightness;
 }
