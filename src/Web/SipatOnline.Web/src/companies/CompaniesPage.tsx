@@ -162,7 +162,7 @@ export default function CompaniesPage() {
                   </TableCell>
                   <TableCell className="py-2 pr-2 text-right" onClick={(event) => event.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
-                      <Link className={buttonVariants({ size: 'sm', variant: 'outline' })} to={`/platform/companies/${company.id}`}>Administrar</Link>
+                      <Link className={buttonVariants({ size: 'sm', variant: 'outline' })} to={`/platform/companies/${company.id}`}>Entrar</Link>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button aria-label={`Ações da empresa ${company.name}`} size="icon-sm" variant="ghost"><EllipsisVertical /></Button>

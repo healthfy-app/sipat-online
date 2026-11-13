@@ -1,6 +1,6 @@
-import { ChevronRight, LogIn, Search, UserPlus } from 'lucide-react';
+import { ChevronRight, Search, UserPlus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   getPlatformCompanyEmployees,
   getPlatformDashboard,
@@ -12,7 +12,7 @@ import {
 import CompanyCertificateLogoPanel from '@/CompanyCertificateLogoPanel';
 import CompanyLearningPanel from '@/CompanyLearningPanel';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader, Stat } from '@/components/ui/page';
 import CompanySipatTab from './CompanySipatTab';
@@ -26,7 +26,9 @@ import CompanyAvatar from './CompanyAvatar';
 const pageSize = 50;
 
 export default function CompanyPage() {
-  const { companyId = '' } = useParams<{ companyId: string }>();
+  const { companyId = '', section } = useParams<{ companyId: string; section?: string }>();
+  const navigate = useNavigate();
+  const tab = section === 'participantes' ? 'participants' : section === 'administradores' ? 'administrators' : 'sipat';
   const [page, setPage] = useState<PlatformCompanyEmployeePage | null>(null);
   const [overview, setOverview] = useState<PlatformCompanyOverview | null>(null);
   const [administrators, setAdministrators] = useState<PlatformUserSummary[] | null>(null);
@@ -89,7 +91,6 @@ export default function CompanyPage() {
   const companyName = page?.companyName ?? overview?.name ?? '';
   const currentPage = Math.floor(offset / pageSize) + 1;
   const pageCount = Math.max(1, Math.ceil((page?.totalCount ?? 0) / pageSize));
-  const adminHref = `/admin/dashboard?companyId=${encodeURIComponent(companyId)}`;
 
   return (
     <div className="page-content">
@@ -109,7 +110,6 @@ export default function CompanyPage() {
               <>
                 <CompanyLearningPanel companyId={companyId} />
                 <CompanyCertificateLogoPanel companyId={companyId} />
-                <a className={buttonVariants()} href={adminHref}><LogIn /> Painel da empresa</a>
               </>
             )}
             badge={overview && <Badge variant={overview.isActive ? 'success' : 'neutral'}>{overview.isActive ? 'Ativa' : 'Inativa'}</Badge>}
@@ -133,7 +133,7 @@ export default function CompanyPage() {
           </section>
         )}
 
-        <Tabs defaultValue="sipat">
+        <Tabs onValueChange={value => navigate(`/platform/companies/${companyId}${value === 'participants' ? '/participantes' : value === 'administrators' ? '/administradores' : ''}`)} value={tab}>
           <TabsList aria-label="Seções da empresa">
             <TabsTrigger value="sipat">Construção SIPAT</TabsTrigger>
             <TabsTrigger value="participants">Participantes <TabCount>{page?.totalCount ?? 0}</TabCount></TabsTrigger>

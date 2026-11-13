@@ -35,7 +35,7 @@ function download(name: string, text: string) {
  */
 export default function SipatBuilderPage() {
   const navigate = useNavigate();
-  const { programId } = useParams();
+  const { programId, companyId: companyParam } = useParams();
   const [search] = useSearchParams();
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [companies, setCompanies] = useState<PlatformCompany[]>([]);
@@ -118,7 +118,7 @@ export default function SipatBuilderPage() {
       const saved = savedId ? await updateSipatProgram(savedId, data) : await createSipatProgram(data);
       setDays(saved.days.map(fromProgramDay)); setDirty(false); setSavedId(saved.id);
       setNotice(`“${saved.title}” foi salva.`);
-      if (!savedId) navigate(`/platform/sipat-builder/${saved.id}`, { replace: true });
+      if (!savedId) navigate(companyParam ? `/platform/companies/${companyParam}/sipat/${saved.id}` : `/platform/sipat-builder/${saved.id}`, { replace: true });
       return saved.id;
     } catch (failure) {
       setError(getErrorMessage(failure));
@@ -184,7 +184,7 @@ export default function SipatBuilderPage() {
     {importing && <ImportDialog catalog={catalog} hasPlan={stage === 'grid' && days.some(day => day.videos.some(Boolean))} onClose={() => setImporting(false)}
       onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${imported.length} ${imported.length === 1 ? 'dia importado' : 'dias importados'}. Revise e salve.`); if (!name.trim()) setName('SIPAT importada'); }}
       onTemplate={template} />}
-    {applying && savedId && <ApplyDialog companies={companies} initialCompanyId={search.get('empresa') ?? ''} onApplied={message => { setApplying(false); setNotice(message); }}
+    {applying && savedId && <ApplyDialog companies={companies} initialCompanyId={companyParam ?? search.get('empresa') ?? ''} onApplied={message => { setApplying(false); setNotice(message); }}
       onClose={() => setApplying(false)} programId={savedId} />}
   </Page>;
 }

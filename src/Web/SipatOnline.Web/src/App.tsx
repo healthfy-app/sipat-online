@@ -33,6 +33,7 @@ import PlatformDashboardPage from './PlatformDashboardPage';
 import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
+import CompanyNav from './companies/CompanyNav';
 import PlatformSettingsPage from './PlatformSettingsPage';
 import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
@@ -296,6 +297,30 @@ export default function App() {
               }
             />
             <Route
+              path="/platform/companies/:companyId/:section"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <PlatformCompanyEmployeesPage />
+                  : <AccessDenied />
+              }
+            />
+            <Route
+              path="/platform/companies/:companyId/sipat/nova"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <SipatBuilderPage />
+                  : <AccessDenied />
+              }
+            />
+            <Route
+              path="/platform/companies/:companyId/sipat/:programId"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <SipatBuilderPage />
+                  : <AccessDenied />
+              }
+            />
+            <Route
               path="/platform/users"
               element={
                 state.tenant.tenantKey === 'platform' &&
@@ -537,6 +562,7 @@ function ProtectedPortal({
     !session.roles.includes('PlatformOperator');
   const isPlatformOperator = session.roles.includes('PlatformOperator');
   const isPlatformCompanyContext = isPlatformOperator && getCompanyAdministrationId() !== null;
+  const companyWorkspaceId = /^\/platform\/companies\/([^/]+)/.exec(location.pathname)?.[1] ?? null;
 
   async function handleSignOut() {
     setError('');
@@ -685,7 +711,8 @@ function ProtectedPortal({
               </NavLink>
             </>
           )}
-          {isPlatformOperator && !isPlatformCompanyContext && (
+          {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}
+          {isPlatformOperator && !isPlatformCompanyContext && !companyWorkspaceId && (
             <>
               <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>

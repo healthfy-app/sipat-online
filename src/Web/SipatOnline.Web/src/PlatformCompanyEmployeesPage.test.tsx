@@ -39,7 +39,7 @@ function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/platform/companies/company-1']}>
       <Routes>
-        <Route path="/platform/companies/:companyId" element={<PlatformCompanyEmployeesPage />} />
+        <Route path="/platform/companies/:companyId/:section?" element={<PlatformCompanyEmployeesPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -82,8 +82,6 @@ describe('Platform company employees', () => {
     expect(within(screen.getByRole('region', { name: 'Resumo da empresa' })).getByText('Administradores')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Administradores/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ver histórico' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Painel da empresa' }))
-      .toHaveAttribute('href', '/admin/dashboard?companyId=company-1');
     expect(screen.getByRole('columnheader', { name: 'Atividades e certificados' })).toBeInTheDocument();
     expect(screen.queryByText('Conclusão média')).not.toBeInTheDocument();
   });

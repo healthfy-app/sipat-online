@@ -27,7 +27,9 @@ export default function BuilderGrid({ days, catalog, onChange }: {
   const previousCount = useRef(days.length);
   const themes = catalog.subjects.filter(subject => subject.id !== 'none');
   const canAddDay = days.length < maxDays;
-  const layout = { '--columns': `repeat(${days.length}, minmax(17rem, 1fr))${canAddDay ? ' 7rem' : ''}` } as CSSProperties;
+  // up to 7 days always fit the width of the page, however many there are; beyond that the days keep a minimum width and scroll
+  const fits = days.length <= 7;
+  const layout = { '--columns': `repeat(${days.length}, ${fits ? 'minmax(0, 1fr)' : 'minmax(11rem, 1fr)'})${canAddDay ? ' 4.5rem' : ''}` } as CSSProperties;
 
   // a day just added scrolls into view
   useEffect(() => {
@@ -71,14 +73,14 @@ export default function BuilderGrid({ days, catalog, onChange }: {
               const color = subjectColor(day.subject);
               const time = dayDuration(day, catalog);
               return <div className="builder-col grid content-start gap-2 border-r border-b border-border p-3" key={`head-${day.key}`} role="columnheader" style={{ ...column(index), borderTop: `4px solid ${color}`, gridColumn: index + 1, gridRow: 1 }}>
-                <div className="flex items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                   <span className="rounded-md px-2 py-0.5 text-xs font-bold tracking-wide text-white" style={{ backgroundColor: color }}>DIA {index + 1}</span>
                   <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground tabular-nums"><Clock aria-hidden="true" className="size-3.5" />{time > 0 ? formatSpan(time) : 'sem vídeos'}</span>
                   <Button aria-label={`Remover o dia ${index + 1}`} disabled={days.length === 1} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </div>
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                  <Input aria-label={`Data do dia ${index + 1}`} className="h-9 px-2 text-sm" onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
-                  <span className="text-xs font-medium whitespace-nowrap text-muted-foreground capitalize">{shortDate(day.date)}</span>
+                <div className="grid items-center gap-1">
+                  <Input aria-label={`Data do dia ${index + 1}`} className="h-9 min-w-0 px-2 text-sm" onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
+                  <span className="text-xs font-medium text-muted-foreground capitalize">{shortDate(day.date)}</span>
                 </div>
                 <Input aria-label={`Título do dia ${index + 1}`} className="font-medium" maxLength={160}
                   onChange={event => patchDay(index, { title: event.target.value })} placeholder="Tema ou slogan do dia" value={day.title} />
@@ -103,8 +105,8 @@ export default function BuilderGrid({ days, catalog, onChange }: {
 
             {canAddDay && <button aria-label="Adicionar dia" className="builder-add-day group flex flex-col items-center justify-center gap-2 border-l border-dashed border-border bg-muted/30 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
               onClick={addDay} style={{ gridColumn: days.length + 1, gridRow: '1 / span 3' }} type="button">
-              <span aria-hidden="true" className="grid size-11 place-items-center rounded-full border-2 border-dashed border-current transition-transform group-hover:scale-110"><Plus className="size-5" /></span>
-              Dia
+              <span aria-hidden="true" className="grid size-9 place-items-center rounded-full border-2 border-dashed border-current transition-transform group-hover:scale-110"><Plus className="size-4" /></span>
+              <span className="text-xs">Dia</span>
             </button>}
           </div>
         </div>

@@ -20,7 +20,7 @@ export default function CompanySipatTab({ companyId }: { companyId: string }) {
     return () => { current = false; };
   }, []);
 
-  const build = `/platform/sipat-builder?empresa=${encodeURIComponent(companyId)}`;
+  const build = `/platform/companies/${companyId}/sipat/nova`;
   return <section aria-label="Construção SIPAT" className="grid gap-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="m-0 max-w-prose text-sm text-muted-foreground">
@@ -37,7 +37,7 @@ export default function CompanySipatTab({ companyId }: { companyId: string }) {
           <strong className="truncate text-sm font-semibold">{program.title}</strong>
           <span className="text-xs text-muted-foreground">{pluralize(program.days.length, 'dia', 'dias')} · {pluralize(program.days.reduce((total, day) => total + day.videoIds.length, 0), 'vídeo', 'vídeos')}</span>
         </div>
-        <Link aria-label={`Abrir ${program.title}`} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }))} to={`/platform/sipat-builder/${program.id}?empresa=${encodeURIComponent(companyId)}`}>Abrir</Link>
+        <Link aria-label={`Abrir ${program.title}`} className={cn(buttonVariants({ size: 'sm', variant: 'outline' }))} to={`/platform/companies/${companyId}/sipat/${program.id}`}>Abrir</Link>
       </li>)}
     </ul>}
   </section>;
