@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getPlatformDashboard, type PlatformCompanyOverview } from '@/api';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
@@ -162,6 +162,7 @@ export default function CompaniesPage() {
                   </TableCell>
                   <TableCell className="py-2 pr-2 text-right" onClick={(event) => event.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
+                      <Link className={buttonVariants({ size: 'sm', variant: 'outline' })} to={`/platform/companies/${company.id}`}>Administrar</Link>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button aria-label={`Ações da empresa ${company.name}`} size="icon-sm" variant="ghost"><EllipsisVertical /></Button>

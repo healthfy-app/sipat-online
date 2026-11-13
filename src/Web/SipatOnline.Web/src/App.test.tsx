@@ -464,7 +464,8 @@ describe('tenant portal', () => {
     expect(screen.getByRole('button', { name: 'Nova empresa' })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Cadastrar empresa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Painel' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Usuários' })).toHaveAttribute('href', '/platform/users');
+    expect(screen.queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Biblioteca' })).toHaveAttribute('href', '/platform/courses');
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/platform/dashboard',

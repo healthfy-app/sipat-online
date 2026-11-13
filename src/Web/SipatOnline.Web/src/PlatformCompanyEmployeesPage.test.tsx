@@ -10,11 +10,18 @@ vi.mock('./api', async (importOriginal) => ({
   getPlatformCompanyEmployees: vi.fn(),
   getPlatformDashboard: vi.fn(),
   listPlatformUsers: vi.fn(),
+  listSipatPrograms: vi.fn(),
 }));
+
+/** the company opens on its SIPAT builder; these tests are about the participants */
+async function openParticipants() {
+  await userEvent.click(await screen.findByRole('tab', { name: /Participantes/ }));
+}
 
 afterEach(cleanup);
 
 beforeEach(() => {
+  vi.mocked(api.listSipatPrograms).mockResolvedValue([]);
   vi.mocked(api.listPlatformUsers).mockResolvedValue({ offset: 0, limit: 50, totalCount: 0, items: [] });
   vi.mocked(api.getPlatformDashboard).mockResolvedValue([{
     id: 'company-1',
@@ -63,6 +70,7 @@ describe('Platform company employees', () => {
   it('shows employee name, registration, completion and active status', async () => {
     vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
     renderPage();
+    await openParticipants();
 
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Ana Silva' })).toBeInTheDocument();
@@ -74,7 +82,7 @@ describe('Platform company employees', () => {
     expect(within(screen.getByRole('region', { name: 'Resumo da empresa' })).getByText('Administradores')).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /Administradores/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ver histórico' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Administrar empresa' }))
+    expect(screen.getByRole('link', { name: 'Painel da empresa' }))
       .toHaveAttribute('href', '/admin/dashboard?companyId=company-1');
     expect(screen.getByRole('columnheader', { name: 'Atividades e certificados' })).toBeInTheDocument();
     expect(screen.queryByText('Conclusão média')).not.toBeInTheDocument();
@@ -97,6 +105,7 @@ describe('Platform company employees', () => {
       }));
     const user = userEvent.setup();
     renderPage();
+    await openParticipants();
     await screen.findByText('Ana Silva');
 
     await user.type(screen.getByLabelText('Buscar por nome ou login'), 'MAT-002');
@@ -133,6 +142,7 @@ describe('Platform company employees', () => {
       }));
     const user = userEvent.setup();
     renderPage();
+    await openParticipants();
     await screen.findByText('Ana Silva');
     expect(screen.getByText('Página 1 de 2 · 51 resultados')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Próxima' }));

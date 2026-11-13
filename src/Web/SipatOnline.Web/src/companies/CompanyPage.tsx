@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader, Stat } from '@/components/ui/page';
+import CompanySipatTab from './CompanySipatTab';
 import { TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingState from '@/LoadingState';
@@ -108,7 +109,7 @@ export default function CompanyPage() {
               <>
                 <CompanyLearningPanel companyId={companyId} />
                 <CompanyCertificateLogoPanel companyId={companyId} />
-                <a className={buttonVariants()} href={adminHref}><LogIn /> Administrar empresa</a>
+                <a className={buttonVariants()} href={adminHref}><LogIn /> Painel da empresa</a>
               </>
             )}
             badge={overview && <Badge variant={overview.isActive ? 'success' : 'neutral'}>{overview.isActive ? 'Ativa' : 'Inativa'}</Badge>}
@@ -132,11 +133,16 @@ export default function CompanyPage() {
           </section>
         )}
 
-        <Tabs defaultValue="participants">
+        <Tabs defaultValue="sipat">
           <TabsList aria-label="Seções da empresa">
+            <TabsTrigger value="sipat">Construção SIPAT</TabsTrigger>
             <TabsTrigger value="participants">Participantes <TabCount>{page?.totalCount ?? 0}</TabCount></TabsTrigger>
             <TabsTrigger value="administrators">Administradores <TabCount>{administrators?.length ?? overview?.administratorCount ?? 0}</TabCount></TabsTrigger>
           </TabsList>
+
+          <TabsContent value="sipat">
+            <CompanySipatTab companyId={companyId} />
+          </TabsContent>
 
           <TabsContent value="participants">
             {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}

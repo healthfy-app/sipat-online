@@ -690,9 +690,7 @@ function ProtectedPortal({
               <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/dashboard">Visão geral</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/users">Usuários</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Cursos</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/sipat-builder">Construção SIPAT</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Biblioteca</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
             </>
           )}
