@@ -191,6 +191,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ILearningEngagementStore, EfLearningEngagementStore>();
         services.AddScoped<LearningEngagementService>();
         services.AddScoped<LearningDistributionService>();
+        services.AddScoped<SipatPlanService>();
         services.AddSingleton<ICertificatePdfRenderer, CertificatePdfRenderer>();
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<PlatformCourseCatalogService>();

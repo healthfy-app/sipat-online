@@ -292,6 +292,28 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("Users", "identity");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatPlanEntity", b =>
+                {
+                    b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DaysJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("SipatEventId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("SipatPlans", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatProgramEntity", b =>
                 {
                     b.Property<Guid>("Id")

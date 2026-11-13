@@ -519,6 +519,50 @@ public static class PlatformCourseCatalogEndpoints
         return endpoints;
     }
 
+    /// <summary>The catalog as the company's administrator sees it: what a day of a SIPAT can be made of, read only.</summary>
+    public static IEndpointRouteBuilder MapSipatCatalogEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/admin/sipat-catalog")
+            .WithTags("SIPAT catalog")
+            .RequireAuthorization("ManageTenantSipats");
+
+        group.MapGet("/", async (
+            IPlatformCourseCatalogStore courses,
+            IGameModuleStore modules,
+            CancellationToken cancellationToken) =>
+        {
+            var themes = (await courses.ListAsync(cancellationToken))
+                .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
+                .Select(course => ToResponse(course) with
+                {
+                    CoverUrl = course.CoverContentType is null
+                        ? null
+                        : $"/api/admin/sipat-catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}"
+                })
+                .ToArray();
+            var videos = (await courses.ListVideosAsync(cancellationToken))
+                .Select(item => new PlatformLibraryVideoResponse(ToResponse(item.Video), item.CourseCount))
+                .ToArray();
+            var games = (await modules.ListAsync(cancellationToken))
+                .Select(item => ToResponse(item.Module, item.UsageCount))
+                .ToArray();
+            return Results.Ok(new SipatCatalogResponse(themes, videos, games));
+        })
+        .WithName("GetSipatCatalog");
+
+        group.MapGet("/courses/{courseId:guid}/cover", async (
+            Guid courseId,
+            IPlatformCourseCatalogStore courses,
+            CancellationToken cancellationToken) =>
+        {
+            var cover = await courses.GetCoverAsync(courseId, cancellationToken);
+            return cover is null ? Results.NotFound() : Results.File(cover.Data, cover.ContentType);
+        })
+        .WithName("GetSipatCatalogCover");
+
+        return endpoints;
+    }
+
     private static async Task<IResult> UploadVideoAsync(
         Guid? courseId,
         HttpContext context,
@@ -684,6 +728,11 @@ public sealed record UpdatePlatformCourseRequest(
 public sealed record SetPlatformCourseVideosRequest(IReadOnlyList<Guid>? VideoIds);
 
 public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Video, int CourseCount);
+
+public sealed record SipatCatalogResponse(
+    IReadOnlyList<PlatformCourseResponse> Courses,
+    IReadOnlyList<PlatformLibraryVideoResponse> Videos,
+    IReadOnlyList<GameModuleResponse> Games);
 
 public sealed record PlatformCourseResponse(
     Guid Id,

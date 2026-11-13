@@ -122,11 +122,20 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         if (program is null) return Failure<ProgramApplication>("learning.program_not_found", "O programa não foi encontrado.");
         if (!access.Value.Events.Any(item => item.Id == sipatId))
             return Failure<ProgramApplication>("learning.sipat_not_found", "Escolha uma SIPAT publicada desta empresa.");
+        return await ApplyDaysAsync(tenantId, sipatId, program.Days, programId, "learning.program.applied", "sipat_program", token);
+    }
 
-        // build and check every day before touching anything, so a program is never applied halfway
+    /// <summary>
+    /// Delivers the days of a SIPAT (the company's own plan, or a program applied to it): each day becomes a track with
+    /// its videos, and the day's games come after the last video. Safe to repeat: a day nobody started is refreshed.
+    /// </summary>
+    public async Task<Result<ProgramApplication>> ApplyDaysAsync(Guid tenantId, Guid sipatId, IReadOnlyList<ProgramDay> days,
+        Guid auditSubjectId, string auditAction, string auditSubjectType, CancellationToken token)
+    {
+        // build and check every day before touching anything, so a SIPAT is never delivered halfway
         var now = clock.GetUtcNow();
-        var courses = new List<PlatformCourse>(program.Days.Count);
-        foreach (var day in program.Days)
+        var courses = new List<PlatformCourse>(days.Count);
+        foreach (var day in days)
         {
             // programs saved before days held videos come back without lists: say what to do instead of failing
             if (day.VideoIds is null || day.VideoIds.Count == 0)
@@ -150,7 +159,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         for (var index = 0; index < courses.Count; index++)
         {
             var course = courses[index];
-            var day = program.Days[index];
+            var day = days[index];
             var track = await db.LearningTracks.SingleOrDefaultAsync(
                 item => item.TenantId == tenantId && item.SipatEventId == sipatId && item.SourceCourseId == course.Id, token);
             if (track is null)
@@ -170,8 +179,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         }
 
         await db.SaveChangesAsync(token);
-        await audit.WriteAsync(new AuditRecord(actor.UserId!, new TenantId(tenantId), "learning.program.applied",
-            "sipat_program", programId.ToString("D"), clock.GetUtcNow()), token);
+        await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(tenantId), auditAction,
+            auditSubjectType, auditSubjectId.ToString("D"), clock.GetUtcNow()), token);
         return Result<ProgramApplication>.Success(new ProgramApplication(courses.Count, created, updated, kept));
     }
 
