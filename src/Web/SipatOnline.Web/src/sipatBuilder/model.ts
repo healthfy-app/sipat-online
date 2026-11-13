@@ -8,7 +8,7 @@ export const maxGameRows = 5;
 export const maxDays = 14;
 
 export interface CatalogVideo { id: string; title: string; durationMs: number; code: string | null }
-export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; coverUrl: string | null }
+export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; coverUrl: string | null; gameIds: string[] }
 export interface Catalog {
   videos: Map<string, CatalogVideo>;
   subjects: Subject[];
@@ -22,6 +22,7 @@ export function videoCode(title: string): string | null {
 
 /** Subjects are the courses of the catalog; videos that belong to no course go to "Sem assunto". */
 export function buildCatalog(courses: PlatformCourse[], library: PlatformLibraryVideo[], games: GameModule[]): Catalog {
+  const gameMap = new Map(games.map(game => [game.id, game]));
   const videos = new Map<string, CatalogVideo>();
   for (const item of library) {
     const title = item.video.libraryTitle ?? item.video.title;
@@ -33,14 +34,15 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
     const ids = course.videos.map(video => video.id).filter(id => videos.has(id));
     if (ids.length === 0) continue;
     ids.forEach(id => used.add(id));
-    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    const gameIds = [...new Set([...(course.modules ?? [])].sort((a, b) => a.afterVideoCount - b.afterVideoCount).map(placement => placement.moduleId))].filter(id => gameMap.has(id));
+    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, gameIds, videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
   }
   const loose = [...videos.keys()].filter(id => !used.has(id));
   if (loose.length > 0) {
-    subjects.push({ id: 'none', title: 'Sem assunto', coverUrl: null, videoIds: loose, totalMs: loose.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    subjects.push({ id: 'none', title: 'Sem assunto', coverUrl: null, gameIds: [], videoIds: loose, totalMs: loose.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
   }
   subjects.sort((a, b) => (a.id === 'none' ? 1 : b.id === 'none' ? -1 : a.title.localeCompare(b.title, 'pt-BR')));
-  return { videos, subjects, games: new Map(games.map(game => [game.id, game])) };
+  return { videos, subjects, games: gameMap };
 }
 
 /** A day while it is being edited: empty slots are kept so the grid keeps its shape. */

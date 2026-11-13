@@ -1,9 +1,9 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { ExternalLink, GripVertical, Layers, Search, X } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { ExternalLink, Gamepad2, GripVertical, Layers, Search, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
-import { formatSpan, normalize, subjectColor, type Subject } from './model';
+import { formatClock, formatSpan, normalize, subjectColor, type Catalog, type Subject } from './model';
 
 export const dropId = (dayIndex: number) => `theme-day-${dayIndex}`;
 
@@ -45,35 +45,60 @@ function TrayCard({ subject }: { subject: Subject }) {
   </div>;
 }
 
-/** The card of the theme chosen for a day; it is also where a theme can be dropped. */
-export function ThemeSlot({ dayIndex, subject, subjects, hasVideosOutsideTheme, onChoose, onClear }: {
-  dayIndex: number; subject: Subject | undefined; subjects: Subject[]; hasVideosOutsideTheme: boolean;
+/**
+ * One day, whole: the theme dropped on it, its videos (read only, in a box that scrolls) and the games that come with
+ * it, highlighted. Videos and games are changed in the theme editor, never here.
+ */
+export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear }: {
+  dayIndex: number; subject: Subject | undefined; themes: Subject[]; catalog: Catalog; videoIds: string[]; gameIds: string[];
   onChoose: (title: string) => void; onClear: () => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId(dayIndex) });
-  const frame = cn('grid gap-2 rounded-xl border p-2 transition-colors', isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : 'border-border bg-card');
-  const chooser: ReactNode = <select aria-label={`Tema do dia ${dayIndex + 1}`} className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onChange={event => onChoose(event.target.value)} value={subject?.title ?? ''}>
+  const frame = cn('grid content-start gap-2 rounded-xl border p-2 transition-colors', isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : 'border-border bg-card');
+  const chooser = <select aria-label={`Tema do dia ${dayIndex + 1}`} className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onChange={event => onChoose(event.target.value)} value={subject?.title ?? ''}>
     <option value="">{subject ? 'Trocar tema' : 'Escolher tema'}</option>
-    {subjects.map(item => <option key={item.id} value={item.title}>{item.title}</option>)}
+    {themes.map(item => <option key={item.id} value={item.title}>{item.title}</option>)}
   </select>;
-  if (!subject) {
-    return <div className={cn(frame, 'border-dashed')} ref={setNodeRef}>
-      <p className="m-0 px-1 pt-1 text-center text-xs text-muted-foreground">Arraste um tema aqui</p>
+  if (!subject && videoIds.length === 0) {
+    return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
+      <Layers aria-hidden="true" className="mx-auto size-6 text-muted-foreground" />
+      <p className="m-0 text-xs text-muted-foreground">Arraste um tema para este dia</p>
       {chooser}
     </div>;
   }
   return <div className={frame} ref={setNodeRef}>
-    <div className="flex items-center gap-2.5">
-      <Cover className="size-11" subject={subject} />
-      <div className="grid min-w-0 flex-1 gap-0.5">
-        <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={subject.title}>{subject.title}</strong>
-        <span className="text-xs text-muted-foreground">{summary(subject)}{hasVideosOutsideTheme && ' · ajustado'}</span>
+    {subject
+      ? <div className="flex items-center gap-2.5">
+        <Cover className="size-11" subject={subject} />
+        <div className="grid min-w-0 flex-1 gap-0.5">
+          <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={subject.title}>{subject.title}</strong>
+          <a className="inline-flex items-center gap-1 justify-self-start text-xs font-semibold text-primary hover:underline" href={`/platform/courses/${subject.id}/edit`} rel="noreferrer" target="_blank">
+            Editar vídeos e jogos <ExternalLink aria-hidden="true" className="size-3" />
+          </a>
+        </div>
+        <button aria-label={`Tirar o tema do dia ${dayIndex + 1}`} className="grid size-7 min-h-0 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted" onClick={onClear} type="button"><X className="size-4" /></button>
       </div>
-      <button aria-label={`Tirar o tema do dia ${dayIndex + 1}`} className="grid size-7 shrink-0 place-items-center rounded-md text-muted-foreground hover:bg-muted" onClick={onClear} type="button"><X className="size-4" /></button>
+      : <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground">Vídeos vindos de uma importação. Arraste um tema para trocar.</p>}
+
+    <div aria-label={`Conteúdo do dia ${dayIndex + 1}`} className="grid max-h-72 gap-1 overflow-y-auto pr-0.5" role="group">
+      <ol className="m-0 grid list-none gap-1 p-0">
+        {videoIds.map((id, index) => {
+          const video = catalog.videos.get(id);
+          return <li className="flex items-center gap-2 rounded-lg bg-muted/60 px-2 py-1.5" key={id}>
+            <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded bg-accent text-[0.6875rem] font-bold text-accent-foreground">{index + 1}</span>
+            <span className="min-w-0 flex-1 text-xs leading-snug font-medium [overflow-wrap:anywhere]">{video?.title ?? 'Vídeo removido do catálogo'}</span>
+            {video && <span className="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">{formatClock(video.durationMs)}</span>}
+          </li>;
+        })}
+      </ol>
+      {gameIds.length > 0 && <ul aria-label="Jogos do dia" className="m-0 mt-1 grid list-none gap-1 p-0">
+        {gameIds.map(id => <li className="flex items-center gap-2 rounded-lg border border-warning/50 bg-warning-soft px-2 py-1.5 text-warning" key={id}>
+          <Gamepad2 aria-hidden="true" className="size-4 shrink-0" />
+          <span className="min-w-0 flex-1 text-xs leading-snug font-semibold [overflow-wrap:anywhere]">{catalog.games.get(id)?.title ?? 'Jogo removido'}</span>
+          <span className="shrink-0 rounded bg-warning/15 px-1.5 text-[0.625rem] font-bold tracking-wide uppercase">Jogo</span>
+        </li>)}
+      </ul>}
     </div>
-    <a className="inline-flex items-center gap-1 justify-self-start text-xs font-semibold text-primary hover:underline" href={`/platform/courses/${subject.id}/edit`} rel="noreferrer" target="_blank">
-      Abrir editor <ExternalLink aria-hidden="true" className="size-3" />
-    </a>
     {chooser}
   </div>;
 }

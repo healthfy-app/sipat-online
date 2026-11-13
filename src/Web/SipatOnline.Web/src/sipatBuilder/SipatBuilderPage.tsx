@@ -14,11 +14,10 @@ import LoadingState from '@/LoadingState';
 import ApplyDialog from './ApplyDialog';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
-import ContentPicker, { type PickTarget } from './ContentPicker';
 import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
 import {
-  addDays, buildCatalog, dayDuration, defaultVideoRows, formatSpan, fromProgramDay, isValidDate, maxVideoRows, newDay, toProgramDay,
+  addDays, buildCatalog, dayDuration, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay,
   type Catalog, type DaySlots,
 } from './model';
 
@@ -52,7 +51,6 @@ export default function SipatBuilderPage() {
   const [days, setDays] = useState<DaySlots[]>([]);
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [picker, setPicker] = useState<PickTarget | null>(null);
   const [importing, setImporting] = useState(false);
   const [applying, setApplying] = useState(false);
 
@@ -97,34 +95,6 @@ export default function SipatBuilderPage() {
     const first = isValidDate(startDate) ? startDate : '';
     setDays(Array.from({ length: dayCount }, (_, index) => newDay(index, first ? addDays(first, index) : '')));
     setStage('grid'); setDirty(true);
-  }
-
-  function pick(id: string) {
-    if (!picker) return;
-    const { kind, dayIndex, slot } = picker;
-    const field = kind === 'video' ? 'videos' : 'games';
-    edit(days.map((day, index) => {
-      if (index !== dayIndex) return day;
-      const items = [...day[field]];
-      while (items.length <= slot) items.push(null);
-      items[slot] = id;
-      return { ...day, [field]: items };
-    }));
-    setPicker(null);
-  }
-
-  function pickMany(ids: string[]) {
-    if (!picker) return;
-    edit(days.map((day, index) => {
-      if (index !== picker.dayIndex) return day;
-      const slots = [...day.videos];
-      for (const id of ids) {
-        const free = slots.findIndex(value => !value);
-        if (free >= 0) slots[free] = id; else if (slots.length < maxVideoRows) slots.push(id);
-      }
-      return { ...day, videos: slots };
-    }));
-    setPicker(null);
   }
 
   /** Why the plan cannot be saved yet, in words the operator can act on. */
@@ -176,7 +146,7 @@ export default function SipatBuilderPage() {
         <Button disabled={saving} onClick={async () => { const id = dirty || !savedId ? await save() : savedId; if (id) setApplying(true); }}><Send /> Aplicar a uma empresa</Button>
       </>}
       badge={dirty ? <Badge variant="outline">Alterações não salvas</Badge> : undefined}
-      description={stage === 'setup' ? 'Monte a programação de dias da SIPAT de uma empresa.' : 'Cada coluna é um dia. Escolha os vídeos e os jogos e veja o tempo de cada dia.'}
+      description={stage === 'setup' ? 'Monte a programação de dias da SIPAT de uma empresa.' : 'Cada coluna é um dia. Arraste um tema para cada dia e confira os vídeos e os jogos.'}
       eyebrow="Operação"
       title="Construção SIPAT"
     />
@@ -205,14 +175,12 @@ export default function SipatBuilderPage() {
             ].map(item => <div className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground" key={item.label}>{item.icon}{item.label}</div>)}
           </dl>
         </div>
-        <BuilderGrid catalog={catalog} days={days} onChange={edit} onPick={setPicker} />
+        <BuilderGrid catalog={catalog} days={days} onChange={edit} />
         <p className="m-0 text-xs text-muted-foreground">
-          Dica: as linhas crescem sozinhas. Ao preencher a última, aparece outra, até {maxVideoRows} vídeos por dia. Cada dia vira uma trilha para os participantes; os vídeos começam com {defaultVideoRows} lugares só como referência da planilha.
+          Cada dia é uma caixa: arraste um tema para ela. Os vídeos e os jogos vêm do tema e aparecem aqui só para conferência. Para mudar o conteúdo, use "Editar vídeos e jogos".
         </p>
       </>}
 
-    {picker && catalog && days[picker.dayIndex] && <ContentPicker catalog={catalog} day={days[picker.dayIndex]} dayNumber={picker.dayIndex + 1}
-      onClose={() => setPicker(null)} onPick={pick} onPickMany={pickMany} target={picker} />}
     {importing && <ImportDialog catalog={catalog} hasPlan={stage === 'grid' && days.some(day => day.videos.some(Boolean))} onClose={() => setImporting(false)}
       onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${imported.length} ${imported.length === 1 ? 'dia importado' : 'dias importados'}. Revise e salve.`); if (!name.trim()) setName('SIPAT importada'); }}
       onTemplate={template} />}
