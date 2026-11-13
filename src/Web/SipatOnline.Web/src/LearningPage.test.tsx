@@ -740,16 +740,34 @@ describe('learning experience', () => {
     expect(within(others).getByRole('heading', { name: 'Curso avulso' })).toBeVisible();
   });
 
-  it('puts the resume step and the journey in program order, not assignment order', async () => {
-    const later = { ...trackCard, id: 'later', title: 'Alongamento', progressPercentage: 20, dayTitle: 'Dia 2', dayPosition: 2, coursePosition: 1 };
-    const first = { ...trackCard, id: 'first', title: 'Uso de EPI', dayTitle: 'Dia 1', dayPosition: 1, coursePosition: 1 };
-    listAssignedTracks.mockResolvedValue([later, first]);
-    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'first' ? first : later, lessons: [lesson] }));
+  it('draws the trail as one open node per day, in program order, with the courses of the chosen day', async () => {
+    const user = userEvent.setup();
+    const later = { ...trackCard, id: 'later', title: 'Alongamento', progressPercentage: 20, dayTitle: 'Dia 2 · Saúde', dayPosition: 2, coursePosition: 1 };
+    const doneOne = { ...trackCard, id: 'done', title: 'Uso de EPI', lessonCount: 2, completedLessonCount: 2, progressPercentage: 100, dayTitle: 'Dia 1 · Segurança', dayPosition: 1, coursePosition: 1 };
+    const todo = { ...trackCard, id: 'todo', title: 'Sinalização', dayTitle: 'Dia 1 · Segurança', dayPosition: 1, coursePosition: 2 };
+    listAssignedTracks.mockResolvedValue([later, todo, doneOne]);
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'later' ? later : todo, lessons: [lesson] }));
     renderAt('/learning');
-    const journey = await screen.findByRole('list', { name: 'Etapas da formação' });
-    const steps = within(journey).getAllByRole('listitem');
-    expect(steps[0]).toHaveTextContent('Uso de EPI');
-    expect(steps[1]).toHaveTextContent('Alongamento');
+
+    const trail = await screen.findByRole('list', { name: 'Dias da trilha' });
+    const days = within(trail).getAllByRole('button');
+    expect(days.map(day => day.textContent)).toEqual(['1Dia 1 · Segurança1 de 2 cursos', '2Dia 2 · Saúde0 de 1 curso']);
+    // every day is open, and the first one with something left is the current one
+    expect(days.every(day => !(day as HTMLButtonElement).disabled)).toBe(true);
+    expect(days[0]).toHaveAttribute('aria-current', 'step');
+    expect(days[1]).not.toHaveAttribute('aria-current');
+
+    const panel = document.getElementById('learning-trail-panel')!;
+    expect(within(panel).getByRole('heading', { name: 'Dia 1 · Segurança' })).toBeVisible();
+    expect(within(panel).getByRole('link', { name: /Uso de EPI/ })).toBeVisible();
+    expect(within(panel).getByRole('link', { name: /Começar: Sinalização/ })).toHaveAttribute('href', '/learning/tracks/sinalizacao');
+
+    await user.click(days[1]);
+    expect(days[1]).toHaveAttribute('aria-pressed', 'true');
+    // the panel is recreated for each day, so look it up again
+    const second = document.getElementById('learning-trail-panel')!;
+    expect(within(second).getByRole('heading', { name: 'Dia 2 · Saúde' })).toBeVisible();
+    expect(within(second).getByRole('link', { name: /Continuar: Alongamento/ })).toHaveAttribute('href', '/learning/tracks/alongamento');
   });
 
   it('keeps the plain list when no course belongs to a day, and hides days emptied by a filter', async () => {

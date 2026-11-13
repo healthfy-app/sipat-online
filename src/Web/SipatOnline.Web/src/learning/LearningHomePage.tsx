@@ -30,6 +30,7 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
+import TrailPath from './TrailPath';
 import ProgressBar from './ProgressBar';
 import './CourseCards.css';
 import './LearningHero.css';
@@ -216,6 +217,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
   ] as const;
 
   const dayGroups = groupTracksByDay(visibleTracks, tracks);
+  // the trail always shows every day, whatever the filters on the course list are
+  const trailDays = groupTracksByDay(tracks, tracks);
   const renderCourse = (track: LearningTrackCard) => {
     const percentage = getTrackProgress(track);
     const completed = percentage === 100;
@@ -407,36 +410,40 @@ export default function LearningHomePage({ participantName, setSummary }: {
 
         {startedAnyCourse && overallProgress < 100 && (
           <>
-            <section aria-labelledby="learning-journey-title" className="learning-journey-card">
-              <div className="learning-journey-heading">
-                <h2 id="learning-journey-title">Sua trilha</h2>
-                <span>Passo {currentStepNumber} de {tracks.length} · {overallProgress}% da formação</span>
-              </div>
-              <ProgressBar label="Progresso da trilha" value={overallProgress} />
-              <ol aria-label="Etapas da formação" className="learning-journey-steps">
-                {tracks.map((track, index) => {
-                  const percentage = getTrackProgress(track);
-                  const isComplete = percentage === 100;
-                  const isCurrent = index === activeStepIndex && !isComplete;
-                  const title = getTrackDisplayTitle(track.title);
-                  return (
-                    <li className={`learning-journey-step${isComplete ? ' is-complete' : ''}${isCurrent ? ' is-current' : ''}`} key={track.id}>
-                      <Link
-                        aria-current={isCurrent ? 'step' : undefined}
-                        to={getTrackPath(track, tracks)}
-                      >
-                        <strong>{index + 1} · {title}</strong>
-                        <span>{isComplete
-                          ? 'Concluído'
-                          : isCurrent
-                            ? `Em andamento · ${track.completedLessonCount} de ${track.lessonCount} aulas`
-                            : 'A seguir'}</span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ol>
-            </section>
+            {trailDays
+              ? <TrailPath allTracks={tracks} days={trailDays} />
+              : (
+              <section aria-labelledby="learning-journey-title" className="learning-journey-card">
+                <div className="learning-journey-heading">
+                  <h2 id="learning-journey-title">Sua trilha</h2>
+                  <span>Passo {currentStepNumber} de {tracks.length} · {overallProgress}% da formação</span>
+                </div>
+                <ProgressBar label="Progresso da trilha" value={overallProgress} />
+                <ol aria-label="Etapas da formação" className="learning-journey-steps">
+                  {tracks.map((track, index) => {
+                    const percentage = getTrackProgress(track);
+                    const isComplete = percentage === 100;
+                    const isCurrent = index === activeStepIndex && !isComplete;
+                    const title = getTrackDisplayTitle(track.title);
+                    return (
+                      <li className={`learning-journey-step${isComplete ? ' is-complete' : ''}${isCurrent ? ' is-current' : ''}`} key={track.id}>
+                        <Link
+                          aria-current={isCurrent ? 'step' : undefined}
+                          to={getTrackPath(track, tracks)}
+                        >
+                          <strong>{index + 1} · {title}</strong>
+                          <span>{isComplete
+                            ? 'Concluído'
+                            : isCurrent
+                              ? `Em andamento · ${track.completedLessonCount} de ${track.lessonCount} aulas`
+                              : 'A seguir'}</span>
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ol>
+              </section>
+              )}
             {shownMilestone !== null && shownMilestone < 100 && (
               <p className="learning-milestone" role="status">
                 {shownMilestone === 25

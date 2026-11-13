@@ -1,0 +1,111 @@
+/*
+ * "Sua trilha" as a winding path with one node per day. Nodes are big enough to hit with a thumb,
+ * the state is color and a check (never color alone), and nothing is locked.
+ */
+.portal-layout-learner .learning-trail {
+  margin-bottom: 1.5rem; padding: 1.25rem; border: 1px solid var(--learner-border); border-radius: 18px; background: var(--learner-surface);
+}
+.portal-layout-learner .learning-trail-heading h2 { margin: 0; color: var(--learner-forest); font-size: 1.25rem; font-weight: 800; }
+.portal-layout-learner .learning-trail-heading p { margin: 0.25rem 0 0; color: var(--learner-text-secondary); font-size: 0.9375rem; }
+
+.portal-layout-learner .learning-trail-body {
+  display: grid; grid-template-columns: minmax(17rem, 22rem) minmax(0, 1fr); gap: 1.5rem; align-items: start; margin-top: 1rem;
+}
+
+/* ---------- the path ---------- */
+.portal-layout-learner .learning-trail-path { position: relative; width: 100%; margin: 0; padding: 0; list-style: none; }
+.portal-layout-learner .learning-trail-line { position: absolute; top: 0; left: 0; overflow: visible; }
+.portal-layout-learner .learning-trail-line path { fill: none; stroke-linecap: round; }
+.portal-layout-learner .learning-trail-line path.is-walked { stroke: var(--learner-action); stroke-width: 7; }
+.portal-layout-learner .learning-trail-line path.is-ahead { stroke: #c8d3ce; stroke-width: 6; stroke-dasharray: 1 13; }
+
+.portal-layout-learner .learning-trail-step { position: absolute; right: 0; left: 0; }
+.portal-layout-learner .learning-trail-button {
+  position: absolute; inset: 0; display: flex; align-items: center; gap: 0.9rem; width: 100%; padding: 0 0 0 var(--node-x);
+  border: 0; border-radius: 14px; color: var(--learner-forest); background: transparent; text-align: left; cursor: pointer;
+}
+.portal-layout-learner .learning-trail-button:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: -3px; }
+
+.portal-layout-learner .learning-trail-node {
+  position: relative; display: grid; flex: 0 0 auto; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: 50%;
+  color: #fff; background: var(--learner-forest); font-size: 1.375rem; font-weight: 800; line-height: 1;
+  box-shadow: 0 6px 14px -6px rgb(18 51 44 / 55%); transition: transform 200ms cubic-bezier(.16, 1, .3, 1), box-shadow 200ms ease;
+}
+.portal-layout-learner .learning-trail-node svg { width: 1.6rem; height: 1.6rem; stroke-width: 3.5; }
+.portal-layout-learner .learning-trail-step.is-done .learning-trail-node { background: var(--learner-action); }
+.portal-layout-learner .learning-trail-step.is-current .learning-trail-node {
+  width: 3.75rem; height: 3.75rem; margin: -0.25rem; color: var(--learner-forest); background: var(--learner-progress-accent);
+  border: 3px solid var(--learner-forest);
+}
+.portal-layout-learner .learning-trail-step.is-open .learning-trail-node { box-shadow: 0 0 0 4px var(--learner-surface), 0 0 0 7px var(--learner-forest); }
+.portal-layout-learner .learning-trail-step.is-open.is-current .learning-trail-node { box-shadow: 0 0 0 4px var(--learner-surface), 0 0 0 7px var(--learner-progress-accent); }
+
+.portal-layout-learner .learning-trail-label { display: grid; min-width: 0; gap: 0.1rem; }
+.portal-layout-learner .learning-trail-label strong { font-size: 1rem; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+.portal-layout-learner .learning-trail-label small { color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 600; }
+.portal-layout-learner .learning-trail-step.is-upcoming:not(.is-open) .learning-trail-label strong { font-weight: 700; }
+
+/* ---------- the open day ---------- */
+.portal-layout-learner .learning-trail-panel {
+  position: sticky; top: 1rem; display: grid; gap: 0.85rem; padding: 1.1rem; border: 2px solid var(--learner-border); border-radius: 18px; background: var(--learner-surface);
+}
+.portal-layout-learner .learning-trail-panel.is-current { border-color: var(--learner-progress-accent); }
+.portal-layout-learner .learning-trail-panel.is-done { border-color: var(--learner-action); }
+.portal-layout-learner .learning-trail-panel > header { display: flex; align-items: center; gap: 0.85rem; }
+.portal-layout-learner .learning-trail-panel-number {
+  display: grid; flex: 0 0 auto; place-items: center; width: 2.5rem; height: 2.5rem; border-radius: 50%;
+  color: #fff; background: var(--learner-forest); font-size: 1.125rem; font-weight: 800;
+}
+.portal-layout-learner .learning-trail-panel.is-current .learning-trail-panel-number { color: var(--learner-forest); background: var(--learner-progress-accent); }
+.portal-layout-learner .learning-trail-panel.is-done .learning-trail-panel-number { background: var(--learner-action); }
+.portal-layout-learner .learning-trail-panel-number svg { width: 1.25rem; height: 1.25rem; stroke-width: 3.5; }
+.portal-layout-learner .learning-trail-panel h3 { margin: 0; color: var(--learner-forest); font-size: 1.1875rem; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+.portal-layout-learner .learning-trail-panel > header p { margin: 0.15rem 0 0; color: var(--learner-text-secondary); font-size: 0.9375rem; font-weight: 600; }
+.portal-layout-learner .learning-trail-panel .learning-progress-track { height: 10px; border-radius: 999px; background: var(--learner-progress-track); }
+.portal-layout-learner .learning-trail-panel .learning-progress-track > span { border-radius: inherit; background: var(--learner-action); }
+.portal-layout-learner .learning-trail-panel.is-current .learning-progress-track > span { background: #e0a800; }
+
+.portal-layout-learner .learning-trail-courses { display: grid; gap: 0.4rem; margin: 0; padding: 0; list-style: none; }
+.portal-layout-learner .learning-trail-course {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.2rem 0.7rem; min-height: 3rem; padding: 0.5rem 0.75rem; border: 1px solid transparent; border-radius: 12px;
+  color: var(--learner-forest); background: var(--learner-canvas); text-decoration: none; transition: background-color 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+.portal-layout-learner .learning-trail-course svg { flex: 0 0 auto; width: 1.375rem; height: 1.375rem; color: #8a9a94; }
+.portal-layout-learner .learning-trail-course.is-done { background: var(--learner-complete-bg); }
+.portal-layout-learner .learning-trail-course.is-done svg { color: var(--learner-action); }
+.portal-layout-learner .learning-trail-course.is-started { border-color: var(--learner-progress-accent); background: #fff8e1; }
+.portal-layout-learner .learning-trail-course.is-started svg { color: #8a5a00; }
+.portal-layout-learner .learning-trail-course:hover { border-color: var(--learner-forest); }
+.portal-layout-learner .learning-trail-course:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+.portal-layout-learner .learning-trail-course-title { flex: 1 1 9rem; min-width: 0; font-size: 1rem; font-weight: 700; overflow-wrap: break-word; }
+.portal-layout-learner .learning-trail-course-state { flex: 0 0 auto; margin-left: auto; color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 600; }
+.portal-layout-learner .learning-trail-course.is-done .learning-trail-course-state { color: var(--learner-complete-text); }
+
+.portal-layout-learner .learning-trail-action {
+  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; min-height: 3.25rem; padding: 0.7rem 1rem; border-radius: 12px;
+  color: var(--learner-forest); background: var(--learner-progress-accent); font-size: 1rem; font-weight: 800; line-height: 1.3; text-decoration: none; overflow-wrap: break-word;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+.portal-layout-learner .learning-trail-action:hover { background: #ffc233; }
+.portal-layout-learner .learning-trail-action:active { transform: scale(0.99); }
+.portal-layout-learner .learning-trail-action:focus-visible { outline: 3px solid var(--learner-forest); outline-offset: 2px; }
+.portal-layout-learner .learning-trail-action svg { flex: 0 0 auto; width: 1.25rem; height: 1.25rem; }
+.portal-layout-learner .learning-trail-action.is-done { color: #fff; background: var(--learner-action); }
+
+@media (max-width: 860px) {
+  .portal-layout-learner .learning-trail-body { grid-template-columns: minmax(0, 1fr); }
+  .portal-layout-learner .learning-trail-panel { position: static; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .portal-layout-learner .learning-trail-button:hover .learning-trail-node { transform: scale(1.07); }
+  .portal-layout-learner .learning-trail-step.is-current .learning-trail-node::after {
+    content: ""; position: absolute; inset: -0.55rem; border-radius: 50%; border: 3px solid var(--learner-progress-accent); opacity: 0;
+    animation: learning-trail-halo 2s ease-out infinite;
+  }
+  .portal-layout-learner .learning-trail-panel { animation: learning-trail-panel-in 260ms cubic-bezier(.16, 1, .3, 1); }
+  .portal-layout-learner .learning-trail-line path.is-walked { stroke-dasharray: 600; animation: learning-trail-draw 900ms ease-out both; }
+}
+@keyframes learning-trail-halo { 0% { opacity: 0.7; transform: scale(0.85); } 100% { opacity: 0; transform: scale(1.25); } }
+@keyframes learning-trail-panel-in { from { opacity: 0; transform: translateX(8px); } }
+@keyframes learning-trail-draw { from { stroke-dashoffset: 600; } to { stroke-dashoffset: 0; } }
