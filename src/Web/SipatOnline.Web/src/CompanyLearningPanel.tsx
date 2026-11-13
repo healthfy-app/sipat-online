@@ -4,6 +4,7 @@ import {
   type PlatformCourse, type CompanyLearningCatalog, type SipatProgram,
 } from './api';
 import CourseDialog from './CourseDialog';
+import { describeApplication } from './sipatBuilder/ApplyDialog';
 
 export default function CompanyLearningPanel({ companyId }: { companyId: string }) {
   const [open, setOpen] = useState(false);
@@ -33,7 +34,7 @@ export default function CompanyLearningPanel({ companyId }: { companyId: string 
       const result = await applyProgramToCompany(companyId, sipatId, programId);
       setCatalog(await requestCompanyLearning(companyId));
       setProgramId('');
-      setNotice(`Programa aplicado: ${result.courses} ${result.courses === 1 ? 'curso organizado' : 'cursos organizados'} nos dias da SIPAT. Aplicar de novo não cria nada em duplicidade.`);
+      setNotice(describeApplication(result));
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Não foi possível aplicar o programa.'); }
     finally { setBusy(false); }
   }

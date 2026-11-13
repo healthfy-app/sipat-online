@@ -32,6 +32,7 @@ import PlatformUsersPage from './PlatformUsersPage';
 import PlatformDashboardPage from './PlatformDashboardPage';
 import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
+import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
 import PlatformSettingsPage from './PlatformSettingsPage';
 import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
@@ -321,6 +322,22 @@ export default function App() {
               element={
                 state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
                   ? <PlatformCoursesPage />
+                  : <AccessDenied />
+              }
+            />
+            <Route
+              path="/platform/sipat-builder"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <SipatBuilderPage />
+                  : <AccessDenied />
+              }
+            />
+            <Route
+              path="/platform/sipat-builder/:programId"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <SipatBuilderPage />
                   : <AccessDenied />
               }
             />
@@ -675,6 +692,7 @@ function ProtectedPortal({
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/dashboard">Visão geral</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/users">Usuários</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Cursos</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/sipat-builder">Construção SIPAT</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
             </>
           )}

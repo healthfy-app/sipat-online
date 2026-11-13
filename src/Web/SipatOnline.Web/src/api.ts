@@ -180,8 +180,20 @@ export interface CompanyLearningCatalog {
 export function requestCompanyLearning(companyId: string): Promise<CompanyLearningCatalog> {
   return requestJson(`/api/platform/companies/${companyId}/learning`);
 }
-/** A day of a SIPAT program: a free title and its courses, in order. */
-export interface ProgramDay { title: string; courseIds: string[] }
+/**
+ * A day of a SIPAT program, as in the "Seletor de módulos" sheet: a title or slogan, an optional date,
+ * a main subject, the videos picked for the day (in order) and its games, quizzes or forms.
+ */
+export interface ProgramDay {
+  /** Stable across edits; absent on a day that was never saved. */
+  id?: string;
+  title: string;
+  /** yyyy-MM-dd */
+  date: string | null;
+  subject: string | null;
+  videoIds: string[];
+  gameIds: string[];
+}
 export interface SipatProgram { id: string; title: string; days: ProgramDay[]; createdAt: string }
 export interface SipatProgramData { title: string; days: ProgramDay[] }
 
@@ -197,7 +209,15 @@ export function updateSipatProgram(programId: string, data: SipatProgramData): P
 export async function deleteSipatProgram(programId: string): Promise<void> {
   await request(`/api/platform/catalog/programs/${programId}`, { method: 'DELETE' });
 }
-export function applyProgramToCompany(companyId: string, sipatId: string, programId: string): Promise<{ courses: number }> {
+export interface ProgramApplication {
+  days: number;
+  created: number;
+  /** Days nobody had started, refreshed with the program's current content. */
+  updated: number;
+  /** Days left as they were because participants already have progress in them. */
+  kept: number;
+}
+export function applyProgramToCompany(companyId: string, sipatId: string, programId: string): Promise<ProgramApplication> {
   return requestJson(`/api/platform/companies/${companyId}/learning/sipats/${sipatId}/programs/${programId}`, { method: 'POST', body: '{}' });
 }
 
@@ -382,6 +402,10 @@ export interface LearningTrackCard {
   dayTitle?: string | null;
   dayPosition?: number | null;
   coursePosition?: number | null;
+  /** yyyy-MM-dd, when the program gave the day a date. */
+  dayDate?: string | null;
+  /** Total length of the videos of the track. */
+  durationMilliseconds?: number;
 }
 
 export interface ParticipantOutcomes {

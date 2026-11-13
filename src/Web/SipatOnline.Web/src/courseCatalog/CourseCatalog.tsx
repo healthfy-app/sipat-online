@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   deleteGameModule,
   deleteSipatProgram,
@@ -22,7 +23,6 @@ import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
 import GameModuleForm from './GameModuleForm';
 import GameModulesPanel from './GameModulesPanel';
-import ProgramForm from './ProgramForm';
 import ProgramsPanel from './ProgramsPanel';
 import VideoLibraryPanel from './VideoLibraryPanel';
 
@@ -31,7 +31,7 @@ type CatalogDialog =
   | { kind: 'create' }
   | { kind: 'upload' }
   | { kind: 'game'; module: GameModule | null }
-  | { kind: 'program'; program: SipatProgram | null };
+
 
 export default function CourseCatalog({
   courses,
@@ -66,6 +66,7 @@ export default function CourseCatalog({
   onProgramsChanged: (message: string) => Promise<void>;
   onError: (message: string) => void;
 }) {
+  const navigate = useNavigate();
   const [tab, setTab] = useState<CatalogTab>('courses');
   const [dialog, setDialog] = useState<CatalogDialog | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
@@ -119,7 +120,7 @@ export default function CourseCatalog({
 
   const primaryAction = {
     courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar curso</Button>,
-    programs: <Button onClick={() => setDialog({ kind: 'program', program: null })}><Plus /> Novo programa</Button>,
+    programs: <Button onClick={() => navigate('/platform/sipat-builder')}><Plus /> Montar SIPAT</Button>,
     videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
     modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
   }[tab];
@@ -165,9 +166,9 @@ export default function CourseCatalog({
             <ProgramsPanel
               busy={isDeleting}
               courses={courses}
-              onCreate={() => setDialog({ kind: 'program', program: null })}
+              onCreate={() => navigate('/platform/sipat-builder')}
               onDelete={(program) => void removeProgram(program)}
-              onEdit={(program) => setDialog({ kind: 'program', program })}
+              onEdit={(program) => navigate(`/platform/sipat-builder/${program.id}`)}
               programs={programs}
             />
           )}
@@ -202,21 +203,6 @@ export default function CourseCatalog({
             setDialog(null);
             await onVideoUploaded(video);
           }} />
-        </Dialog>
-      )}
-
-      {dialog?.kind === 'program' && (
-        <Dialog busy={dialogBusy} onClose={() => setDialog(null)} size="lg" title={dialog.program ? 'Editar programa' : 'Novo programa'}>
-          <ProgramForm
-            courses={courses}
-            onBusyChange={setDialogBusy}
-            onCancel={() => setDialog(null)}
-            onSaved={async (message) => {
-              setDialog(null);
-              await onProgramsChanged(message);
-            }}
-            program={dialog.program}
-          />
         </Dialog>
       )}
 
