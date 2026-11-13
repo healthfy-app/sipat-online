@@ -90,3 +90,15 @@
   .portal-layout-learner .week-day { animation: week-day-rise 380ms cubic-bezier(.16, 1, .3, 1) both; }
 }
 @keyframes week-day-rise { from { opacity: 0; transform: translateY(10px); } }
+
+/* the SIPAT of each year: the current one is shown, earlier ones are one tap away */
+.portal-layout-learner .sipat-years { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.portal-layout-learner .sipat-year {
+  display: grid; gap: 0.1rem; min-width: 6.5rem; padding: 0.5rem 1rem; border: 1px solid var(--learner-border); border-radius: 14px;
+  color: var(--learner-forest); background: var(--learner-surface); font: inherit; text-align: left; cursor: pointer;
+}
+.portal-layout-learner .sipat-year strong { font-size: 1.125rem; font-weight: 800; }
+.portal-layout-learner .sipat-year span { color: var(--learner-text-secondary); font-size: 0.8125rem; font-weight: 600; }
+.portal-layout-learner .sipat-year[aria-pressed="true"] { border-color: var(--learner-forest); background: var(--learner-forest); color: #fff; }
+.portal-layout-learner .sipat-year[aria-pressed="true"] span { color: rgb(255 255 255 / 80%); }
+.portal-layout-learner .sipat-year:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }

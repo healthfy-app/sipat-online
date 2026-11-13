@@ -14,7 +14,10 @@ public sealed record LearningTrackCard(
     int? DayPosition = null,
     int? CoursePosition = null,
     DateOnly? DayDate = null,
-    long DurationMilliseconds = 0);
+    long DurationMilliseconds = 0,
+    string? SipatTitle = null,
+    DateTimeOffset? SipatStartsAt = null,
+    string? SipatStatus = null);
 
 public sealed record LearningLessonProgress(
     Guid Id,

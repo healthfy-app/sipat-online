@@ -20,8 +20,8 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange }: {
-  days: DaySlots[]; catalog: Catalog; onChange: (days: DaySlots[]) => void;
+export default function BuilderGrid({ days, catalog, onChange, canEditThemes = true }: {
+  days: DaySlots[]; catalog: Catalog; onChange: (days: DaySlots[]) => void; canEditThemes?: boolean;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const previousCount = useRef(days.length);
@@ -90,7 +90,7 @@ export default function BuilderGrid({ days, catalog, onChange }: {
             {days.map((day, index) => {
               const subject = themeOfDay(themes, day);
               return <Cell index={index} key={`box-${day.key}`} row={2}>
-                <DayBox catalog={catalog} dayIndex={index} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
+                <DayBox canEditThemes={canEditThemes} catalog={catalog} dayIndex={index} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
                   onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)} />
               </Cell>;
             })}

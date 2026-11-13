@@ -40,7 +40,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
   participantName?: string;
   setSummary?: (summary: LearningSummary | null) => void;
 }) {
-  const [tracks, setTracks] = useState<LearningTrackCard[]>([]);
+  const [allTracks, setTracks] = useState<LearningTrackCard[]>([]);
+  const [chosenSipat, setChosenSipat] = useState<string | null>(null);
   const [resumeExperience, setResumeExperience] = useState<LearningExperience | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingResume, setIsLoadingResume] = useState(false);
@@ -54,6 +55,12 @@ export default function LearningHomePage({ participantName, setSummary }: {
   const [shownMilestone, setShownMilestone] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
+  // a participant can have several SIPATs (one a year): the published one is shown, earlier ones are one tap away
+  const sipats = Array.from(new Map(allTracks.map(track => [track.sipatEventId, track])).values())
+    .map(track => ({ id: track.sipatEventId, title: track.sipatTitle ?? 'SIPAT', startsAt: track.sipatStartsAt ?? '', published: track.sipatStatus === 'Published' }))
+    .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+  const currentSipat = sipats.find(item => item.id === chosenSipat) ?? sipats.find(item => item.published) ?? sipats[0];
+  const tracks = sipats.length > 1 && currentSipat ? allTracks.filter(track => track.sipatEventId === currentSipat.id) : allTracks;
   const overallProgress = getOverallProgress(tracks);
   const isFormationComplete = overallProgress >= 100;
   const completedCourses = tracks.filter(track => getTrackProgress(track) === 100).length;
@@ -417,6 +424,13 @@ export default function LearningHomePage({ participantName, setSummary }: {
             )}
           </section>
         )}
+
+        {sipats.length > 1 && currentSipat && <nav aria-label="SIPATs" className="sipat-years">
+          {sipats.map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} onClick={() => { setChosenSipat(item.id); setSelectedDay(null); }} type="button">
+            <strong>{item.startsAt ? new Date(item.startsAt).getUTCFullYear() : item.title}</strong>
+            <span>{item.published ? 'Em andamento' : 'Anterior'}</span>
+          </button>)}
+        </nav>}
 
         {(startedAnyCourse || dayMode) && (overallProgress < 100 || dayMode) && (
           <>

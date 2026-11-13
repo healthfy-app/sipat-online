@@ -15,7 +15,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader, Stat } from '@/components/ui/page';
-import CompanySipatTab from './CompanySipatTab';
 import { TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingState from '@/LoadingState';
@@ -28,7 +27,7 @@ const pageSize = 50;
 export default function CompanyPage() {
   const { companyId = '', section } = useParams<{ companyId: string; section?: string }>();
   const navigate = useNavigate();
-  const tab = section === 'participantes' ? 'participants' : section === 'administradores' ? 'administrators' : 'sipat';
+  const tab = section === 'administradores' ? 'administrators' : 'participants';
   const [page, setPage] = useState<PlatformCompanyEmployeePage | null>(null);
   const [overview, setOverview] = useState<PlatformCompanyOverview | null>(null);
   const [administrators, setAdministrators] = useState<PlatformUserSummary[] | null>(null);
@@ -170,16 +169,11 @@ export default function CompanyPage() {
           </section>
         )}
 
-        <Tabs onValueChange={value => navigate(`/platform/companies/${companyId}${value === 'participants' ? '/participantes' : value === 'administrators' ? '/administradores' : ''}`)} value={tab}>
+        <Tabs onValueChange={value => navigate(`/platform/companies/${companyId}${value === 'administrators' ? '/administradores' : '/participantes'}`)} value={tab}>
           <TabsList aria-label="Seções da empresa">
-            <TabsTrigger value="sipat">Construção SIPAT</TabsTrigger>
             <TabsTrigger value="participants">Participantes <TabCount>{page?.totalCount ?? 0}</TabCount></TabsTrigger>
             <TabsTrigger value="administrators">Administradores <TabCount>{administrators?.length ?? overview?.administratorCount ?? 0}</TabCount></TabsTrigger>
           </TabsList>
-
-          <TabsContent value="sipat">
-            <CompanySipatTab companyId={companyId} />
-          </TabsContent>
 
           <TabsContent value="participants">
             {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}

@@ -5,11 +5,9 @@ import {
   listGameModules,
   listPlatformCourses,
   listPlatformLibraryVideos,
-  listSipatPrograms,
   type GameModule,
   type PlatformCourse,
   type PlatformLibraryVideo,
-  type SipatProgram,
 } from './api';
 import LoadingState from './LoadingState';
 import CourseCatalog from './courseCatalog/CourseCatalog';
@@ -27,7 +25,6 @@ export default function PlatformCoursesPage() {
   const [courses, setCourses] = useState<PlatformCourse[]>([]);
   const [library, setLibrary] = useState<PlatformLibraryVideo[]>([]);
   const [modules, setModules] = useState<GameModule[]>([]);
-  const [programs, setPrograms] = useState<SipatProgram[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [error, setError] = useState('');
@@ -42,16 +39,14 @@ export default function PlatformCoursesPage() {
     setError('');
     setIsLoading(true);
     try {
-      const [courseList, libraryList, moduleList, programList] = await Promise.all([
+      const [courseList, libraryList, moduleList] = await Promise.all([
         listPlatformCourses(),
         listPlatformLibraryVideos(),
         listGameModules(),
-        listSipatPrograms(),
       ]);
       setCourses(courseList);
       setLibrary(libraryList);
       setModules(moduleList);
-      setPrograms(programList);
     } catch (loadError) {
       setError(getErrorMessage(loadError));
       if (propagateError) throw loadError;
@@ -113,7 +108,6 @@ export default function PlatformCoursesPage() {
           isLoading={isLoading}
           library={library}
           modules={modules}
-          programs={programs}
           onCreated={async (course) => {
             setError('');
             setCourses((current) => [course, ...current.filter((item) => item.id !== course.id)]);

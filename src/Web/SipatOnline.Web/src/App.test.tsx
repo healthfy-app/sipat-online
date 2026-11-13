@@ -58,8 +58,7 @@ describe('tenant portal', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
-    expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Programação' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'SIPATs' })).not.toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('link', { name: 'Acompanhamento' }));
     expect(await screen.findByText(/Modo de consulta/)).toBeVisible();
@@ -91,7 +90,7 @@ describe('tenant portal', () => {
       .toHaveTextContent('Modo operador · Administrando Acme');
     expect(screen.getByRole('link', { name: 'Identidade visual' })).toHaveAttribute('href', '/admin/appearance');
     expect(screen.getByRole('link', { name: 'Voltar à plataforma' })).toHaveAttribute('href', '/platform');
-    expect(screen.getByRole('link', { name: 'Trilhas e vídeos' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
     const companyNavigation = screen.getByRole('complementary', { name: 'Navegação principal' });
     expect(within(companyNavigation).getByText('GESTÃO DA EMPRESA')).toBeVisible();
     expect(within(companyNavigation).queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
@@ -302,8 +301,8 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
-    expect(screen.getByRole('link', { name: 'Programação' })).toHaveAttribute('href', '/admin/sipats');
-    expect(screen.getByRole('link', { name: 'Trilhas e vídeos' })).toHaveAttribute('href', '/admin/content');
+    expect(screen.getByRole('link', { name: 'SIPATs' })).toHaveAttribute('href', '/admin/sipats');
+    expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
   });
 

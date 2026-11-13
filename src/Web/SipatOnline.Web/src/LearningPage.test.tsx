@@ -780,4 +780,22 @@ describe('learning experience', () => {
     expect(screen.queryByRole('heading', { name: 'Vídeos da semana' })).not.toBeInTheDocument();
     expect(screen.queryByRole('list', { name: 'Dias da trilha' })).not.toBeInTheDocument();
   });
+
+  it('shows the week of the published SIPAT and keeps the earlier years one tap away', async () => {
+    const user = userEvent.setup();
+    const now = { ...trackCard, id: 'n', sipatEventId: 'sipat-2026', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatStatus: 'Published' as const };
+    const before = { ...trackCard, id: 'o', sipatEventId: 'sipat-2025', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 1, coursePosition: 1, lessonCount: 1, completedLessonCount: 1, progressPercentage: 100, sipatTitle: 'SIPAT 2025', sipatStartsAt: '2025-11-10T00:00:00Z', sipatStatus: 'Cancelled' as const };
+    listAssignedTracks.mockResolvedValue([before, now]);
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'n' ? now : before, lessons: [{ ...lesson, title: trackId === 'n' ? 'Ginástica laboral' : 'Respiração' }] }));
+    renderAt('/learning');
+
+    const years = await screen.findByRole('navigation', { name: 'SIPATs' });
+    expect(within(years).getByRole('button', { name: /2026.*Em andamento/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Dia 1 · Mente tranquila' })).not.toBeInTheDocument();
+
+    await user.click(within(years).getByRole('button', { name: /2025.*Anterior/ }));
+    expect(await screen.findByRole('region', { name: 'Dia 1 · Mente tranquila' })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Dia 1 · Boa postura' })).not.toBeInTheDocument();
+  });
 });

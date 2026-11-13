@@ -1,16 +1,13 @@
 import { Plus } from 'lucide-react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   deleteGameModule,
   deletePlatformCourse,
   deletePlatformVideo,
-  deleteSipatProgram,
   type GameModule,
   type PlatformCourse,
   type PlatformCourseVideo,
   type PlatformLibraryVideo,
-  type SipatProgram,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,10 +22,9 @@ import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
 import GameModuleForm from './GameModuleForm';
 import GameModulesPanel from './GameModulesPanel';
-import ProgramsPanel from './ProgramsPanel';
 import VideoLibraryPanel from './VideoLibraryPanel';
 
-type CatalogTab = 'courses' | 'programs' | 'videos' | 'modules';
+type CatalogTab = 'courses' | 'videos' | 'modules';
 type CatalogDialog =
   | { kind: 'create' }
   | { kind: 'upload' }
@@ -39,7 +35,6 @@ export default function CourseCatalog({
   courses,
   library,
   modules,
-  programs,
   isLoading,
   error,
   busy,
@@ -55,7 +50,6 @@ export default function CourseCatalog({
   courses: PlatformCourse[];
   library: PlatformLibraryVideo[];
   modules: GameModule[];
-  programs: SipatProgram[];
   isLoading: boolean;
   error: string;
   busy: boolean;
@@ -68,7 +62,6 @@ export default function CourseCatalog({
   onProgramsChanged: (message: string) => Promise<void>;
   onError: (message: string) => void;
 }) {
-  const navigate = useNavigate();
   const [tab, setTab] = useState<CatalogTab>('courses');
   const [dialog, setDialog] = useState<CatalogDialog | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
@@ -79,7 +72,6 @@ export default function CourseCatalog({
   const showTabs = !isEmptyCatalog || tab !== 'courses';
   const tabs: { id: CatalogTab; label: string; count: number }[] = [
     { id: 'courses', label: 'Temas', count: courses.length },
-    { id: 'programs', label: 'SIPATs prontas', count: programs.length },
     { id: 'videos', label: 'Vídeos', count: library.length },
     { id: 'modules', label: 'Jogos e perguntas', count: modules.length },
   ];
@@ -134,23 +126,8 @@ export default function CourseCatalog({
     }
   }
 
-  async function removeProgram(program: SipatProgram) {
-    if (!window.confirm(`Excluir a SIPAT pronta "${program.title}"? As empresas que já a receberam continuam com o conteúdo.`)) return;
-    onError('');
-    setIsDeleting(true);
-    try {
-      await deleteSipatProgram(program.id);
-      await onProgramsChanged(`A SIPAT pronta "${program.title}" foi excluída.`);
-    } catch (deleteError) {
-      onError(getErrorMessage(deleteError));
-    } finally {
-      setIsDeleting(false);
-    }
-  }
-
   const primaryAction = {
     courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar tema</Button>,
-    programs: <Button onClick={() => navigate('/platform/sipat-builder')}><Plus /> Montar SIPAT</Button>,
     videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
     modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
   }[tab];
@@ -190,18 +167,6 @@ export default function CourseCatalog({
           {body ?? (isEmptyCatalog
             ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
             : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} courses={courses} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
-        </TabsContent>
-        <TabsContent value="programs">
-          {body ?? (
-            <ProgramsPanel
-              busy={isDeleting}
-              courses={courses}
-              onCreate={() => navigate('/platform/sipat-builder')}
-              onDelete={(program) => void removeProgram(program)}
-              onEdit={(program) => navigate(`/platform/sipat-builder/${program.id}`)}
-              programs={programs}
-            />
-          )}
         </TabsContent>
         <TabsContent value="videos">
           {body ?? <VideoLibraryPanel busy={isDeleting} library={library} onDelete={(item) => void removeVideo(item)} onUpload={openUpload} />}

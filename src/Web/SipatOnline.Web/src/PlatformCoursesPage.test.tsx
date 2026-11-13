@@ -764,29 +764,4 @@ describe('Platform course catalog', () => {
     await waitFor(() => expect(api.deletePlatformVideo).toHaveBeenCalledTimes(2));
     confirm.mockRestore();
   });
-
-  it('lists programs with their days and asks before removing one', async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.listSipatPrograms).mockResolvedValue([{
-      id: 'p-1', title: 'SIPAT 2026', createdAt: '2026-11-13T12:00:00Z',
-      days: [
-        { id: 'd-1', title: 'Dia 1 · Segurança', date: '2026-11-17', subject: 'c-1', videoIds: ['v1', 'v2'], gameIds: [] },
-        { id: 'd-2', title: 'Dia 2 · Saúde', date: null, subject: null, videoIds: ['v3'], gameIds: ['g1'] },
-      ],
-    }]);
-    vi.mocked(api.deleteSipatProgram).mockResolvedValue(undefined);
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
-    render(<PlatformCoursesPage />);
-
-    await user.click(await screen.findByRole('tab', { name: /SIPATs prontas/ }));
-    expect(screen.getByText('2 dias · 3 vídeos')).toBeVisible();
-    expect(screen.getByText('Dia 1 · Segurança')).toBeVisible();
-    expect(screen.getByText(/1 vídeo · 1 jogo/)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Excluir SIPAT pronta SIPAT 2026' }));
-    expect(api.deleteSipatProgram).not.toHaveBeenCalled();
-    confirm.mockReturnValue(true);
-    await user.click(screen.getByRole('button', { name: 'Excluir SIPAT pronta SIPAT 2026' }));
-    expect(api.deleteSipatProgram).toHaveBeenCalledWith('p-1');
-    confirm.mockRestore();
-  });
 });

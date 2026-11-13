@@ -21,9 +21,10 @@ import {
   type IdentitySession,
   type TenantBranding,
 } from './api';
-import SipatEventsPage from './SipatEventsPage';
+import SipatsPage from './sipatBuilder/SipatsPage';
+import CompanyContext from './companies/CompanyContext';
+import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
-import LearningAuthoringPage from './LearningAuthoringPage';
 import LearningManagementPage from './LearningManagementPage';
 import TenantLearningDashboardPage from './TenantLearningDashboardPage';
 import PlatformCompaniesPage from './PlatformCompaniesPage';
@@ -190,13 +191,23 @@ export default function App() {
             />
             <Route
               path="/admin/sipats"
-              element={
-                state.session && hasAdminRole(state.session) ? (
-                  <SipatEventsPage />
-                ) : (
-                  <AccessDenied />
-                )
-              }
+              element={state.session && hasAdminRole(state.session) ? <SipatsPage basePath="/admin/sipats" /> : <AccessDenied />}
+            />
+            <Route
+              path="/admin/sipats/:sipatId"
+              element={state.session && hasAdminRole(state.session) ? <SipatBuilderPage basePath="/admin/sipats" canEditThemes={false} /> : <AccessDenied />}
+            />
+            <Route
+              path="/platform/companies/:companyId/sipats"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/sipats`} />}</CompanyContext>
+                : <AccessDenied />}
+            />
+            <Route
+              path="/platform/companies/:companyId/sipats/:sipatId"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                ? <CompanyContext>{companyId => <SipatBuilderPage basePath={`/platform/companies/${companyId}/sipats`} canEditThemes />}</CompanyContext>
+                : <AccessDenied />}
             />
             <Route
               path="/admin/learning"
@@ -214,16 +225,6 @@ export default function App() {
                 <TenantAppearancePage tenant={state.tenant} onSaved={tenant => setState(current =>
                   current.status === 'ready' ? { ...current, tenant } : current)} />
               ) : <AccessDenied />}
-            />
-            <Route
-              path="/admin/content"
-              element={
-                state.session && hasAdminRole(state.session) ? (
-                  <LearningAuthoringPage />
-                ) : (
-                  <AccessDenied />
-                )
-              }
             />
             <Route
               path="/learning"
@@ -287,36 +288,13 @@ export default function App() {
             />
             <Route
               path="/platform/companies/:companyId"
-              element={
-                state.tenant.tenantKey === 'platform' &&
-                state.session?.roles.includes('PlatformOperator') ? (
-                  <PlatformCompanyEmployeesPage />
-                ) : (
-                  <AccessDenied />
-                )
-              }
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <CompanyHome /> : <AccessDenied />}
             />
             <Route
               path="/platform/companies/:companyId/:section"
               element={
                 state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
                   ? <PlatformCompanyEmployeesPage />
-                  : <AccessDenied />
-              }
-            />
-            <Route
-              path="/platform/companies/:companyId/sipat/nova"
-              element={
-                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                  ? <SipatBuilderPage />
-                  : <AccessDenied />
-              }
-            />
-            <Route
-              path="/platform/companies/:companyId/sipat/:programId"
-              element={
-                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                  ? <SipatBuilderPage />
                   : <AccessDenied />
               }
             />
@@ -347,22 +325,6 @@ export default function App() {
               element={
                 state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
                   ? <PlatformCoursesPage />
-                  : <AccessDenied />
-              }
-            />
-            <Route
-              path="/platform/sipat-builder"
-              element={
-                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                  ? <SipatBuilderPage />
-                  : <AccessDenied />
-              }
-            />
-            <Route
-              path="/platform/sipat-builder/:programId"
-              element={
-                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                  ? <SipatBuilderPage />
                   : <AccessDenied />
               }
             />
@@ -561,8 +523,9 @@ function ProtectedPortal({
     !hasAdminRole(session) &&
     !session.roles.includes('PlatformOperator');
   const isPlatformOperator = session.roles.includes('PlatformOperator');
-  const isPlatformCompanyContext = isPlatformOperator && getCompanyAdministrationId() !== null;
   const companyWorkspaceId = /^\/platform\/companies\/([^/]+)/.exec(location.pathname)?.[1] ?? null;
+  // inside the company workspace the operator keeps the workspace menu, even though the company is set for the calls to its admin routes
+  const isPlatformCompanyContext = isPlatformOperator && getCompanyAdministrationId() !== null && companyWorkspaceId === null;
 
   async function handleSignOut() {
     setError('');
@@ -702,8 +665,7 @@ function ProtectedPortal({
               <p className="sidebar-label">GESTÃO DA EMPRESA</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
               {hasAdminRole(session) && <>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">Programação</NavLink>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/content">Trilhas e vídeos</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">SIPATs</NavLink>
                 <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>
               </>}
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">

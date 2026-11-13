@@ -49,9 +49,9 @@ function TrayCard({ subject }: { subject: Subject }) {
  * One day, whole: the theme dropped on it, its videos (read only, in a box that scrolls) and the games that come with
  * it, highlighted. Videos and games are changed in the theme editor, never here.
  */
-export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear }: {
+export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear, canEditThemes = true }: {
   dayIndex: number; subject: Subject | undefined; themes: Subject[]; catalog: Catalog; videoIds: string[]; gameIds: string[];
-  onChoose: (title: string) => void; onClear: () => void;
+  onChoose: (title: string) => void; onClear: () => void; canEditThemes?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId(dayIndex) });
   const frame = cn('grid content-start gap-2 rounded-xl border p-2 transition-colors', isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : 'border-border bg-card');
@@ -72,9 +72,9 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
         <Cover className="size-11" subject={subject} />
         <div className="grid min-w-0 flex-1 gap-0.5">
           <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={themeLabel(subject)}>{subject.title}{subject.option ? <span className="ml-1 font-normal text-muted-foreground">· Opção {subject.option}</span> : null}</strong>
-          <a className="inline-flex items-center gap-1 justify-self-start text-xs font-semibold text-primary hover:underline" href={`/platform/courses/${subject.id}/edit`} rel="noreferrer" target="_blank">
+          {canEditThemes && <a className="inline-flex items-center gap-1 justify-self-start text-xs font-semibold text-primary hover:underline" href={`/platform/courses/${subject.id}/edit`} rel="noreferrer" target="_blank">
             Editar vídeos e jogos <ExternalLink aria-hidden="true" className="size-3" />
-          </a>
+          </a>}
         </div>
         <button aria-label={`Tirar o tema do dia ${dayIndex + 1}`} className="grid size-7 min-h-0 shrink-0 place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted" onClick={onClear} type="button"><X className="size-4" /></button>
       </div>

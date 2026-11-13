@@ -409,6 +409,10 @@ public sealed class EfLearningStore(
         var completed = lessons.Count(lesson => lesson.IsCompleted);
         var hasCover = await dbContext.LearningContentSnapshots.AsNoTracking().AnyAsync(
             item => item.TenantId == tenantId.Value && item.RevisionId == revision.Id && item.CoverData != null, cancellationToken);
+        var sipat = await dbContext.SipatEvents.AsNoTracking()
+            .Where(item => item.Id == trackEntity.SipatEventId && item.TenantId == tenantId.Value)
+            .Select(item => new { item.Title, item.StartsAt, item.Status })
+            .SingleOrDefaultAsync(cancellationToken);
         var card = new LearningTrackCard(
             trackEntity.Id,
             trackEntity.SipatEventId,
@@ -425,7 +429,10 @@ public sealed class EfLearningStore(
             trackEntity.DayPosition,
             trackEntity.CoursePosition,
             trackEntity.DayDate,
-            totalDuration);
+            totalDuration,
+            sipat?.Title,
+            sipat?.StartsAt,
+            sipat?.Status.ToString());
 
         return new LearningExperience(card, lessons);
     }

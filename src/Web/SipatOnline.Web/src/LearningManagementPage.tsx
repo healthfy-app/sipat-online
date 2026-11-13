@@ -12,6 +12,7 @@ import {
   listAllParticipants,
   listLearningParticipation,
   listTenantLearningTracks,
+  renameUser,
   type CreateParticipantData,
   type LearningParticipantProgress,
   type LearningParticipantReport,
@@ -96,6 +97,9 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
   const [credentialsDownloaded, setCredentialsDownloaded] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [isBulkBusy, setIsBulkBusy] = useState(false);
+  const [editingName, setEditingName] = useState<string | null>(null);
+  const [editError, setEditError] = useState('');
+  const [isSavingName, setIsSavingName] = useState(false);
   const [report, setReport] = useState<LearningParticipantReport | null>(null);
   const [reportError, setReportError] = useState('');
   const [error, setError] = useState('');
@@ -185,6 +189,25 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
       visibleIds.forEach((id) => (allVisibleSelected ? next.delete(id) : next.add(id)));
       return next;
     });
+  }
+
+  async function handleSaveName(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const target = participants.find((participant) => participant.id === selectedParticipantId);
+    const name = (editingName ?? '').trim();
+    if (!target || name === '') { setEditError('Informe o nome do colaborador.'); return; }
+    setIsSavingName(true);
+    setEditError('');
+    try {
+      await renameUser(target.id, name);
+      setEditingName(null);
+      setNotice(`Os dados de ${name} foram atualizados.`);
+      await loadData(target.id);
+    } catch (failure) {
+      setEditError(getErrorMessage(failure));
+    } finally {
+      setIsSavingName(false);
+    }
   }
 
   async function handleBulkStatus(isActive: boolean) {
@@ -711,6 +734,19 @@ export default function LearningManagementPage({ readOnly = false }: { readOnly?
               <span className="eyebrow">MATRÍCULA</span>
               <strong>{selectedSummary.participant.loginIdentifier}</strong>
             </div>
+            {!readOnly && <div>
+              {editingName === null
+                ? <button className="button button-secondary" onClick={() => { setEditError(''); setEditingName(selectedSummary.participant.displayName); }} type="button">Editar dados</button>
+                : <form className="participant-edit-form" onSubmit={(event) => void handleSaveName(event)}>
+                    <label htmlFor="participant-edit-name">Nome do colaborador</label>
+                    <input autoFocus id="participant-edit-name" maxLength={200} onChange={(event) => setEditingName(event.target.value)} value={editingName} />
+                    {editError && <p role="alert">{editError}</p>}
+                    <span>
+                      <button className="button button-primary" disabled={isSavingName} type="submit">{isSavingName ? 'Salvando...' : 'Salvar'}</button>
+                      <button className="button button-quiet" disabled={isSavingName} onClick={() => setEditingName(null)} type="button">Cancelar</button>
+                    </span>
+                  </form>}
+            </div>}
             <div>
               <span className="eyebrow">TRILHAS CONCLUÍDAS</span>
               <strong>{selectedSummary.completedTrackCount} de {selectedSummary.assignedTrackCount}</strong>

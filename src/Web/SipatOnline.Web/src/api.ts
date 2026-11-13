@@ -222,6 +222,31 @@ export async function deletePlatformCourse(courseId: string): Promise<void> {
 export async function deletePlatformVideo(videoId: string): Promise<void> {
   await request(`/api/platform/catalog/videos/${videoId}`, { method: 'DELETE' });
 }
+/** What a day of a SIPAT can be made of: published themes, library videos and games. Read only, for the company's administrator and the operator. */
+export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibraryVideo[]; games: GameModule[] }
+export function getSipatCatalog(): Promise<SipatCatalog> {
+  return requestJson<SipatCatalog>('/api/admin/sipat-catalog');
+}
+export interface SipatPlanSummary { sipatEventId: string; days: number; videos: number }
+export function listSipatPlans(): Promise<SipatPlanSummary[]> {
+  return requestJson<SipatPlanSummary[]>('/api/admin/sipat-plans');
+}
+export async function getSipatPlan(sipatId: string): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`));
+}
+export async function saveSipatPlan(sipatId: string, days: ProgramDay[]): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify({ days }) }));
+}
+export async function copySipatPlan(sipatId: string, sourceId: string): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan/copy-from/${sourceId}`, { method: 'POST', body: '{}' }));
+}
+/** Publishes the SIPAT (one at a time per company) and delivers each day to the participants. */
+export function launchSipat(sipatId: string): Promise<ProgramApplication> {
+  return requestJson<ProgramApplication>(`/api/admin/sipats/${sipatId}/plan/launch`, { method: 'POST', body: '{}' });
+}
+function tidyDays(days: ProgramDay[]): ProgramDay[] {
+  return (days ?? []).map(day => ({ ...day, title: day.title ?? '', date: day.date ?? null, subject: day.subject ?? null, videoIds: day.videoIds ?? [], gameIds: day.gameIds ?? [] }));
+}
 export async function deleteSipatProgram(programId: string): Promise<void> {
   await request(`/api/platform/catalog/programs/${programId}`, { method: 'DELETE' });
 }
@@ -422,6 +447,10 @@ export interface LearningTrackCard {
   dayDate?: string | null;
   /** Total length of the videos of the track. */
   durationMilliseconds?: number;
+  /** The SIPAT (the year's week of training) the track belongs to. */
+  sipatTitle?: string | null;
+  sipatStartsAt?: string | null;
+  sipatStatus?: 'Draft' | 'Published' | 'Cancelled' | null;
 }
 
 export interface ParticipantOutcomes {
@@ -863,6 +892,14 @@ export interface LearningParticipantReport {
 
 export function getLearningParticipantReport(participantId: string): Promise<LearningParticipantReport> {
   return requestJson<LearningParticipantReport>(`/api/admin/learning/participants/${participantId}/report`);
+}
+
+/** The administrator corrects the name of a collaborator of the company. */
+export function renameUser(userId: string, displayName: string): Promise<ParticipantAccount> {
+  return requestJson<ParticipantAccount>(`/api/admin/users/${userId}/display-name`, {
+    method: 'PUT',
+    body: JSON.stringify({ displayName }),
+  });
 }
 
 export function changeUserStatus(userId: string, isActive: boolean): Promise<ParticipantAccount> {
