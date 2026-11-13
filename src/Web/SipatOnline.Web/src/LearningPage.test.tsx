@@ -720,74 +720,64 @@ describe('learning experience', () => {
     expect(screen.getByText('A reprodução não está configurada.')).toBeVisible();
   });
 
-  it('groups courses by the day of the SIPAT program, in program order, with each day progress', async () => {
-    const day1a = { ...trackCard, id: 'a', title: 'Uso de EPI', lessonCount: 2, completedLessonCount: 2, progressPercentage: 100, dayTitle: 'Dia 1 · Segurança no chão de fábrica', dayPosition: 1, coursePosition: 1 };
-    const day1b = { ...trackCard, id: 'b', title: 'Sinalização', lessonCount: 2, completedLessonCount: 0, progressPercentage: 0, dayTitle: 'Dia 1 · Segurança no chão de fábrica', dayPosition: 1, coursePosition: 2 };
-    const day2 = { ...trackCard, id: 'c', title: 'Alongamento', dayTitle: 'Dia 2 · Saúde', dayPosition: 2, coursePosition: 1 };
-    const alone = { ...trackCard, id: 'd', title: 'Curso avulso' };
-    listAssignedTracks.mockResolvedValue([day2, alone, day1b, day1a]);
+  it('lists the videos of the week day by day, in program order, with the date and the progress of each day', async () => {
+    const day1 = { ...trackCard, id: 'a', title: 'Opção 1 · Ergonomia', lessonCount: 2, completedLessonCount: 1, progressPercentage: 50, dayTitle: 'Boa postura e movimento', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-09' };
+    const day2 = { ...trackCard, id: 'b', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 2, coursePosition: 1 };
+    listAssignedTracks.mockResolvedValue([day2, day1]);
+    const watched = { ...lesson, id: 'v-1', title: 'Ginástica laboral', isCompleted: true, watchedPercentage: 100 };
+    const next = { ...lesson, id: 'v-2', title: 'Trabalho sentado', position: 2 };
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve(
+      trackId === 'a' ? { track: day1, lessons: [watched, next] } : { track: day2, lessons: [{ ...lesson, id: 'v-3', title: 'Respiração' }] }));
     renderAt('/learning');
 
-    const first = await screen.findByRole('region', { name: 'Dia 1 · Segurança no chão de fábrica' });
-    const second = screen.getByRole('region', { name: 'Dia 2 · Saúde' });
-    const others = screen.getByRole('region', { name: 'Outros cursos' });
+    expect(await screen.findByRole('heading', { name: 'Vídeos da semana' })).toBeVisible();
+    const first = await screen.findByRole('region', { name: 'Dia 1 · Boa postura e movimento' });
+    const second = screen.getByRole('region', { name: 'Dia 2 · Mente tranquila' });
     expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(second.compareDocumentPosition(others) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(within(first).getByText('1 de 2 cursos concluídos')).toBeVisible();
-    expect(within(first).getAllByRole('heading', { level: 3 }).map(item => item.textContent))
-      .toEqual(['Dia 1 · Segurança no chão de fábrica', 'Uso de EPI', 'Sinalização']);
-    expect(within(second).getByText('0 de 1 curso concluído')).toBeVisible();
-    expect(within(others).getByRole('heading', { name: 'Curso avulso' })).toBeVisible();
+    expect(within(first).getByText(/segunda-feira, 09\/11 · 1 de 2 vídeos assistidos/i)).toBeVisible();
+    // each video opens the day at that video, and the next one to watch is marked
+    expect(await within(first).findByRole('link', { name: /Vídeo 1.*Ginástica laboral.*Assistido/ })).toHaveAttribute('href', '/learning/tracks/opcao-1-ergonomia?video=v-1');
+    expect(within(first).getByRole('link', { name: /Vídeo 2.*Trabalho sentado.*Próximo/ })).toHaveAttribute('href', '/learning/tracks/opcao-1-ergonomia?video=v-2');
+    expect(await within(second).findByRole('link', { name: /Respiração/ })).toBeVisible();
+    // the course list with search and categories gives way to the week
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
   });
 
-  it('draws the trail as one open node per day and lists the courses of a day in a window', async () => {
+  it('keeps the trail in front from the first visit, and a day on it filters the videos below', async () => {
     const user = userEvent.setup();
-    const later = { ...trackCard, id: 'later', title: 'Alongamento', progressPercentage: 20, dayTitle: 'Dia 2 · Saúde', dayPosition: 2, coursePosition: 1 };
-    const doneOne = { ...trackCard, id: 'done', title: 'Uso de EPI', lessonCount: 2, completedLessonCount: 2, progressPercentage: 100, dayTitle: 'Dia 1 · Segurança', dayPosition: 1, coursePosition: 1 };
-    const todo = { ...trackCard, id: 'todo', title: 'Sinalização', dayTitle: 'Dia 1 · Segurança', dayPosition: 1, coursePosition: 2 };
-    listAssignedTracks.mockResolvedValue([later, todo, doneOne]);
-    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'later' ? later : todo, lessons: [lesson] }));
+    const day1 = { ...trackCard, id: 'a', title: 'Uso de EPI', lessonCount: 2, completedLessonCount: 2, progressPercentage: 100, dayTitle: 'Segurança', dayPosition: 1, coursePosition: 1 };
+    const day2 = { ...trackCard, id: 'b', title: 'Alongamento', dayTitle: 'Saúde', dayPosition: 2, coursePosition: 1 };
+    listAssignedTracks.mockResolvedValue([day2, day1]);
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'a' ? day1 : day2, lessons: [lesson] }));
     renderAt('/learning');
 
     const trail = await screen.findByRole('list', { name: 'Dias da trilha' });
     const days = within(trail).getAllByRole('button');
-    expect(days.map(day => day.textContent)).toEqual(['1Dia 1 · Segurança1 de 2 cursos', '2Dia 2 · Saúde0 de 1 curso']);
-    // every day is open, and the first one with something left is the current one
+    expect(days.map(day => day.textContent)).toEqual(['Segurança2 de 2 vídeos', '2Saúde0 de 1 vídeo']);
+    // every day is open; the first one with something left is the current one; none is chosen yet
     expect(days.every(day => !(day as HTMLButtonElement).disabled)).toBe(true);
-    expect(days[0]).toHaveAttribute('aria-current', 'step');
-    expect(days[1]).not.toHaveAttribute('aria-current');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-    await user.click(days[0]);
-    const first = await screen.findByRole('dialog', { name: 'Dia 1 · Segurança' });
-    expect(within(first).getByText('1 de 2 cursos concluídos')).toBeVisible();
-    expect(within(first).getByRole('link', { name: /Uso de EPI.*Concluído/ })).toHaveAttribute('href', '/learning/tracks/uso-de-epi');
-    // the course still to do is marked as the next one
-    expect(within(first).getByRole('link', { name: /Sinalização.*Próximo/ })).toHaveAttribute('href', '/learning/tracks/sinalizacao');
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(days[1]).toHaveAttribute('aria-current', 'step');
+    expect(days.every(day => day.getAttribute('aria-pressed') === 'false')).toBe(true);
+    expect(screen.getByRole('region', { name: 'Dia 1 · Segurança' })).toBeVisible();
 
     await user.click(days[1]);
-    const second = await screen.findByRole('dialog', { name: 'Dia 2 · Saúde' });
-    // a day with a single track is one built from videos: the window lists the videos
-    expect(await within(second).findByRole('link', { name: /Identificação de riscos.*Próximo/ })).toHaveAttribute('href', '/learning/tracks/alongamento');
+    expect(days[1]).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Saúde', level: 2 })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Dia 1 · Segurança' })).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Dia 2 · Saúde' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Ver a semana toda' }));
+    expect(screen.getByRole('region', { name: 'Dia 1 · Segurança' })).toBeVisible();
+    expect(days[1]).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('keeps the plain list when no course belongs to a day, and hides days emptied by a filter', async () => {
+  it('keeps the plain course list, with its search, when no course belongs to a day', async () => {
     listAssignedTracks.mockResolvedValue([trackCard]);
     const plain = renderAt('/learning');
     await waitFor(() => expect(plain.container.querySelector('.learning-catalog-course')).not.toBeNull());
-    expect(plain.container.querySelector('.learning-day')).toBeNull();
-    plain.unmount();
-
-    const inDay = { ...trackCard, id: 'a', title: 'Uso de EPI', dayTitle: 'Dia 1', dayPosition: 1, coursePosition: 1 };
-    const other = { ...trackCard, id: 'b', title: 'Alongamento', dayTitle: 'Dia 2', dayPosition: 2, coursePosition: 1 };
-    listAssignedTracks.mockResolvedValue([inDay, other]);
-    renderAt('/learning');
-    const user = userEvent.setup();
-    await screen.findByRole('region', { name: 'Dia 2' });
-    await user.type(screen.getByRole('searchbox'), 'Uso');
-    expect(screen.queryByRole('region', { name: 'Dia 2' })).not.toBeInTheDocument();
-    expect(screen.getByRole('region', { name: 'Dia 1' })).toBeVisible();
+    expect(screen.getByRole('searchbox')).toBeVisible();
+    expect(screen.queryByRole('heading', { name: 'Vídeos da semana' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Dias da trilha' })).not.toBeInTheDocument();
   });
 });

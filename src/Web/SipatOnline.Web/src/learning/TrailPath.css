@@ -81,3 +81,7 @@
 }
 @keyframes learning-trail-halo { 0% { opacity: 0.7; transform: scale(0.85); } 100% { opacity: 0; transform: scale(1.25); } }
 @keyframes learning-trail-draw { from { stroke-dashoffset: 700; } to { stroke-dashoffset: 0; } }
+
+/* a day chosen as the filter of the videos below */
+.portal-layout-learner .learning-trail-step.is-selected .learning-trail-node { box-shadow: 0 0 0 4px var(--learner-surface), 0 0 0 7px var(--learner-forest); }
+.portal-layout-learner .learning-trail-step.is-selected .learning-trail-label strong { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 3px; }

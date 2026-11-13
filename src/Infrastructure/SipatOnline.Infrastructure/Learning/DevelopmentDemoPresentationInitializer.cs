@@ -126,6 +126,20 @@ public sealed class DevelopmentDemoPresentationInitializer(
              "Vídeo Motivacional - Dove retratos da real beleza", "Vídeo Motivacional - Mindshift"])
     ];
 
+    /// <summary>
+    /// The week each demo company receives: the six subjects of option 1, one per day, as in the "Seletor de módulos"
+    /// sheet (a slogan, a date and the videos of the day). Options 2 and 3 stay in the library as alternatives.
+    /// </summary>
+    private static readonly DayDefinition[] Days =
+    [
+        new("Ergonomia e atividade física", 1, "Boa postura e movimento, mais saúde em cada momento!", new DateOnly(2026, 11, 9)),
+        new("Higiene Mental", 2, "Mente tranquila, trabalho seguro", new DateOnly(2026, 11, 10)),
+        new("Comportamento seguro", 3, "Atitudes seguras protegem vidas!", new DateOnly(2026, 11, 11)),
+        new("Hábitos de vida", 4, "Pequenos hábitos hoje, mais qualidade de vida amanhã!", new DateOnly(2026, 11, 12)),
+        new("Alimentação para uma vida saudável", 5, "Comer bem é cuidar de você", new DateOnly(2026, 11, 13)),
+        new("Liderança", 6, "Liderar é cuidar de quem está ao lado", new DateOnly(2026, 11, 16))
+    ];
+
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         if (!environment.IsDevelopment() ||
@@ -164,6 +178,15 @@ public sealed class DevelopmentDemoPresentationInitializer(
             foreach (var course in Courses)
             {
                 var trackId = await EnsureTrackAsync(tenant, sipatId, course, now, cancellationToken);
+                var day = course.Option == 1 ? Days.SingleOrDefault(item => item.Subject == course.Title) : null;
+                if (day is null)
+                {
+                    // not part of the week of this company: participants no longer see it
+                    await RevokeAssignmentsAsync(tenant.Id, trackId, now, cancellationToken);
+                    continue;
+                }
+
+                await EnsureDayAsync(trackId, day, cancellationToken);
                 foreach (var participant in participants[tenant.Id])
                 {
                     await EnsureAssignmentAsync(tenant.Id, trackId, participant.Id, now, cancellationToken);
@@ -481,6 +504,26 @@ public sealed class DevelopmentDemoPresentationInitializer(
         });
     }
 
+    private async Task EnsureDayAsync(Guid trackId, DayDefinition day, CancellationToken cancellationToken)
+    {
+        var track = await db.LearningTracks.SingleAsync(item => item.Id == trackId, cancellationToken);
+        track.DayTitle = day.Slogan;
+        track.DayPosition = day.Position;
+        track.DayDate = day.Date;
+        track.CoursePosition = 1;
+    }
+
+    private async Task RevokeAssignmentsAsync(Guid tenantId, Guid trackId, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        var active = await db.LearningAssignments
+            .Where(item => item.TenantId == tenantId && item.TrackId == trackId && item.RevokedAt == null)
+            .ToListAsync(cancellationToken);
+        foreach (var assignment in active)
+        {
+            assignment.RevokedAt = now;
+        }
+    }
+
     internal static IEnumerable<(Guid CourseId, Guid TrackId)> CourseLinks(Guid tenantId) =>
         Courses.Select(course => (
             StableId($"demo-course:{course.Option}:{course.Title}"),
@@ -515,4 +558,6 @@ public sealed class DevelopmentDemoPresentationInitializer(
     private sealed record CompanyDefinition(string Key, string Name, string PrimaryColor);
 
     private sealed record CourseDefinition(int Option, string Title, string[] Lessons);
+
+    private sealed record DayDefinition(string Subject, int Position, string Slogan, DateOnly Date);
 }

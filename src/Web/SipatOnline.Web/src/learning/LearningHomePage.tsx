@@ -31,6 +31,7 @@ import {
 import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
 import TrailPath from './TrailPath';
+import WeekVideos from './WeekVideos';
 import ProgressBar from './ProgressBar';
 import './CourseCards.css';
 import './LearningHero.css';
@@ -51,6 +52,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
   const [category, setCategory] = useState<CourseCategory>('all');
   const [sortMode, setSortMode] = useState<CourseSort>('recommended');
   const [shownMilestone, setShownMilestone] = useState<number | null>(null);
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
 
   const overallProgress = getOverallProgress(tracks);
   const isFormationComplete = overallProgress >= 100;
@@ -219,6 +221,10 @@ export default function LearningHomePage({ participantName, setSummary }: {
   const dayGroups = groupTracksByDay(visibleTracks, tracks);
   // the trail always shows every day, whatever the filters on the course list are
   const trailDays = groupTracksByDay(tracks, tracks);
+  // a SIPAT built by days: the trail stays in front from the first visit, a day on it filters the videos below
+  const dayMode = trailDays !== null;
+  const programDays = trailDays?.filter(day => day.position !== null) ?? [];
+  const completedDays = programDays.filter(day => day.total > 0 && day.completed === day.total).length;
   const renderCourse = (track: LearningTrackCard) => {
     const percentage = getTrackProgress(track);
     const completed = percentage === 100;
@@ -276,11 +282,13 @@ export default function LearningHomePage({ participantName, setSummary }: {
     <main className={`learning-page learning-catalog${startedAnyCourse ? ' is-returning' : ''}`}>
       {!heroGreets && <header className="learning-page-heading">
         {firstName && <p className="learning-catalog-greeting">Olá, {firstName}.</p>}
-        <h1>{startedAnyCourse ? 'Bom te ver de volta.' : 'Seus cursos. Seu próximo passo.'}</h1>
+        <h1>{startedAnyCourse ? 'Bom te ver de volta.' : dayMode ? 'Sua SIPAT. Seu próximo passo.' : 'Seus cursos. Seu próximo passo.'}</h1>
         <p className="muted-copy">
           {startedAnyCourse
             ? 'Continue de onde parou e avance no seu ritmo.'
-            : 'Explore os cursos da sua SIPAT e acompanhe cada conquista, no seu ritmo.'}
+            : dayMode
+              ? 'Siga o caminho dos dias e assista no seu ritmo, um vídeo de cada vez.'
+              : 'Explore os cursos da sua SIPAT e acompanhe cada conquista, no seu ritmo.'}
         </p>
       </header>}
 
@@ -320,7 +328,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
               </div>
               <div className="learning-catalog-progress">
                 <h2>Sua formação</h2>
-                <p>{completedCourses} de {tracks.length} cursos concluídos · {totalLessons} vídeos</p>
+                <p>{dayMode
+                  ? `${completedDays} de ${programDays.length} ${programDays.length === 1 ? 'dia concluído' : 'dias concluídos'}`
+                  : `${completedCourses} de ${tracks.length} cursos concluídos`} · {totalLessons} vídeos</p>
                 <p className="learning-catalog-first-note">
                   Dê o primeiro passo. Cada vídeo é curto e você pode pausar quando quiser.
                 </p>
@@ -354,7 +364,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
               </div>
               <div className="learning-completion-progress">
                 <div className="learning-completion-progress-heading">
-                  <span>Passo {currentStepNumber} de {tracks.length}</span>
+                  <span>{dayMode ? `${completedDays} de ${programDays.length} ${programDays.length === 1 ? 'dia concluído' : 'dias concluídos'}` : `Passo ${currentStepNumber} de ${tracks.length}`}</span>
                   <strong>{overallProgress}% da formação</strong>
                 </div>
                 <ProgressBar
@@ -366,13 +376,13 @@ export default function LearningHomePage({ participantName, setSummary }: {
                 <>
                   {continueTrack.dayTitle && <p className="learning-hero-day">{continueTrack.dayTitle}</p>}
                   <p className="learning-formation-current-course">
-                    {resumeTrack && resumeLesson ? `Aula ${resumeLesson.position} · ` : ''}
+                    {resumeTrack && resumeLesson ? `${dayMode ? 'Vídeo' : 'Aula'} ${resumeLesson.position} · ` : ''}
                     {continueTitle ?? continueTrack.title}
                   </p>
                   {resumeTrack && resumeLesson
                     ? <p>
                         Você parou em {formatDuration(resumeLesson.lastPlaybackPositionMilliseconds)}
-                        {remainingCourseMinutes !== null && ` · faltam ${remainingCourseMinutes} min para terminar o curso`}
+                        {remainingCourseMinutes !== null && ` · faltam ${remainingCourseMinutes} min para terminar o ${dayMode ? 'dia' : 'curso'}`}
                       </p>
                     : resumeTrack && isLoadingResume
                       ? <p role="status">Carregando o ponto em que você parou...</p>
@@ -380,7 +390,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                         ? <p role="status">{resumeError} Abra o curso para continuar.</p>
                         : <p>{resumeTrack ? 'Continue seu curso no seu ritmo.' : 'Comece por este curso para avançar na formação.'}</p>}
                   <Link className="learning-catalog-feature-action" to={continuePath}>
-                    {resumeTrack ? 'Continuar vídeo' : 'Começar curso'} <span aria-hidden="true">→</span>
+                    {resumeTrack ? 'Continuar vídeo' : dayMode ? 'Começar o dia' : 'Começar curso'} <span aria-hidden="true">→</span>
                   </Link>
                 </>
               )}
@@ -408,10 +418,10 @@ export default function LearningHomePage({ participantName, setSummary }: {
           </section>
         )}
 
-        {startedAnyCourse && overallProgress < 100 && (
+        {(startedAnyCourse || dayMode) && (overallProgress < 100 || dayMode) && (
           <>
             {trailDays
-              ? <TrailPath allTracks={tracks} days={trailDays} />
+              ? <TrailPath allTracks={tracks} days={trailDays} onSelect={setSelectedDay} selectedKey={selectedDay} />
               : (
               <section aria-labelledby="learning-journey-title" className="learning-journey-card">
                 <div className="learning-journey-heading">
@@ -456,7 +466,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
           </>
         )}
 
-        <section aria-labelledby="learning-catalog-title" className="learning-catalog-list-section">
+        {dayMode && trailDays && <WeekVideos allTracks={tracks} days={trailDays} onShowAll={() => setSelectedDay(null)} selectedKey={selectedDay} />}
+
+        {!dayMode && <section aria-labelledby="learning-catalog-title" className="learning-catalog-list-section">
           <div className="learning-catalog-list-heading">
             <h2 id="learning-catalog-title">Meus cursos <span>{tracks.length}</span></h2>
           </div>
@@ -535,7 +547,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                   </div>
                 : <div className="learning-catalog-grid">{visibleTracks.map(renderCourse)}</div>}
           </div>
-        </section>
+        </section>}
       </>}
     </main>
   );

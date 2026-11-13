@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import CourseDialog from '@/CourseDialog';
 import LearningActivitiesPanel from '@/LearningActivitiesPanel';
 import {
@@ -44,6 +44,8 @@ export default function LearningTrackPage({
   const [experience, setExperience] = useState<LearningExperience | null>(null);
   const [apiTrackId, setApiTrackId] = useState<string | null>(null);
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
+  const [query] = useSearchParams();
+  const askedVideoId = query.get('video');
   const [playbackSession, setPlaybackSession] = useState<LearningPlaybackSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStartingPlayback, setIsStartingPlayback] = useState(false);
@@ -110,7 +112,8 @@ export default function LearningTrackPage({
           setSelectedLessonId((current) =>
             data.lessons.some((lesson) => lesson.id === current)
               ? current
-              : data.lessons.find((lesson) => lesson.id === resumeLessonId)?.id
+              : data.lessons.find((lesson) => lesson.id === askedVideoId)?.id
+                ?? data.lessons.find((lesson) => lesson.id === resumeLessonId)?.id
                 ?? getNextLesson(data.lessons)?.id
                 ?? null,
           );

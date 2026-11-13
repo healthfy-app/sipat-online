@@ -53,8 +53,10 @@ function DayVideos({ track, allTracks }: { track: LearningTrackCard; allTracks: 
  * way it walks (right by default: day 1 starts at the left end). Every day is open: tapping one opens a
  * window that only lists the courses of that day, each one a link.
  */
-export default function TrailPath({ days, allTracks, flow = 'right' }: {
+export default function TrailPath({ days, allTracks, flow = 'right', selectedKey, onSelect }: {
   days: DayGroup[]; allTracks: LearningTrackCard[]; flow?: 'left' | 'right';
+  /** With onSelect, tapping a day filters the videos below (tapping it again shows the whole week) instead of opening a window. */
+  selectedKey?: string | null; onSelect?: (key: string | null) => void;
 }) {
   const firstOpen = days.findIndex(day => day.completed < day.total);
   const currentIndex = firstOpen >= 0 ? firstOpen : days.length - 1;
@@ -85,7 +87,9 @@ export default function TrailPath({ days, allTracks, flow = 'right' }: {
   return <section aria-labelledby="learning-trail-title" className="learning-trail">
     <div className="learning-trail-heading">
       <h2 id="learning-trail-title">Sua trilha</h2>
-      <p>Toque em um dia para ver os cursos. Você pode ir para qualquer um, na ordem que preferir.</p>
+      <p>{onSelect
+        ? 'Toque em um dia para ver só os vídeos dele. Você pode assistir na ordem que preferir.'
+        : 'Toque em um dia para ver os cursos. Você pode ir para qualquer um, na ordem que preferir.'}</p>
     </div>
 
     <div className="learning-trail-scroller" ref={scroller}>
@@ -95,16 +99,21 @@ export default function TrailPath({ days, allTracks, flow = 'right' }: {
         </svg>
         {days.map((day, index) => {
           const state = stateOf(day, index, currentIndex);
-          return <li className={`learning-trail-step is-${state}`} key={day.key}
+          const videos = day.tracks.reduce((sum, track) => sum + track.lessonCount, 0);
+          const watched = day.tracks.reduce((sum, track) => sum + track.completedLessonCount, 0);
+          const chosen = onSelect ? selectedKey === day.key : false;
+          return <li className={`learning-trail-step is-${state}${chosen ? ' is-selected' : ''}`} key={day.key}
             style={{ left: centerX(index) - column / 2, width: column, '--node-top': `${centerY(index) - nodeRadius}px` } as CSSProperties}>
-            <button aria-current={state === 'current' ? 'step' : undefined} aria-haspopup="dialog" className="learning-trail-button"
-              onClick={() => setModalIndex(index)} type="button">
+            <button aria-current={state === 'current' ? 'step' : undefined} aria-haspopup={onSelect ? undefined : 'dialog'} aria-pressed={onSelect ? chosen : undefined}
+              className="learning-trail-button" onClick={() => (onSelect ? onSelect(chosen ? null : day.key) : setModalIndex(index))} type="button">
               <span aria-hidden="true" className="learning-trail-node">
                 {state === 'done' ? <Check /> : day.position ?? <BookOpen />}
               </span>
               <span className="learning-trail-label">
                 <strong>{day.title}</strong>
-                <small>{day.completed} de {day.total} {day.total === 1 ? 'curso' : 'cursos'}</small>
+                <small>{onSelect
+                  ? `${watched} de ${videos} ${videos === 1 ? 'vídeo' : 'vídeos'}`
+                  : `${day.completed} de ${day.total} ${day.total === 1 ? 'curso' : 'cursos'}`}</small>
               </span>
             </button>
           </li>;
