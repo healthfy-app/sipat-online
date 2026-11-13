@@ -53,7 +53,7 @@
   .portal-layout-learner .learning-track-page .learning-course-sidebar > section:nth-child(n + 4) { animation-delay: 300ms; }
 
   /* the new video fades in instead of popping */
-  .portal-layout-learner .learning-track-page .lesson-player { animation: learning-fade 380ms ease-out both; }
+  .portal-layout-learner .learning-track-page .sipat-player { animation: learning-fade 380ms ease-out both; }
 
   /* waiting for the video: a calm pulse on the icon, a sweep across the frame */
   .portal-layout-learner .learning-track-page .learning-player-state[role="status"] .learning-player-icon { animation: learning-pulse 1.6s ease-in-out infinite; }

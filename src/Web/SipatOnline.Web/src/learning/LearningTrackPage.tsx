@@ -27,7 +27,7 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import ProgressBar from './ProgressBar';
-import LessonPlayer from './LessonPlayer';
+import SipatPlayer from '@/player/SipatPlayer';
 import './LearningMotion.css';
 
 export default function LearningTrackPage({
@@ -597,8 +597,7 @@ export default function LearningTrackPage({
           <div className="learning-player-frame">
             {playbackSession ? (
               <>
-                <LessonPlayer furthestRef={furthestRef} key={`${selectedLesson?.id}-${playbackSession.sessionId}`} markers={markers}
-                  onLockedSeek={() => setSeekNotice(true)} videoRef={videoRef}>
+                <SipatPlayer key={`${selectedLesson?.id}-${playbackSession.sessionId}`} lock={{ furthest: furthestRef, onBlocked: () => setSeekNotice(true) }} markers={markers} videoRef={videoRef}>
                 <video
                   aria-label={selectedLesson?.title ?? 'Vídeo da trilha'}
                   className="learning-video"
@@ -623,7 +622,7 @@ export default function LearningTrackPage({
                 >
                   Seu navegador não oferece suporte à reprodução deste vídeo.
                 </video>
-                </LessonPlayer>
+                </SipatPlayer>
                 {playbackSession.isDevelopmentDemo && (
                   <p className="learning-demo-notice" role="note">
                     Vídeo de demonstração. O progresso registrado aqui não comprova participação oficial.
