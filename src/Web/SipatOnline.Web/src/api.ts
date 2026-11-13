@@ -50,7 +50,7 @@ export interface PlatformCompanyEmployeePage {
 }
 
 export type PlatformCourseStatus = 'Draft' | 'Published';
-export type GamificationGameType = 'Quiz' | 'RiskSpotting' | 'Puzzle' | 'Memory' | 'Scenario' | 'Ordering';
+export type GamificationGameType = 'Quiz' | 'RiskSpotting' | 'Puzzle' | 'Memory' | 'Scenario' | 'Ordering' | 'SafeOrRisky';
 
 export interface PlatformCourse {
   id: string;
@@ -112,7 +112,11 @@ export interface GameContent {
   pairs: { first: string; second: string }[] | null;
   risks: { label: string; x: number; y: number; width: number; height: number }[] | null;
   columns: number;
+  /** Seguro ou arriscado: situations the participant judges. */
+  cards?: GameCard[] | null;
 }
+
+export interface GameCard { text: string; safe: boolean; explanation: string | null }
 
 export interface GameModuleData {
   title: string;

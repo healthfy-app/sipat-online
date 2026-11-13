@@ -9,11 +9,12 @@ import OrderingGame from '@/games/OrderingGame';
 import PuzzleGame from '@/games/PuzzleGame';
 import QuizGame from '@/games/QuizGame';
 import RiskSpottingGame from '@/games/RiskSpottingGame';
+import SafeOrRiskyGame from '@/games/SafeOrRiskyGame';
 
 export type { GameOutcome } from '@/games/gameKit';
 
 const boards = {
-  Quiz: QuizGame, Scenario: QuizGame, RiskSpotting: RiskSpottingGame, Memory: MemoryGame, Puzzle: PuzzleGame, Ordering: OrderingGame,
+  Quiz: QuizGame, Scenario: QuizGame, RiskSpotting: RiskSpottingGame, Memory: MemoryGame, Puzzle: PuzzleGame, Ordering: OrderingGame, SafeOrRisky: SafeOrRiskyGame,
 } as const;
 
 function isPlayable(module: GameModule) {
@@ -24,6 +25,7 @@ function isPlayable(module: GameModule) {
     case 'Memory': return !!content?.pairs?.length;
     case 'Puzzle': return !!content?.imageUrl;
     case 'Ordering': return (content?.items?.length ?? 0) >= 2;
+    case 'SafeOrRisky': return !!content?.cards?.some(card => card.text.trim());
   }
 }
 

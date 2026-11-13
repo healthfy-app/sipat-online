@@ -2,8 +2,12 @@ import type { GameContent, GamificationGameType } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, NativeSelect, Textarea } from '@/components/ui/input';
+import SafeCardsEditor from './SafeCardsEditor';
 
-export const emptyGameContent: GameContent = { imageUrl: '', items: [], pairs: [], risks: [], columns: 2 };
+export const emptyGameContent: GameContent = {
+  imageUrl: '', items: [], pairs: [], risks: [], columns: 2,
+  cards: [{ text: '', safe: false, explanation: '' }, { text: '', safe: true, explanation: '' }, { text: '', safe: false, explanation: '' }],
+};
 
 const riskFields = { x: 'Esquerda', y: 'Topo', width: 'Largura', height: 'Altura' } as const;
 
@@ -56,6 +60,10 @@ export default function GameContentEditor({ type, content, onChange }: {
           <Textarea id="game-ordered-items" required rows={6} value={(content.items ?? []).join('\n')}
             onChange={(event) => patch({ items: event.target.value.split('\n') })} />
         </Field>
+      )}
+
+      {type === 'SafeOrRisky' && (
+        <SafeCardsEditor cards={content.cards?.length ? content.cards : emptyGameContent.cards!} onChange={(cards) => patch({ cards })} />
       )}
 
       {type === 'RiskSpotting' && <>

@@ -74,7 +74,7 @@ export default function CourseConfigureStep({
               {values.gamificationEnabled && (
                 <fieldset className="m-0 grid grid-cols-[repeat(auto-fill,minmax(min(100%,14rem),1fr))] gap-2 border-0 p-0">
                   <legend className="mb-2 p-0 text-xs font-bold uppercase tracking-[0.06em]">Tipo de jogo</legend>
-                  {gameTypeOptions.map((option) => (
+                  {gameTypeOptions.filter((option) => !option.retired || option.value === values.gameType).map((option) => (
                     <label
                       className="m-0 flex cursor-pointer gap-2.5 rounded-md border border-border p-3 transition-colors hover:border-accent-foreground/25 has-[:checked]:border-primary has-[:checked]:bg-accent"
                       key={option.value}

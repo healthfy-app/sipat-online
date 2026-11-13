@@ -153,10 +153,30 @@ describe('GamePlayer', () => {
     await finishWithContinue(user, close);
   });
 
-  it.each(['Memory', 'Ordering', 'Puzzle', 'RiskSpotting'] as const)('can skip an unfinished %s without claiming completion', async gameType => {
+  it('plays safe-or-risky cards with buttons and arrow keys, explaining each answer', async () => {
+    const { user, close } = await start({ ...base, gameType: 'SafeOrRisky', content: { ...empty, cards: [
+      { text: 'Subir em escada quebrada', safe: false, explanation: 'Escada danificada sai de uso.' },
+      { text: 'Sinalizar piso molhado', safe: true, explanation: null },
+      { text: '   ', safe: true, explanation: null },
+    ] } });
+    expect(screen.getByRole('heading', { name: 'Subir em escada quebrada' })).toBeVisible();
+    expect(screen.getByText('0 de 2 cartas')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Seguro' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Não foi dessa vez. É arriscado.');
+    expect(screen.getByRole('status')).toHaveTextContent('Escada danificada sai de uso.');
+    await user.click(screen.getByRole('button', { name: 'Próxima carta' }));
+    await user.keyboard('{ArrowRight}');
+    expect(screen.getByRole('status')).toHaveTextContent('Acertou! É seguro.');
+    await user.click(screen.getByRole('button', { name: 'Ver resultado' }));
+    expect(screen.getByRole('img', { name: '1 de 3 estrelas' })).toBeVisible();
+    await finishWithContinue(user, close);
+  });
+
+  it.each(['Memory', 'Ordering', 'Puzzle', 'RiskSpotting', 'SafeOrRisky'] as const)('can skip an unfinished %s without claiming completion', async gameType => {
     const { user, close } = await start({ ...base, gameType, content: { ...empty, imageUrl: '/risk-scene.svg',
       items: ['Primeiro', 'Segundo'], pairs: [{ first: 'A', second: 'B' }, { first: 'C', second: 'D' }],
-      risks: [{ label: 'Risco', x: 10, y: 10, width: 20, height: 20 }] } });
+      risks: [{ label: 'Risco', x: 10, y: 10, width: 20, height: 20 }],
+      cards: [{ text: 'Carta', safe: true, explanation: null }] } });
     await user.click(screen.getByRole('button', { name: 'Pular' }));
     expect(close).toHaveBeenCalledExactlyOnceWith('skipped');
   });

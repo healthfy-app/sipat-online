@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react';
 import {
   createGameModule,
   updateGameModule,
+  type GameContent,
   type GameModule,
   type GameQuestion,
   type GamificationGameType,
@@ -51,7 +52,7 @@ export default function GameModuleForm({
   const [questions, setQuestions] = useState<QuestionDraft[]>(
     module && module.questions.length > 0 ? module.questions.map(toDraft) : [{ ...emptyQuestion }],
   );
-  const [content, setContent] = useState(module?.content ?? emptyGameContent);
+  const [content, setContent] = useState<GameContent>(() => ({ ...emptyGameContent, ...module?.content, cards: module?.content?.cards ?? emptyGameContent.cards }));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [testing, setTesting] = useState(false);
@@ -70,6 +71,7 @@ export default function GameModuleForm({
         imageUrl: content.imageUrl?.trim() ?? null,
         items: content.items?.map((item) => item.trim()).filter(Boolean) ?? null,
         pairs: content.pairs?.map((pair) => ({ first: pair.first.trim(), second: pair.second.trim() })) ?? null,
+        cards: content.cards?.map((card) => ({ ...card, text: card.text.trim(), explanation: card.explanation?.trim() || null })) ?? null,
       },
     };
   }
@@ -121,7 +123,7 @@ export default function GameModuleForm({
         </Field>
         <Field hint={gameTypeOptions.find((option) => option.value === gameType)?.description} htmlFor="game-module-type" label="Tipo de jogo">
           <NativeSelect id="game-module-type" value={gameType} onChange={(event) => setGameType(event.target.value as GamificationGameType)}>
-            {gameTypeOptions.map((option) => (
+            {gameTypeOptions.filter((option) => !option.retired || option.value === module?.gameType).map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}{option.playable ? '' : ' (jogável em breve)'}
               </option>

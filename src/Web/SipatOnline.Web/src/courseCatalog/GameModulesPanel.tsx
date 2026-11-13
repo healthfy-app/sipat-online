@@ -9,7 +9,7 @@ import GameStage from '@/games/GameStage';
 import LazyGamePlayer from '@/games/LazyGamePlayer';
 import { cn } from '@/lib/utils';
 
-const warmTypes = new Set(['RiskSpotting', 'Scenario']);
+const warmTypes = new Set(['RiskSpotting', 'Scenario', 'SafeOrRisky']);
 
 export default function GameModulesPanel({
   modules,

@@ -70,7 +70,7 @@ public sealed class LearningEngagementApiTests
             await Call(platform, $"/api/platform/catalog/courses/{courseId}/videos", HttpMethod.Put,
                 new { videoIds = new[] { videoId } });
             var moduleIds = new List<Guid>();
-            foreach (var type in new[] { "Quiz", "Scenario", "Ordering", "Memory", "Puzzle", "RiskSpotting" })
+            foreach (var type in new[] { "Quiz", "Scenario", "Ordering", "Memory", "Puzzle", "RiskSpotting", "SafeOrRisky" })
             {
                 var module = await Call(platform, "/api/platform/catalog/modules", HttpMethod.Post, new
                 {
@@ -83,7 +83,13 @@ public sealed class LearningEngagementApiTests
                         columns = 2,
                         items = new[] { "Planejar", "Executar" },
                         pairs = new[] { new { first = "EPI", second = "Proteção" }, new { first = "Piso", second = "Sinalização" } },
-                        risks = new[] { new { label = "Cabo", x = 10, y = 10, width = 20, height = 20 } }
+                        risks = new[] { new { label = "Cabo", x = 10, y = 10, width = 20, height = 20 } },
+                        cards = new[]
+                        {
+                            new { text = "Usar o cinto em altura", safe = true, explanation = (string?)"Evita quedas." },
+                            new { text = "Correr na escada", safe = false, explanation = (string?)null },
+                            new { text = "Sinalizar o piso molhado", safe = true, explanation = (string?)"Previne escorregões." }
+                        }
                     }
                 }, HttpStatusCode.Created);
                 Assert.Equal(type, module.GetProperty("gameType").GetString());
@@ -101,6 +107,13 @@ public sealed class LearningEngagementApiTests
                     risks = new[] { new { label = "Fora da imagem", x = 90, y = 10, width = 20, height = 20 } }
                 }
             }, HttpStatusCode.BadRequest);
+            await Call(platform, "/api/platform/catalog/modules", HttpMethod.Post, new
+            {
+                title = "Poucas cartas",
+                gameType = "SafeOrRisky",
+                questions = Array.Empty<object>(),
+                content = new { columns = 2, cards = new[] { new { text = "Só uma", safe = true } } }
+            }, HttpStatusCode.BadRequest);
             await Call(platform, $"/api/platform/catalog/courses/{courseId}/modules", HttpMethod.Put,
                 new { items = moduleIds.Select(id => new { moduleId = id, afterVideoCount = 0 }) });
             await Call(platform, $"/api/platform/catalog/videos/{videoId}/checkpoints", HttpMethod.Put,
@@ -112,8 +125,8 @@ public sealed class LearningEngagementApiTests
             var repeated = await Call(platform, $"{companyPath}/sipats/{sipatId}/courses/{courseId}", HttpMethod.Post, new { });
             Assert.Equal(trackId, repeated.GetProperty("trackId").GetGuid());
             var activities = await participant.GetFromJsonAsync<JsonElement>($"/api/learning/tracks/{trackId}/activities");
-            Assert.Equal(7, activities.GetProperty("items").GetArrayLength());
-            Assert.Equal(moduleIds, activities.GetProperty("items").EnumerateArray().Take(6).Select(item => item.GetProperty("module").GetProperty("id").GetGuid()));
+            Assert.Equal(8, activities.GetProperty("items").GetArrayLength());
+            Assert.Equal(moduleIds, activities.GetProperty("items").EnumerateArray().Take(7).Select(item => item.GetProperty("module").GetProperty("id").GetGuid()));
             await Call(participant, $"/api/learning/tracks/{trackId}/activities/placement-0/outcome", HttpMethod.Put, new { outcome = "completed" });
             await Call(participant, $"/api/learning/tracks/{trackId}/activities/placement-0/outcome", HttpMethod.Put, new { outcome = "skipped" });
             await Call(participant, $"/api/learning/tracks/{trackId}/activities/placement-0/outcome", HttpMethod.Put,

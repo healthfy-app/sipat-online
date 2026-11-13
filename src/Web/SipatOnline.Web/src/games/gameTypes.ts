@@ -1,4 +1,4 @@
-import { Brain, ListOrdered, MessageCircleQuestion, Puzzle, Search, Signpost, type LucideIcon } from 'lucide-react';
+import { Brain, Layers, ListOrdered, MessageCircleQuestion, Puzzle, Search, Signpost, type LucideIcon } from 'lucide-react';
 import type { GamificationGameType } from '@/api';
 
 export interface GameTypeLook {
@@ -28,6 +28,10 @@ export const gameLooks: Record<GamificationGameType, GameTypeLook> = {
   Puzzle: {
     label: 'Quebra-cabeça', icon: Puzzle,
     howTo: ['Arraste uma peça sobre outra para trocar as duas.', 'Ou clique em duas peças, uma depois da outra.', 'Peças no lugar certo travam sozinhas.'],
+  },
+  SafeOrRisky: {
+    label: 'Seguro ou arriscado?', icon: Layers,
+    howTo: ['Leia a situação de cada carta.', 'Arraste para a direita se for seguro e para a esquerda se for arriscado (ou use os botões e as setas).', 'Acertos seguidos multiplicam seus pontos.'],
   },
   Ordering: {
     label: 'Ordenação', icon: ListOrdered,

@@ -78,6 +78,14 @@
 .puzzle-board.is-solved { gap: 0; padding: 0; transition: gap 400ms ease, padding 400ms ease; box-shadow: 0 0 0 4px #3ec28f, 0 18px 40px -12px rgb(20 104 58 / 60%); }
 .puzzle-board.is-solved .puzzle-piece { border-radius: 0; box-shadow: none; }
 
+/* ---------- Seguro ou arriscado: carimbos que aparecem ao arrastar ---------- */
+.safe-stamp {
+  padding: .25rem .6rem; border: 3px solid currentColor; border-radius: .5rem;
+  font-size: 1.05rem; font-weight: 800; letter-spacing: .06em; text-transform: uppercase;
+}
+.safe-stamp.is-safe { color: #14683a; transform: rotate(10deg); }
+.safe-stamp.is-risky { color: var(--danger, #b3261e); transform: rotate(-10deg); }
+
 /* ---------- Palco: o jogo entra por cima do vídeo pausado ---------- */
 .game-stage { background: rgb(4 16 12 / 68%); backdrop-filter: blur(10px) saturate(.9); -webkit-backdrop-filter: blur(10px) saturate(.9); animation: stage-in 220ms ease-out; }
 .game-stage-panel { animation: stage-panel-in 360ms cubic-bezier(.16, 1, .3, 1); }

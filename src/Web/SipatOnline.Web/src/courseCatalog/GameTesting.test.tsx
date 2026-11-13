@@ -40,4 +40,29 @@ describe('testing games while creating them', () => {
     expect(screen.getByLabelText('Texto da pergunta 1')).toHaveValue('Pergunta ainda não salva?');
     expect(saved).not.toHaveBeenCalled();
   });
+
+  it('offers Seguro ou arriscado instead of Caça aos riscos for new games and tests the cards draft', async () => {
+    const user = userEvent.setup();
+    render(<GameModuleForm module={null} onBusyChange={vi.fn()} onCancel={vi.fn()} onSaved={vi.fn()} />);
+    const type = screen.getByLabelText('Tipo de jogo');
+    expect(screen.queryByRole('option', { name: 'Caça aos riscos' })).not.toBeInTheDocument();
+    await user.selectOptions(type, 'SafeOrRisky');
+    expect(screen.getAllByRole('radiogroup')).toHaveLength(3);
+    await user.type(screen.getByLabelText('Situação da carta 1'), 'Correr na escada');
+    await user.click(screen.getAllByRole('radio', { name: 'Arriscado' })[0]);
+    await user.type(screen.getByLabelText('Por que, na carta 1'), 'Pode causar queda.');
+    await user.click(screen.getByRole('button', { name: 'Adicionar carta' }));
+    expect(screen.getByLabelText('Situação da carta 4')).toHaveFocus();
+    expect(screen.getByText('1 segura · 3 arriscadas')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Testar jogo' }));
+    await user.click(await screen.findByRole('button', { name: 'Começar' }, { timeout: 5000 }));
+    expect(screen.getByRole('heading', { name: 'Correr na escada' })).toBeVisible();
+  });
+
+  it('keeps an existing Caça aos riscos game editable', () => {
+    render(<GameModuleForm module={{ ...quiz, gameType: 'RiskSpotting', questions: [], content: {
+      imageUrl: '/risk-scene.svg', items: null, pairs: null, risks: [{ label: 'Cabo', x: 1, y: 1, width: 10, height: 10 }], columns: 2 } }}
+      onBusyChange={vi.fn()} onCancel={vi.fn()} onSaved={vi.fn()} />);
+    expect(screen.getByRole('option', { name: 'Caça aos riscos' })).toBeInTheDocument();
+  });
 });

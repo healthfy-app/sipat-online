@@ -13,7 +13,8 @@ public enum GamificationGameType
     Puzzle = 2,
     Memory = 3,
     Scenario = 4,
-    Ordering = 5
+    Ordering = 5,
+    SafeOrRisky = 6
 }
 
 public sealed record PlatformCourse(
