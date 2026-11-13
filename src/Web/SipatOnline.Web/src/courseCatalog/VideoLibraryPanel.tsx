@@ -27,7 +27,7 @@ export default function VideoLibraryPanel({
       {library.length === 0 ? (
         <EmptyState action={<Button onClick={onUpload}>Enviar o primeiro vídeo</Button>} title="A biblioteca ainda não tem vídeos." />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17rem),1fr))] gap-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {library.map((item) => {
             const { video, courseCount } = item;
             return (

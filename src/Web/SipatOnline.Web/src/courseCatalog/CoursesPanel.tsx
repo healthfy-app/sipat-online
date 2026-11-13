@@ -88,7 +88,7 @@ export default function CoursesPanel({
           title="Nenhum curso corresponde aos filtros."
         />
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15.5rem),1fr))] gap-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((course) => (
             <CourseCard busy={busy} course={course} key={course.id}
               onDelete={() => onDelete(course)} onDuplicate={() => onDuplicate(course)} onOpen={() => onOpen(course)} />

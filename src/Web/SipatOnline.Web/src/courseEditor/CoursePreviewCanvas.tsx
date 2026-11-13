@@ -48,7 +48,7 @@ export default function CoursePreviewCanvas({
           'flex flex-col overflow-hidden bg-[var(--learner-forest,#12332c)] text-white shadow-[0_24px_48px_-24px_rgb(14_42_34/0.45)]',
           'transition-[width,border-radius,min-height] duration-300 ease-out-soft',
           desktop
-            ? 'min-h-[min(30rem,calc(100dvh-12rem))] w-[min(100%,52rem)] rounded-lg'
+            ? 'min-h-[min(34rem,calc(100dvh-10rem))] w-[min(100%,72rem)] rounded-lg'
             : 'min-h-[min(40rem,calc(100dvh-12rem))] w-[min(100%,24rem)] rounded-[1.5rem] max-[860px]:min-h-[30rem]',
         )}
       >
@@ -63,7 +63,7 @@ export default function CoursePreviewCanvas({
           {!item && <p className="m-0 text-white/75">Adicione um vídeo para visualizar o conteúdo.</p>}
           {item?.kind === 'video' && <>
             <h2 className="m-0 text-[1.375rem] font-medium leading-snug text-white [text-wrap:balance]">{item.video.title}</h2>
-            <div className="[&_video]:max-h-96 [&_video]:w-full [&_video]:rounded-md [&_video]:bg-black [&_.video-preview-error]:text-white">
+            <div className="[&_video]:max-h-[min(40rem,70dvh)] [&_video]:w-full [&_video]:rounded-md [&_video]:bg-black [&_.video-preview-error]:text-white">
               <VideoPreview checkpoints={item.checkpoints} key={item.video.id} src={item.video.fileUrl} title={`Prévia de ${item.video.title}`} />
             </div>
           </>}
