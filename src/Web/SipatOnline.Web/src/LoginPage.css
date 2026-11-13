@@ -494,14 +494,23 @@
   }
 }
 
-/* Banner da empresa: vira o fundo do painel de marca, com véu escuro para o texto continuar legível */
+/* Banner da empresa: vira o fundo do painel de marca, desfocado e com véu escuro para o texto continuar legível */
 .login-brand-panel.has-banner {
-  background:
-    linear-gradient(180deg, rgb(8 26 21 / 52%), rgb(8 26 21 / 80%)),
-    var(--login-banner) center / cover no-repeat;
+  isolation: isolate;
+  background: var(--login-forest);
 }
 
-.login-brand-panel.has-banner::before,
+.login-brand-panel.has-banner::before {
+  position: absolute;
+  z-index: -1;
+  inset: -2rem;
+  background:
+    linear-gradient(180deg, rgb(8 26 21 / 55%), rgb(8 26 21 / 82%)),
+    var(--login-banner) center / cover no-repeat;
+  content: "";
+  filter: blur(18px) saturate(1.05);
+}
+
 .login-brand-panel.has-banner::after,
 .login-brand-panel.has-banner .login-brand-art {
   display: none;
