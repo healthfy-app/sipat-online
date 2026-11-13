@@ -109,9 +109,8 @@ describe('learning experience', () => {
     listAssignedTracks.mockResolvedValue([{ ...trackCard, lessonCount: 5, completedLessonCount: 5, progressPercentage: coverage }]);
     renderAt('/learning', onSummary);
 
-    expect(await screen.findByRole('heading', { name: 'Formação concluída' })).toBeVisible();
+    expect(await screen.findByRole('heading', { level: 1, name: 'Formação concluída. Parabéns!' })).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Progresso de Segurança no trabalho' })).toHaveAttribute('aria-valuenow', '100');
-    expect(screen.getByText('Sua trilha')).toBeVisible();
     expect(screen.getByText('Passo 1 de 1')).toBeVisible();
     expect(screen.getByRole('progressbar', {
       name: 'Progresso da formação: 1 de 1 cursos concluídos',
@@ -145,8 +144,12 @@ describe('learning experience', () => {
     renderAt('/learning');
     expect(await screen.findByRole('link', { name: /Continuar aula/ }))
       .toBeVisible();
-    expect(screen.getByRole('region', { name: 'Formação em andamento' })
-      .querySelector('.learning-completion-illustration')).toHaveClass('is-in-progress');
+    const hero = screen.getByRole('region', { name: 'Formação em andamento' });
+    // the greeting lives inside the green card, with the course to continue shown as a cover
+    expect(within(hero).getByRole('heading', { level: 1, name: 'Bom te ver de volta.' })).toBeVisible();
+    expect(hero.querySelector('.learning-hero-cover')).toBeInTheDocument();
+    expect(hero.querySelector('.learning-completion-illustration')).toBeNull();
+    expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     await waitFor(() => expect(screen.getByRole('link', { name: /Continuar aula/ }))
       .toHaveAttribute('href', '/learning/tracks/ergonomia?lesson=lesson-1'));
     expect(screen.getByText('Passo 2 de 2 · 70% da formação')).toBeVisible();

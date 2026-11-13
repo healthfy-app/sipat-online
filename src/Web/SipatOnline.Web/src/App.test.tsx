@@ -414,7 +414,7 @@ describe('tenant portal', () => {
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
-    expect(await screen.findByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Bom te ver de volta.' })).toBeVisible();
     const sidebar = screen.getByRole('complementary', { name: 'Área do aluno' });
     expect(await within(sidebar).findByText('50% concluído')).toBeVisible();
     expect(within(sidebar).getByText('0 de 1 cursos')).toBeVisible();

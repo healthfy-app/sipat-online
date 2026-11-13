@@ -32,6 +32,7 @@ import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
 import ProgressBar from './ProgressBar';
 import './CourseCards.css';
+import './LearningHero.css';
 
 export default function LearningHomePage({ participantName, setSummary }: {
   participantName?: string;
@@ -264,17 +265,21 @@ export default function LearningHomePage({ participantName, setSummary }: {
     </article>;
   };
 
+  const firstName = participantName?.split(' ')[0];
+  // once the formation has started, the greeting lives inside the green card instead of floating above it
+  const heroGreets = startedAnyCourse && !isLoading && !error && tracks.length > 0;
+
   return (
     <main className={`learning-page learning-catalog${startedAnyCourse ? ' is-returning' : ''}`}>
-      <header className="learning-page-heading">
-        {participantName && <p className="learning-catalog-greeting">Olá, {participantName.split(' ')[0]}.</p>}
+      {!heroGreets && <header className="learning-page-heading">
+        {firstName && <p className="learning-catalog-greeting">Olá, {firstName}.</p>}
         <h1>{startedAnyCourse ? 'Bom te ver de volta.' : 'Seus cursos. Seu próximo passo.'}</h1>
         <p className="muted-copy">
           {startedAnyCourse
             ? 'Continue de onde parou e avance no seu ritmo.'
             : 'Explore os cursos da sua SIPAT e acompanhe cada conquista, no seu ritmo.'}
         </p>
-      </header>
+      </header>}
 
       {isLoading && <LoadingState className="learning-state">Carregando suas trilhas...</LoadingState>}
       {error && (
@@ -335,8 +340,15 @@ export default function LearningHomePage({ participantName, setSummary }: {
             className={`learning-resume-hero learning-formation-hero${isFormationComplete ? '' : ' is-in-progress'}`}
           >
             <div className="learning-resume-content">
-              <p className="learning-catalog-eyebrow">Sua trilha</p>
-              <h2>{isFormationComplete ? 'Formação concluída' : 'Formação em andamento'}</h2>
+              <div className="learning-hero-greeting">
+                {firstName && <p className="learning-hero-hello">Olá, {firstName}.</p>}
+                <h1>{isFormationComplete ? 'Formação concluída. Parabéns!' : 'Bom te ver de volta.'}</h1>
+                <p className="learning-hero-lead">
+                  {isFormationComplete
+                    ? 'Você terminou todos os cursos da sua SIPAT. Seus certificados estão disponíveis.'
+                    : 'Continue de onde parou e avance no seu ritmo.'}
+                </p>
+              </div>
               <div className="learning-completion-progress">
                 <div className="learning-completion-progress-heading">
                   <span>Passo {currentStepNumber} de {tracks.length}</span>
@@ -349,6 +361,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
               </div>
               {!isFormationComplete && continueTrack && (
                 <>
+                  {continueTrack.dayTitle && <p className="learning-hero-day">{continueTrack.dayTitle}</p>}
                   <p className="learning-formation-current-course">
                     {resumeTrack && resumeLesson ? `Aula ${resumeLesson.position} · ` : ''}
                     {continueTitle ?? continueTrack.title}
@@ -369,27 +382,26 @@ export default function LearningHomePage({ participantName, setSummary }: {
                 </>
               )}
             </div>
-            <div
-              aria-hidden="true"
-              className={`learning-completion-illustration${isFormationComplete ? '' : ' is-in-progress'}`}
-            >
-              <svg viewBox="0 0 140 140">
-                <circle cx="70" cy="70" r="62" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeOpacity="0.24" />
-                {isFormationComplete ? (
-                  <>
-                    <path d="M48 30h44v24c0 18-9 29-22 29S48 72 48 54V30Z" fill="currentColor" />
-                    <path d="M48 39H32v11c0 14 8 22 21 23M92 39h16v11c0 14-8 22-21 23" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="7" />
-                    <path d="M70 84v17M51 108h38" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="7" />
-                    <path d="m70 42 3.5 7 7.5 1-5.5 5.2 1.3 7.3-6.8-3.6-6.8 3.6 1.3-7.3-5.5-5.2 7.5-1L70 42Z" fill="var(--learner-deep)" />
-                  </>
-                ) : (
-                  <>
-                    <path d="M70 44c-10-7-22-9-34-6v42c12-3 24-1 34 6 10-7 22-9 34-6V38c-12-3-24-1-34 6Z" fill="currentColor" />
-                    <path d="M70 44v42M45 51c7-1 13 0 18 2m14-2c5-2 11-3 18-2" fill="none" stroke="var(--learner-deep)" strokeLinecap="round" strokeWidth="5" />
-                  </>
-                )}
-              </svg>
-            </div>
+            {!isFormationComplete && continueTrack && (
+              <Link aria-hidden="true" className="learning-resume-cover learning-hero-cover" tabIndex={-1} to={continuePath}>
+                <img alt="" decoding="async" src={continueTrack.coverUrl ?? getCourseCover(continueTrack.title)} />
+                <span className="learning-resume-play">
+                  <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" fill="currentColor" /></svg>
+                </span>
+                <span className="learning-hero-cover-bar"><span style={{ width: `${getTrackProgress(continueTrack)}%` }} /></span>
+              </Link>
+            )}
+            {isFormationComplete && (
+              <div aria-hidden="true" className="learning-completion-illustration">
+                <svg viewBox="0 0 140 140">
+                  <circle cx="70" cy="70" r="62" fill="currentColor" fillOpacity="0.1" stroke="currentColor" strokeOpacity="0.24" />
+                  <path d="M48 30h44v24c0 18-9 29-22 29S48 72 48 54V30Z" fill="currentColor" />
+                  <path d="M48 39H32v11c0 14 8 22 21 23M92 39h16v11c0 14-8 22-21 23" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="7" />
+                  <path d="M70 84v17M51 108h38" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="7" />
+                  <path d="m70 42 3.5 7 7.5 1-5.5 5.2 1.3 7.3-6.8-3.6-6.8 3.6 1.3-7.3-5.5-5.2 7.5-1L70 42Z" fill="var(--learner-deep)" />
+                </svg>
+              </div>
+            )}
           </section>
         )}
 
