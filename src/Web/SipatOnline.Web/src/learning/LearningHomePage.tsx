@@ -32,6 +32,7 @@ import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
 import TrailPath from './TrailPath';
 import WeekVideos from './WeekVideos';
+import { sipatPhase } from '@/sipatBuilder/sipatPhase';
 import ProgressBar from './ProgressBar';
 import './CourseCards.css';
 import './LearningHero.css';
@@ -57,9 +58,19 @@ export default function LearningHomePage({ participantName, setSummary }: {
 
   // a participant can have several SIPATs (one a year): the published one is shown, earlier ones are one tap away
   const sipats = Array.from(new Map(allTracks.map(track => [track.sipatEventId, track])).values())
-    .map(track => ({ id: track.sipatEventId, title: track.sipatTitle ?? 'SIPAT', startsAt: track.sipatStartsAt ?? '', published: track.sipatStatus === 'Published' }))
+    .map(track => {
+      const event = { status: track.sipatStatus ?? 'Published', startsAt: track.sipatStartsAt ?? '', endsAt: track.sipatEndsAt ?? track.sipatStartsAt ?? '' };
+      return {
+        id: track.sipatEventId, title: track.sipatTitle ?? 'SIPAT', startsAt: event.startsAt,
+        phase: sipatPhase(event, 1), hasDays: allTracks.some(item => item.sipatEventId === track.sipatEventId && !!item.dayTitle),
+      };
+    })
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  const currentSipat = sipats.find(item => item.id === chosenSipat) ?? sipats.find(item => item.published) ?? sipats[0];
+  // the one shown first: the week that is happening (or about to), built by days; then the most recent
+  const live = (item: (typeof sipats)[number]) => item.phase === 'running' || item.phase === 'published';
+  const currentSipat = sipats.find(item => item.id === chosenSipat)
+    ?? sipats.find(item => live(item) && item.hasDays) ?? sipats.find(live) ?? sipats[0];
+  const yearOf = (item: (typeof sipats)[number]) => (item.startsAt ? new Date(item.startsAt).getUTCFullYear() : null);
   const tracks = sipats.length > 1 && currentSipat ? allTracks.filter(track => track.sipatEventId === currentSipat.id) : allTracks;
   const overallProgress = getOverallProgress(tracks);
   const isFormationComplete = overallProgress >= 100;
@@ -427,8 +438,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
 
         {sipats.length > 1 && currentSipat && <nav aria-label="SIPATs" className="sipat-years">
           {sipats.map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} onClick={() => { setChosenSipat(item.id); setSelectedDay(null); }} type="button">
-            <strong>{item.startsAt ? new Date(item.startsAt).getUTCFullYear() : item.title}</strong>
-            <span>{item.published ? 'Em andamento' : 'Anterior'}</span>
+            <strong>{yearOf(item) !== null && sipats.filter(other => yearOf(other) === yearOf(item)).length === 1 ? yearOf(item) : item.title}</strong>
+            <span>{item.phase === 'running' ? 'Em andamento' : item.phase === 'published' ? 'Em breve' : 'Concluída'}</span>
           </button>)}
         </nav>}
 

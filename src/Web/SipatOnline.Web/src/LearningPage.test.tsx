@@ -783,8 +783,8 @@ describe('learning experience', () => {
 
   it('shows the week of the published SIPAT and keeps the earlier years one tap away', async () => {
     const user = userEvent.setup();
-    const now = { ...trackCard, id: 'n', sipatEventId: 'sipat-2026', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatStatus: 'Published' as const };
-    const before = { ...trackCard, id: 'o', sipatEventId: 'sipat-2025', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 1, coursePosition: 1, lessonCount: 1, completedLessonCount: 1, progressPercentage: 100, sipatTitle: 'SIPAT 2025', sipatStartsAt: '2025-11-10T00:00:00Z', sipatStatus: 'Cancelled' as const };
+    const now = { ...trackCard, id: 'n', sipatEventId: 'sipat-2026', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-11-15T00:00:00Z', sipatStatus: 'Published' as const };
+    const before = { ...trackCard, id: 'o', sipatEventId: 'sipat-2025', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 1, coursePosition: 1, lessonCount: 1, completedLessonCount: 1, progressPercentage: 100, sipatTitle: 'SIPAT 2025', sipatStartsAt: '2025-11-10T00:00:00Z', sipatEndsAt: '2025-11-15T00:00:00Z', sipatStatus: 'Published' as const };
     listAssignedTracks.mockResolvedValue([before, now]);
     getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'n' ? now : before, lessons: [{ ...lesson, title: trackId === 'n' ? 'Ginástica laboral' : 'Respiração' }] }));
     renderAt('/learning');
@@ -794,8 +794,23 @@ describe('learning experience', () => {
     expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Dia 1 · Mente tranquila' })).not.toBeInTheDocument();
 
-    await user.click(within(years).getByRole('button', { name: /2025.*Anterior/ }));
+    await user.click(within(years).getByRole('button', { name: /2025.*Concluída/ }));
     expect(await screen.findByRole('region', { name: 'Dia 1 · Mente tranquila' })).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Dia 1 · Boa postura' })).not.toBeInTheDocument();
+  });
+
+  it('opens on the SIPAT built by days when an older SIPAT of the same year is also published', async () => {
+    const byDays = { ...trackCard, id: 'd', sipatEventId: 'sipat-b', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, sipatTitle: 'SIPAT de demonstração 2026', sipatStartsAt: '2026-11-10T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    const legacy = { ...trackCard, id: 'l', sipatEventId: 'sipat-a', title: 'Teste Novembro', sipatTitle: 'SIPAT Novembro 2026', sipatStartsAt: '2026-11-11T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    listAssignedTracks.mockResolvedValue([legacy, byDays]);
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'd' ? byDays : legacy, lessons: [lesson] }));
+    renderAt('/learning');
+
+    // the week by days wins over the legacy one, even though the legacy one starts later
+    expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
+    // two SIPATs of the same year are told apart by their names, not by the year
+    const years = screen.getByRole('navigation', { name: 'SIPATs' });
+    expect(within(years).getByRole('button', { name: /SIPAT de demonstração 2026/ })).toHaveAttribute('aria-pressed', 'true');
+    expect(within(years).getByRole('button', { name: /SIPAT Novembro 2026/ })).toHaveAttribute('aria-pressed', 'false');
   });
 });

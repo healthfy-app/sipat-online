@@ -456,6 +456,7 @@ export interface LearningTrackCard {
   sipatTitle?: string | null;
   sipatStartsAt?: string | null;
   sipatStatus?: 'Draft' | 'Published' | 'Cancelled' | null;
+  sipatEndsAt?: string | null;
 }
 
 export interface ParticipantOutcomes {

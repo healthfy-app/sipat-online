@@ -411,7 +411,7 @@ public sealed class EfLearningStore(
             item => item.TenantId == tenantId.Value && item.RevisionId == revision.Id && item.CoverData != null, cancellationToken);
         var sipat = await dbContext.SipatEvents.AsNoTracking()
             .Where(item => item.Id == trackEntity.SipatEventId && item.TenantId == tenantId.Value)
-            .Select(item => new { item.Title, item.StartsAt, item.Status })
+            .Select(item => new { item.Title, item.StartsAt, item.EndsAt, item.Status })
             .SingleOrDefaultAsync(cancellationToken);
         var card = new LearningTrackCard(
             trackEntity.Id,
@@ -432,7 +432,8 @@ public sealed class EfLearningStore(
             totalDuration,
             sipat?.Title,
             sipat?.StartsAt,
-            sipat?.Status.ToString());
+            sipat?.Status.ToString(),
+            sipat?.EndsAt);
 
         return new LearningExperience(card, lessons);
     }

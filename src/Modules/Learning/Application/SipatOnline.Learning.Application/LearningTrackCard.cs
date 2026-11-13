@@ -17,7 +17,8 @@ public sealed record LearningTrackCard(
     long DurationMilliseconds = 0,
     string? SipatTitle = null,
     DateTimeOffset? SipatStartsAt = null,
-    string? SipatStatus = null);
+    string? SipatStatus = null,
+    DateTimeOffset? SipatEndsAt = null);
 
 public sealed record LearningLessonProgress(
     Guid Id,
