@@ -82,6 +82,8 @@ public sealed class EfSipatProgramStore(PlatformDbContext dbContext) : ISipatPro
     private static SipatProgram ToDomain(SipatProgramEntity entity) => new(
         entity.Id,
         entity.Title,
-        JsonSerializer.Deserialize<IReadOnlyList<ProgramDay>>(entity.DaysJson, JsonOptions) ?? [],
+        (JsonSerializer.Deserialize<IReadOnlyList<ProgramDay>>(entity.DaysJson, JsonOptions) ?? [])
+            .Select(day => day with { VideoIds = day.VideoIds ?? [], GameIds = day.GameIds ?? [] })
+            .ToArray(),
         entity.CreatedAt);
 }

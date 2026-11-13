@@ -11,7 +11,6 @@ import {
   type PlatformUserSummary,
 } from '@/api';
 import CompanyCertificateLogoPanel from '@/CompanyCertificateLogoPanel';
-import CompanyLearningPanel from '@/CompanyLearningPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -147,7 +146,6 @@ export default function CompanyPage() {
             actions={(
               <>
                 <a className={buttonVariants({ variant: 'default' })} href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}><LogIn /> Entrar como administrador</a>
-                <CompanyLearningPanel companyId={companyId} />
                 <CompanyCertificateLogoPanel companyId={companyId} />
               </>
             )}

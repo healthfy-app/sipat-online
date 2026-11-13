@@ -128,6 +128,9 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var courses = new List<PlatformCourse>(program.Days.Count);
         foreach (var day in program.Days)
         {
+            // programs saved before days held videos come back without lists: say what to do instead of failing
+            if (day.VideoIds is null || day.VideoIds.Count == 0)
+                return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra a SIPAT em Construção SIPAT, escolha um tema para cada dia e salve.");
             var videos = new List<PlatformCourseVideo>(day.VideoIds.Count);
             foreach (var videoId in day.VideoIds)
             {
@@ -136,7 +139,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
                     return Failure<ProgramApplication>("learning.program_video_invalid", $"Um vídeo do dia \"{day.Title}\" não existe mais. Revise o programa.");
                 videos.Add(video);
             }
-            var placements = day.GameIds.Select(gameId => new CourseModulePlacement(gameId, videos.Count)).ToArray();
+            var placements = (day.GameIds ?? []).Select(gameId => new CourseModulePlacement(gameId, videos.Count)).ToArray();
             var course = new PlatformCourse(day.Id, day.Title, day.Subject, now, PlatformCourseStatus.Published, true, videos, placements);
             var snapshot = await CreateSnapshotAsync(course, token);
             if (!snapshot.IsSuccess) return Result<ProgramApplication>.Failure(snapshot.Error);
