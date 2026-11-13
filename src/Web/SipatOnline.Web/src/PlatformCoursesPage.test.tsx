@@ -20,6 +20,8 @@ vi.mock('./api', async (importOriginal) => {
     createGameModule: vi.fn(),
     createSipatProgram: vi.fn(),
     deleteSipatProgram: vi.fn(),
+    deletePlatformCourse: vi.fn(),
+    deletePlatformVideo: vi.fn(),
     listSipatPrograms: vi.fn(),
     updateSipatProgram: vi.fn(),
     createPlatformCourse: vi.fn(),
@@ -97,6 +99,8 @@ beforeEach(() => {
   vi.mocked(api.createSipatProgram).mockReset();
   vi.mocked(api.updateSipatProgram).mockReset();
   vi.mocked(api.deleteSipatProgram).mockReset();
+  vi.mocked(api.deletePlatformCourse).mockReset();
+  vi.mocked(api.deletePlatformVideo).mockReset();
   vi.mocked(api.listPlatformCourses).mockReset().mockResolvedValue([ergonomics, fire]);
   vi.mocked(api.listPlatformLibraryVideos).mockReset().mockResolvedValue([
     { video: opening, courseCount: 1 },
@@ -732,6 +736,35 @@ describe('Platform course catalog', () => {
     });
   });
 
+  it('deletes a theme only after asking', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.deletePlatformCourse).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Excluir tema Ergonomia' }));
+    expect(api.deletePlatformCourse).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: 'Excluir tema Ergonomia' }));
+    expect(api.deletePlatformCourse).toHaveBeenCalledWith('c-1');
+    expect(await screen.findByText('O tema "Ergonomia" foi excluído.')).toBeVisible();
+    confirm.mockRestore();
+  });
+
+  it('deletes a video from the library and shows why when it is still in use', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.deletePlatformVideo).mockRejectedValueOnce(new Error('Este vídeo ainda está em uso (1 tema). Tire-o de lá antes de excluir.')).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+    await user.click((await screen.findAllByRole('button', { name: /^Excluir vídeo / }))[0]);
+    expect(await screen.findByRole('alert')).toHaveTextContent('ainda está em uso');
+    await user.click(screen.getAllByRole('button', { name: /^Excluir vídeo / })[0]);
+    await waitFor(() => expect(api.deletePlatformVideo).toHaveBeenCalledTimes(2));
+    confirm.mockRestore();
+  });
+
   it('lists programs with their days and asks before removing one', async () => {
     const user = userEvent.setup();
     vi.mocked(api.listSipatPrograms).mockResolvedValue([{
@@ -749,10 +782,10 @@ describe('Platform course catalog', () => {
     expect(screen.getByText('2 dias · 3 vídeos')).toBeVisible();
     expect(screen.getByText('Dia 1 · Segurança')).toBeVisible();
     expect(screen.getByText(/1 vídeo · 1 jogo/)).toBeVisible();
-    await user.click(screen.getByRole('button', { name: 'Remover programa SIPAT 2026' }));
+    await user.click(screen.getByRole('button', { name: 'Excluir SIPAT pronta SIPAT 2026' }));
     expect(api.deleteSipatProgram).not.toHaveBeenCalled();
     confirm.mockReturnValue(true);
-    await user.click(screen.getByRole('button', { name: 'Remover programa SIPAT 2026' }));
+    await user.click(screen.getByRole('button', { name: 'Excluir SIPAT pronta SIPAT 2026' }));
     expect(api.deleteSipatProgram).toHaveBeenCalledWith('p-1');
     confirm.mockRestore();
   });

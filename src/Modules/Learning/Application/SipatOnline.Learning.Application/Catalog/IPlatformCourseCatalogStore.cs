@@ -44,6 +44,15 @@ public interface IPlatformCourseCatalogStore
 
     Task<PlatformCourseCover?> GetCoverAsync(Guid courseId, CancellationToken cancellationToken);
 
+    /// <summary>Deletes a theme (course) with its links, cover and lessons. Videos stay in the library. False when it does not exist.</summary>
+    Task<bool> DeleteCourseAsync(Guid courseId, CancellationToken cancellationToken);
+
+    /// <summary>Where a video is still used, so it is only deleted when nothing depends on it.</summary>
+    Task<PlatformVideoUsage> GetVideoUsageAsync(Guid videoId, CancellationToken cancellationToken);
+
+    /// <summary>Deletes a video of the library (and its checkpoints). False when it does not exist.</summary>
+    Task<bool> DeleteVideoAsync(Guid videoId, CancellationToken cancellationToken);
+
     /// <summary>Replaces lessons and the videos inside them; returns false when a video does not exist.</summary>
     Task<bool> SetCourseStructureAsync(
         Guid courseId,
@@ -55,4 +64,9 @@ public interface IPlatformCourseCatalogStore
         Guid courseId,
         IReadOnlyList<Guid> videoIds,
         CancellationToken cancellationToken);
+}
+
+public sealed record PlatformVideoUsage(int Themes, int Programs, int DeliveredLessons)
+{
+    public bool IsInUse => Themes > 0 || Programs > 0 || DeliveredLessons > 0;
 }

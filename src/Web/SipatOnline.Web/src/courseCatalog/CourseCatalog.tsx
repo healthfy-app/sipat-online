@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   deleteGameModule,
+  deletePlatformCourse,
+  deletePlatformVideo,
   deleteSipatProgram,
   type GameModule,
   type PlatformCourse,
@@ -104,13 +106,41 @@ export default function CourseCatalog({
     }
   }
 
+  async function removeCourse(course: PlatformCourse) {
+    if (!window.confirm(`Excluir o tema "${course.title}"? As empresas que já receberam esta SIPAT continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
+    onError('');
+    setIsDeleting(true);
+    try {
+      await deletePlatformCourse(course.id);
+      await onProgramsChanged(`O tema "${course.title}" foi excluído.`);
+    } catch (deleteError) {
+      onError(getErrorMessage(deleteError));
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  async function removeVideo(item: PlatformLibraryVideo) {
+    if (!window.confirm(`Excluir o vídeo "${item.video.title}"? O arquivo é apagado e isso não pode ser desfeito.`)) return;
+    onError('');
+    setIsDeleting(true);
+    try {
+      await deletePlatformVideo(item.video.id);
+      await onProgramsChanged(`O vídeo "${item.video.title}" foi excluído.`);
+    } catch (deleteError) {
+      onError(getErrorMessage(deleteError));
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
   async function removeProgram(program: SipatProgram) {
-    if (!window.confirm(`Remover o programa "${program.title}"? As empresas que já o receberam continuam com seus cursos.`)) return;
+    if (!window.confirm(`Excluir a SIPAT pronta "${program.title}"? As empresas que já a receberam continuam com o conteúdo.`)) return;
     onError('');
     setIsDeleting(true);
     try {
       await deleteSipatProgram(program.id);
-      await onProgramsChanged(`O programa "${program.title}" foi removido.`);
+      await onProgramsChanged(`A SIPAT pronta "${program.title}" foi excluída.`);
     } catch (deleteError) {
       onError(getErrorMessage(deleteError));
     } finally {
@@ -159,7 +189,7 @@ export default function CourseCatalog({
         <TabsContent value="courses">
           {body ?? (isEmptyCatalog
             ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
-            : courses.length > 0 && <CoursesPanel busy={busy} courses={courses} onDuplicate={onDuplicate} onOpen={onOpen} />)}
+            : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} courses={courses} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
         </TabsContent>
         <TabsContent value="programs">
           {body ?? (
@@ -174,7 +204,7 @@ export default function CourseCatalog({
           )}
         </TabsContent>
         <TabsContent value="videos">
-          {body ?? <VideoLibraryPanel library={library} onUpload={openUpload} />}
+          {body ?? <VideoLibraryPanel busy={isDeleting} library={library} onDelete={(item) => void removeVideo(item)} onUpload={openUpload} />}
         </TabsContent>
         <TabsContent value="modules">
           {body ?? (

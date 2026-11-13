@@ -100,6 +100,42 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("UpdatePlatformCourse");
 
+        catalog.MapDelete("/courses/{courseId:guid}", async (
+            Guid courseId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformCourseCatalogService courseService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await courseService.DeleteCourseAsync(courseId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("DeletePlatformCourse");
+
+        catalog.MapDelete("/videos/{videoId:guid}", async (
+            Guid videoId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformCourseCatalogService courseService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await courseService.DeleteVideoAsync(videoId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("DeletePlatformVideo");
+
         catalog.MapPost("/courses/{courseId:guid}/duplicate", async (
             Guid courseId,
             HttpContext context,
@@ -604,6 +640,7 @@ public static class PlatformCourseCatalogEndpoints
             "learning.platform_course.storage_unconfigured" or
                 "learning.platform_course.video_file_missing" => StatusCodes.Status503ServiceUnavailable,
             "learning.platform_course.actor_required" => StatusCodes.Status400BadRequest,
+            "learning.platform_course.video_in_use" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 

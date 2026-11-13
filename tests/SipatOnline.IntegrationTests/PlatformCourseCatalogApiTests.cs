@@ -180,6 +180,23 @@ public sealed class PlatformCourseCatalogApiTests
         Assert.All(
             library.EnumerateArray(),
             item => Assert.Equal(2, item.GetProperty("courseCount").GetInt32()));
+
+        // a video that a theme still uses cannot be deleted; the theme can, and then the video is free
+        using var videoInUse = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/videos/{firstVideo}", (object?)null);
+        Assert.Equal(HttpStatusCode.Conflict, videoInUse.StatusCode);
+        Assert.Contains("em uso", await videoInUse.Content.ReadAsStringAsync());
+
+        using var deleteCopy = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/courses/{copyId}", (object?)null);
+        Assert.Equal(HttpStatusCode.NoContent, deleteCopy.StatusCode);
+        using var deleteCourse = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/courses/{courseId}", (object?)null);
+        Assert.Equal(HttpStatusCode.NoContent, deleteCourse.StatusCode);
+        using var courseAgain = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/courses/{courseId}", (object?)null);
+        Assert.Equal(HttpStatusCode.NotFound, courseAgain.StatusCode);
+
+        using var freeVideo = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/videos/{firstVideo}", (object?)null);
+        Assert.Equal(HttpStatusCode.NoContent, freeVideo.StatusCode);
+        using var libraryAfter = await client.GetAsync("https://ops.localhost/api/platform/catalog/videos");
+        Assert.Equal(secondVideo, Assert.Single((await ReadAsync(libraryAfter)).EnumerateArray()).GetProperty("video").GetProperty("id").GetGuid());
     }
 
     [DockerFact]

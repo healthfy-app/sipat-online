@@ -1,4 +1,4 @@
-import { Copy } from 'lucide-react';
+import { Copy, Trash2 } from 'lucide-react';
 import type { PlatformCourse } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -10,11 +10,13 @@ export default function CourseCard({
   busy,
   onOpen,
   onDuplicate,
+  onDelete,
 }: {
   course: PlatformCourse;
   busy: boolean;
   onOpen: () => void;
   onDuplicate: () => void;
+  onDelete: () => void;
 }) {
   const totalMilliseconds = course.videos.reduce((sum, video) => sum + video.durationMilliseconds, 0);
   const option = getCourseOption(course.description);
@@ -66,6 +68,7 @@ export default function CourseCard({
         <span aria-hidden="true" className="text-[0.8125rem] font-semibold text-muted-foreground transition-colors group-hover:text-primary">
           Abrir editor →
         </span>
+        <div className="flex items-center">
         <Button
           aria-label={`Duplicar tema ${course.title}`}
           className="relative z-10"
@@ -77,6 +80,18 @@ export default function CourseCard({
         >
           <Copy /> Duplicar
         </Button>
+        <Button
+          aria-label={`Excluir tema ${course.title}`}
+          className="relative z-10"
+          disabled={busy}
+          onClick={onDelete}
+          size="icon-sm"
+          title="Excluir tema"
+          variant="ghost"
+        >
+          <Trash2 />
+        </Button>
+        </div>
       </footer>
     </article>
   );

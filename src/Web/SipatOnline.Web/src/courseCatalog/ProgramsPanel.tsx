@@ -30,7 +30,7 @@ export default function ProgramsPanel({ programs, courses, busy, onCreate, onEdi
               </div>
               <div className="flex gap-1.5">
                 <Button aria-label={`Abrir programa ${program.title}`} disabled={busy} onClick={() => onEdit(program)} size="sm" variant="outline">Abrir</Button>
-                <Button aria-label={`Remover programa ${program.title}`} disabled={busy} onClick={() => onDelete(program)} size="sm" variant="destructive">Remover</Button>
+                <Button aria-label={`Excluir SIPAT pronta ${program.title}`} disabled={busy} onClick={() => onDelete(program)} size="sm" variant="destructive">Excluir</Button>
               </div>
             </div>
             <ol className="m-0 grid list-none gap-2 p-0">

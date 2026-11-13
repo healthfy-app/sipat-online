@@ -64,6 +64,45 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             .ToArray();
     }
 
+    public async Task<bool> DeleteCourseAsync(Guid courseId, CancellationToken cancellationToken)
+    {
+        var course = await dbContext.PlatformCourses
+            .SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
+        if (course is null)
+        {
+            return false;
+        }
+
+        // links, lessons, cover and module links go with it (cascade); videos and delivered tracks are untouched
+        dbContext.PlatformCourses.Remove(course);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
+    public async Task<PlatformVideoUsage> GetVideoUsageAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        var themes = await dbContext.PlatformCourseVideoLinks.CountAsync(link => link.VideoId == videoId, cancellationToken);
+        var text = videoId.ToString("D");
+        var programs = await dbContext.SipatPrograms.CountAsync(program => program.DaysJson.Contains(text), cancellationToken);
+        var reference = $"catalog:{text}";
+        var delivered = await dbContext.LearningLessons.CountAsync(lesson => lesson.ProviderAssetReference == reference, cancellationToken);
+        return new PlatformVideoUsage(themes, programs, delivered);
+    }
+
+    public async Task<bool> DeleteVideoAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        var video = await dbContext.PlatformCourseVideos
+            .SingleOrDefaultAsync(item => item.Id == videoId, cancellationToken);
+        if (video is null)
+        {
+            return false;
+        }
+
+        dbContext.PlatformCourseVideos.Remove(video);
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return true;
+    }
+
     public async Task<Result<bool>> AddCourseAsync(
         PlatformCourse course,
         CancellationToken cancellationToken)

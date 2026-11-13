@@ -23,11 +23,13 @@ export default function CoursesPanel({
   busy,
   onOpen,
   onDuplicate,
+  onDelete,
 }: {
   courses: PlatformCourse[];
   busy: boolean;
   onOpen: (course: PlatformCourse) => void;
   onDuplicate: (course: PlatformCourse) => void;
+  onDelete: (course: PlatformCourse) => void;
 }) {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
@@ -89,7 +91,7 @@ export default function CoursesPanel({
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,15.5rem),1fr))] gap-4">
           {filtered.map((course) => (
             <CourseCard busy={busy} course={course} key={course.id}
-              onDuplicate={() => onDuplicate(course)} onOpen={() => onOpen(course)} />
+              onDelete={() => onDelete(course)} onDuplicate={() => onDuplicate(course)} onOpen={() => onOpen(course)} />
           ))}
         </div>
       )}

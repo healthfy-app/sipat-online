@@ -216,6 +216,12 @@ export async function createSipatProgram(data: SipatProgramData): Promise<SipatP
 export async function updateSipatProgram(programId: string, data: SipatProgramData): Promise<SipatProgram> {
   return tidyProgram(await requestJson<SipatProgram>(`/api/platform/catalog/programs/${programId}`, { method: 'PUT', body: JSON.stringify(data) }));
 }
+export async function deletePlatformCourse(courseId: string): Promise<void> {
+  await request(`/api/platform/catalog/courses/${courseId}`, { method: 'DELETE' });
+}
+export async function deletePlatformVideo(videoId: string): Promise<void> {
+  await request(`/api/platform/catalog/videos/${videoId}`, { method: 'DELETE' });
+}
 export async function deleteSipatProgram(programId: string): Promise<void> {
   await request(`/api/platform/catalog/programs/${programId}`, { method: 'DELETE' });
 }

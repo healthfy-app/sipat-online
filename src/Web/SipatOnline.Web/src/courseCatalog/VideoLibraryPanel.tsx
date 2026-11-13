@@ -1,3 +1,4 @@
+import { Trash2 } from 'lucide-react';
 import type { PlatformLibraryVideo } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -7,15 +8,19 @@ import VideoPreview from '@/VideoPreview';
 
 export default function VideoLibraryPanel({
   library,
+  busy,
   onUpload,
+  onDelete,
 }: {
   library: PlatformLibraryVideo[];
+  busy: boolean;
   onUpload: () => void;
+  onDelete: (video: PlatformLibraryVideo) => void;
 }) {
   return (
     <section aria-label="Vídeos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <p className="m-0 text-sm text-muted-foreground">Vídeos reutilizáveis em qualquer curso do catálogo.</p>
+        <p className="m-0 text-sm text-muted-foreground">Vídeos reutilizáveis em qualquer tema do acervo.</p>
         <span className="text-[0.8125rem] tabular-nums text-muted-foreground">{pluralize(library.length, 'vídeo', 'vídeos')}</span>
       </div>
 
@@ -23,7 +28,9 @@ export default function VideoLibraryPanel({
         <EmptyState action={<Button onClick={onUpload}>Enviar o primeiro vídeo</Button>} title="A biblioteca ainda não tem vídeos." />
       ) : (
         <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,17rem),1fr))] gap-4">
-          {library.map(({ video, courseCount }) => (
+          {library.map((item) => {
+            const { video, courseCount } = item;
+            return (
             <article className="flex min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-card" key={video.id}>
               <div className="aspect-video bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
                 <VideoPreview preload="metadata" src={video.fileUrl} title={`Prévia de ${video.title}`} />
@@ -33,12 +40,16 @@ export default function VideoLibraryPanel({
                 <p className="m-0 text-[0.8125rem] tabular-nums text-muted-foreground">
                   {formatDuration(video.durationMilliseconds)} · {formatBytes(video.sizeBytes)}
                 </p>
-                <Badge className="mt-1" variant={courseCount === 0 ? 'warning' : 'default'}>
-                  {courseCount === 0 ? 'Ainda não usado em cursos' : `Usado em ${pluralize(courseCount, 'curso', 'cursos')}`}
-                </Badge>
+                <div className="mt-1 flex items-center justify-between gap-2">
+                  <Badge variant={courseCount === 0 ? 'warning' : 'default'}>
+                    {courseCount === 0 ? 'Ainda não usado em temas' : `Usado em ${pluralize(courseCount, 'tema', 'temas')}`}
+                  </Badge>
+                  <Button aria-label={`Excluir vídeo ${video.title}`} disabled={busy} onClick={() => onDelete(item)} size="icon-sm" title="Excluir vídeo" variant="ghost"><Trash2 /></Button>
+                </div>
               </div>
             </article>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>

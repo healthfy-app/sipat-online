@@ -183,6 +183,59 @@ public sealed class PlatformCourseCatalogService(
         return Result<PlatformCourse>.Success(await catalogStore.FindCourseAsync(copy.Id, cancellationToken) ?? copy);
     }
 
+    /// <summary>Deletes a theme. Companies that already received it keep their copy.</summary>
+    public async Task<Result<bool>> DeleteCourseAsync(Guid courseId, CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return permission;
+        }
+
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        if (!await catalogStore.DeleteCourseAsync(courseId, cancellationToken))
+        {
+            return CourseNotFound<bool>();
+        }
+
+        await WriteAuditAsync("learning.platform_course.deleted", "platform_course", courseId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return Result<bool>.Success(true);
+    }
+
+    /// <summary>Deletes a video only when no theme, no saved SIPAT and no delivered lesson uses it.</summary>
+    public async Task<Result<bool>> DeleteVideoAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return permission;
+        }
+
+        var usage = await catalogStore.GetVideoUsageAsync(videoId, cancellationToken);
+        if (usage.IsInUse)
+        {
+            var where = new List<string>();
+            if (usage.Themes > 0) where.Add(usage.Themes == 1 ? "1 tema" : $"{usage.Themes} temas");
+            if (usage.Programs > 0) where.Add(usage.Programs == 1 ? "1 SIPAT pronta" : $"{usage.Programs} SIPATs prontas");
+            if (usage.DeliveredLessons > 0) where.Add("SIPATs já entregues a empresas");
+            return Failure<bool>(
+                "learning.platform_course.video_in_use",
+                $"Este vídeo ainda está em uso ({string.Join(", ", where)}). Tire-o de lá antes de excluir.");
+        }
+
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        if (!await catalogStore.DeleteVideoAsync(videoId, cancellationToken))
+        {
+            return Failure<bool>("learning.platform_course.video_not_found", "O vídeo não foi encontrado.");
+        }
+
+        await WriteAuditAsync("learning.platform_course.video_deleted", "platform_course_video", videoId, cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        await videoStorage.DeleteAsync(videoId, cancellationToken);
+        return Result<bool>.Success(true);
+    }
+
     public async Task<Result<PlatformCourse>> SetVideosAsync(
         Guid courseId,
         IReadOnlyList<Guid>? videoIds,
