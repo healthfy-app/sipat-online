@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import type { GameOutcome } from '@/games/gameKit';
 import GameStage from '@/games/GameStage';
 
-export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosition, playbackKey, videoRef }: {
+export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosition, playbackKey, videoRef, onActivities }: {
   trackId: string; lessonId: string | null; playbackKey: string | undefined;
   lessonPosition: number;
   videoRef: RefObject<HTMLVideoElement | null>;
+  /** Lets the page draw the activities on the video timeline. */
+  onActivities?: (activities: LearningActivity[]) => void;
 }) {
   const [activities, setActivities] = useState<LearningActivity[]>([]);
   const [active, setActive] = useState<LearningActivity | null>(null);
@@ -31,8 +33,12 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
     return () => { current = false; };
   }, [trackId, retry]);
 
+  useEffect(() => { onActivities?.(activities); }, [activities, onActivities]);
+
   function open(activity: LearningActivity, shouldResume?: boolean) {
     if (activeRef.current) return;
+    // the game opens over the page, which a fullscreen player would hide
+    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
     resume.current = shouldResume ?? (!!videoRef.current && !videoRef.current.paused && !videoRef.current.ended);
     activeRef.current = activity;
     videoRef.current?.pause();

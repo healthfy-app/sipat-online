@@ -266,14 +266,31 @@ describe('learning experience', () => {
     Object.defineProperty(video, 'duration', { configurable: true, value: 5 });
     fireEvent.loadedMetadata(video);
     expect(video.currentTime).toBe(2.4);
-    expect(video).toHaveAttribute('controls');
+    // our own bar replaces the browser controls, so no native speed menu or seek bar is offered
+    expect(video).not.toHaveAttribute('controls');
     expect(video).toHaveAttribute('playsinline');
     expect(screen.queryByLabelText('Velocidade de reprodução')).not.toBeInTheDocument();
-    expect(video).toHaveAttribute('controlslist', expect.stringContaining('noplaybackrate'));
+    expect(screen.getByRole('slider', { name: 'Posição do vídeo' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Tela cheia' })).toBeInTheDocument();
     video.playbackRate = 2;
     fireEvent.rateChange(video);
     expect(video.playbackRate).toBe(1);
     expect(recordRange).not.toHaveBeenCalled();
+  });
+
+  it('only lets the timeline go as far as what was already watched', async () => {
+    const { video } = await playableCourse([{ ...lesson, lastPlaybackPositionMilliseconds: 12000 }]);
+    Object.defineProperty(video, 'duration', { configurable: true, value: 60 });
+    fireEvent.loadedMetadata(video);
+    const timeline = screen.getByRole('slider', { name: 'Posição do vídeo' });
+    expect(timeline).toHaveAttribute('aria-valuetext', '0:12 de 1:00');
+    fireEvent.keyDown(timeline, { key: 'ArrowRight' });
+    expect(video.currentTime).toBe(12);
+    expect(screen.getByText(/não é possível avançar além do que você já viu/)).toBeVisible();
+    fireEvent.keyDown(timeline, { key: 'ArrowLeft' });
+    expect(video.currentTime).toBe(7);
+    fireEvent.keyDown(timeline, { key: 'End' });
+    expect(video.currentTime).toBe(12);
   });
 
   it('sends the viewer back when they try to skip ahead of what was watched', async () => {

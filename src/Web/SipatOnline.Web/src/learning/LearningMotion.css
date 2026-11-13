@@ -1,0 +1,91 @@
+/*
+ * Motion for the lesson screen. Every animation answers something the participant did or
+ * shows what changed (arrival, lesson switch, progress, completion). Nothing loops except
+ * the small "playing" bars, and everything is off under prefers-reduced-motion.
+ */
+.portal-layout-learner .learning-track-page {
+  --rise: cubic-bezier(.16, 1, .3, 1);
+}
+
+/* progress always glides to its new value */
+.portal-layout-learner .learning-track-page .learning-progress-track > span { transition: transform 700ms var(--rise); }
+.portal-layout-learner .learning-track-page .learning-lesson-progress > span { transition: width 600ms var(--rise); }
+
+.portal-layout-learner .learning-track-page .learning-player-frame {
+  box-shadow: 0 18px 44px -18px rgb(10 30 24 / 45%);
+}
+
+/* lesson list */
+.portal-layout-learner .learning-track-page .learning-lesson-item {
+  transition: background-color 180ms ease, border-color 180ms ease, color 180ms ease, transform 180ms var(--rise);
+}
+.portal-layout-learner .learning-track-page .learning-lesson-indicator { transition: background-color 250ms ease, color 250ms ease; }
+.portal-layout-learner .learning-playing-bars { display: inline-flex; align-items: flex-end; gap: 2px; width: 14px; height: 14px; flex: 0 0 auto; }
+.portal-layout-learner .learning-playing-bars i { flex: 1; height: 100%; border-radius: 1px; background: var(--learner-action); transform-origin: bottom; transform: scaleY(.45); }
+
+/* navigation */
+.portal-layout-learner .learning-track-page .learning-lesson-navigation .button > span[aria-hidden] { display: inline-block; transition: transform 180ms var(--rise); }
+.portal-layout-learner .learning-track-page .learning-status { transition: color 250ms ease, background-color 250ms ease; }
+
+/* sidebar cards */
+.portal-layout-learner .learning-track-page .learning-activities-open > span[aria-hidden] { display: inline-block; transition: transform 180ms var(--rise); }
+
+.portal-layout-learner .learning-track-page .learning-seek-notice {
+  display: inline-flex; align-items: center; gap: .4rem; padding: .35rem .7rem; border-radius: 999px;
+  background: var(--signal-soft, #fff5d9); color: var(--signal-ink, #705300); font-weight: 600;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* arrival: the page settles from top to bottom, once */
+  .portal-layout-learner .learning-track-page > .learning-course-header,
+  .portal-layout-learner .learning-track-page > .learning-active-lesson-heading,
+  .portal-layout-learner .learning-track-page .learning-player-frame,
+  .portal-layout-learner .learning-track-page .learning-lesson-navigation,
+  .portal-layout-learner .learning-track-page .learning-course-sidebar > section {
+    animation: learning-rise 460ms var(--rise) both;
+  }
+  .portal-layout-learner .learning-track-page > .learning-active-lesson-heading { animation-delay: 40ms; }
+  .portal-layout-learner .learning-track-page .learning-player-frame { animation-delay: 80ms; }
+  .portal-layout-learner .learning-track-page .learning-lesson-navigation { animation-delay: 140ms; }
+  .portal-layout-learner .learning-track-page .learning-course-sidebar > section:nth-child(1) { animation-delay: 120ms; }
+  .portal-layout-learner .learning-track-page .learning-course-sidebar > section:nth-child(2) { animation-delay: 180ms; }
+  .portal-layout-learner .learning-track-page .learning-course-sidebar > section:nth-child(3) { animation-delay: 240ms; }
+  .portal-layout-learner .learning-track-page .learning-course-sidebar > section:nth-child(n + 4) { animation-delay: 300ms; }
+
+  /* the new video fades in instead of popping */
+  .portal-layout-learner .learning-track-page .lesson-player { animation: learning-fade 380ms ease-out both; }
+
+  /* waiting for the video: a calm pulse on the icon, a sweep across the frame */
+  .portal-layout-learner .learning-track-page .learning-player-state[role="status"] .learning-player-icon { animation: learning-pulse 1.6s ease-in-out infinite; }
+  .portal-layout-learner .learning-track-page .learning-player-frame:has(.learning-player-state[role="status"])::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(100deg, transparent 30%, rgb(255 255 255 / 7%) 50%, transparent 70%);
+    background-size: 220% 100%; animation: learning-sweep 1.8s linear infinite;
+  }
+
+  .portal-layout-learner .learning-track-page .learning-lesson-item:hover:not(:disabled):not(.is-current) { transform: translateX(3px); }
+  .portal-layout-learner .learning-track-page .learning-lesson-item.is-current { animation: learning-select 320ms var(--rise); }
+  .portal-layout-learner .learning-track-page .learning-lesson-item.is-complete .learning-lesson-indicator { animation: learning-pop 420ms var(--rise); }
+  .portal-layout-learner .learning-playing-bars i { animation: learning-bars 900ms ease-in-out infinite; }
+  .portal-layout-learner .learning-playing-bars i:nth-child(2) { animation-delay: -300ms; }
+  .portal-layout-learner .learning-playing-bars i:nth-child(3) { animation-delay: -600ms; }
+
+  .portal-layout-learner .learning-track-page .learning-status.is-complete { animation: learning-pop 420ms var(--rise); }
+  /* lesson done: the way forward draws the eye twice, then rests */
+  .portal-layout-learner .learning-track-page .learning-status.is-complete ~ .button-primary:not(:disabled) { animation: learning-beckon 1.4s ease-out 300ms 2; }
+  .portal-layout-learner .learning-track-page .learning-lesson-navigation .button-primary:hover:not(:disabled) > span[aria-hidden],
+  .portal-layout-learner .learning-track-page .learning-activities-open:hover > span[aria-hidden] { transform: translateX(4px); }
+
+  .portal-layout-learner .learning-track-page .learning-seek-notice { animation: learning-notice 320ms var(--rise); }
+  .portal-layout-learner .learning-track-page .learning-save-status.is-visible { animation: learning-fade 250ms ease-out; }
+}
+
+@keyframes learning-rise { from { opacity: 0; transform: translateY(14px); } }
+@keyframes learning-fade { from { opacity: 0; } }
+@keyframes learning-pop { from { transform: scale(.82); opacity: .4; } 60% { transform: scale(1.06); } }
+@keyframes learning-select { from { transform: scale(.985); } }
+@keyframes learning-bars { 0%, 100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+@keyframes learning-pulse { 50% { transform: scale(1.08); box-shadow: 0 0 0 10px rgb(255 255 255 / 5%); } }
+@keyframes learning-sweep { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+@keyframes learning-notice { from { opacity: 0; transform: translateY(-6px); } }
+@keyframes learning-beckon { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--learner-action) 55%, transparent); } 70%, 100% { box-shadow: 0 0 0 12px transparent; } }

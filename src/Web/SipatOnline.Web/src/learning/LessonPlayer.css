@@ -1,0 +1,127 @@
+/* Lesson player: our own control bar over the browser's video engine (Media Chrome). */
+
+.lesson-player {
+  --player-accent: var(--learner-action, var(--brand-primary, #0f7a3d));
+  --player-signal: #ffd166;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: #000;
+}
+.lesson-player.is-filling { position: fixed; inset: 0; z-index: 900; }
+.lesson-player-filling .learning-page { animation: none !important; transform: none !important; }
+.lesson-player-filling .portal-content { container-type: normal !important; }
+.lesson-player-filling .learning-player-frame { animation: none !important; overflow: visible; }
+.lesson-player:fullscreen { width: 100vw; height: 100vh; }
+
+.lesson-player-controller {
+  display: block;
+  width: 100%;
+  height: 100%;
+  --media-primary-color: #fff;
+  --media-secondary-color: transparent;
+  --media-control-background: transparent;
+  --media-control-hover-background: rgb(255 255 255 / 14%);
+  --media-control-padding: 8px;
+  --media-control-height: 22px;
+  --media-button-icon-height: 22px;
+  --media-font-family: 'Geist', system-ui, sans-serif;
+  --media-font-size: 13px;
+  --media-font-weight: 500;
+  --media-range-track-height: 3px;
+  --media-range-track-background: rgb(255 255 255 / 30%);
+  --media-range-bar-color: #fff;
+  --media-range-thumb-background: #fff;
+  --media-focus-box-shadow: 0 0 0 2px var(--player-signal);
+  --media-loading-indicator-icon-height: 56px;
+  --media-tooltip-display: none;
+}
+.lesson-player .learning-video { width: 100%; height: 100%; max-height: none; object-fit: contain; background: #000; }
+
+/* ---------- barra ---------- */
+.lesson-player-bar {
+  align-items: center;
+  gap: 2px;
+  padding: 2px 10px 8px;
+  background: linear-gradient(to top, rgb(0 0 0 / 78%), rgb(0 0 0 / 0%));
+}
+.lesson-player-bar > * { border-radius: 8px; }
+.lesson-player-bar media-volume-range { width: 72px; }
+.lesson-player-bar media-time-display { font-variant-numeric: tabular-nums; opacity: .92; }
+.lesson-player-spacer { flex: 1; }
+.lesson-player-activities {
+  display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; padding: 3px 9px;
+  border-radius: 999px; background: rgb(255 255 255 / 14%); color: #fff;
+  font: 600 12px/1.4 'Geist', system-ui, sans-serif; font-variant-numeric: tabular-nums;
+}
+.lesson-player-activities svg { width: 14px; height: 14px; color: var(--player-signal); }
+.lesson-player-button {
+  display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: #fff; cursor: pointer; transition: background-color 150ms ease, transform 150ms ease;
+}
+.lesson-player-button:hover { background: rgb(255 255 255 / 14%); }
+.lesson-player-button:active { transform: scale(.92); }
+.lesson-player-button:focus-visible { outline: 2px solid var(--player-signal); outline-offset: -2px; }
+.lesson-player-button svg { width: 20px; height: 20px; }
+
+/* ---------- botão central: aparece pausado, some com um leve zoom ao tocar ---------- */
+.lesson-player-bigplay {
+  --media-button-icon-height: 34px;
+  width: 76px; height: 76px; border-radius: 50%;
+  background: color-mix(in srgb, var(--player-accent) 92%, #000);
+  box-shadow: 0 12px 32px rgb(0 0 0 / 45%), inset 0 1px 0 rgb(255 255 255 / 22%);
+  transition: opacity 220ms ease, transform 220ms cubic-bezier(.2, .8, .2, 1), background-color 150ms ease;
+}
+.lesson-player-bigplay:hover { transform: scale(1.06); background: var(--player-accent); }
+.lesson-player-bigplay:not([mediapaused]) { opacity: 0; transform: scale(1.35); pointer-events: none; }
+
+/* ---------- linha do tempo ---------- */
+.lesson-scrubber {
+  position: relative; display: flex; align-items: center; align-self: stretch; height: 22px; padding: 0 14px; cursor: pointer;
+  touch-action: none; outline: none; background: linear-gradient(to top, rgb(0 0 0 / 38%), transparent);
+}
+.lesson-scrubber-track {
+  position: relative; width: 100%; height: 4px; border-radius: 999px; background: rgb(255 255 255 / 22%);
+  transition: height 140ms ease;
+}
+.lesson-scrubber.is-hovered .lesson-scrubber-track, .lesson-scrubber:focus-visible .lesson-scrubber-track { height: 7px; }
+.lesson-scrubber:focus-visible .lesson-scrubber-track { box-shadow: 0 0 0 2px var(--player-signal); }
+.lesson-scrubber-track > span { position: absolute; top: 0; left: 0; height: 100%; border-radius: inherit; }
+.lesson-scrubber-buffered { background: rgb(255 255 255 / 18%); }
+.lesson-scrubber-unlocked { background: rgb(255 255 255 / 55%); transition: width 300ms linear; }
+.lesson-scrubber-played { background: var(--player-accent); filter: brightness(1.35) saturate(1.1); }
+.lesson-scrubber-track > .lesson-scrubber-thumb {
+  top: 50%; width: 14px; height: 14px; border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 50%); transform: translate(-50%, -50%) scale(0); transition: transform 140ms ease;
+}
+.lesson-scrubber.is-hovered .lesson-scrubber-thumb, .lesson-scrubber:focus-visible .lesson-scrubber-thumb { transform: translate(-50%, -50%) scale(1); }
+.lesson-scrubber-track > .lesson-scrubber-marker {
+  top: 50%; width: 9px; height: 9px; border: 2px solid #111; border-radius: 50%; background: var(--player-signal);
+  transform: translate(-50%, -50%); transition: transform 140ms ease;
+}
+.lesson-scrubber.is-hovered .lesson-scrubber-marker { transform: translate(-50%, -50%) scale(1.25); }
+.lesson-scrubber-track > .lesson-scrubber-marker.is-done { background: #fff; }
+
+.lesson-scrubber-tip {
+  position: absolute; bottom: 24px; display: grid; justify-items: center; gap: 2px; padding: 5px 9px;
+  border-radius: 8px; background: rgb(12 20 17 / 92%); color: #fff; white-space: nowrap; pointer-events: none;
+  font: 600 12px/1.35 'Geist', system-ui, sans-serif; font-variant-numeric: tabular-nums;
+  transform: translateX(-50%); animation: lesson-tip-in 120ms ease-out;
+}
+.lesson-scrubber-tip > * { display: inline-flex; align-items: center; gap: 5px; }
+.lesson-scrubber-tip strong { color: var(--player-signal); font-weight: 600; }
+.lesson-scrubber-tip.is-locked > span { color: rgb(255 255 255 / 75%); font-weight: 500; }
+.lesson-scrubber-tip svg { width: 12px; height: 12px; }
+@keyframes lesson-tip-in { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
+
+/* o aviso de demonstração sobe para não cobrir a barra */
+.learning-player-frame .lesson-player ~ .learning-demo-notice { top: .75rem; bottom: auto; pointer-events: none; opacity: .92; }
+
+@media (max-width: 480px) {
+  .lesson-player-bar media-volume-range, .lesson-player-bar media-seek-backward-button { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lesson-player-bigplay, .lesson-scrubber-track, .lesson-scrubber-thumb, .lesson-scrubber-marker, .lesson-scrubber-unlocked { transition: none; }
+  .lesson-player-bigplay:not([mediapaused]) { transform: none; }
+  .lesson-scrubber-tip { animation: none; }
+}

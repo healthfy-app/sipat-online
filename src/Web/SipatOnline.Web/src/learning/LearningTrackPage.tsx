@@ -8,6 +8,7 @@ import {
   recordLearningPlaybackRange,
   saveLearningPosition,
   startLearningPlayback,
+  type LearningActivity,
   type LearningExperience,
   type LearningLessonProgress,
   type LearningPlaybackSession,
@@ -26,6 +27,8 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import ProgressBar from './ProgressBar';
+import LessonPlayer from './LessonPlayer';
+import './LearningMotion.css';
 
 export default function LearningTrackPage({
   resumeLessonId,
@@ -50,6 +53,8 @@ export default function LearningTrackPage({
   const [retry, setRetry] = useState(0);
   const [playbackRetry, setPlaybackRetry] = useState(0);
   const [seekNotice, setSeekNotice] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [activities, setActivities] = useState<LearningActivity[]>([]);
   const furthestRef = useRef(0);
   const [activeLessonTab, setActiveLessonTab] = useState<'about' | 'notes' | 'materials'>('about');
   const [isLessonDetailsOpen, setLessonDetailsOpen] = useState(false);
@@ -70,7 +75,14 @@ export default function LearningTrackPage({
 
   useEffect(() => {
     setLessonDetailsOpen(false);
+    setIsPlaying(false);
   }, [selectedLessonId]);
+
+  useEffect(() => {
+    if (!seekNotice) return;
+    const timer = window.setTimeout(() => setSeekNotice(false), 5000);
+    return () => window.clearTimeout(timer);
+  }, [seekNotice]);
 
   useEffect(() => {
     let active = true;
@@ -556,6 +568,9 @@ export default function LearningTrackPage({
   };
 
   const trackTitle = getTrackDisplayTitle(experience.track.title);
+  const markers = activities
+    .filter(item => item.lessonId === selectedLesson?.id && item.timeMilliseconds !== null)
+    .map(item => ({ id: item.id, seconds: item.timeMilliseconds! / 1000, title: item.module.title, done: item.outcome !== null }));
 
   return (
     <main className="learning-page learning-track-page">
@@ -571,7 +586,7 @@ export default function LearningTrackPage({
       </header>
 
       {selectedLesson && (
-        <header className="learning-active-lesson-heading">
+        <header className="learning-active-lesson-heading" key={selectedLesson.id}>
           <p className="eyebrow">AULA {selectedLesson.position} DE {experience.lessons.length}</p>
           <h2>{selectedLesson.title}</h2>
         </header>
@@ -582,20 +597,21 @@ export default function LearningTrackPage({
           <div className="learning-player-frame">
             {playbackSession ? (
               <>
+                <LessonPlayer furthestRef={furthestRef} key={`${selectedLesson?.id}-${playbackSession.sessionId}`} markers={markers}
+                  onLockedSeek={() => setSeekNotice(true)} videoRef={videoRef}>
                 <video
                   aria-label={selectedLesson?.title ?? 'Vídeo da trilha'}
                   className="learning-video"
-                  controls
-                  controlsList="nodownload noplaybackrate"
-                  key={`${selectedLesson?.id}-${playbackSession.sessionId}`}
+                  disablePictureInPicture
+                  slot="media"
                   onError={() => {
                     setPlaybackSession(null);
                     setPlaybackError('Não foi possível carregar o vídeo. Verifique sua conexão e tente novamente.');
                   }}
-                  onEnded={() => void handleVideoEnded()}
+                  onEnded={() => { setIsPlaying(false); void handleVideoEnded(); }}
                   onLoadedMetadata={handleLoadedMetadata}
-                  onPause={() => void persistPlayback(true)}
-                  onPlaying={handlePlaying}
+                  onPause={() => { setIsPlaying(false); void persistPlayback(true); }}
+                  onPlaying={() => { setIsPlaying(true); handlePlaying(); }}
                   onRateChange={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }}
                   onSeeking={handleSeeking}
                   onSeeked={() => void persistPlayback(true)}
@@ -607,6 +623,7 @@ export default function LearningTrackPage({
                 >
                   Seu navegador não oferece suporte à reprodução deste vídeo.
                 </video>
+                </LessonPlayer>
                 {playbackSession.isDevelopmentDemo && (
                   <p className="learning-demo-notice" role="note">
                     Vídeo de demonstração. O progresso registrado aqui não comprova participação oficial.
@@ -715,7 +732,9 @@ export default function LearningTrackPage({
                           <span style={{ width: `${Math.min(100, Math.max(0, lesson.watchedPercentage))}%` }} />
                         </span>
                       </span>
-                      {isCurrent && <span aria-hidden="true" className="learning-current-mark">●</span>}
+                      {isCurrent && (isPlaying
+                        ? <span aria-hidden="true" className="learning-playing-bars"><i /><i /><i /></span>
+                        : <span aria-hidden="true" className="learning-current-mark">●</span>)}
                     </button>
                   </li>
                 );
@@ -726,6 +745,7 @@ export default function LearningTrackPage({
             trackId={apiTrackId ?? experience.track.id}
             lessonId={selectedLesson?.id ?? null}
             lessonPosition={selectedLesson?.position ?? 1}
+            onActivities={setActivities}
             playbackKey={playbackSession?.sessionId}
             videoRef={videoRef}
           />
