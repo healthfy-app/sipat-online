@@ -1,6 +1,8 @@
 import { useContext, useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { BrandThemeContext } from '@/branding';
+// The stage shows before the game chunk arrives, so its styles ship with the main bundle.
+import './games.css';
 
 /**
  * Full-screen stage for a game: the page (and the paused video) stays visible, dimmed and
