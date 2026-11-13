@@ -9,6 +9,13 @@ public sealed class LearningTrackEntity
 
     public Guid SipatEventId { get; set; }
 
+    /// <summary>Day of the SIPAT program this course sits in (null when it was distributed on its own).</summary>
+    public string? DayTitle { get; set; }
+
+    public int? DayPosition { get; set; }
+
+    public int? CoursePosition { get; set; }
+
     public string Title { get; set; } = string.Empty;
 
     public string? Description { get; set; }

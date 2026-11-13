@@ -420,7 +420,10 @@ public sealed class EfLearningStore(
             lessons.Length > 0 && completed == lessons.Length
                 ? 100
                 : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
-            hasCover ? $"/api/learning/tracks/{trackId:D}/cover" : null);
+            hasCover ? $"/api/learning/tracks/{trackId:D}/cover" : null,
+            trackEntity.DayTitle,
+            trackEntity.DayPosition,
+            trackEntity.CoursePosition);
 
         return new LearningExperience(card, lessons);
     }

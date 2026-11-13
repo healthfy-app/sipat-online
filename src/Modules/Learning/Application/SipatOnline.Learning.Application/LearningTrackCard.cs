@@ -9,7 +9,10 @@ public sealed record LearningTrackCard(
     int LessonCount,
     int CompletedLessonCount,
     int ProgressPercentage,
-    string? CoverUrl = null);
+    string? CoverUrl = null,
+    string? DayTitle = null,
+    int? DayPosition = null,
+    int? CoursePosition = null);
 
 public sealed record LearningLessonProgress(
     Guid Id,

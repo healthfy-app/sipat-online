@@ -371,6 +371,72 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("DeleteGameModule");
 
+        catalog.MapGet("/programs", async (
+            SipatProgramService programService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await programService.ListAsync(cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value.Select(ToProgramResponse).ToArray()) : ToProblem(result.Error);
+        })
+        .WithName("ListSipatPrograms");
+
+        catalog.MapPost("/programs", async (
+            SaveProgramRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatProgramService programService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await programService.CreateAsync(request.Title, ToProgramDays(request.Days), cancellationToken);
+            return result.IsSuccess
+                ? Results.Created($"/api/platform/catalog/programs/{result.Value.Id:D}", ToProgramResponse(result.Value))
+                : ToProblem(result.Error);
+        })
+        .WithName("CreateSipatProgram");
+
+        catalog.MapPut("/programs/{programId:guid}", async (
+            Guid programId,
+            SaveProgramRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatProgramService programService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await programService.UpdateAsync(programId, request.Title, ToProgramDays(request.Days), cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToProgramResponse(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("UpdateSipatProgram");
+
+        catalog.MapDelete("/programs/{programId:guid}", async (
+            Guid programId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatProgramService programService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await programService.DeleteAsync(programId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("DeleteSipatProgram");
+
         catalog.MapPut("/courses/{courseId:guid}/modules", async (
             Guid courseId,
             SetCourseModulesRequest request,
@@ -507,6 +573,12 @@ public static class PlatformCourseCatalogEndpoints
     private static IReadOnlyList<GameQuestion>? ToQuestions(IReadOnlyList<GameQuestionDto>? questions) =>
         questions?.Select(item => new GameQuestion(item.Text ?? string.Empty, item.Options ?? [], item.CorrectIndex)).ToArray();
 
+    private static ProgramResponse ToProgramResponse(SipatProgram program) =>
+        new(program.Id, program.Title, program.Days.Select(day => new ProgramDayDto(day.Title, day.CourseIds)).ToArray(), program.CreatedAt);
+
+    private static IReadOnlyList<ProgramDay>? ToProgramDays(IReadOnlyList<ProgramDayDto>? days) =>
+        days?.Select(day => new ProgramDay(day.Title ?? string.Empty, day.CourseIds ?? [])).ToArray();
+
     private static GameModuleResponse ToResponse(GameModule module, int usageCount) =>
         new(
             module.Id,
@@ -524,6 +596,7 @@ public static class PlatformCourseCatalogEndpoints
             "learning.platform_course.forbidden" => StatusCodes.Status403Forbidden,
             "learning.platform_course.not_found" or
                 "learning.game_module.not_found" or
+                "learning.program.not_found" or
                 "learning.platform_course.cover_not_found" or
                 "learning.platform_course.video_not_found" => StatusCodes.Status404NotFound,
             "learning.platform_course.storage_unconfigured" or
@@ -614,6 +687,12 @@ public sealed record GameModuleResponse(
     DateTimeOffset CreatedAt,
     int UsageCount,
     GameContent? Content = null);
+
+public sealed record ProgramDayDto(string? Title, IReadOnlyList<Guid>? CourseIds);
+
+public sealed record SaveProgramRequest(string? Title, IReadOnlyList<ProgramDayDto>? Days);
+
+public sealed record ProgramResponse(Guid Id, string Title, IReadOnlyList<ProgramDayDto> Days, DateTimeOffset CreatedAt);
 
 public sealed record SetCourseModulesRequest(IReadOnlyList<CourseModulePlacementDto>? Items);
 

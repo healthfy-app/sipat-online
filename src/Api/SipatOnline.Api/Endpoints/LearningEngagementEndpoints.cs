@@ -171,6 +171,15 @@ public static class LearningEngagementEndpoints
             var result = await service.DistributeAsync(companyId, sipatId, courseId, token);
             return result.IsSuccess ? Results.Ok(new { trackId = result.Value }) : Problem(result.Error);
         });
+        platform.MapPost("/sipats/{sipatId:guid}/programs/{programId:guid}", async (
+            Guid companyId, Guid sipatId, Guid programId, HttpContext context, IAntiforgery antiforgery,
+            LearningDistributionService service, CancellationToken token) =>
+        {
+            var csrf = await ValidateAsync(antiforgery, context);
+            if (csrf is not null) return csrf;
+            var result = await service.ApplyProgramAsync(companyId, sipatId, programId, token);
+            return result.IsSuccess ? Results.Ok(new { courses = result.Value }) : Problem(result.Error);
+        });
         platform.MapGet("/participants/{participantId:guid}/outcomes", async (Guid companyId, Guid participantId,
             LearningDistributionService service, PlatformDbContext db, CancellationToken token) =>
         {

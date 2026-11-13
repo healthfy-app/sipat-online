@@ -292,6 +292,28 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("Users", "identity");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatProgramEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DaysJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SipatPrograms", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.GameModuleEntity", b =>
                 {
                     b.Property<string>("ContentJson").HasColumnType("text");
@@ -467,6 +489,9 @@ namespace SipatOnline.Infrastructure.Migrations
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningTrackEntity", b =>
                 {
                     b.Property<Guid?>("SourceCourseId").HasColumnType("uuid");
+                    b.Property<int?>("CoursePosition").HasColumnType("integer");
+                    b.Property<int?>("DayPosition").HasColumnType("integer");
+                    b.Property<string>("DayTitle").HasMaxLength(120).HasColumnType("character varying(120)");
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 

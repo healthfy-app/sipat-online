@@ -14,6 +14,7 @@ public sealed class LearningTrackEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(track => track.SipatEventId).IsRequired();
         builder.Property(track => track.Title).HasMaxLength(200).IsRequired();
         builder.Property(track => track.Description).HasMaxLength(2000);
+        builder.Property(track => track.DayTitle).HasMaxLength(120);
         builder.Property(track => track.CreatedAt).IsRequired();
         builder.HasOne<SipatOnline.Infrastructure.Sipats.SipatEventEntity>()
             .WithMany()

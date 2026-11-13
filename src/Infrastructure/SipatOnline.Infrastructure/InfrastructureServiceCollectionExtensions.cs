@@ -206,6 +206,8 @@ public static class InfrastructureServiceCollectionExtensions
                 provider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
         services.AddScoped<IGameModuleStore, EfGameModuleStore>();
         services.AddScoped<GameModuleService>();
+        services.AddScoped<ISipatProgramStore, EfSipatProgramStore>();
+        services.AddScoped<SipatProgramService>();
         services.AddScoped<DevelopmentLearningSampleInitializer>();
         services.AddScoped<DevelopmentDemoPresentationInitializer>();
         services.AddScoped<DevelopmentEngagementInitializer>();
