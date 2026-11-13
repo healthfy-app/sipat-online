@@ -45,7 +45,7 @@ export default function CoursePreviewCanvas({
 
       <div
         className={cn(
-          'flex flex-col overflow-hidden bg-[var(--learner-forest,#12332c)] text-white shadow-[0_24px_48px_-24px_rgb(14_42_34/0.45)]',
+          'flex shrink-0 flex-col overflow-hidden bg-[var(--learner-forest,#12332c)] text-white shadow-[0_24px_48px_-24px_rgb(14_42_34/0.45)]',
           'transition-[width,border-radius,min-height] duration-300 ease-out-soft',
           desktop
             ? 'min-h-[min(34rem,calc(100dvh-10rem))] w-[min(100%,72rem)] rounded-lg'
@@ -56,7 +56,7 @@ export default function CoursePreviewCanvas({
           <span className="block h-full rounded-r-full bg-signal transition-[width] duration-300 ease-out-soft" style={{ width: `${progress}%` }} />
         </div>
         <header className="flex items-center justify-between gap-4 border-b border-white/12 px-4.5 py-3.5">
-          <span className="text-sm font-bold tracking-tight">SIPAT Online</span>
+          <span className="flex items-center gap-2 text-sm font-bold tracking-tight"><img alt="" className="size-6 shrink-0" height={24} src="/favicon.svg" width={24} />SIPAT Online</span>
           {item && <span className="rounded-sm bg-black/30 px-2 py-1 text-[0.8125rem] font-bold tabular-nums">{selectedIndex + 1} / {track.length}</span>}
         </header>
         <div className={cn('flex flex-1 flex-col justify-center gap-4 p-5 text-center', item?.kind === 'activity' && 'justify-start p-3 text-left')}>
