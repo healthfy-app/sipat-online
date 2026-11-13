@@ -2,9 +2,9 @@ import { BookOpen, Check, Circle, CircleCheck, Play } from 'lucide-react';
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import CourseDialog from '@/CourseDialog';
-import type { LearningTrackCard } from '@/api';
+import { getAssignedLearningTrack, type LearningLessonProgress, type LearningTrackCard } from '@/api';
 import {
-  getTrackDisplayTitle, getTrackPath, getTrackProgress,
+  formatDuration, getTrackDisplayTitle, getTrackPath, getTrackProgress,
   type DayGroup,
 } from './learningHelpers';
 import ProgressBar from './ProgressBar';
@@ -21,6 +21,31 @@ type StepState = 'done' | 'current' | 'upcoming';
 function stateOf(day: DayGroup, index: number, currentIndex: number): StepState {
   if (day.total > 0 && day.completed === day.total) return 'done';
   return index === currentIndex ? 'current' : 'upcoming';
+}
+
+/** A day built from videos is one track: the window lists its videos, each one opens the track. */
+function DayVideos({ track, allTracks }: { track: LearningTrackCard; allTracks: LearningTrackCard[] }) {
+  const [lessons, setLessons] = useState<LearningLessonProgress[] | null>(null);
+  useEffect(() => {
+    let current = true;
+    getAssignedLearningTrack(track.id).then(result => { if (current) setLessons(result.lessons); }).catch(() => { if (current) setLessons([]); });
+    return () => { current = false; };
+  }, [track.id]);
+  if (lessons === null) return <p className="learning-trail-dialog-summary">Carregando os vídeos...</p>;
+  if (lessons.length === 0) return null;
+  const nextId = lessons.find(lesson => !lesson.isCompleted)?.id;
+  return <ol aria-label="Vídeos do dia" className="learning-trail-courses">
+    {lessons.map(lesson => {
+      const Icon = lesson.isCompleted ? CircleCheck : lesson.watchedPercentage > 0 ? Play : Circle;
+      return <li key={lesson.id}>
+        <Link className={`learning-trail-course${lesson.isCompleted ? ' is-done' : lesson.id === nextId ? ' is-next' : ''}`} to={getTrackPath(track, allTracks)}>
+          <Icon aria-hidden="true" />
+          <span className="learning-trail-course-title">{lesson.title}</span>
+          <span className="learning-trail-course-state">{lesson.isCompleted ? 'Concluído' : lesson.id === nextId ? 'Próximo' : formatDuration(lesson.durationMilliseconds)}</span>
+        </Link>
+      </li>;
+    })}
+  </ol>;
 }
 
 /**
@@ -92,7 +117,9 @@ export default function TrailPath({ days, allTracks, flow = 'right' }: {
         {open.completed} de {open.total} {open.total === 1 ? 'curso concluído' : 'cursos concluídos'}
       </p>
       <ProgressBar label={`Progresso de ${open.title}`} value={open.percentage} />
-      <ul className="learning-trail-courses">
+      {open.tracks.length === 1 && open.tracks[0].lessonCount > 0
+        ? <DayVideos allTracks={allTracks} track={open.tracks[0]} />
+        : <ul className="learning-trail-courses">
         {open.tracks.map(track => {
           const percentage = getTrackProgress(track);
           const done = percentage === 100;
@@ -109,7 +136,7 @@ export default function TrailPath({ days, allTracks, flow = 'right' }: {
             </Link>
           </li>;
         })}
-      </ul>
+      </ul>}
     </CourseDialog>}
   </section>;
 }

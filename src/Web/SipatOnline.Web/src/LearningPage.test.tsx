@@ -769,7 +769,8 @@ describe('learning experience', () => {
 
     await user.click(days[1]);
     const second = await screen.findByRole('dialog', { name: 'Dia 2 · Saúde' });
-    expect(within(second).getByRole('link', { name: /Alongamento.*0 de 1 aulas/ })).toHaveAttribute('href', '/learning/tracks/alongamento');
+    // a day with a single track is one built from videos: the window lists the videos
+    expect(await within(second).findByRole('link', { name: /Identificação de riscos.*Próximo/ })).toHaveAttribute('href', '/learning/tracks/alongamento');
   });
 
   it('keeps the plain list when no course belongs to a day, and hides days emptied by a filter', async () => {
