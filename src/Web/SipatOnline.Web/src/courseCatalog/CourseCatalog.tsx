@@ -149,13 +149,13 @@ export default function CourseCatalog({
             {import.meta.env.DEV && <Badge className="border-white/25 bg-white/10 text-white" variant="outline">Apresentação demo</Badge>}
           </div>
           <p className="m-0 text-[0.9375rem] text-white/75">{`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}</p>
-          <ul aria-label="Resumo do acervo" className="m-0 mt-2 flex list-none flex-wrap gap-2 p-0">
+          <ul aria-label="Resumo do acervo" className="m-0 mt-3 flex list-none flex-wrap gap-x-6 gap-y-2 rounded-2xl bg-white/[0.07] px-4 py-3">
             {[
               [courses.length, 'assuntos'],
               [library.length, 'vídeos'],
               [modules.length, 'jogos e perguntas'],
             ].map(([count, label]) => (
-              <li className="rounded-xl bg-white/10 px-3.5 py-1.5 text-[0.8125rem] text-white/85" key={label}>
+              <li className="text-[0.8125rem] text-white/80" key={label}>
                 <strong className="mr-1 text-base font-extrabold tabular-nums text-white">{count}</strong>{label}
               </li>
             ))}

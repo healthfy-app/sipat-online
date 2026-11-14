@@ -49,7 +49,7 @@ export default function CoursesPanel({
 
   return (
     <section aria-label="Cursos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
-      <div className="flex flex-wrap items-center gap-2.5">
+      <div className="library-filters flex flex-wrap items-center gap-2.5 rounded-[1.25rem] border border-[#dfe6e3] bg-white p-4">
         <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-sm">
           <Search className="pointer-events-none absolute left-3 size-4" />
           <Input

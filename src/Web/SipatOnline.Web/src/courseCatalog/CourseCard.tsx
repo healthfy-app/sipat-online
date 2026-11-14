@@ -43,7 +43,7 @@ export default function CourseCard({
 
       <div className="grid flex-1 content-start gap-1.5 px-5 pb-3 pt-4">
         <div className="flex min-h-5 flex-wrap gap-1.5">
-          {option && <Badge className="rounded-[0.3125rem] px-1.5 text-[0.6875rem]" variant="neutral">Opção {option}</Badge>}
+          {option && <span className="text-[0.75rem] font-bold uppercase tracking-[0.06em] text-[#3d514b]">Opção {option}</span>}
           {course.gamificationEnabled && <Badge className="rounded-[0.3125rem] px-1.5 text-[0.6875rem]">Gamificação</Badge>}
         </div>
         <h3 className="m-0 min-h-[2.7em] text-[1.0625rem] font-extrabold leading-[1.3] tracking-[-0.01em] text-[#12332c]">
