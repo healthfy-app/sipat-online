@@ -72,6 +72,25 @@ Abra `https://ops.exemplo.com.br`, entre com o dono e cadastre a primeira empres
 - O backup do banco gravado na própria VM **não substitui** uma cópia externa. Inclua o volume `platform-videos` na cópia externa (por exemplo, `rclone` ou *snapshot* do disco) e **teste a restauração** antes do go-live.
 - Banda: considere o tamanho médio dos vídeos e o horário de pico (o número de pessoas assistindo ao mesmo tempo) ao escolher o plano de rede da VM.
 
+### Vídeos no Cloudflare R2 (recomendado para o pico)
+Com o R2, o participante assiste por links assinados e temporários direto da Cloudflare, e a banda da VM deixa de ser o gargalo.
+
+1. No painel da Cloudflare, em **R2**, crie um bucket **privado** para os vídeos (por exemplo, `sipat-videos`).
+2. Crie uma chave de API do R2 (token S3) com permissão de leitura e escrita **somente nesse bucket**. Anote o endereço da conta (`https://<ACCOUNT_ID>.r2.cloudflarestorage.com`), o *Access Key ID* e o *Secret Access Key*.
+3. No `deploy/.env.production`, descomente e preencha `VIDEO_STORAGE_PROVIDER=R2`, `R2_SERVICE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e `R2_VIDEO_BUCKET`. Reinicie a API (`up -d api`) para ler o arquivo.
+4. Copie os vídeos que já estão no volume da VM para o bucket:
+   ```bash
+   docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml run --rm api --copy-videos-to-r2
+   ```
+   O comando imprime uma linha por vídeo (`copiado  <título>  <Mbps> Mbps`) e um resumo no fim. Ele pode ser repetido sem problema: copia de novo por cima. Vídeos acima de 3 Mbps saem marcados como `PESADO`; um vídeo sem arquivo no volume aparece como `sem arquivo na origem` e faz o comando terminar com erro.
+5. Para cada vídeo marcado como `PESADO`, converta o original e envie de novo pelo painel (substituindo o vídeo):
+   ```bash
+   deploy/scripts/convert-video.sh original.mp4 convertido.mp4
+   ```
+6. **Todo vídeo novo deve passar por `convert-video.sh` antes do envio.** O script gera H.264, no máximo 720p, cerca de 2 Mbps, áudio AAC de 128 kbps e `faststart`, que é o que mantém o vídeo leve para quem assiste no celular e na rede da fábrica. Requer o `ffmpeg` instalado (`sudo apt install ffmpeg`).
+
+**Antes do go-live:** confirme nos termos de uso da Cloudflare que servir vídeo pelo R2 é permitido no seu plano. **Plano B:** se houver qualquer problema, defina `VIDEO_STORAGE_PROVIDER=File` (ou apague a variável) e reinicie a API; ela volta a servir os vídeos do volume `platform-videos`, que por isso deve continuar existindo e com cópia externa.
+
 ## 6. Atualizar
 ```bash
 git pull   # na VM, com o método autenticado de sua escolha
