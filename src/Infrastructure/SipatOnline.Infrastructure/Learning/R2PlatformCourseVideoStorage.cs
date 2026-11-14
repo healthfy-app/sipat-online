@@ -13,7 +13,6 @@ public sealed class R2PlatformCourseVideoStorage(
 {
     private const int CopyBufferSize = 81_920;
 
-
     private bool UsesHttp => options.ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
 
     public static string KeyFor(Guid videoId) => $"videos/{videoId:N}/720p.mp4";
@@ -115,45 +114,15 @@ public sealed class R2PlatformCourseVideoStorage(
 
     public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken)
     {
-        // The SDK converts Expires into X-Amz-Expires against its own clock, which it corrects with the skew it learns
-        // from server responses (not exposed), so the result can be off by a second. Sign, read what the SDK wrote and
-        // shift Expires by the difference until the lifetime is exactly the requested whole seconds.
-        var wantedSeconds = (long)Math.Round(validFor.TotalSeconds);
-        var adjustment = TimeSpan.Zero;
-        Uri url;
-        var attempts = 0;
-        while (true)
+        var url = s3.GetPreSignedURL(new GetPreSignedUrlRequest
         {
-            url = new Uri(s3.GetPreSignedURL(new GetPreSignedUrlRequest
-            {
-                BucketName = options.Bucket,
-                Key = KeyFor(videoId),
-                Verb = HttpVerb.GET,
-                Expires = clock.GetUtcNow().UtcDateTime.Add(validFor).Add(adjustment),
-                Protocol = UsesHttp ? Protocol.HTTP : Protocol.HTTPS
-            }));
-            var actualSeconds = ReadExpiresSeconds(url);
-            if (actualSeconds == wantedSeconds || ++attempts >= 4)
-            {
-                return Task.FromResult<Uri?>(url);
-            }
-
-            adjustment += TimeSpan.FromSeconds(wantedSeconds - actualSeconds);
-        }
-    }
-
-    private static long ReadExpiresSeconds(Uri url)
-    {
-        foreach (var pair in url.Query.TrimStart('?').Split('&'))
-        {
-            if (pair.StartsWith("X-Amz-Expires=", StringComparison.Ordinal) &&
-                long.TryParse(pair["X-Amz-Expires=".Length..], out var seconds))
-            {
-                return seconds;
-            }
-        }
-
-        return -1;
+            BucketName = options.Bucket,
+            Key = KeyFor(videoId),
+            Verb = HttpVerb.GET,
+            Expires = clock.GetUtcNow().UtcDateTime.Add(validFor),
+            Protocol = UsesHttp ? Protocol.HTTP : Protocol.HTTPS
+        });
+        return Task.FromResult<Uri?>(new Uri(url));
     }
 
     public async Task DeleteAsync(Guid videoId, CancellationToken cancellationToken) =>
