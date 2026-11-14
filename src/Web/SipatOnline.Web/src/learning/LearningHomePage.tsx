@@ -144,7 +144,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
     listAssignedLearningTracks()
       .then((items) => {
         if (active) {
-          setTracks(sortTracksByProgram(items.filter(track => track.sipatStatus !== 'Cancelled')));
+          setTracks(sortTracksByProgram(items.filter(track => track.sipatStatus !== 'Cancelled' && track.sipatStatus !== 'Draft')));
         }
       })
       .catch((loadError: unknown) => {

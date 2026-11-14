@@ -1,9 +1,9 @@
-import { CalendarDays, Film, Plus } from 'lucide-react';
+import { CalendarDays, Film, Plus, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listSipatEvents, listSipatPlans, type SipatEvent, type SipatPlanSummary } from '@/api';
+import { listSipatEvents, listSipatPlans, reactivateSipatEvent, type SipatEvent, type SipatPlanSummary } from '@/api';
 import { Badge } from '@/components/ui/badge';
-import { buttonVariants } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
@@ -17,6 +17,8 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
   const [events, setEvents] = useState<SipatEvent[] | null>(null);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [reactivating, setReactivating] = useState<string | null>(null);
 
   useEffect(() => {
     let current = true;
@@ -35,10 +37,22 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
     return [...byYear.entries()].sort((a, b) => b[0] - a[0]);
   }, [events]);
 
+  async function reactivate(event: SipatEvent) {
+    setReactivating(event.id); setError(''); setNotice('');
+    try {
+      const back = await reactivateSipatEvent(event.id);
+      setEvents(known => (known ?? []).map(item => (item.id === back.id ? back : item)));
+      setNotice(`"${back.title}" voltou como rascunho. Abra, confira os dias e publique de novo.`);
+    } catch (failure) {
+      setError(getErrorMessage(failure));
+    } finally { setReactivating(null); }
+  }
+
   const create = <Link className={buttonVariants()} to={`${basePath}/nova`}><Plus /> Nova SIPAT</Link>;
   return <Page>
     <PageHeader actions={create} description="Cada SIPAT é uma semana de treinamento. Só uma fica publicada por vez; as dos anos anteriores continuam no histórico." eyebrow="Programação" title="SIPATs" />
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
+    {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
     {!events && !error && <LoadingState>Carregando as SIPATs...</LoadingState>}
     {events && events.length === 0 && <EmptyState action={<Link className={buttonVariants()} to={`${basePath}/nova`}>Criar a primeira SIPAT</Link>} description="Defina a data de início, quantos dias e o assunto de cada dia." title="Nenhuma SIPAT ainda." />}
     {years.map(([year, items]) => <section aria-label={`SIPATs de ${year}`} className="grid gap-3" key={year}>
@@ -47,9 +61,8 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
         {items.map(event => {
           const plan = plans.find(item => item.sipatEventId === event.id);
           const label = phaseLabel[sipatPhase(event, plan?.days ?? 0)];
-          return <li key={event.id}>
-            <Link aria-label={`Abrir ${event.title}`} className={cn('grid h-full gap-3 rounded-2xl border bg-card p-4 text-foreground no-underline shadow-card transition-shadow hover:shadow-card-hover',
-              event.status === 'Published' && new Date(event.endsAt) > new Date() ? 'border-primary/40' : 'border-border')} to={`${basePath}/${event.id}`}>
+          const cancelled = event.status === 'Cancelled';
+          const details = <>
               <div className="flex items-start justify-between gap-2">
                 <strong className="text-base leading-snug">{event.title}</strong>
                 <Badge variant={label.variant}>{label.text}</Badge>
@@ -62,7 +75,17 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
                 <Film aria-hidden="true" className="size-4" />
                 {plan && plan.days > 0 ? `${pluralize(plan.days, 'dia', 'dias')} · ${pluralize(plan.videos, 'vídeo', 'vídeos')}` : 'Dias ainda não montados'}
               </p>
-            </Link>
+</>;
+          return <li key={event.id}>
+            {cancelled
+              ? <div aria-disabled="true" aria-label={`${event.title} (cancelada)`} className="grid h-full gap-3 rounded-2xl border border-dashed border-border bg-muted/40 p-4 text-muted-foreground" role="group">
+                <div className="grid gap-3 opacity-60">{details}</div>
+                <Button className="justify-self-start" disabled={reactivating === event.id} onClick={() => void reactivate(event)} size="sm" variant="outline">
+                  <RotateCcw /> {reactivating === event.id ? 'Reativando...' : 'Reativar'}
+                </Button>
+              </div>
+              : <Link aria-label={`Abrir ${event.title}`} className={cn('grid h-full gap-3 rounded-2xl border bg-card p-4 text-foreground no-underline shadow-card transition-shadow hover:shadow-card-hover',
+                event.status === 'Published' && new Date(event.endsAt) > new Date() ? 'border-primary/40' : 'border-border')} to={`${basePath}/${event.id}`}>{details}</Link>}
           </li>;
         })}
       </ul>

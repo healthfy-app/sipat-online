@@ -136,6 +136,20 @@ public sealed class SipatEventApiTests
             csrfToken);
         Assert.Equal(HttpStatusCode.Conflict, updateCancelledResponse.StatusCode);
 
+        // a cancelled SIPAT can come back as a draft, and only a cancelled one can
+        csrfToken = await GetAntiforgeryTokenAsync(client);
+        var reactivateResponse = await SendJsonWithAntiforgeryAsync(
+            client, HttpMethod.Post, $"/api/admin/sipats/{created.Id:D}/reactivate", new { }, csrfToken);
+        Assert.Equal(HttpStatusCode.OK, reactivateResponse.StatusCode);
+        var reactivated = await reactivateResponse.Content.ReadFromJsonAsync<SipatEventResponse>();
+        Assert.NotNull(reactivated);
+        Assert.Equal("Draft", reactivated.Status);
+
+        csrfToken = await GetAntiforgeryTokenAsync(client);
+        var reactivateAgain = await SendJsonWithAntiforgeryAsync(
+            client, HttpMethod.Post, $"/api/admin/sipats/{created.Id:D}/reactivate", new { }, csrfToken);
+        Assert.Equal(HttpStatusCode.Conflict, reactivateAgain.StatusCode);
+
         await using var scope = factory.Services.CreateAsyncScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
         var auditActions = await dbContext.AuditEntries
@@ -145,7 +159,7 @@ public sealed class SipatEventApiTests
             .Select(entry => entry.Action)
             .ToArrayAsync();
         Assert.Equal(
-            ["sipat.created", "sipat.published", "sipat.updated", "sipat.cancelled"],
+            ["sipat.created", "sipat.published", "sipat.updated", "sipat.cancelled", "sipat.reactivated"],
             auditActions);
     }
 

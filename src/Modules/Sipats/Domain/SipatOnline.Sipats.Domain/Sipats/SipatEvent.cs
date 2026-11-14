@@ -226,6 +226,19 @@ public sealed class SipatEvent
         return Result<SipatEvent>.Success(this);
     }
 
+    /// <summary>A cancelled SIPAT comes back as a draft: its days are kept, and it must be published again to reach the participants.</summary>
+    public Result<SipatEvent> Reactivate()
+    {
+        if (Status != SipatEventStatus.Cancelled)
+        {
+            return Result<SipatEvent>.Failure(
+                new DomainError("sipat.reactivate.invalid_state", "Somente uma SIPAT cancelada pode ser reativada."));
+        }
+
+        Status = SipatEventStatus.Draft;
+        return Result<SipatEvent>.Success(this);
+    }
+
     private static Result<bool> ValidateSchedule(DateTimeOffset startsAt, DateTimeOffset endsAt)
     {
         if (startsAt == default || endsAt == default)

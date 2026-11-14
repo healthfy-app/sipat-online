@@ -1,10 +1,11 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as api from '@/api';
 import SipatsPage from './SipatsPage';
 
-vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api')>()), listSipatEvents: vi.fn(), listSipatPlans: vi.fn() }));
+vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api')>()), listSipatEvents: vi.fn(), listSipatPlans: vi.fn(), reactivateSipatEvent: vi.fn() }));
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const event = (id: string, title: string, startsAt: string, status: 'Draft' | 'Published' | 'Cancelled') =>
@@ -36,5 +37,23 @@ describe('SIPATs of a company', () => {
     expect(within(first).getByText('Dias ainda não montados')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Abrir SIPAT 2026' })).toHaveAttribute('href', '/admin/sipats/b');
     expect(screen.getByRole('link', { name: 'Nova SIPAT' })).toHaveAttribute('href', '/admin/sipats/nova');
+  });
+
+  it('shows a cancelled SIPAT disabled, with a way to bring it back as a draft', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listSipatEvents).mockResolvedValue({
+      offset: 0, limit: 100, totalCount: 1, items: [event('a', 'SIPAT 2026', '2026-11-09T00:00:00Z', 'Cancelled')],
+    });
+    vi.mocked(api.listSipatPlans).mockResolvedValue([]);
+    vi.mocked(api.reactivateSipatEvent).mockResolvedValue(event('a', 'SIPAT 2026', '2026-11-09T00:00:00Z', 'Draft'));
+    render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
+
+    expect(await screen.findByRole('group', { name: 'SIPAT 2026 (cancelada)' })).toHaveAttribute('aria-disabled', 'true');
+    expect(screen.queryByRole('link', { name: 'Abrir SIPAT 2026' })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Reativar' }));
+    expect(api.reactivateSipatEvent).toHaveBeenCalledWith('a');
+    expect(await screen.findByRole('link', { name: 'Abrir SIPAT 2026' })).toHaveAttribute('href', '/admin/sipats/a');
+    expect(screen.getByRole('status')).toHaveTextContent('voltou como rascunho');
   });
 });

@@ -1026,6 +1026,13 @@ export async function publishSipatEvent(id: string): Promise<SipatEvent> {
   });
 }
 
+export async function reactivateSipatEvent(id: string): Promise<SipatEvent> {
+  return requestJson<SipatEvent>(`/api/admin/sipats/${id}/reactivate`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export async function cancelSipatEvent(id: string): Promise<SipatEvent> {
   return requestJson<SipatEvent>(`/api/admin/sipats/${id}/cancel`, {
     method: 'POST',

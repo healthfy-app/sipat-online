@@ -177,6 +177,9 @@ public sealed class SipatEventApplicationService(
     public Task<Result<SipatEvent>> CancelAsync(Guid id, CancellationToken cancellationToken) =>
         ChangeStatusAsync(id, "sipat.cancelled", sipatEvent => sipatEvent.Cancel(), cancellationToken);
 
+    public Task<Result<SipatEvent>> ReactivateAsync(Guid id, CancellationToken cancellationToken) =>
+        ChangeStatusAsync(id, "sipat.reactivated", sipatEvent => sipatEvent.Reactivate(), cancellationToken);
+
     private async Task<Result<SipatEvent>> ChangeStatusAsync(
         Guid id,
         string auditAction,
