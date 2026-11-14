@@ -30,9 +30,11 @@ public static class InfrastructureServiceCollectionExtensions
     {
         services.AddOptions<TenantRuntimeOptions>()
             .Bind(configuration.GetSection(TenantRuntimeOptions.SectionName))
-            .Validate(options => options.Id != Guid.Empty, "A valid tenant ID must be configured.")
-            .Validate(options => TenantKey.Create(options.Key).IsSuccess, "A valid tenant key must be configured.")
-            .Validate(options => !string.IsNullOrWhiteSpace(options.Name), "A tenant name must be configured.")
+            // the first company is optional (a production that starts empty has none): its ID, key and name come together or not at all
+            .Validate(
+                options => (options.Id == Guid.Empty && string.IsNullOrWhiteSpace(options.Key) && string.IsNullOrWhiteSpace(options.Name)) ||
+                           (options.Id != Guid.Empty && TenantKey.Create(options.Key).IsSuccess && !string.IsNullOrWhiteSpace(options.Name)),
+                "The first tenant ID, key and name must be configured together (or all left out).")
             .Validate(
                 options => !string.IsNullOrWhiteSpace(options.BaseDomain) &&
                            Uri.CheckHostName(options.BaseDomain.Trim().TrimEnd('.')) == UriHostNameType.Dns,

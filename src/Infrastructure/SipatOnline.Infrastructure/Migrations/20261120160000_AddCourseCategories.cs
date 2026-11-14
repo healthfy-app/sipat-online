@@ -22,14 +22,6 @@ public sealed class AddCourseCategories : Migration
             constraints: table => table.PrimaryKey("PK_CourseCategories", item => item.Id));
         migrationBuilder.CreateIndex(name: "IX_CourseCategories_Position", schema: "learning", table: "CourseCategories", column: "Position");
         migrationBuilder.AddColumn<Guid>(name: "CategoryId", schema: "learning", table: "PlatformCourses", type: "uuid", nullable: true);
-        migrationBuilder.Sql("INSERT INTO learning.\"CourseCategories\" (\"Id\", \"Name\", \"Position\", \"CreatedAt\") VALUES ('7d1a0001-0000-4000-8000-000000000001', 'Alimentação', 0, now());");
-        migrationBuilder.Sql("INSERT INTO learning.\"CourseCategories\" (\"Id\", \"Name\", \"Position\", \"CreatedAt\") VALUES ('7d1a0001-0000-4000-8000-000000000002', 'Segurança no trabalho', 1, now());");
-        migrationBuilder.Sql("INSERT INTO learning.\"CourseCategories\" (\"Id\", \"Name\", \"Position\", \"CreatedAt\") VALUES ('7d1a0001-0000-4000-8000-000000000003', 'Postura', 2, now());");
-        migrationBuilder.Sql("INSERT INTO learning.\"CourseCategories\" (\"Id\", \"Name\", \"Position\", \"CreatedAt\") VALUES ('7d1a0001-0000-4000-8000-000000000004', 'Saúde mental', 3, now());");
-        migrationBuilder.Sql("UPDATE learning.\"PlatformCourses\" SET \"CategoryId\" = '7d1a0001-0000-4000-8000-000000000001' WHERE \"CategoryId\" IS NULL AND (\"Title\" ILIKE '%aliment%' OR \"Title\" ILIKE '%nutri%');");
-        migrationBuilder.Sql("UPDATE learning.\"PlatformCourses\" SET \"CategoryId\" = '7d1a0001-0000-4000-8000-000000000003' WHERE \"CategoryId\" IS NULL AND (\"Title\" ILIKE '%postura%' OR \"Title\" ILIKE '%ergonomia%' OR \"Title\" ILIKE '%ginástica%');");
-        migrationBuilder.Sql("UPDATE learning.\"PlatformCourses\" SET \"CategoryId\" = '7d1a0001-0000-4000-8000-000000000002' WHERE \"CategoryId\" IS NULL AND (\"Title\" ILIKE '%seguran%' OR \"Title\" ILIKE '%EPI%' OR \"Title\" ILIKE '%acidente%');");
-        migrationBuilder.Sql("UPDATE learning.\"PlatformCourses\" SET \"CategoryId\" = '7d1a0001-0000-4000-8000-000000000004' WHERE \"CategoryId\" IS NULL AND (\"Title\" ILIKE '%mental%' OR \"Title\" ILIKE '%estresse%' OR \"Title\" ILIKE '%mente%');");
     }
 
     protected override void Down(MigrationBuilder migrationBuilder)

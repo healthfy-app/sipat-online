@@ -4,10 +4,18 @@ x-api-environment: &api-environment
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_HTTP_PORTS: 8080
   ConnectionStrings__SipatOnline: Host=postgres;Port=5432;Database=${POSTGRES_DB:-sipat_online};Username=${POSTGRES_USER:-sipat_online};Password=${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD in deploy/.env.production}
-  SipatOnline__Tenant__Id: ${TENANT_ID:?Configure TENANT_ID in deploy/.env.production}
-  SipatOnline__Tenant__Key: ${TENANT_KEY:?Configure TENANT_KEY in deploy/.env.production}
-  SipatOnline__Tenant__Name: ${TENANT_NAME:?Configure TENANT_NAME in deploy/.env.production}
+  # the first company is optional: leave TENANT_ID, TENANT_KEY and TENANT_NAME empty and the platform starts with none
+  SipatOnline__Tenant__Id: ${TENANT_ID:-}
+  SipatOnline__Tenant__Key: ${TENANT_KEY:-}
+  SipatOnline__Tenant__Name: ${TENANT_NAME:-}
   SipatOnline__Tenant__BaseDomain: ${TENANT_BASE_DOMAIN:?Configure TENANT_BASE_DOMAIN in deploy/.env.production}
+  SipatOnline__Tenant__PlatformHost: ${PLATFORM_HOST:?Configure PLATFORM_HOST (for example ops.example.com) in deploy/.env.production}
+  # where the videos of the library are kept: a volume of the VM, to be backed up with the database
+  SipatOnline__PlatformCatalog__StoragePath: /var/sipat/videos
+  # the owner of the platform, created on the first start (the password is only read then)
+  SipatOnline__PlatformOperator__LoginIdentifier: ${PLATFORM_OPERATOR_LOGIN_IDENTIFIER:-}
+  SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-}
+  SipatOnline__PlatformOperator__Password: ${PLATFORM_OPERATOR_PASSWORD:-}
   SipatOnline__ForwardedHeaders__KnownProxies__0: 172.28.0.2
   SipatOnline__BootstrapAdmin__LoginIdentifier: ${BOOTSTRAP_ADMIN_LOGIN_IDENTIFIER:-}
   SipatOnline__BootstrapAdmin__DisplayName: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-}
@@ -54,6 +62,7 @@ services:
     environment: *api-environment
     volumes:
       - aspnet-data-protection:/root/.aspnet/DataProtection-Keys
+      - platform-videos:/var/sipat/videos
     expose:
       - "8080"
     depends_on:
@@ -97,6 +106,7 @@ services:
 volumes:
   postgres-data:
   aspnet-data-protection:
+  platform-videos:
 
 networks:
   data:

@@ -78,9 +78,9 @@ public sealed class CompanyPlanApiTests
             Assert.Equal(HttpStatusCode.NoContent, back.StatusCode);
         Assert.Equal(2, (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").GetArrayLength());
 
-        // categories: four come ready, the operator adds, renames and places a subject in one; deleting it only unplaces the subject
-        var seeded = await Get(operatorClient, "/api/platform/catalog/categories");
-        Assert.Equal(["Alimentação", "Segurança no trabalho", "Postura", "Saúde mental"], seeded.EnumerateArray().Select(item => item.GetProperty("name").GetString()));
+        // categories: the library starts without any, the operator adds, renames and places a subject in one; deleting it only unplaces the subject
+        Assert.Empty((await Get(operatorClient, "/api/platform/catalog/categories")).EnumerateArray());
+        await Send(operatorClient, HttpMethod.Post, "/api/platform/catalog/categories", new { name = "Postura" }, HttpStatusCode.Created);
         var created = await Send(operatorClient, HttpMethod.Post, "/api/platform/catalog/categories", new { name = "  Ergonomia  " }, HttpStatusCode.Created);
         var categoryId = created.GetProperty("id").GetGuid();
         Assert.Equal("Ergonomia", created.GetProperty("name").GetString());
