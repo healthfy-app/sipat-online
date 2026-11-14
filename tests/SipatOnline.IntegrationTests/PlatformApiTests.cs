@@ -386,6 +386,53 @@ public sealed class PlatformApiTests
             "acme-unassigned",
             Assert.Single(employeeNameSearchPage.Items).LoginIdentifier);
 
+        // the operator deactivates and reactivates participants of the company, one request for several
+        var statusToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var deactivateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Put,
+            $"/api/platform/companies/{company.Id:D}/employees/status",
+            new ChangeEmployeesStatusRequest([unassignedEmployee.Id, Guid.NewGuid()], false),
+            statusToken);
+        Assert.Equal(HttpStatusCode.OK, deactivateResponse.StatusCode);
+        var deactivated = await deactivateResponse.Content.ReadFromJsonAsync<PlatformEmployeeStatusChange>();
+        Assert.Equal(new PlatformEmployeeStatusChange(2, 1), deactivated);
+
+        using var activeOnlyResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{company.Id:D}/employees");
+        var activeOnly = await activeOnlyResponse.Content.ReadFromJsonAsync<PlatformCompanyEmployeePage>();
+        Assert.NotNull(activeOnly);
+        Assert.Equal(1, activeOnly.TotalCount);
+        using var withInactiveResponse = await client.GetAsync(
+            $"https://ops.localhost/api/platform/companies/{company.Id:D}/employees?includeInactive=true");
+        var withInactive = await withInactiveResponse.Content.ReadFromJsonAsync<PlatformCompanyEmployeePage>();
+        Assert.NotNull(withInactive);
+        Assert.Equal(2, withInactive.TotalCount);
+
+        statusToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var reactivateResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Put,
+            $"/api/platform/companies/{company.Id:D}/employees/status",
+            new ChangeEmployeesStatusRequest([unassignedEmployee.Id], true),
+            statusToken);
+        Assert.Equal(HttpStatusCode.OK, reactivateResponse.StatusCode);
+        Assert.Equal(
+            new PlatformEmployeeStatusChange(1, 1),
+            await reactivateResponse.Content.ReadFromJsonAsync<PlatformEmployeeStatusChange>());
+
+        statusToken = await GetAntiforgeryTokenAsync(client, "ops.localhost");
+        using var emptyBatchResponse = await SendJsonWithAntiforgeryAsync(
+            client,
+            "ops.localhost",
+            HttpMethod.Put,
+            $"/api/platform/companies/{company.Id:D}/employees/status",
+            new ChangeEmployeesStatusRequest([], false),
+            statusToken);
+        Assert.Equal(HttpStatusCode.BadRequest, emptyBatchResponse.StatusCode);
+
         using var participantClient = CreateClient(factory);
         antiforgeryToken = await GetAntiforgeryTokenAsync(participantClient, "acme-health.localhost");
         using var participantLoginResponse = await SendJsonWithAntiforgeryAsync(

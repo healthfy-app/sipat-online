@@ -63,13 +63,13 @@ export function parseParticipantCsv(
   const headers = headerRecord.map(normalizeHeader);
   const nameIndex = headers.findIndex((header) => ['nome', 'nome completo', 'name'].includes(header));
   const identifierIndex = headers.findIndex((header) =>
-    ['matricula', 'employeeid', 'employeeidentifier', 'registro', 'registration'].includes(header),
+    ['login', 'matricula', 'employeeid', 'employeeidentifier', 'registro', 'registration'].includes(header),
   );
   if (nameIndex < 0 || identifierIndex < 0 || nameIndex === identifierIndex) {
     return {
       rows: [],
       issues: [],
-      fatalError: 'Inclua as colunas obrigatórias "nome" e "matricula" no cabeçalho.',
+      fatalError: 'Inclua as colunas obrigatórias "nome" e "login" no cabeçalho.',
     };
   }
   if (new Set(headers.filter(Boolean)).size !== headers.filter(Boolean).length) {
@@ -103,7 +103,7 @@ export function parseParticipantCsv(
       issues.push({
         recordNumber,
         loginIdentifier,
-        message: 'Matrícula repetida neste arquivo.',
+        message: 'Login repetido neste arquivo.',
       });
       return;
     }
@@ -113,7 +113,7 @@ export function parseParticipantCsv(
       issues.push({
         recordNumber,
         loginIdentifier,
-        message: 'Matrícula já cadastrada nesta empresa.',
+        message: 'Login já cadastrado nesta empresa.',
       });
       return;
     }
@@ -179,7 +179,7 @@ export function serializeCredentialCsv(credentials: readonly Pick<
   'displayName' | 'loginIdentifier' | 'initialPassword'
 >[]): string {
   const rows = [
-    ['nome', 'matricula', 'senha_inicial'],
+    ['nome', 'login', 'senha_inicial'],
     ...credentials.map((credential) => [
       credential.displayName,
       credential.loginIdentifier,
@@ -204,7 +204,7 @@ function validateRecord(
     };
   }
   if (!displayName || !loginIdentifier) {
-    return { recordNumber, loginIdentifier, message: 'Informe nome e matrícula.' };
+    return { recordNumber, loginIdentifier, message: 'Informe nome e login.' };
   }
   if (
     displayName.length > MAX_NAME_LENGTH
@@ -212,7 +212,7 @@ function validateRecord(
     || /[\r\n\u0000]/.test(displayName)
     || /[\r\n\u0000]/.test(loginIdentifier)
   ) {
-    return { recordNumber, loginIdentifier, message: 'O nome ou a matrícula tem formato ou tamanho inválido.' };
+    return { recordNumber, loginIdentifier, message: 'O nome ou o login tem formato ou tamanho inválido.' };
   }
   return null;
 }

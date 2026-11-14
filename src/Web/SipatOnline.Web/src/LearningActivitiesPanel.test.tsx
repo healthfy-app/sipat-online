@@ -46,7 +46,10 @@ describe('course activities during playback', () => {
     video.currentTime = 2; fireEvent.timeUpdate(video);
     expect(await screen.findByRole('dialog')).toHaveAccessibleName('Pratique segurança');
     expect(video.paused).toBe(true);
+    // The game chunk loads on demand; the first import is slow when the whole suite runs.
+    await user.click(await screen.findByRole('button', { name: 'Começar' }, { timeout: 5000 }));
     await user.click(screen.getByRole('button', { name: 'Usar EPI' }));
+    await user.click(screen.getByRole('button', { name: 'Ver resultado' }));
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(save).toHaveBeenCalledExactlyOnceWith('track-1', 'checkpoint-0-0', 'completed');
@@ -76,7 +79,10 @@ describe('course activities during playback', () => {
     const { video } = await setup([checkpoint]);
 
     await user.click(screen.getByRole('button', { name: 'Ver atividades' }));
-    expect(screen.getByRole('dialog', { name: 'Atividades para praticar' })).toBeVisible();
+    const dialog = screen.getByRole('dialog', { name: 'Atividades para praticar' });
+    expect(dialog).toBeVisible();
+    expect(dialog).toHaveClass('learning-dialog', 'learning-activities-dialog');
+    expect(dialog).toHaveTextContent('Todas são opcionais e não bloqueiam seu progresso.');
     expect(video.paused).toBe(true);
     expect(screen.getByRole('button', { name: 'Pratique segurança · Iniciar atividade' })).toBeVisible();
 

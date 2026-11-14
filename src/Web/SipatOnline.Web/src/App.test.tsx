@@ -58,8 +58,7 @@ describe('tenant portal', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
-    expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('link', { name: 'Programação' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'SIPATs' })).not.toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('link', { name: 'Acompanhamento' }));
     expect(await screen.findByText(/Modo de consulta/)).toBeVisible();
@@ -88,10 +87,10 @@ describe('tenant portal', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(screen.getByRole('status', { name: 'Modo de administração da empresa' }))
-      .toHaveTextContent('MODO DONO · Administrando Acme');
+      .toHaveTextContent('Modo operador · Administrando Acme');
     expect(screen.getByRole('link', { name: 'Identidade visual' })).toHaveAttribute('href', '/admin/appearance');
     expect(screen.getByRole('link', { name: 'Voltar à plataforma' })).toHaveAttribute('href', '/platform');
-    expect(screen.getByRole('link', { name: 'Trilhas e vídeos' })).toBeVisible();
+    expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
     const companyNavigation = screen.getByRole('complementary', { name: 'Navegação principal' });
     expect(within(companyNavigation).getByText('GESTÃO DA EMPRESA')).toBeVisible();
     expect(within(companyNavigation).queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
@@ -147,7 +146,7 @@ describe('tenant portal', () => {
     vi.stubGlobal('fetch', fetch);
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
-    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(fetch).toHaveBeenCalledTimes(role === 'ClientAdmin' ? 3 : 2);
     expect(screen.queryByRole('navigation', { name: 'Etapas do curso' })).not.toBeInTheDocument();
   });
 
@@ -226,7 +225,7 @@ describe('tenant portal', () => {
     expect(screen.getByRole('region', { name: 'Acesso ao portal da empresa' })).toBeVisible();
     expect(screen.getByText('Pequenos passos. Rotinas mais seguras.')).toBeInTheDocument();
     expect(screen.getByText('Acme Segurança')).toBeVisible();
-    expect(screen.getByLabelText('Matrícula')).toBeVisible();
+    expect(screen.getByLabelText('Login')).toBeVisible();
     expect(screen.getByLabelText('Senha')).toHaveAttribute('placeholder', 'Digite sua senha');
   });
 
@@ -295,16 +294,16 @@ describe('tenant portal', () => {
 
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Matrícula'), 'admin');
+    await user.type(await screen.findByLabelText('Login'), 'admin');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
-    expect(screen.getByRole('link', { name: 'Programação' })).toHaveAttribute('href', '/admin/sipats');
-    expect(screen.getByRole('link', { name: 'Trilhas e vídeos' })).toHaveAttribute('href', '/admin/content');
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(7));
+    expect(screen.getByRole('link', { name: 'SIPATs' })).toHaveAttribute('href', '/admin/sipats');
+    expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(8));
   });
 
   it('shows the learner portal without the administration sidebar for participants', async () => {
@@ -338,12 +337,12 @@ describe('tenant portal', () => {
 
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Matrícula'), 'participant');
+    await user.type(await screen.findByLabelText('Login'), 'participant');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', {
-      name: 'Você ainda não tem uma trilha atribuída',
+      name: 'Você ainda não tem uma SIPAT disponível',
     })).toBeVisible();
     expect(screen.queryByRole('navigation', { name: 'Navegação principal' }))
       .not.toBeInTheDocument();
@@ -410,14 +409,14 @@ describe('tenant portal', () => {
 
     render(<App />);
 
-    await user.type(await screen.findByLabelText('Matrícula'), 'participant');
+    await user.type(await screen.findByLabelText('Login'), 'participant');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
-    expect(await screen.findByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Bom te ver de volta.' })).toBeVisible();
     const sidebar = screen.getByRole('complementary', { name: 'Área do aluno' });
     expect(await within(sidebar).findByText('50% concluído')).toBeVisible();
-    expect(within(sidebar).getByText('0 de 1 cursos')).toBeVisible();
+    expect(within(sidebar).getByText('0 de 1 dias')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Minha formação' })).toHaveAttribute('aria-current', 'page');
   });
 
@@ -456,15 +455,16 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Acesse a plataforma' })).toBeVisible();
     expect(screen.getByRole('region', { name: 'Acesso à plataforma' })).toBeVisible();
     expect(screen.getByText('Acesso exclusivo para a equipe de operação.')).toBeVisible();
-    await user.type(screen.getByLabelText('Matrícula'), 'operator');
+    await user.type(screen.getByLabelText('Login'), 'operator');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', { name: 'Empresas' })).toBeVisible();
-    expect(screen.getByRole('link', { name: '+ Nova empresa' })).toHaveAttribute('href', '/platform/companies');
+    expect(screen.getByRole('button', { name: 'Nova empresa' })).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Cadastrar empresa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Painel' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Usuários' })).toHaveAttribute('href', '/platform/users');
+    expect(screen.queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Biblioteca' })).toHaveAttribute('href', '/platform/courses');
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/platform/dashboard',

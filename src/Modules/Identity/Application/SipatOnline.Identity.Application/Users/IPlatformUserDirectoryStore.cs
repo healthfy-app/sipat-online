@@ -13,6 +13,16 @@ public interface IPlatformUserDirectoryStore
         int limit,
         CancellationToken cancellationToken);
 
+    /// <summary>
+    /// Activates or deactivates participants of one company. Only participants are touched; administrators are not.
+    /// Returns the ids whose state really changed, or null when the company does not exist.
+    /// </summary>
+    Task<IReadOnlyList<Guid>?> SetEmployeesActiveAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> userIds,
+        bool isActive,
+        CancellationToken cancellationToken);
+
     Task<PlatformUserDirectoryPage> ListAsync(
         Guid? tenantId,
         string? search,
@@ -30,7 +40,8 @@ public sealed record PlatformCompanyOverview(
     DateTimeOffset CreatedAt,
     int EmployeeCount,
     int AdministratorCount,
-    int TotalUserCount);
+    int TotalUserCount,
+    string Plan = "Diamante");
 
 public sealed record PlatformCompanyEmployeePage(
     Guid CompanyId,
@@ -49,3 +60,5 @@ public sealed record PlatformCompanyEmployeeSummary(
     int ProgressPercentage,
     int CompletedLessonCount,
     int LessonCount);
+
+public sealed record PlatformEmployeeStatusChange(int Requested, int Changed);

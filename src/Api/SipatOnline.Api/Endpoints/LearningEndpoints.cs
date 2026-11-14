@@ -37,6 +37,16 @@ public static class LearningEndpoints
         })
         .WithName("ListLearningParticipation");
 
+        reports.MapGet("/learning/participants/{participantId:guid}/report", async (
+            Guid participantId,
+            LearningService learningService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await learningService.GetParticipantReportAsync(participantId, cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .WithName("GetLearningParticipantReport");
+
         admin.MapGet("/learning/tracks/{trackId:guid}/draft", async (
             Guid trackId,
             LearningService learningService,

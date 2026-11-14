@@ -1,0 +1,56 @@
+/*
+ * Top of "Minha formação" once the formation has started: the greeting lives inside the green card,
+ * and the course to continue shows its cover with a play button instead of a decorative icon.
+ */
+.portal-layout-learner .learning-formation-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(15rem, 25rem);
+  align-items: center;
+  gap: 1.5rem 2rem;
+  padding: clamp(1.25rem, 2.5vw, 2rem);
+}
+
+.portal-layout-learner .learning-hero-greeting { display: grid; gap: 0.35rem; margin-bottom: 0.25rem; }
+.portal-layout-learner .learning-resume-content > .learning-hero-greeting p { margin: 0; line-height: 1.4; }
+.portal-layout-learner .learning-hero-hello { color: rgb(255 255 255 / 78%); font-size: 1rem; font-weight: 600; }
+.portal-layout-learner .learning-resume-hero .learning-hero-greeting h1 {
+  margin: 0; color: #fff; font-size: clamp(1.75rem, 3.2vw, 2.5rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.035em;
+}
+.portal-layout-learner .learning-hero-lead { color: rgb(255 255 255 / 78%); font-size: 1rem; }
+
+.portal-layout-learner .learning-resume-content > .learning-hero-day {
+  margin: 0; padding: 0.2rem 0.65rem; border-radius: 999px;
+  color: var(--learner-deep); background: var(--learner-progress-accent); font-size: 0.8125rem; font-weight: 800;
+}
+
+/* the course to continue */
+.portal-layout-learner .learning-hero-cover {
+  display: block; width: 100%; border-radius: 16px; aspect-ratio: 16 / 10; background: #0b241f;
+  box-shadow: 0 22px 44px -18px rgb(0 0 0 / 65%); outline: 1px solid rgb(255 255 255 / 14%); outline-offset: -1px;
+  transition: transform 220ms cubic-bezier(.16, 1, .3, 1), box-shadow 220ms ease;
+}
+.portal-layout-learner .learning-hero-cover > img { opacity: 1; }
+.portal-layout-learner .learning-hero-cover::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(to top, rgb(5 20 16 / 70%), transparent 55%);
+}
+.portal-layout-learner .learning-hero-cover .learning-resume-play {
+  z-index: 1; width: 3.75rem; height: 3.75rem; padding-left: 0.2rem;
+  color: var(--learner-deep); background: var(--learner-progress-accent); box-shadow: 0 10px 26px rgb(0 0 0 / 45%);
+  transition: transform 200ms cubic-bezier(.16, 1, .3, 1);
+}
+.portal-layout-learner .learning-hero-cover .learning-resume-play svg { width: 1.5rem; height: 1.5rem; }
+.portal-layout-learner .learning-hero-cover-bar {
+  position: absolute; z-index: 1; right: 1rem; bottom: 0.9rem; left: 1rem; height: 6px; border-radius: 999px; background: rgb(255 255 255 / 30%);
+}
+.portal-layout-learner .learning-hero-cover-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--learner-progress-accent); }
+
+@media (max-width: 800px) {
+  .portal-layout-learner .learning-formation-hero { grid-template-columns: minmax(0, 1fr); }
+  /* on a phone the way forward is the button, not a picture */
+  .portal-layout-learner .learning-hero-cover { display: none; }
+}
+
+@media (prefers-reduced-motion: no-preference) and (hover: hover) {
+  .portal-layout-learner .learning-hero-cover:hover { transform: translateY(-3px) scale(1.015); }
+  .portal-layout-learner .learning-hero-cover:hover .learning-resume-play { transform: translate(-50%, -50%) scale(1.1); }
+}

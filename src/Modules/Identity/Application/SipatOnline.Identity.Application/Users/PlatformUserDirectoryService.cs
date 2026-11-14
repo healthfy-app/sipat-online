@@ -6,9 +6,70 @@ namespace SipatOnline.Identity.Application.Users;
 public sealed class PlatformUserDirectoryService(
     ICurrentActor currentActor,
     ITenantContext tenantContext,
-    IPlatformUserDirectoryStore directoryStore)
+    IPlatformUserDirectoryStore directoryStore,
+    IApplicationUnitOfWork unitOfWork,
+    IAuditTrail auditTrail,
+    TimeProvider timeProvider)
 {
     public const int MaximumPageSize = 100;
+    public const int MaximumStatusBatch = 500;
+
+    /// <summary>The operator activates or deactivates several participants of a company at once, with one audit entry each.</summary>
+    public async Task<Result<PlatformEmployeeStatusChange>> ChangeCompanyEmployeesStatusAsync(
+        Guid tenantId,
+        IReadOnlyList<Guid>? userIds,
+        bool isActive,
+        CancellationToken cancellationToken)
+    {
+        if (!currentActor.IsInRole(PlatformRoles.PlatformOperator) ||
+            tenantContext.CurrentTenantId is not null)
+        {
+            return Result<PlatformEmployeeStatusChange>.Failure(
+                new DomainError(
+                    "identity.platform_directory.forbidden",
+                    "Você não tem permissão para alterar colaboradores da empresa."));
+        }
+
+        var ids = (userIds ?? []).Where(id => id != Guid.Empty).Distinct().ToArray();
+        if (tenantId == Guid.Empty || ids.Length == 0 || ids.Length > MaximumStatusBatch)
+        {
+            return Result<PlatformEmployeeStatusChange>.Failure(
+                new DomainError(
+                    "identity.platform_directory.pagination_invalid",
+                    $"Escolha de 1 a {MaximumStatusBatch} participantes de uma empresa válida."));
+        }
+
+        var actorId = currentActor.UserId;
+        if (string.IsNullOrWhiteSpace(actorId))
+        {
+            return Result<PlatformEmployeeStatusChange>.Failure(
+                new DomainError("identity.platform_user.actor_required", "Não foi possível identificar o operador."));
+        }
+
+        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+        var changed = await directoryStore.SetEmployeesActiveAsync(tenantId, ids, isActive, cancellationToken);
+        if (changed is null)
+        {
+            return Result<PlatformEmployeeStatusChange>.Failure(
+                new DomainError("identity.platform_directory.tenant_not_found", "A empresa solicitada não foi encontrada."));
+        }
+
+        foreach (var userId in changed)
+        {
+            await auditTrail.WriteAsync(
+                new AuditRecord(
+                    actorId,
+                    new TenantId(tenantId),
+                    isActive ? "identity.user.activated" : "identity.user.deactivated",
+                    "user",
+                    userId.ToString("D"),
+                    timeProvider.GetUtcNow()),
+                cancellationToken);
+        }
+
+        await transaction.CommitAsync(cancellationToken);
+        return Result<PlatformEmployeeStatusChange>.Success(new PlatformEmployeeStatusChange(ids.Length, changed.Count));
+    }
 
     public async Task<Result<IReadOnlyList<PlatformCompanyOverview>>> ListCompaniesAsync(
         CancellationToken cancellationToken)

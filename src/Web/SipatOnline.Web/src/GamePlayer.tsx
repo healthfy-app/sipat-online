@@ -1,94 +1,73 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
+import { MotionConfig } from 'motion/react';
 import type { GameModule } from './api';
-import InteractiveGame, { type GameOutcome } from './InteractiveGame';
-import AchievementMark from './AchievementMark';
+import { Button } from '@/components/ui/button';
+import { prefersReducedMotion, useElapsedSeconds, useGameScore, type GameOutcome, type GameResult } from '@/games/gameKit';
+import { GameCountdown, GameFrame, GameHud, GameIntro, GameVictory, useTitleId, type HudProgress } from '@/games/GameShell';
+import MemoryGame from '@/games/MemoryGame';
+import OrderingGame from '@/games/OrderingGame';
+import PuzzleGame from '@/games/PuzzleGame';
+import QuizGame from '@/games/QuizGame';
+import RiskSpottingGame from '@/games/RiskSpottingGame';
+import SafeOrRiskyGame from '@/games/SafeOrRiskyGame';
 
-/** Plays a module without scoring. It can always be skipped and never blocks anything. */
-export default function GamePlayer({
-  module,
-  onClose,
-}: {
-  module: GameModule;
-  onClose: (outcome?: GameOutcome) => void;
+export type { GameOutcome } from '@/games/gameKit';
+
+const boards = {
+  Quiz: QuizGame, Scenario: QuizGame, RiskSpotting: RiskSpottingGame, Memory: MemoryGame, Puzzle: PuzzleGame, Ordering: OrderingGame, SafeOrRisky: SafeOrRiskyGame,
+} as const;
+
+function isPlayable(module: GameModule) {
+  const content = module.content;
+  switch (module.gameType) {
+    case 'Quiz': case 'Scenario': return module.questions.length > 0;
+    case 'RiskSpotting': return !!content?.imageUrl && !!content.risks?.length;
+    case 'Memory': return !!content?.pairs?.length;
+    case 'Puzzle': return !!content?.imageUrl;
+    case 'Ordering': return (content?.items?.length ?? 0) >= 2;
+    case 'SafeOrRisky': return !!content?.cards?.some(card => card.text.trim());
+  }
+}
+
+/**
+ * Plays a module: opening screen, countdown, the board with a live scoreboard, then the result.
+ * It can always be skipped and never blocks the course. Points are for fun only and are not saved.
+ */
+export default function GamePlayer({ module, onClose }: { module: GameModule; onClose: (outcome?: GameOutcome) => void }) {
+  const [attempt, setAttempt] = useState(0);
+  return <MotionConfig reducedMotion="user">
+    <GameSession key={attempt} module={module} onClose={onClose} onReplay={() => setAttempt(value => value + 1)} replay={attempt > 0} />
+  </MotionConfig>;
+}
+
+function GameSession({ module, onClose, onReplay, replay }: {
+  module: GameModule; onClose: (outcome?: GameOutcome) => void; onReplay: () => void; replay: boolean;
 }) {
-  const [index, setIndex] = useState(0);
-  const [selected, setSelected] = useState<number | null>(null);
-  const question = module.questions[index];
-  const isLast = index >= module.questions.length - 1;
-  const heading = useRef<HTMLHeadingElement>(null);
-  useEffect(() => { if (index > 0) heading.current?.focus(); }, [index]);
+  const titleId = useTitleId();
+  const [phase, setPhase] = useState<'intro' | 'countdown' | 'play' | 'done'>(replay ? 'play' : 'intro');
+  const [result, setResult] = useState<GameResult | null>(null);
+  const [progress, setProgress] = useState<HudProgress | null>(null);
+  const score = useGameScore();
+  const seconds = useElapsedSeconds(phase === 'play');
+  const onProgress = useCallback((next: HudProgress) => setProgress(next), []);
+  const startPlaying = useCallback(() => setPhase('play'), []);
+  const skip = () => onClose('skipped');
 
-  function next() {
-    if (isLast) {
-      onClose('completed');
-      return;
-    }
-    setIndex(index + 1);
-    setSelected(null);
-  }
+  if (!isPlayable(module)) return <GameFrame module={module} onSkip={skip} showSkip={false} titleId={titleId}>
+    <div className="grid justify-items-start gap-3 p-5" role="alert">
+      <p className="m-0">Este jogo precisa de conteúdo. Peça à operação para revisar a configuração.</p>
+      <Button onClick={skip} variant="outline">Pular atividade</Button>
+    </div>
+  </GameFrame>;
 
-  if (module.gameType !== 'Quiz' && module.gameType !== 'Scenario') {
-    return <InteractiveGame key={module.id} module={module} onClose={onClose} />;
-  }
-  if (!question) {
-    return (
-      <section aria-label={module.title} className="game-player">
-        <h3>{module.title}</h3>
-        <p className="muted-copy">Este tipo de jogo ainda não está disponível para jogar.</p>
-        <button className="button button-secondary" onClick={() => onClose('skipped')} type="button">Continuar</button>
-      </section>
-    );
-  }
-
-  return (
-    <section aria-label={module.title} className="game-player">
-      <div className="game-step-heading"><span>{module.title}</span><span>{index + 1}/{module.questions.length}</span></div>
-      <progress className="game-question-progress" aria-label="Progresso das perguntas"
-        max={module.questions.length} value={index + (selected === null ? 0 : 1)} />
-      <div className="game-question" key={index}>
-      <h3 ref={heading} tabIndex={-1}>{question.text}</h3>
-      <div className="game-options" role="group" aria-label="Alternativas">
-        {question.options.map((option, optionIndex) => {
-          const state = selected === null
-            ? ''
-            : optionIndex === question.correctIndex
-              ? ' is-correct'
-              : optionIndex === selected
-                ? ' is-wrong'
-                : '';
-          return (
-            <button
-              className={`game-option${state}`}
-              disabled={selected !== null}
-              key={option}
-              onClick={() => setSelected(optionIndex)}
-              type="button"
-            >
-              <span className="game-option-letter" aria-hidden="true">{String.fromCharCode(65 + optionIndex)}</span>
-              <span>{option}</span>
-            </button>
-          );
-        })}
-      </div>
-      {selected !== null && (
-        <div className={`game-feedback${selected === question.correctIndex ? ' is-complete' : ''}`}>
-        {selected === question.correctIndex && <AchievementMark animate />}
-        <p aria-live="polite" role="status">
-          {selected === question.correctIndex
-            ? 'Resposta correta!'
-            : `A resposta correta é: ${question.options[question.correctIndex]}`}
-        </p>
-        </div>
-      )}
-      </div>
-      <div className="game-actions">
-        {selected !== null && (
-          <button className="button button-primary" onClick={next} type="button">
-            {isLast ? 'Continuar' : 'Próxima pergunta'}
-          </button>
-        )}
-        <button className="button button-quiet" onClick={() => onClose('skipped')} type="button">Pular</button>
-      </div>
-    </section>
-  );
+  const Board = boards[module.gameType];
+  return <GameFrame module={module} onSkip={skip} showSkip={phase !== 'done'} titleId={titleId}>
+    {phase === 'intro' && <GameIntro module={module} onStart={() => setPhase(prefersReducedMotion() ? 'play' : 'countdown')} />}
+    {phase === 'countdown' && <GameCountdown onDone={startPlaying} />}
+    {phase === 'play' && <>
+      <GameHud gainId={score.gainId} lastGain={score.lastGain} progress={progress} score={score.score} seconds={seconds} streak={score.streak} />
+      <Board module={module} onFinish={outcome => { setResult({ ...outcome, seconds }); setPhase('done'); }} onProgress={onProgress} score={score} />
+    </>}
+    {phase === 'done' && result && <GameVictory onContinue={() => onClose('completed')} onReplay={onReplay} result={result} />}
+  </GameFrame>;
 }

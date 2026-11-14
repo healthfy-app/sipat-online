@@ -1,0 +1,141 @@
+/*
+ * The videos of the SIPAT week below the trail: one block per day, three videos to a row on a desktop.
+ * Calm surfaces, one accent (the SIPAT yellow) for what comes next, and a check (never color alone) for what is done.
+ */
+.portal-layout-learner .week-videos { display: grid; gap: 1.25rem; }
+.portal-layout-learner .week-videos-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1rem; }
+.portal-layout-learner .week-videos-heading h2 { margin: 0; color: var(--learner-forest); font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.portal-layout-learner .week-videos-heading p { margin: 0; color: var(--learner-text-secondary); font-size: 0.9375rem; }
+.portal-layout-learner .week-videos-all {
+  min-height: 2.5rem; padding: 0 1rem; border: 1px solid var(--learner-border); border-radius: 999px; color: var(--learner-forest);
+  background: var(--learner-surface); font: inherit; font-size: 0.9375rem; font-weight: 700; cursor: pointer;
+}
+.portal-layout-learner .week-videos-all:hover { border-color: var(--learner-forest); }
+.portal-layout-learner .week-videos-all:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+.portal-layout-learner .week-videos-note { margin: 0; color: var(--learner-text-secondary); font-size: 0.9375rem; }
+
+.portal-layout-learner .week-videos-days { display: grid; gap: 1.25rem; }
+.portal-layout-learner .week-day {
+  display: grid; gap: 1rem; padding: 1.25rem; border: 1px solid var(--learner-border); border-radius: 18px; background: var(--learner-surface);
+}
+.portal-layout-learner .week-day-header { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(8rem, 14rem) auto auto; align-items: center; gap: 0.5rem 1rem; }
+.portal-layout-learner .week-day-number {
+  display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%;
+  color: #fff; background: var(--learner-forest); font-size: 1.25rem; font-weight: 800; line-height: 1;
+}
+.portal-layout-learner .week-day-number svg { width: 1.375rem; height: 1.375rem; stroke-width: 3; }
+.portal-layout-learner .week-day-number.is-progress { color: var(--learner-forest); background: var(--learner-progress-accent); }
+.portal-layout-learner .week-day-number.is-done { background: var(--learner-action); }
+.portal-layout-learner .week-day-heading { min-width: 0; }
+.portal-layout-learner .week-day-heading h3 { margin: 0; color: var(--learner-forest); font-size: 1.1875rem; font-weight: 800; line-height: 1.25; overflow-wrap: anywhere; }
+.portal-layout-learner .week-day-heading p { margin: 0.15rem 0 0; color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 600; }
+.portal-layout-learner .week-day-heading p::first-letter { text-transform: uppercase; }
+.portal-layout-learner .week-day-progress .learning-progress-track { height: 8px; border-radius: 999px; background: var(--learner-progress-track, #cfd8d4); }
+.portal-layout-learner .week-day-progress .learning-progress-track > span { border-radius: inherit; background: var(--learner-action); }
+
+.portal-layout-learner .week-day-track { display: grid; gap: 0.6rem; }
+.portal-layout-learner .week-day-subject {
+  margin: 0; color: var(--learner-text-secondary); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase;
+}
+
+.portal-layout-learner .week-video-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0.875rem; margin: 0; padding: 0; list-style: none; }
+.portal-layout-learner .week-video {
+  display: grid; grid-template-rows: auto 1fr; height: 100%; overflow: hidden; border: 1px solid var(--learner-border); border-radius: 14px;
+  color: var(--learner-forest); background: var(--learner-canvas); text-decoration: none;
+  transition: border-color 160ms ease, box-shadow 200ms ease, transform 200ms cubic-bezier(.16, 1, .3, 1);
+}
+.portal-layout-learner .week-video:hover { border-color: var(--learner-forest); box-shadow: 0 10px 24px -14px rgb(18 51 44 / 45%); }
+.portal-layout-learner .week-video:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+.portal-layout-learner .week-video.is-next { border-color: var(--learner-progress-accent); box-shadow: 0 0 0 2px var(--learner-progress-accent); }
+
+.portal-layout-learner .week-video-cover { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: var(--learner-forest); }
+.portal-layout-learner .week-video-cover img { width: 100%; height: 100%; object-fit: cover; }
+.portal-layout-learner .week-video.is-done .week-video-cover img { filter: saturate(0.55) brightness(0.8); }
+.portal-layout-learner .week-video-play {
+  position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 50%;
+  color: var(--learner-forest); background: rgb(255 255 255 / 92%); transform: translate(-50%, -50%);
+  transition: transform 200ms cubic-bezier(.16, 1, .3, 1), background-color 160ms ease;
+}
+.portal-layout-learner .week-video-play svg { width: 1.25rem; height: 1.25rem; }
+.portal-layout-learner .week-video.is-next .week-video-play { background: var(--learner-progress-accent); }
+.portal-layout-learner .week-video.is-done .week-video-play { color: #fff; background: var(--learner-action); }
+.portal-layout-learner .week-video-time {
+  position: absolute; right: 0.5rem; bottom: 0.5rem; padding: 0.1rem 0.4rem; border-radius: 6px;
+  color: #fff; background: rgb(0 0 0 / 68%); font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums;
+}
+.portal-layout-learner .week-video-bar { position: absolute; right: 0; bottom: 0; left: 0; height: 4px; background: rgb(255 255 255 / 30%); }
+.portal-layout-learner .week-video-bar > span { display: block; height: 100%; background: var(--learner-progress-accent); }
+
+.portal-layout-learner .week-video-body { display: grid; align-content: start; gap: 0.2rem; padding: 0.65rem 0.75rem 0.8rem; }
+.portal-layout-learner .week-video-kicker { color: var(--learner-text-secondary); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.portal-layout-learner .week-video-body strong {
+  display: -webkit-box; overflow: hidden; font-size: 0.9375rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere;
+  -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+}
+.portal-layout-learner .week-video-state { margin-top: 0.15rem; color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 600; }
+.portal-layout-learner .week-video.is-done .week-video-state { color: var(--learner-complete-text, #0b5a2c); }
+.portal-layout-learner .week-video.is-next .week-video-state { color: #8a5a00; }
+
+/* a day never wraps: five to a row on a wide screen, a row that scrolls sideways on a narrow one */
+@media (max-width: 1100px) {
+  .portal-layout-learner .week-video-grid {
+    grid-auto-flow: column; grid-template-columns: none; grid-auto-columns: minmax(13.5rem, 40%); overflow-x: auto; overscroll-behavior-x: contain;
+    scroll-snap-type: x proximity; padding-bottom: 0.5rem; scrollbar-width: thin;
+  }
+  .portal-layout-learner .week-video-grid > li { scroll-snap-align: start; }
+}
+@media (max-width: 640px) {
+  .portal-layout-learner .week-video-grid { grid-auto-columns: minmax(14rem, 78%); }
+  .portal-layout-learner .week-day { padding: 1rem; }
+  .portal-layout-learner .week-day-header { grid-template-columns: auto minmax(0, 1fr); }
+  .portal-layout-learner .week-day-progress { grid-column: 1 / -1; grid-row: 2; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .portal-layout-learner .week-video:hover { transform: translateY(-2px); }
+  .portal-layout-learner .week-video:hover .week-video-play { transform: translate(-50%, -50%) scale(1.08); }
+  .portal-layout-learner .week-day { animation: week-day-rise 380ms cubic-bezier(.16, 1, .3, 1) both; }
+}
+@keyframes week-day-rise { from { opacity: 0; transform: translateY(10px); } }
+
+/* the SIPAT of each year: the current one is shown, earlier ones are one tap away */
+.portal-layout-learner .sipat-years { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1rem; }
+.portal-layout-learner .sipat-year {
+  display: grid; gap: 0.1rem; min-width: 6.5rem; padding: 0.5rem 1rem; border: 1px solid var(--learner-border); border-radius: 14px;
+  color: var(--learner-forest); background: var(--learner-surface); font: inherit; text-align: left; cursor: pointer;
+}
+.portal-layout-learner .sipat-year strong { font-size: 1.125rem; font-weight: 800; }
+.portal-layout-learner .sipat-year span { color: var(--learner-text-secondary); font-size: 0.8125rem; font-weight: 600; }
+.portal-layout-learner .sipat-year[aria-pressed="true"] { border-color: var(--learner-forest); background: var(--learner-forest); color: #fff; }
+.portal-layout-learner .sipat-year[aria-pressed="true"] span { color: rgb(255 255 255 / 80%); }
+.portal-layout-learner .sipat-year:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+
+.portal-layout-learner .week-day-toggle {
+  display: grid; place-items: center; width: 2.25rem; height: 2.25rem; padding: 0; border: 1px solid var(--learner-border, #d9e2de);
+  border-radius: 999px; color: var(--learner-forest); background: #fff; cursor: pointer;
+}
+.portal-layout-learner .week-day-toggle:hover { border-color: var(--learner-forest); }
+.portal-layout-learner .week-day-toggle:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+.portal-layout-learner .week-day-toggle svg { width: 1.25rem; height: 1.25rem; }
+.portal-layout-learner .week-day-body { display: grid; grid-template-rows: 1fr; margin-top: 0.9rem; }
+.portal-layout-learner .week-day-body-inner { display: grid; gap: 0.6rem; min-height: 0; overflow: hidden; }
+.portal-layout-learner .week-day.is-collapsed .week-day-body { grid-template-rows: 0fr; margin-top: 0; }
+.portal-layout-learner .week-day.is-collapsed .week-day-toggle svg { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .portal-layout-learner .week-day-body { transition: grid-template-rows 320ms cubic-bezier(.16, 1, .3, 1), margin-top 320ms cubic-bezier(.16, 1, .3, 1); }
+  .portal-layout-learner .week-day-toggle svg { transition: transform 260ms cubic-bezier(.16, 1, .3, 1); }
+}
+.portal-layout-learner .learning-completion-motivation { margin: 0.5rem 0 0; font-size: 0.9375rem; font-weight: 600; opacity: 0.9; }
+.portal-layout-learner .week-day-open {
+  display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.5rem 0.95rem; border-radius: 999px; color: #fff; background: var(--learner-forest);
+  font-size: 0.875rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.portal-layout-learner .week-day-open:hover { background: var(--learner-action); }
+.portal-layout-learner .week-day-open:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+.portal-layout-learner .week-day-open svg { width: 1rem; height: 1rem; transition: transform 200ms ease; }
+.portal-layout-learner .week-day-open:hover svg { transform: translateX(3px); }
+@media (max-width: 640px) {
+  .portal-layout-learner .week-day-header { grid-template-columns: auto minmax(0, 1fr) auto auto; }
+  .portal-layout-learner .week-day-open span, .portal-layout-learner .week-day-open { font-size: 0; gap: 0; padding: 0.55rem; }
+  .portal-layout-learner .week-day-open svg { width: 1.1rem; height: 1.1rem; }
+}

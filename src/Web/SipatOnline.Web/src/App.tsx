@@ -13,6 +13,8 @@ import {
 import {
   ApiError,
   configureCompanyAdministration,
+  getCompanyCapabilities,
+  type CompanyCapabilities,
   getCompanyAdministrationId,
   getSession,
   getTenantBranding,
@@ -21,17 +23,20 @@ import {
   type IdentitySession,
   type TenantBranding,
 } from './api';
-import SipatEventsPage from './SipatEventsPage';
+import SipatsPage from './sipatBuilder/SipatsPage';
+import CompanyContext from './companies/CompanyContext';
+import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
-import LearningAuthoringPage from './LearningAuthoringPage';
-import LearningManagementPage from './LearningManagementPage';
+import CollaboratorsPage from './collaborators/CollaboratorsPage';
 import TenantLearningDashboardPage from './TenantLearningDashboardPage';
+import { isCompanyPanelMode } from './companies/companyContextMode';
 import PlatformCompaniesPage from './PlatformCompaniesPage';
 import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
 import PlatformUsersPage from './PlatformUsersPage';
-import PlatformDashboardPage from './PlatformDashboardPage';
 import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
+import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
+import CompanyNav from './companies/CompanyNav';
 import PlatformSettingsPage from './PlatformSettingsPage';
 import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
@@ -97,12 +102,16 @@ export default function App() {
 
   if (state.status === 'error') {
     return (
-      <main className="standalone-message">
-        <div className="message-card" role="alert">
-          <p className="eyebrow">SIPAT ONLINE</p>
-          <h1>Este portal não está disponível</h1>
-          <p>{state.message}</p>
-          <a className="button button-secondary" href="/platform" onClick={clearCompanyAdministration}>
+      <main className="grid min-h-screen place-items-center bg-background p-4 text-foreground">
+        <div className="grid w-full max-w-md gap-3 rounded-xl bg-card p-8 shadow-card" role="alert">
+          <p className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-primary">SIPAT ONLINE</p>
+          <h1 className="m-0 text-2xl font-semibold leading-tight tracking-tight">Este portal não está disponível</h1>
+          <p className="m-0 text-muted-foreground">{state.message}</p>
+          <p className="m-0 text-sm text-muted-foreground">
+            Endereço acessado: <strong className="text-foreground">{window.location.host}</strong>. O endereço de cada empresa
+            começa pelo identificador dela. Confira se ele está escrito exatamente como foi cadastrado.
+          </p>
+          <a className="mt-2 inline-flex min-h-9 w-fit items-center rounded-md border border-border bg-card px-4 text-sm font-semibold text-foreground no-underline hover:bg-accent" href="/platform" onClick={clearCompanyAdministration}>
             Voltar ao início
           </a>
         </div>
@@ -184,19 +193,29 @@ export default function App() {
             />
             <Route
               path="/admin/sipats"
-              element={
-                state.session && hasAdminRole(state.session) ? (
-                  <SipatEventsPage />
-                ) : (
-                  <AccessDenied />
-                )
-              }
+              element={state.session && hasAdminRole(state.session) ? <SipatsPage basePath="/admin/sipats" /> : <AccessDenied />}
+            />
+            <Route
+              path="/admin/sipats/:sipatId"
+              element={state.session && hasAdminRole(state.session) ? <SipatBuilderPage basePath="/admin/sipats" canEditThemes={false} /> : <AccessDenied />}
+            />
+            <Route
+              path="/platform/companies/:companyId/sipats"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/sipats`} />}</CompanyContext>
+                : <AccessDenied />}
+            />
+            <Route
+              path="/platform/companies/:companyId/sipats/:sipatId"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                ? <CompanyContext>{companyId => <SipatBuilderPage basePath={`/platform/companies/${companyId}/sipats`} canEditThemes />}</CompanyContext>
+                : <AccessDenied />}
             />
             <Route
               path="/admin/learning"
               element={
                 state.session && canViewCompany(state.session) ? (
-                  <LearningManagementPage readOnly={!hasAdminRole(state.session)} />
+                  <CollaboratorsPage readOnly={!hasAdminRole(state.session)} />
                 ) : (
                   <AccessDenied />
                 )
@@ -208,16 +227,6 @@ export default function App() {
                 <TenantAppearancePage tenant={state.tenant} onSaved={tenant => setState(current =>
                   current.status === 'ready' ? { ...current, tenant } : current)} />
               ) : <AccessDenied />}
-            />
-            <Route
-              path="/admin/content"
-              element={
-                state.session && hasAdminRole(state.session) ? (
-                  <LearningAuthoringPage />
-                ) : (
-                  <AccessDenied />
-                )
-              }
             />
             <Route
               path="/learning"
@@ -262,7 +271,8 @@ export default function App() {
               element={
                 state.tenant.tenantKey === 'platform' &&
                 state.session?.roles.includes('PlatformOperator') ? (
-                  <PlatformDashboardPage />
+                  // the operator's overview left the menu: the companies list already says what it said
+                  <Navigate replace to="/platform" />
                 ) : (
                   <AccessDenied />
                 )
@@ -281,13 +291,14 @@ export default function App() {
             />
             <Route
               path="/platform/companies/:companyId"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <CompanyHome /> : <AccessDenied />}
+            />
+            <Route
+              path="/platform/companies/:companyId/:section"
               element={
-                state.tenant.tenantKey === 'platform' &&
-                state.session?.roles.includes('PlatformOperator') ? (
-                  <PlatformCompanyEmployeesPage />
-                ) : (
-                  <AccessDenied />
-                )
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <PlatformCompanyEmployeesPage />
+                  : <AccessDenied />
               }
             />
             <Route
@@ -375,7 +386,10 @@ function LoginPage({
       aria-label={tenant.tenantKey === 'platform' ? 'Acesso à plataforma' : 'Acesso ao portal da empresa'}
       className="login-layout"
     >
-      <div className="login-brand-panel">
+      <div
+        className={`login-brand-panel${tenant.bannerReference ? ' has-banner' : ''}`}
+        style={tenant.bannerReference ? ({ '--login-banner': `url("${tenant.bannerReference}")` } as React.CSSProperties) : undefined}
+      >
         <TenantIdentity tenant={tenant} compact={false} />
         <div className="login-intro">
           {tenant.tenantKey === 'platform' ? (
@@ -389,7 +403,7 @@ function LoginPage({
               <p className="eyebrow">CONTEÚDOS PARA A SEMANA DA SIPAT</p>
               <h1>Aprender também faz parte de cuidar.</h1>
               <p>
-                Acesse os cursos e demais conteúdos que sua empresa preparou para
+                Acesse os vídeos e demais conteúdos que sua empresa preparou para
                 a semana da SIPAT.
               </p>
             </>
@@ -440,9 +454,9 @@ function LoginPage({
           <p className="muted-copy">
             {tenant.tenantKey === 'platform'
               ? 'Entre com suas credenciais de operação.'
-              : 'Use a matrícula e a senha fornecidas pela sua empresa.'}
+              : 'Use o login e a senha fornecidas pela sua empresa.'}
           </p>
-          <label htmlFor="login-identifier">Matrícula</label>
+          <label htmlFor="login-identifier">Login</label>
           <input
             autoComplete="username"
             id="login-identifier"
@@ -502,6 +516,14 @@ function ProtectedPortal({
   const [error, setError] = useState('');
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null);
+  // what the company can do (its plan is never shown): the menu offers only what is available
+  const [capabilities, setCapabilities] = useState<CompanyCapabilities | null>(null);
+  useEffect(() => {
+    if (!session || !(hasAdminRole(session) || (session.roles.includes('PlatformOperator') && getCompanyAdministrationId() !== null))) return;
+    let current = true;
+    getCompanyCapabilities().then(result => { if (current) setCapabilities(result); }).catch(() => undefined);
+    return () => { current = false; };
+  }, [session]);
 
   if (!session) {
     return <Navigate to="/login" replace />;
@@ -512,7 +534,9 @@ function ProtectedPortal({
     !hasAdminRole(session) &&
     !session.roles.includes('PlatformOperator');
   const isPlatformOperator = session.roles.includes('PlatformOperator');
-  const isPlatformCompanyContext = isPlatformOperator && getCompanyAdministrationId() !== null;
+  const companyWorkspaceId = /^\/platform\/companies\/([^/]+)/.exec(location.pathname)?.[1] ?? null;
+  // inside the company workspace the operator keeps the workspace menu, even though the company is set for the calls to its admin routes
+  const isPlatformCompanyContext = isCompanyPanelMode(isPlatformOperator, location.pathname, getCompanyAdministrationId());
 
   async function handleSignOut() {
     setError('');
@@ -534,30 +558,10 @@ function ProtectedPortal({
 
   return (
     <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${isPlatformCompanyContext ? ' portal-layout-company-context' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
-      {!isLearnerOnly && <header className="portal-header">
-        <Link
-          aria-label={`${tenant.tenantName} - início`}
-          className="brand-link"
-          to={getLandingPage(session)}
-        >
-          <TenantIdentity tenant={tenant} compact />
-        </Link>
-        <div className="header-actions">
-          <span className="user-name">{session.displayName}</span>
-          <button
-            className="button button-quiet"
-            disabled={isSigningOut}
-            onClick={handleSignOut}
-            type="button"
-          >
-            {isSigningOut ? 'Saindo...' : 'Sair'}
-          </button>
-        </div>
-      </header>}
       {!isLearnerOnly && isPlatformCompanyContext && (
         <aside aria-label="Modo de administração da empresa" className="company-context-banner" role="status">
           <span>
-            <strong>MODO DONO · Administrando {tenant.tenantName}</strong>
+            <strong>Modo operador · Administrando {tenant.tenantName}</strong>
             <span> · Você está agindo em nome desta empresa.</span>
           </span>
           <a className="button button-secondary company-context-return" href="/platform" onClick={handleReturnToPlatform}>
@@ -624,7 +628,7 @@ function ProtectedPortal({
                 </svg>
                 <div>
                   <strong>{learningSummary.percentage}% concluído</strong>
-                  <span>{learningSummary.completed} de {learningSummary.total} cursos</span>
+                  <span>{learningSummary.completed} de {learningSummary.total} dias</span>
                 </div>
               </div>
             )}
@@ -639,6 +643,13 @@ function ProtectedPortal({
           </aside>
         )}
         {!isLearnerOnly && <aside aria-label="Navegação principal" className="sidebar">
+          <Link
+            aria-label={`${tenant.tenantName} - início`}
+            className="brand-link sidebar-brand"
+            to={getLandingPage(session)}
+          >
+            <TenantIdentity tenant={tenant} compact />
+          </Link>
           {session.roles.includes('Participant') && !isPlatformCompanyContext && (
             <>
               <p className="sidebar-label">APRENDIZAGEM</p>
@@ -652,25 +663,34 @@ function ProtectedPortal({
               <p className="sidebar-label">GESTÃO DA EMPRESA</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
               {hasAdminRole(session) && <>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">Programação</NavLink>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/content">Trilhas e vídeos</NavLink>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">SIPATs</NavLink>
+                {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
               </>}
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
-                {hasAdminRole(session) ? 'Participantes e trilhas' : 'Acompanhamento'}
+                {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}
               </NavLink>
             </>
           )}
-          {isPlatformOperator && !isPlatformCompanyContext && (
+          {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}
+          {isPlatformOperator && !isPlatformCompanyContext && !companyWorkspaceId && (
             <>
               <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/dashboard">Visão geral</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/users">Usuários</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Cursos</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Biblioteca</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
             </>
           )}
+          <div className="sidebar-account">
+            <span className="user-name">{session.displayName}</span>
+            <button
+              className="sidebar-signout"
+              disabled={isSigningOut}
+              onClick={handleSignOut}
+              type="button"
+            >
+              {isSigningOut ? 'Saindo...' : 'Sair'}
+            </button>
+          </div>
           <div className="sidebar-footer">
             <span className="tenant-indicator" />
             <span>{tenant.tenantKey === 'platform' ? 'Operação SIPAT Online' : 'Portal da empresa'}</span>

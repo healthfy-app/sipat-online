@@ -129,6 +129,26 @@ public static class SipatEventEndpoints
         })
         .WithName("CancelSipatEvent");
 
+        group.MapPost("/{sipatEventId:guid}/reactivate", async (
+            Guid sipatEventId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatEventApplicationService sipatEventService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await sipatEventService.ReactivateAsync(sipatEventId, cancellationToken);
+            return result.IsSuccess
+                ? Results.Ok(ToResponse(result.Value))
+                : ToProblem(result.Error);
+        })
+        .WithName("ReactivateSipatEvent");
+
         return endpoints;
     }
 
@@ -149,7 +169,7 @@ public static class SipatEventEndpoints
         {
             "sipat.forbidden" => StatusCodes.Status403Forbidden,
             "sipat.not_found" => StatusCodes.Status404NotFound,
-            "sipat.publish.invalid_state" or "sipat.cancelled" => StatusCodes.Status409Conflict,
+            "sipat.publish.invalid_state" or "sipat.reactivate.invalid_state" or "sipat.cancelled" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 

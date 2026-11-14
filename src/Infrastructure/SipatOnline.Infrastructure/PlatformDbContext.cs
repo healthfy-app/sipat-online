@@ -31,11 +31,20 @@ public sealed class PlatformDbContext(
 
     public DbSet<PlatformCourseEntity> PlatformCourses => Set<PlatformCourseEntity>();
 
+    public DbSet<CourseCategoryEntity> CourseCategories => Set<CourseCategoryEntity>();
+
     public DbSet<PlatformCourseVideoEntity> PlatformCourseVideos => Set<PlatformCourseVideoEntity>();
 
     public DbSet<PlatformCourseVideoLinkEntity> PlatformCourseVideoLinks => Set<PlatformCourseVideoLinkEntity>();
+
+    public DbSet<PlatformCourseLessonEntity> PlatformCourseLessons => Set<PlatformCourseLessonEntity>();
     public DbSet<PlatformCourseCoverEntity> PlatformCourseCovers => Set<PlatformCourseCoverEntity>();
     public DbSet<GameModuleEntity> GameModules => Set<GameModuleEntity>();
+    public DbSet<SipatProgramEntity> SipatPrograms => Set<SipatProgramEntity>();
+
+    public DbSet<SipatPlanEntity> SipatPlans => Set<SipatPlanEntity>();
+
+    public DbSet<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity> PlanSubjectExclusions => Set<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity>();
     public DbSet<PlatformCourseModuleLinkEntity> PlatformCourseModuleLinks => Set<PlatformCourseModuleLinkEntity>();
     public DbSet<PlatformVideoCheckpointEntity> PlatformVideoCheckpoints => Set<PlatformVideoCheckpointEntity>();
     public DbSet<LearningContentSnapshotEntity> LearningContentSnapshots => Set<LearningContentSnapshotEntity>();

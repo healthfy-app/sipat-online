@@ -30,9 +30,11 @@ public static class InfrastructureServiceCollectionExtensions
     {
         services.AddOptions<TenantRuntimeOptions>()
             .Bind(configuration.GetSection(TenantRuntimeOptions.SectionName))
-            .Validate(options => options.Id != Guid.Empty, "A valid tenant ID must be configured.")
-            .Validate(options => TenantKey.Create(options.Key).IsSuccess, "A valid tenant key must be configured.")
-            .Validate(options => !string.IsNullOrWhiteSpace(options.Name), "A tenant name must be configured.")
+            // the first company is optional (a production that starts empty has none): its ID, key and name come together or not at all
+            .Validate(
+                options => (options.Id == Guid.Empty && string.IsNullOrWhiteSpace(options.Key) && string.IsNullOrWhiteSpace(options.Name)) ||
+                           (options.Id != Guid.Empty && TenantKey.Create(options.Key).IsSuccess && !string.IsNullOrWhiteSpace(options.Name)),
+                "The first tenant ID, key and name must be configured together (or all left out).")
             .Validate(
                 options => !string.IsNullOrWhiteSpace(options.BaseDomain) &&
                            Uri.CheckHostName(options.BaseDomain.Trim().TrimEnd('.')) == UriHostNameType.Dns,
@@ -119,11 +121,13 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddIdentity<PlatformIdentityUser, IdentityRole<Guid>>(options =>
             {
                 options.User.RequireUniqueEmail = false;
-                options.Password.RequiredLength = 12;
-                options.Password.RequireDigit = true;
-                options.Password.RequireLowercase = true;
-                options.Password.RequireUppercase = true;
+                // Senhas compartilhadas com operadores: a única regra é ter ao menos 6 caracteres.
+                options.Password.RequiredLength = 6;
+                options.Password.RequireDigit = false;
+                options.Password.RequireLowercase = false;
+                options.Password.RequireUppercase = false;
                 options.Password.RequireNonAlphanumeric = false;
+                options.Password.RequiredUniqueChars = 1;
                 options.Lockout.AllowedForNewUsers = true;
                 options.Lockout.MaxFailedAccessAttempts = 5;
                 options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
@@ -189,6 +193,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ILearningEngagementStore, EfLearningEngagementStore>();
         services.AddScoped<LearningEngagementService>();
         services.AddScoped<LearningDistributionService>();
+        services.AddScoped<SipatPlanService>();
+        services.AddScoped<SipatOnline.Infrastructure.Identity.EmployeeCredentialService>();
+        services.AddScoped<SipatOnline.Infrastructure.Tenancy.TenantPlanService>();
         services.AddSingleton<ICertificatePdfRenderer, CertificatePdfRenderer>();
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<PlatformCourseCatalogService>();
@@ -204,6 +211,8 @@ public static class InfrastructureServiceCollectionExtensions
                 provider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
         services.AddScoped<IGameModuleStore, EfGameModuleStore>();
         services.AddScoped<GameModuleService>();
+        services.AddScoped<ISipatProgramStore, EfSipatProgramStore>();
+        services.AddScoped<SipatProgramService>();
         services.AddScoped<DevelopmentLearningSampleInitializer>();
         services.AddScoped<DevelopmentDemoPresentationInitializer>();
         services.AddScoped<DevelopmentEngagementInitializer>();

@@ -17,7 +17,12 @@ export function colorContrast(first: string, second: string): number {
   return (Math.max(left, right) + 0.05) / (Math.min(left, right) + 0.05);
 }
 
-export function tenantTheme(primary: string, secondary: string): CSSProperties {
+/** Cor padrão do backend para empresas que não escolheram uma; no front vira o verde da marca SIPAT. */
+const backendDefaultPrimary = /^#1f2937$/i;
+export const sipatPrimary = '#14694B';
+
+export function tenantTheme(chosenPrimary: string, secondary: string): CSSProperties {
+  const primary = backendDefaultPrimary.test(chosenPrimary) ? sipatPrimary : chosenPrimary;
   let accent = primary;
   while (colorContrast(accent, '#FFFFFF') < 4.5) {
     accent = `#${[1, 3, 5].map(index => Math.floor(parseInt(accent.slice(index, index + 2), 16) * 0.85)

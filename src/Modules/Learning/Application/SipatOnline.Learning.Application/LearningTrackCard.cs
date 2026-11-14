@@ -9,7 +9,16 @@ public sealed record LearningTrackCard(
     int LessonCount,
     int CompletedLessonCount,
     int ProgressPercentage,
-    string? CoverUrl = null);
+    string? CoverUrl = null,
+    string? DayTitle = null,
+    int? DayPosition = null,
+    int? CoursePosition = null,
+    DateOnly? DayDate = null,
+    long DurationMilliseconds = 0,
+    string? SipatTitle = null,
+    DateTimeOffset? SipatStartsAt = null,
+    string? SipatStatus = null,
+    DateTimeOffset? SipatEndsAt = null);
 
 public sealed record LearningLessonProgress(
     Guid Id,
@@ -20,7 +29,9 @@ public sealed record LearningLessonProgress(
     long LastPlaybackPositionMilliseconds,
     int WatchedPercentage,
     bool IsCompleted,
-    DateTimeOffset? CompletedAt);
+    DateTimeOffset? CompletedAt,
+    string? SectionTitle = null,
+    long WatchedMilliseconds = 0);
 
 public sealed record LearningExperience(
     LearningTrackCard Track,
@@ -39,3 +50,9 @@ public sealed record LearningLessonContext(
     Guid LessonId,
     string ProviderAssetReference,
     long DurationMilliseconds);
+
+public sealed record LearningParticipantReport(
+    Guid ParticipantId,
+    string LoginIdentifier,
+    string DisplayName,
+    IReadOnlyList<LearningExperience> Tracks);

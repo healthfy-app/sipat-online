@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application.Catalog;
 
@@ -100,6 +101,42 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("UpdatePlatformCourse");
 
+        catalog.MapDelete("/courses/{courseId:guid}", async (
+            Guid courseId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformCourseCatalogService courseService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await courseService.DeleteCourseAsync(courseId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("DeletePlatformCourse");
+
+        catalog.MapDelete("/videos/{videoId:guid}", async (
+            Guid videoId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformCourseCatalogService courseService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await courseService.DeleteVideoAsync(videoId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("DeletePlatformVideo");
+
         catalog.MapPost("/courses/{courseId:guid}/duplicate", async (
             Guid courseId,
             HttpContext context,
@@ -140,6 +177,32 @@ public static class PlatformCourseCatalogEndpoints
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
         })
         .WithName("SetPlatformCourseVideos");
+
+        catalog.MapPut("/courses/{courseId:guid}/structure", async (
+            Guid courseId,
+            SetPlatformCourseStructureRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var lessons = request.Lessons?
+                .Select(item => new CourseLessonDraft(
+                    item.Id,
+                    item.Title ?? string.Empty,
+                    item.Description,
+                    (item.Videos ?? []).Select(video => new CourseLessonVideoDraft(video.VideoId, video.Title)).ToArray()))
+                .ToArray();
+            var result = await catalogService.SetStructureAsync(courseId, lessons, cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("SetPlatformCourseStructure");
 
         catalog.MapPut("/courses/{courseId:guid}/cover", async (
             Guid courseId,
@@ -345,6 +408,72 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("DeleteGameModule");
 
+        catalog.MapGet("/programs", async (
+            SipatProgramService programService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await programService.ListAsync(cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value.Select(ToProgramResponse).ToArray()) : ToProblem(result.Error);
+        })
+        .WithName("ListSipatPrograms");
+
+        catalog.MapPost("/programs", async (
+            SaveProgramRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatProgramService programService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await programService.CreateAsync(request.Title, ToProgramDays(request.Days), cancellationToken);
+            return result.IsSuccess
+                ? Results.Created($"/api/platform/catalog/programs/{result.Value.Id:D}", ToProgramResponse(result.Value))
+                : ToProblem(result.Error);
+        })
+        .WithName("CreateSipatProgram");
+
+        catalog.MapPut("/programs/{programId:guid}", async (
+            Guid programId,
+            SaveProgramRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatProgramService programService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await programService.UpdateAsync(programId, request.Title, ToProgramDays(request.Days), cancellationToken);
+            return result.IsSuccess ? Results.Ok(ToProgramResponse(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("UpdateSipatProgram");
+
+        catalog.MapDelete("/programs/{programId:guid}", async (
+            Guid programId,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatProgramService programService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await programService.DeleteAsync(programId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("DeleteSipatProgram");
+
         catalog.MapPut("/courses/{courseId:guid}/modules", async (
             Guid courseId,
             SetCourseModulesRequest request,
@@ -388,6 +517,114 @@ public static class PlatformCourseCatalogEndpoints
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
         })
         .WithName("SetVideoCheckpoints");
+        return endpoints;
+    }
+
+    /// <summary>Which assuntos each plan can use, for the operator: everything is available unless taken out.</summary>
+    public static IEndpointRouteBuilder MapPlanSubjectEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/platform/catalog/plan-subjects")
+            .WithTags("Plan subjects")
+            .RequireAuthorization("ManagePlatform");
+
+        group.MapGet("/", async (
+            IPlatformCourseCatalogStore courses,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
+            CancellationToken cancellationToken) =>
+        {
+            var published = (await courses.ListAsync(cancellationToken))
+                .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
+                .Select(course => new PlanSubjectCourse(course.Id, course.Title, course.Description, course.Videos.Count, course.CategoryId))
+                .ToArray();
+            var excluded = new Dictionary<string, IReadOnlyList<Guid>>();
+            foreach (var plan in Enum.GetValues<SipatOnline.Infrastructure.Tenancy.CompanyPlan>())
+            {
+                excluded[plan.ToString()] = (await plans.ExcludedSubjectsAsync(plan, cancellationToken)).ToArray();
+            }
+
+            return Results.Ok(new PlanSubjectsResponse(published, excluded));
+        })
+        .WithName("GetPlanSubjects");
+
+        group.MapPut("/{plan}", async (
+            string plan,
+            SetPlanSubjectsRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            if (!SipatOnline.Infrastructure.Tenancy.CompanyPlans.TryParse(plan, out var parsed))
+            {
+                return Results.Problem(statusCode: 400, title: "tenant.plan.invalid", detail: "Escolha um plano válido: Bronze, Prata, Ouro ou Diamante.");
+            }
+
+            var result = await plans.SetExcludedSubjectsAsync(parsed, request.ExcludedCourseIds ?? [], cancellationToken);
+            return result.IsSuccess
+                ? Results.NoContent()
+                : Results.Problem(statusCode: 403, title: result.Error.Code, detail: result.Error.Message);
+        })
+        .WithName("SetPlanSubjects");
+
+        return endpoints;
+    }
+
+    /// <summary>The catalog as the company's administrator sees it: what a day of a SIPAT can be made of, read only.</summary>
+    public static IEndpointRouteBuilder MapSipatCatalogEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        var group = endpoints.MapGroup("/api/admin/sipat-catalog")
+            .WithTags("SIPAT catalog")
+            .RequireAuthorization("ManageTenantSipats");
+
+        group.MapGet("/", async (
+            IPlatformCourseCatalogStore courses,
+            IGameModuleStore modules,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
+            SipatOnline.Infrastructure.PlatformDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            var capabilities = await plans.CapabilitiesAsync(cancellationToken);
+            var excluded = await plans.ExcludedSubjectsAsync(await plans.CurrentAsync(cancellationToken), cancellationToken);
+            var themes = (await courses.ListAsync(cancellationToken))
+                .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
+                .Where(course => !excluded.Contains(course.Id))
+                .Select(course => ToResponse(course) with
+                {
+                    CoverUrl = course.CoverContentType is null
+                        ? null
+                        : $"/api/admin/sipat-catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}"
+                })
+                .ToArray();
+            var offered = themes.SelectMany(theme => theme.Videos.Select(video => video.Id)).ToHashSet();
+            var videos = (await courses.ListVideosAsync(cancellationToken))
+                .Where(item => offered.Contains(item.Video.Id))
+                .Select(item => new PlatformLibraryVideoResponse(ToResponse(item.Video), item.CourseCount))
+                .ToArray();
+            var games = capabilities.Quizzes
+                ? (await modules.ListAsync(cancellationToken)).Select(item => ToResponse(item.Module, item.UsageCount)).ToArray()
+                : [];
+            var categories = await db.CourseCategories.AsNoTracking().OrderBy(item => item.Position).ThenBy(item => item.Name)
+                .Select(item => new CourseCategoryResponse(item.Id, item.Name, 0)).ToArrayAsync(cancellationToken);
+            return Results.Ok(new SipatCatalogResponse(themes, videos, games, categories));
+        })
+        .WithName("GetSipatCatalog");
+
+        group.MapGet("/courses/{courseId:guid}/cover", async (
+            Guid courseId,
+            IPlatformCourseCatalogStore courses,
+            CancellationToken cancellationToken) =>
+        {
+            var cover = await courses.GetCoverAsync(courseId, cancellationToken);
+            return cover is null ? Results.NotFound() : Results.File(cover.Data, cover.ContentType);
+        })
+        .WithName("GetSipatCatalogCover");
+
         return endpoints;
     }
 
@@ -453,7 +690,11 @@ public static class PlatformCourseCatalogEndpoints
             course.Modules.Select(item => new CourseModulePlacementDto(item.ModuleId, item.AfterVideoCount)).ToArray(),
             course.CoverContentType is null
                 ? null
-                : $"/api/platform/catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}");
+                : $"/api/platform/catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}",
+            (course.Lessons ?? [])
+                .Select(lesson => new PlatformCourseLessonDto(lesson.Id, lesson.Title, lesson.Description, lesson.VideoIds))
+                .ToArray(),
+            course.CategoryId);
 
     private static PlatformCourseVideoResponse ToResponse(PlatformCourseVideo video) =>
         new(
@@ -464,7 +705,9 @@ public static class PlatformCourseCatalogEndpoints
             video.DurationMilliseconds,
             video.CreatedAt,
             $"/api/platform/catalog/videos/{video.Id:D}/file",
-            video.Checkpoints.Select(item => new VideoCheckpointDto(item.TimeMilliseconds, item.ModuleId)).ToArray());
+            video.Checkpoints.Select(item => new VideoCheckpointDto(item.TimeMilliseconds, item.ModuleId)).ToArray(),
+            video.LessonId,
+            video.LibraryTitle);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -475,6 +718,12 @@ public static class PlatformCourseCatalogEndpoints
 
     private static IReadOnlyList<GameQuestion>? ToQuestions(IReadOnlyList<GameQuestionDto>? questions) =>
         questions?.Select(item => new GameQuestion(item.Text ?? string.Empty, item.Options ?? [], item.CorrectIndex)).ToArray();
+
+    private static ProgramResponse ToProgramResponse(SipatProgram program) =>
+        new(program.Id, program.Title, program.Days.Select(day => new ProgramDayDto(day.Id, day.Title, day.Date, day.Subject, day.VideoIds, day.GameIds)).ToArray(), program.CreatedAt);
+
+    private static IReadOnlyList<ProgramDay>? ToProgramDays(IReadOnlyList<ProgramDayDto>? days) =>
+        days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, day.Date, day.Subject, day.VideoIds ?? [], day.GameIds ?? [])).ToArray();
 
     private static GameModuleResponse ToResponse(GameModule module, int usageCount) =>
         new(
@@ -493,11 +742,15 @@ public static class PlatformCourseCatalogEndpoints
             "learning.platform_course.forbidden" => StatusCodes.Status403Forbidden,
             "learning.platform_course.not_found" or
                 "learning.game_module.not_found" or
+                "learning.program.not_found" or
+                "learning.program.video_not_found" or
+                "learning.program.game_not_found" or
                 "learning.platform_course.cover_not_found" or
                 "learning.platform_course.video_not_found" => StatusCodes.Status404NotFound,
             "learning.platform_course.storage_unconfigured" or
                 "learning.platform_course.video_file_missing" => StatusCodes.Status503ServiceUnavailable,
             "learning.platform_course.actor_required" => StatusCodes.Status400BadRequest,
+            "learning.platform_course.video_in_use" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 
@@ -542,6 +795,18 @@ public sealed record SetPlatformCourseVideosRequest(IReadOnlyList<Guid>? VideoId
 
 public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Video, int CourseCount);
 
+public sealed record PlanSubjectsResponse(IReadOnlyList<PlanSubjectCourse> Courses, IReadOnlyDictionary<string, IReadOnlyList<Guid>> Excluded);
+
+public sealed record PlanSubjectCourse(Guid Id, string Title, string? Description, int VideoCount, Guid? CategoryId = null);
+
+public sealed record SetPlanSubjectsRequest(IReadOnlyList<Guid>? ExcludedCourseIds);
+
+public sealed record SipatCatalogResponse(
+    IReadOnlyList<PlatformCourseResponse> Courses,
+    IReadOnlyList<PlatformLibraryVideoResponse> Videos,
+    IReadOnlyList<GameModuleResponse> Games,
+    IReadOnlyList<CourseCategoryResponse>? Categories = null);
+
 public sealed record PlatformCourseResponse(
     Guid Id,
     string Title,
@@ -552,7 +817,17 @@ public sealed record PlatformCourseResponse(
     IReadOnlyList<PlatformCourseVideoResponse> Videos,
     string GameType,
     IReadOnlyList<CourseModulePlacementDto> Modules,
-    string? CoverUrl);
+    string? CoverUrl,
+    IReadOnlyList<PlatformCourseLessonDto>? Lessons = null,
+    Guid? CategoryId = null);
+
+public sealed record PlatformCourseLessonDto(Guid Id, string Title, string? Description, IReadOnlyList<Guid> VideoIds);
+
+public sealed record SetPlatformCourseStructureRequest(IReadOnlyList<CourseLessonRequest>? Lessons);
+
+public sealed record CourseLessonRequest(Guid? Id, string? Title, string? Description, IReadOnlyList<CourseLessonVideoRequest>? Videos);
+
+public sealed record CourseLessonVideoRequest(Guid VideoId, string? Title);
 
 public sealed record CourseModulePlacementDto(Guid ModuleId, int AfterVideoCount);
 
@@ -575,6 +850,18 @@ public sealed record GameModuleResponse(
     int UsageCount,
     GameContent? Content = null);
 
+public sealed record ProgramDayDto(
+    Guid? Id,
+    string? Title,
+    DateOnly? Date,
+    string? Subject,
+    IReadOnlyList<Guid>? VideoIds,
+    IReadOnlyList<Guid>? GameIds);
+
+public sealed record SaveProgramRequest(string? Title, IReadOnlyList<ProgramDayDto>? Days);
+
+public sealed record ProgramResponse(Guid Id, string Title, IReadOnlyList<ProgramDayDto> Days, DateTimeOffset CreatedAt);
+
 public sealed record SetCourseModulesRequest(IReadOnlyList<CourseModulePlacementDto>? Items);
 
 public sealed record SetVideoCheckpointsRequest(IReadOnlyList<VideoCheckpointDto>? Items);
@@ -587,4 +874,8 @@ public sealed record PlatformCourseVideoResponse(
     long DurationMilliseconds,
     DateTimeOffset CreatedAt,
     string FileUrl,
-    IReadOnlyList<VideoCheckpointDto> Checkpoints);
+    IReadOnlyList<VideoCheckpointDto> Checkpoints,
+    Guid? LessonId = null,
+    string? LibraryTitle = null);
+
+public sealed record CourseCategoryResponse(Guid Id, string Name, int CourseCount);

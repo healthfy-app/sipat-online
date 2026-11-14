@@ -1,0 +1,151 @@
+/*
+ * Base do design system (shadcn/ui + Tailwind v4).
+ *
+ * Importa só o tema e os utilitários do Tailwind, sem o reset global (preflight):
+ * as telas que ainda usam o CSS antigo continuam exatamente iguais. Os utilitários
+ * ficam fora de @layer de propósito, para vencer as regras globais de elemento
+ * (button, input, h1...) que o CSS antigo ainda declara.
+ *
+ * As cores vêm dos tokens da marca SIPAT já definidos em styles.css (e da cor da
+ * empresa, quando o tema da empresa os sobrescreve).
+ */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: 'Geist', system-ui, sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+
+  --color-background: var(--canvas, #f3f5f4);
+  --color-foreground: var(--ink, #0e2a22);
+  --color-card: var(--surface, #fff);
+  --color-card-foreground: var(--ink, #0e2a22);
+  --color-popover: var(--surface, #fff);
+  --color-popover-foreground: var(--ink, #0e2a22);
+  --color-primary: var(--brand-primary, #14694b);
+  --color-primary-foreground: #fff;
+  --color-secondary: var(--surface-soft, #f3f5f4);
+  --color-secondary-foreground: var(--ink, #0e2a22);
+  --color-muted: var(--surface-soft, #f3f5f4);
+  --color-muted-foreground: var(--muted, #52635b);
+  --color-accent: var(--green-soft, #e9f3ee);
+  --color-accent-foreground: var(--brand-primary, #14694b);
+  --color-destructive: var(--danger, #b3261e);
+  --color-destructive-soft: var(--danger-soft, #fff6f4);
+  --color-success: #14683a;
+  --color-success-soft: #e2f1e7;
+  --color-warning: var(--signal-ink, #705300);
+  --color-warning-soft: var(--signal-soft, #fff5d9);
+  --color-signal: #ffd166;
+  --color-border: var(--line, #d5dbd8);
+  --color-input: var(--line-strong, #b7c9be);
+  --color-ring: var(--brand-primary, #14694b);
+
+  --radius-sm: 0.375rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+
+  --shadow-card: 0 1px 2px rgb(14 42 34 / 6%), 0 4px 14px -6px rgb(14 42 34 / 12%);
+  --shadow-card-hover: 0 2px 4px rgb(14 42 34 / 6%), 0 14px 28px -12px rgb(14 42 34 / 22%);
+  --shadow-panel: 0 2px 8px -2px rgb(14 42 34 / 18%);
+  --shadow-overlay: 0 24px 64px -16px rgb(14 42 34 / 35%);
+
+  --ease-out-soft: cubic-bezier(0.16, 1, 0.3, 1);
+
+  --animate-overlay-in: overlay-in 160ms ease-out;
+  --animate-dialog-in: dialog-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+
+  @keyframes overlay-in { from { opacity: 0; } }
+  @keyframes dialog-in { from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); } }
+  @keyframes sheet-in { from { transform: translateX(100%); } }
+}
+
+/* seta do select nativo do design system */
+select[data-slot="select"] {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 16 16'%3E%3Cpath stroke='%2352635b' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m4 6 4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right 0.625rem center;
+  background-repeat: no-repeat;
+  background-size: 1rem;
+}
+
+/* diálogos, menus e painéis renderizam fora do layout: levam a fonte do design system */
+[data-slot="dialog"], [data-slot="dropdown-menu"], [data-slot="sheet"] { font-family: var(--font-sans); }
+
+/* ---------- Ponte para as telas de gestão ainda não reescritas ----------
+ * As classes antigas (.button, .field, .form-card...) ganham as medidas e cores do design
+ * system, para todas as telas de gestão terem a mesma cara. A área do participante
+ * (.portal-layout-learner) e seus diálogos ficam de fora: continuam idênticos.
+ */
+:is(.portal-layout:not(.portal-layout-learner), body:not(:has(.portal-layout-learner)) .course-dialog-backdrop) {
+  & .button {
+    min-height: 2.25rem;
+    padding: 0.375rem 0.875rem;
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.2;
+    transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, transform 120ms ease;
+  }
+  & .button:not(:disabled):active { transform: scale(0.97); }
+  & .button-primary { border-color: var(--brand-primary); color: #fff; background: var(--brand-primary); }
+  & .button-primary:hover:not(:disabled) { filter: none; background: color-mix(in srgb, var(--brand-primary) 90%, #000); }
+  & .button-secondary { border-color: var(--line); color: var(--ink); background: var(--surface); }
+  & .button-secondary:hover:not(:disabled) { border-color: color-mix(in srgb, var(--brand-primary) 25%, var(--line)); background: var(--green-soft); color: var(--brand-primary); }
+  & .button-quiet { color: var(--muted); }
+  & .button-quiet:hover:not(:disabled) { border-color: transparent; background: var(--green-soft); color: var(--brand-primary); }
+  & .button:focus-visible { outline: 2px solid var(--brand-primary); outline-offset: 2px; }
+
+  & .field { gap: 0.375rem; }
+  & .field label { margin: 0; color: var(--ink); font-size: 0.8125rem; font-weight: 600; }
+  & .field :is(input, select, textarea) {
+    border: 1px solid var(--line);
+    border-radius: 0.5rem;
+    font-size: 0.875rem;
+  }
+  & .field :is(input, select) { min-height: 2.25rem; padding: 0 0.75rem; }
+  & .field textarea { padding: 0.5rem 0.75rem; }
+  & .field :is(input, select, textarea):focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand-primary) 15%, transparent);
+  }
+  & .field-hint { font-size: 0.75rem; }
+
+  & :is(.form-card, .list-section) {
+    border: 0;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 2px rgb(14 42 34 / 6%), 0 4px 14px -6px rgb(14 42 34 / 12%);
+  }
+}
+
+/* ---------- Editor de cursos em tela cheia ---------- */
+
+html:has([data-course-editor]) { overflow: hidden; }
+
+/* o que fica atrás do editor não deve ser alcançado pelo teclado */
+.portal-layout.portal-layout-course-editor > .portal-header,
+.portal-layout.portal-layout-course-editor .sidebar { display: none; }
+
+/* o aviso de sucesso vira um toast enquanto o editor está aberto */
+.course-workspace:has([data-course-editor]) > .success-message {
+  position: fixed;
+  bottom: 1.25rem;
+  left: 50%;
+  z-index: 30;
+  max-width: min(32rem, calc(100% - 2rem));
+  margin: 0;
+  padding: 0.625rem 1rem;
+  border: 0;
+  border-radius: 0.5rem;
+  color: #fff;
+  background: var(--ink, #0e2a22);
+  box-shadow: 0 12px 28px -12px rgb(14 42 34 / 50%);
+  font-size: 0.875rem;
+  transform: translateX(-50%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-slot] { animation: none !important; transition: none !important; }
+}

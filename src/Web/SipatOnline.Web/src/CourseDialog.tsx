@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 import './PlatformCourses.css';
 import { BrandThemeContext } from './branding';
 
-export default function CourseDialog({ title, onClose, children, wide = false, busy = false, drawer = false }: {
-  title: string; onClose: () => void; children: ReactNode; wide?: boolean; busy?: boolean; drawer?: boolean;
+export default function CourseDialog({ title, onClose, children, wide = false, busy = false, drawer = false, className = '' }: {
+  title: string; onClose: () => void; children: ReactNode; wide?: boolean; busy?: boolean; drawer?: boolean; className?: string;
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const titleId = useId();
@@ -31,7 +31,7 @@ export default function CourseDialog({ title, onClose, children, wide = false, b
   return createPortal(<div className={`course-dialog-backdrop${drawer ? ' course-dialog-backdrop-drawer' : ''}`} style={theme} onClick={event => {
     if (event.target === event.currentTarget && !busy) onClose();
   }}>
-    <div aria-labelledby={titleId} aria-modal="true" className={`course-dialog${wide ? ' course-dialog-wide' : ''}${drawer ? ' course-dialog-drawer' : ''}`}
+    <div aria-labelledby={titleId} aria-modal="true" className={`course-dialog${wide ? ' course-dialog-wide' : ''}${drawer ? ' course-dialog-drawer' : ''}${className ? ` ${className}` : ''}`}
       onKeyDown={event => {
         if (event.key === 'Escape') { event.stopPropagation(); if (!busy) onClose(); }
         if (event.key !== 'Tab') return;

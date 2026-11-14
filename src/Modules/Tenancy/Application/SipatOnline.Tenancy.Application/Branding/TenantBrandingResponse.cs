@@ -6,4 +6,5 @@ public sealed record TenantBrandingResponse(
     string? LogoReference,
     string PrimaryColor,
     string SecondaryColor,
-    string? CustomDomain);
+    string? CustomDomain,
+    string? BannerReference = null);

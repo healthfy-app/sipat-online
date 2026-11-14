@@ -14,6 +14,7 @@ public sealed class LearningTrackEntityConfiguration : IEntityTypeConfiguration<
         builder.Property(track => track.SipatEventId).IsRequired();
         builder.Property(track => track.Title).HasMaxLength(200).IsRequired();
         builder.Property(track => track.Description).HasMaxLength(2000);
+        builder.Property(track => track.DayTitle).HasMaxLength(120);
         builder.Property(track => track.CreatedAt).IsRequired();
         builder.HasOne<SipatOnline.Infrastructure.Sipats.SipatEventEntity>()
             .WithMany()
@@ -64,6 +65,7 @@ public sealed class LearningLessonEntityConfiguration : IEntityTypeConfiguration
         builder.Property(lesson => lesson.Id).ValueGeneratedNever();
         builder.Property(lesson => lesson.Title).HasMaxLength(200).IsRequired();
         builder.Property(lesson => lesson.Description).HasMaxLength(2000);
+        builder.Property(lesson => lesson.SectionTitle).HasMaxLength(200);
         builder.Property(lesson => lesson.ProviderAssetReference).HasMaxLength(256).IsRequired();
         builder.HasOne<LearningTrackRevisionEntity>()
             .WithMany()

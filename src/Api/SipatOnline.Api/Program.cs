@@ -111,10 +111,14 @@ app.MapHealthChecks("/health");
 app.MapIdentityEndpoints();
 app.MapPlatformEndpoints();
 app.MapPlatformCourseCatalogEndpoints();
+app.MapCourseCategoryEndpoints();
 app.MapUserManagementEndpoints();
 app.MapTenantEndpoints();
 app.MapTenantAppearanceEndpoints();
 app.MapSipatEventEndpoints();
+app.MapSipatPlanEndpoints();
+app.MapSipatCatalogEndpoints();
+app.MapPlanSubjectEndpoints();
 app.MapLearningEndpoints();
 app.MapLearningEngagementEndpoints();
 

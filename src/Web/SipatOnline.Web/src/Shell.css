@@ -1,0 +1,55 @@
+/*
+ * The shell of the management screens (operator and company administrator), in the model of the learner area:
+ * no top bar. The side menu runs the full height — brand on top, sections in the middle, the user and "Sair" at the bottom.
+ * The company panel strip of the operator, when there is one, sits above everything.
+ */
+.portal-layout { --shell-top: 0rem; }
+.portal-layout-company-context { --shell-top: 2.75rem; }
+
+.portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .portal-body {
+  min-height: calc(100vh - var(--shell-top)); grid-template-columns: 232px minmax(0, 1fr);
+}
+.portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .portal-body .sidebar {
+  position: sticky; top: var(--shell-top); width: 232px; height: calc(100vh - var(--shell-top)); overflow-y: auto;
+  gap: 2px; padding: 1rem 0.75rem; border-right: 1px solid #dfe6e3; background: #fff;
+}
+.portal-layout:not(.portal-layout-learner) .sidebar-brand {
+  margin: 0 0 0.75rem; padding: 0.25rem 0.5rem 0.9rem; border-bottom: 1px solid #dfe6e3;
+}
+.portal-layout:not(.portal-layout-learner) .sidebar-brand .tenant-logo { max-width: 9rem; height: 2.25rem; }
+.portal-layout:not(.portal-layout-learner) .sidebar-brand .sipat-default-logo { width: 2.25rem; height: 2.25rem; }
+.portal-layout:not(.portal-layout-learner) .sidebar-brand .tenant-name { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; }
+
+.portal-layout:not(.portal-layout-learner) .sidebar-account {
+  display: grid; gap: 0.6rem; margin-top: auto; padding: 0.9rem 0.5rem 0.25rem; border-top: 1px solid #dfe6e3;
+}
+.portal-layout:not(.portal-layout-learner) .sidebar-account .user-name {
+  overflow: hidden; color: #12332c; font-size: 0.8125rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap;
+}
+.sidebar-signout {
+  min-height: 2.25rem; padding: 0 1rem; border: 1px solid #cdd7d3; border-radius: 999px; background: #fff; color: #12332c;
+  font-size: 0.875rem; font-weight: 700; cursor: pointer; transition: border-color 160ms ease;
+}
+.sidebar-signout:hover:not(:disabled) { border-color: #12332c; }
+.sidebar-signout:focus-visible { outline: 3px solid #ffd166; outline-offset: 2px; }
+.portal-layout:not(.portal-layout-learner) .sidebar-footer { margin-top: 0; padding: 0.4rem 0.5rem 0; }
+
+.company-context-banner {
+  position: sticky; top: 0; z-index: 20; min-height: 2.75rem; border: 0; border-radius: 0;
+}
+
+@media (max-width: 860px) {
+  .portal-layout-company-context { --shell-top: 4.5rem; }
+  .portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .portal-body { display: flex; flex-direction: column; }
+  .portal-layout:not(.portal-layout-learner):not(.portal-layout-course-editor) .portal-body .sidebar {
+    z-index: 10; width: 100%; height: auto; min-height: 3.25rem; flex-direction: row; align-items: center; gap: 0.25rem;
+    overflow-x: auto; overflow-y: hidden; padding: 0.5rem 0.75rem; border-right: 0; border-bottom: 1px solid #dfe6e3;
+  }
+  .portal-layout:not(.portal-layout-learner) .sidebar-brand { flex: 0 0 auto; margin: 0 0.5rem 0 0; padding: 0; border: 0; }
+  .portal-layout:not(.portal-layout-learner) .sidebar-brand .tenant-name { display: none; }
+  .portal-layout:not(.portal-layout-learner) .sidebar-account {
+    display: flex; align-items: center; flex: 0 0 auto; margin: 0 0 0 auto; padding: 0 0 0 0.5rem; border: 0;
+  }
+  .portal-layout:not(.portal-layout-learner) .sidebar-account .user-name { display: none; }
+  .sidebar-signout { min-height: 2.25rem; }
+}

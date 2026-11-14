@@ -2,7 +2,9 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.Extensions.Options;
 using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.BuildingBlocks.Domain;
+using Microsoft.EntityFrameworkCore;
 using SipatOnline.Infrastructure;
+using SipatOnline.Infrastructure.Tenancy;
 using SipatOnline.Tenancy.Application.Branding;
 using SipatOnline.Tenancy.Domain.Tenants;
 
@@ -20,6 +22,7 @@ public static class TenantEndpoints
             ITenantContext tenantContext,
             IOptions<TenantRuntimeOptions> tenantOptions,
             TenantBrandingService brandingService,
+            PlatformDbContext db,
             CancellationToken cancellationToken) =>
         {
             if (tenantOptions.Value.IsPlatformHost(context.Request.Host.Host) && tenantContext.CurrentTenantId is null)
@@ -35,9 +38,16 @@ public static class TenantEndpoints
             }
 
             var result = await brandingService.GetAsync(cancellationToken);
-            return result.IsSuccess
-                ? Results.Ok(result.Value)
-                : ToProblem(result.Error);
+            if (!result.IsSuccess) return ToProblem(result.Error);
+
+            // o banner de entrada fica fora do domínio: só informamos o endereço quando existe
+            var banner = await db.Tenants.AsNoTracking()
+                .Where(item => item.Key == result.Value.TenantKey && item.PortalBannerData != null)
+                .Select(item => new { item.Key, Length = item.PortalBannerData!.Length })
+                .SingleOrDefaultAsync(cancellationToken);
+            return Results.Ok(banner is null
+                ? result.Value
+                : result.Value with { BannerReference = TenantBannerReference.For(banner.Key, banner.Length) });
         })
         .AllowAnonymous()
         .WithName("GetTenantBranding");

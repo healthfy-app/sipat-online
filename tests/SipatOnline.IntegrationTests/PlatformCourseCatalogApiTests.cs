@@ -180,6 +180,114 @@ public sealed class PlatformCourseCatalogApiTests
         Assert.All(
             library.EnumerateArray(),
             item => Assert.Equal(2, item.GetProperty("courseCount").GetInt32()));
+
+        // a video that a theme still uses cannot be deleted; the theme can, and then the video is free
+        using var videoInUse = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/videos/{firstVideo}", (object?)null);
+        Assert.Equal(HttpStatusCode.Conflict, videoInUse.StatusCode);
+        Assert.Contains("em uso", await videoInUse.Content.ReadAsStringAsync());
+
+        using var deleteCopy = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/courses/{copyId}", (object?)null);
+        Assert.Equal(HttpStatusCode.NoContent, deleteCopy.StatusCode);
+        using var deleteCourse = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/courses/{courseId}", (object?)null);
+        Assert.Equal(HttpStatusCode.NoContent, deleteCourse.StatusCode);
+        using var courseAgain = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/courses/{courseId}", (object?)null);
+        Assert.Equal(HttpStatusCode.NotFound, courseAgain.StatusCode);
+
+        using var freeVideo = await SendAsync(client, HttpMethod.Delete, $"/api/platform/catalog/videos/{firstVideo}", (object?)null);
+        Assert.Equal(HttpStatusCode.NoContent, freeVideo.StatusCode);
+        using var libraryAfter = await client.GetAsync("https://ops.localhost/api/platform/catalog/videos");
+        Assert.Equal(secondVideo, Assert.Single((await ReadAsync(libraryAfter)).EnumerateArray()).GetProperty("video").GetProperty("id").GetGuid());
+    }
+
+    [DockerFact]
+    public async Task Course_GroupsVideosInLessons_WithCourseOnlyTitlesAndCopies()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+        }
+
+        using var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://integration-test.localhost"),
+            AllowAutoRedirect = false
+        });
+        using var login = await SendAsync(client, HttpMethod.Post, "/api/platform/identity/login",
+            new LoginRequest("platform-operator", "PlatformPassword123"));
+        Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
+        var a = await SeedVideoAsync(factory, "Abertura");
+        var b = await SeedVideoAsync(factory, "Postura");
+        var c = await SeedVideoAsync(factory, "Encerramento");
+
+        using var created = await SendAsync(client, HttpMethod.Post, "/api/platform/catalog/courses",
+            new CreatePlatformCourseRequest("Ergonomia", "Postura", false));
+        var courseId = (await ReadAsync(created)).GetProperty("id").GetGuid();
+
+        // vincular vídeos pelo modo antigo cria a "Aula 1" automaticamente
+        using var linked = await SendAsync(client, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/videos",
+            new SetPlatformCourseVideosRequest([a, b]));
+        var first = await ReadAsync(linked);
+        var lessons = first.GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Single(lessons);
+        Assert.Equal("Aula 1", lessons[0].GetProperty("title").GetString());
+        Assert.Equal(2, lessons[0].GetProperty("videoIds").GetArrayLength());
+
+        // estrutura: duas aulas, um vídeo movido, título só neste curso
+        var lessonId = lessons[0].GetProperty("id").GetGuid();
+        using var structure = await SendAsync(client, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/structure",
+            new SetPlatformCourseStructureRequest(
+            [
+                new CourseLessonRequest(lessonId, "Introdução", "Boas-vindas", [new CourseLessonVideoRequest(a, "Boas-vindas à ergonomia")]),
+                new CourseLessonRequest(null, "Prática", null, [new CourseLessonVideoRequest(b, null), new CourseLessonVideoRequest(c, null)])
+            ]));
+        Assert.Equal(HttpStatusCode.OK, structure.StatusCode);
+        var saved = await ReadAsync(structure);
+        var savedLessons = saved.GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Equal(["Introdução", "Prática"], savedLessons.Select(item => item.GetProperty("title").GetString()));
+        Assert.Equal(lessonId, savedLessons[0].GetProperty("id").GetGuid());
+        var videos = saved.GetProperty("videos").EnumerateArray().ToArray();
+        Assert.Equal(["Boas-vindas à ergonomia", "Postura", "Encerramento"], videos.Select(item => item.GetProperty("title").GetString()));
+        Assert.Equal("Abertura", videos[0].GetProperty("libraryTitle").GetString());
+        Assert.Equal(savedLessons[1].GetProperty("id").GetGuid(), videos[1].GetProperty("lessonId").GetGuid());
+
+        // o título da biblioteca continua o original
+        using (var library = await client.GetAsync($"https://{Host}/api/platform/catalog/videos"))
+        {
+            var titles = (await ReadAsync(library)).EnumerateArray().Select(item => item.GetProperty("video").GetProperty("title").GetString()).ToArray();
+            Assert.Contains("Abertura", titles);
+            Assert.DoesNotContain("Boas-vindas à ergonomia", titles);
+        }
+
+        // validações
+        foreach (var invalid in new SetPlatformCourseStructureRequest[]
+        {
+            new([new CourseLessonRequest(null, "  ", null, [])]),
+            new([new CourseLessonRequest(null, "A", null, [new CourseLessonVideoRequest(a, null)]), new CourseLessonRequest(null, "B", null, [new CourseLessonVideoRequest(a, null)])]),
+        })
+        {
+            using var rejected = await SendAsync(client, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/structure", invalid);
+            Assert.Equal(HttpStatusCode.BadRequest, rejected.StatusCode);
+        }
+        using (var unknownVideo = await SendAsync(client, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/structure",
+            new SetPlatformCourseStructureRequest([new CourseLessonRequest(null, "A", null, [new CourseLessonVideoRequest(Guid.NewGuid(), null)])])))
+            Assert.Equal(HttpStatusCode.NotFound, unknownVideo.StatusCode);
+
+        // um vídeo novo vinculado depois cai na última aula, e a cópia leva aulas e títulos
+        var d = await SeedVideoAsync(factory, "Extra");
+        using var extra = await SendAsync(client, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/videos",
+            new SetPlatformCourseVideosRequest([a, b, c, d]));
+        var withExtra = (await ReadAsync(extra)).GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Equal(1, withExtra[0].GetProperty("videoIds").GetArrayLength());
+        Assert.Equal(3, withExtra[1].GetProperty("videoIds").GetArrayLength());
+
+        using var copy = await SendAsync<object>(client, HttpMethod.Post, $"/api/platform/catalog/courses/{courseId}/duplicate", null);
+        var copied = await ReadAsync(copy);
+        Assert.Equal(["Introdução", "Prática"], copied.GetProperty("lessons").EnumerateArray().Select(item => item.GetProperty("title").GetString()));
+        Assert.Equal("Boas-vindas à ergonomia", copied.GetProperty("videos")[0].GetProperty("title").GetString());
+        Assert.NotEqual(lessonId, copied.GetProperty("lessons")[0].GetProperty("id").GetGuid());
     }
 
     private static async Task<Guid> SeedVideoAsync(SipatOnlineApiFactory factory, string title)

@@ -65,6 +65,8 @@ public static class UserManagementEndpoints
             HttpContext context,
             IAntiforgery antiforgery,
             UserApplicationService userService,
+            SipatOnline.Infrastructure.Learning.LearningDistributionService distribution,
+            SipatOnline.BuildingBlocks.Application.ITenantContext tenantContext,
             CancellationToken cancellationToken) =>
         {
             var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
@@ -80,6 +82,12 @@ public static class UserManagementEndpoints
             }
 
             var user = result.Value;
+            // someone who arrives while a SIPAT is live starts with its days already there
+            if (request.Role == SipatOnline.BuildingBlocks.Application.PlatformRoles.Participant && tenantContext.CurrentTenantId is { IsEmpty: false } tenant)
+            {
+                await distribution.EnsureAssignmentsAsync(tenant.Value, user.Id.Value, cancellationToken);
+            }
+
             var response = ToResponse(user);
             return Results.Created($"/api/admin/users/{user.Id.Value:D}", response);
         })
@@ -133,6 +141,44 @@ public static class UserManagementEndpoints
         })
         .WithName("ChangeUserStatus");
 
+        group.MapPut("/{userId:guid}/login", async (
+            Guid userId,
+            ChangeLoginRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatOnline.Infrastructure.Identity.EmployeeCredentialService credentials,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await credentials.ChangeLoginAsync(userId, request.LoginIdentifier, cancellationToken);
+            return result.IsSuccess ? Results.Ok(new { loginIdentifier = result.Value }) : ToProblem(result.Error);
+        })
+        .WithName("ChangeEmployeeLogin");
+
+        group.MapPut("/{userId:guid}/password", async (
+            Guid userId,
+            ResetPasswordRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            SipatOnline.Infrastructure.Identity.EmployeeCredentialService credentials,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await credentials.ResetPasswordAsync(userId, request.NewPassword, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("ResetEmployeePassword");
+
         return endpoints;
     }
 
@@ -185,3 +231,7 @@ public sealed record UserListResponse(
     int Limit,
     int TotalCount,
     IReadOnlyList<UserResponse> Items);
+
+public sealed record ChangeLoginRequest(string? LoginIdentifier);
+
+public sealed record ResetPasswordRequest(string? NewPassword);

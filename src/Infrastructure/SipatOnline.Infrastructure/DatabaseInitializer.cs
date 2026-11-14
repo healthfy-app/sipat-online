@@ -39,6 +39,12 @@ public sealed class DatabaseInitializer(
     private async Task SeedTenantAsync(CancellationToken cancellationToken)
     {
         var options = tenantOptions.Value;
+        if (options.Id == Guid.Empty)
+        {
+            // no first company configured: the platform starts empty, companies are registered by the operator
+            return;
+        }
+
         var tenant = await dbContext.Tenants.SingleOrDefaultAsync(
             entity => entity.Id == options.Id,
             cancellationToken);
@@ -113,6 +119,11 @@ public sealed class DatabaseInitializer(
         }
 
         var tenantId = tenantOptions.Value.Id;
+        if (tenantId == Guid.Empty)
+        {
+            throw new InvalidOperationException("The bootstrap administrator belongs to the first tenant: configure the first tenant or leave the bootstrap administrator out.");
+        }
+
         var identifierResult = LoginIdentifier.Create(options.LoginIdentifier);
         var displayNameResult = DisplayName.Create(options.DisplayName);
         if (!identifierResult.IsSuccess || !displayNameResult.IsSuccess || options.Password is null)

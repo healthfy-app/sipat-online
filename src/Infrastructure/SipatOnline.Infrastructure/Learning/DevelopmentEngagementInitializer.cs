@@ -27,8 +27,13 @@ public sealed class DevelopmentEngagementInitializer(PlatformDbContext db, IConf
                 new(null, ["Identificar os riscos", "Planejar a tarefa", "Usar a proteção adequada", "Executar com atenção"], null, null)),
             (GamificationGameType.Puzzle, "Quebra-cabeça: cuidado e bem-estar", [],
                 new("/course-covers/wellbeing.jpg", null, null, null)),
-            (GamificationGameType.RiskSpotting, "Caça aos riscos: área de circulação", [],
-                new("/risk-scene.svg", null, null, [new("Cabo atravessando a passagem", 12, 70, 32, 16), new("Caixa bloqueando a saída", 72, 45, 20, 35)]))
+            (GamificationGameType.SafeOrRisky, "Seguro ou arriscado: rotina na fábrica", [],
+                new(null, null, null, null, Cards: [
+                    new("Subir na escada com um degrau quebrado só para pegar uma caixa leve", false, "Escada danificada deve ser retirada de uso, mesmo para tarefas rápidas."),
+                    new("Isolar e sinalizar o piso molhado antes de limpar", true, "Sinalizar evita escorregões de quem passa pelo local."),
+                    new("Deixar o extintor atrás das caixas porque ele atrapalha a passagem", false, "O extintor precisa estar visível e com acesso livre."),
+                    new("Desligar e bloquear a máquina antes da manutenção", true, "O bloqueio impede que alguém ligue o equipamento por engano."),
+                    new("Tirar o protetor auricular por alguns minutos no setor barulhento", false, "Mesmo pouco tempo de exposição a ruído alto causa perda auditiva.")]))
         };
         var moduleIds = new List<Guid>();
         await using var transaction = await db.Database.BeginTransactionAsync(token);

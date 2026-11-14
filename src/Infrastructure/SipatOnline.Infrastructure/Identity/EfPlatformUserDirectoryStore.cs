@@ -44,7 +44,8 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
                     dbContext.UserRoles.Any(userRole =>
                         userRole.UserId == user.Id &&
                         administratorRoleIds.Contains(userRole.RoleId))),
-                TotalUserCount = dbContext.Users.Count(user => user.TenantId == tenant.Id)
+                TotalUserCount = dbContext.Users.Count(user => user.TenantId == tenant.Id),
+                tenant.Plan
             })
             .OrderByDescending(company => company.EmployeeCount)
             .ThenBy(company => company.Name)
@@ -59,7 +60,45 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
             company.CreatedAt,
             company.EmployeeCount,
             company.AdministratorCount,
-            company.TotalUserCount)).ToArray();
+            company.TotalUserCount,
+            Enum.IsDefined(typeof(SipatOnline.Infrastructure.Tenancy.CompanyPlan), company.Plan) ? ((SipatOnline.Infrastructure.Tenancy.CompanyPlan)company.Plan).ToString() : "Bronze")).ToArray();
+    }
+
+    public async Task<IReadOnlyList<Guid>?> SetEmployeesActiveAsync(
+        Guid tenantId,
+        IReadOnlyCollection<Guid> userIds,
+        bool isActive,
+        CancellationToken cancellationToken)
+    {
+        if (!await dbContext.Tenants.AnyAsync(tenant => tenant.Id == tenantId, cancellationToken))
+        {
+            return null;
+        }
+
+        var participantRoleId = await dbContext.Roles.AsNoTracking()
+            .Where(role => role.NormalizedName == PlatformRoles.Participant.ToUpperInvariant())
+            .Select(role => (Guid?)role.Id)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (participantRoleId is null)
+        {
+            return [];
+        }
+
+        var users = await dbContext.Users
+            .Where(user => user.TenantId == tenantId &&
+                           userIds.Contains(user.Id) &&
+                           user.IsActive != isActive &&
+                           dbContext.UserRoles.Any(userRole =>
+                               userRole.UserId == user.Id &&
+                               userRole.RoleId == participantRoleId))
+            .ToListAsync(cancellationToken);
+        foreach (var user in users)
+        {
+            user.IsActive = isActive;
+        }
+
+        await dbContext.SaveChangesAsync(cancellationToken);
+        return users.Select(user => user.Id).ToArray();
     }
 
     public async Task<PlatformCompanyEmployeePage?> ListCompanyEmployeesAsync(

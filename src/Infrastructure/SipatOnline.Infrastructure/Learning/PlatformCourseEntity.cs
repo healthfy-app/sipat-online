@@ -20,9 +20,29 @@ public sealed class PlatformCourseEntity
 
     public DateTimeOffset? CoverUpdatedAt { get; set; }
 
+    public Guid? CategoryId { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 
     public ICollection<PlatformCourseModuleLinkEntity> ModuleLinks { get; set; } = [];
+
+    public ICollection<PlatformCourseLessonEntity> Lessons { get; set; } = [];
+}
+
+/// <summary>Aula de um curso: agrupa vídeos na ordem em que o participante os verá.</summary>
+public sealed class PlatformCourseLessonEntity
+{
+    public Guid Id { get; set; }
+
+    public Guid CourseId { get; set; }
+
+    public string Title { get; set; } = string.Empty;
+
+    public string? Description { get; set; }
+
+    public int Position { get; set; }
+
+    public PlatformCourseEntity Course { get; set; } = null!;
 }
 
 public sealed class PlatformCourseVideoEntity
@@ -105,6 +125,12 @@ public sealed class PlatformCourseVideoLinkEntity
     public Guid VideoId { get; set; }
 
     public int Position { get; set; }
+
+    /// <summary>Aula à qual o vídeo pertence; nulo em vínculos antigos (tratados como "Aula 1").</summary>
+    public Guid? LessonId { get; set; }
+
+    /// <summary>Título exibido só neste curso; nulo usa o título da biblioteca.</summary>
+    public string? TitleOverride { get; set; }
 
     public PlatformCourseEntity Course { get; set; } = null!;
 

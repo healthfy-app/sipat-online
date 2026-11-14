@@ -9,6 +9,15 @@ public sealed class LearningTrackEntity
 
     public Guid SipatEventId { get; set; }
 
+    /// <summary>Day of the SIPAT program this course sits in (null when it was distributed on its own).</summary>
+    public string? DayTitle { get; set; }
+
+    public int? DayPosition { get; set; }
+
+    public DateOnly? DayDate { get; set; }
+
+    public int? CoursePosition { get; set; }
+
     public string Title { get; set; } = string.Empty;
 
     public string? Description { get; set; }
@@ -37,6 +46,9 @@ public sealed class LearningTrackRevisionEntity
 
 public sealed class LearningLessonEntity
 {
+    /// <summary>Nome da aula do curso a que este vídeo pertence (agrupa a lista do participante).</summary>
+    public string? SectionTitle { get; set; }
+
     public Guid Id { get; set; }
 
     public Guid TenantId { get; set; }

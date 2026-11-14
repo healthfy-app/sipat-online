@@ -1,13 +1,17 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getLearningActivities, saveLearningActivityOutcome, type LearningActivity } from './api';
 import CourseDialog from './CourseDialog';
-import GamePlayer from './GamePlayer';
-import type { GameOutcome } from './InteractiveGame';
+import GamePlayer from '@/games/LazyGamePlayer';
+import { Button } from '@/components/ui/button';
+import type { GameOutcome } from '@/games/gameKit';
+import GameStage from '@/games/GameStage';
 
-export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosition, playbackKey, videoRef }: {
+export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosition, playbackKey, videoRef, onActivities }: {
   trackId: string; lessonId: string | null; playbackKey: string | undefined;
   lessonPosition: number;
   videoRef: RefObject<HTMLVideoElement | null>;
+  /** Lets the page draw the activities on the video timeline. */
+  onActivities?: (activities: LearningActivity[]) => void;
 }) {
   const [activities, setActivities] = useState<LearningActivity[]>([]);
   const [active, setActive] = useState<LearningActivity | null>(null);
@@ -29,8 +33,12 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
     return () => { current = false; };
   }, [trackId, retry]);
 
+  useEffect(() => { onActivities?.(activities); }, [activities, onActivities]);
+
   function open(activity: LearningActivity, shouldResume?: boolean) {
     if (activeRef.current) return;
+    // the game opens over the page, which a fullscreen player would hide
+    if (document.fullscreenElement) void document.exitFullscreen?.().catch(() => undefined);
     resume.current = shouldResume ?? (!!videoRef.current && !videoRef.current.paused && !videoRef.current.ended);
     activeRef.current = activity;
     videoRef.current?.pause();
@@ -121,7 +129,7 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
         <h2 id="learning-activities-title">Atividades para praticar</h2>
         <span>{activities.length}</span>
       </div>
-      <p>Quizzes opcionais, sem pontos. Pular não bloqueia a conclusão do curso.</p>
+      <p>Jogos opcionais para praticar. Pular não bloqueia a conclusão do curso.</p>
     </div>
     <button aria-expanded={activitiesOpen} aria-haspopup="dialog" className="learning-activities-open"
       onClick={openActivityList} type="button">
@@ -129,7 +137,8 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
     </button>
     {notice && <p role="status">{notice}</p>}
     {activitiesOpen && (
-      <CourseDialog onClose={closeActivityList} title="Atividades para praticar" wide>
+      <CourseDialog className="learning-dialog learning-activities-dialog" onClose={closeActivityList} title="Atividades para praticar" wide>
+        <p className="learning-dialog-intro">Escolha uma atividade para revisar o conteúdo. Todas são opcionais e não bloqueiam seu progresso.</p>
         <div className="learning-activity-grid">
           {activities.map(activity => {
             const status = activity.outcome === 'completed'
@@ -155,14 +164,15 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
         </div>
       </CourseDialog>
     )}
-    {active && <CourseDialog busy={busy} onClose={() => void close('skipped')} title={active.module.title}>
+    {active && <GameStage busy={busy} label={active.module.title} onClose={() => void close('skipped')}>
       <GamePlayer key={active.id} module={active.module} onClose={outcome => void close(outcome)} />
-      {saveError && <div role="alert"><p>{saveError}</p>
-        <button className="button button-quiet" onClick={() => {
+      {saveError && <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-destructive-soft px-4 py-3 font-sans text-sm text-destructive" role="alert">
+        <p className="m-0">{saveError}</p>
+        <Button onClick={() => {
           boundary.current = null; activeRef.current = null; setActive(null);
           setNotice('A atividade não foi registrada. Use Reproduzir para continuar o vídeo.');
-        }} type="button">Fechar sem registrar</button>
+        }} size="sm" variant="outline">Fechar sem registrar</Button>
       </div>}
-    </CourseDialog>}
+    </GameStage>}
   </section>;
 }

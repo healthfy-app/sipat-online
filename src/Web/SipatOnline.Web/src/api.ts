@@ -5,6 +5,7 @@ export interface TenantBranding {
   primaryColor: string;
   secondaryColor: string;
   customDomain: string | null;
+  bannerReference?: string | null;
 }
 
 export interface IdentitySession {
@@ -22,7 +23,11 @@ export interface PlatformCompany {
   isActive: boolean;
 }
 
+/** The plans sold on the site. The company is never shown its own plan; only the operator sees and changes it. */
+export type CompanyPlan = 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
+
 export interface PlatformCompanyOverview extends PlatformCompany {
+  plan?: CompanyPlan;
   employeeCount: number;
   administratorCount: number;
   totalUserCount: number;
@@ -49,7 +54,7 @@ export interface PlatformCompanyEmployeePage {
 }
 
 export type PlatformCourseStatus = 'Draft' | 'Published';
-export type GamificationGameType = 'Quiz' | 'RiskSpotting' | 'Puzzle' | 'Memory' | 'Scenario' | 'Ordering';
+export type GamificationGameType = 'Quiz' | 'RiskSpotting' | 'Puzzle' | 'Memory' | 'Scenario' | 'Ordering' | 'SafeOrRisky';
 
 export interface PlatformCourse {
   id: string;
@@ -62,6 +67,22 @@ export interface PlatformCourse {
   videos: PlatformCourseVideo[];
   modules: CourseModulePlacement[];
   coverUrl: string | null;
+  lessons?: PlatformCourseLesson[];
+  categoryId?: string | null;
+}
+
+export interface PlatformCourseLesson {
+  id: string;
+  title: string;
+  description: string | null;
+  videoIds: string[];
+}
+
+export interface CourseLessonDraft {
+  id: string | null;
+  title: string;
+  description: string | null;
+  videos: { videoId: string; title: string | null }[];
 }
 
 export interface CourseModulePlacement {
@@ -96,7 +117,11 @@ export interface GameContent {
   pairs: { first: string; second: string }[] | null;
   risks: { label: string; x: number; y: number; width: number; height: number }[] | null;
   columns: number;
+  /** Seguro ou arriscado: situations the participant judges. */
+  cards?: GameCard[] | null;
 }
+
+export interface GameCard { text: string; safe: boolean; explanation: string | null }
 
 export interface GameModuleData {
   title: string;
@@ -123,6 +148,7 @@ export interface ParticipationCertificate {
 export interface CertificateEligibility {
   sipatEventId: string; eventTitle: string; totalCourses: number; completedCourses: number;
   isEligible: boolean; certificate: ParticipationCertificate | null; hasCompanyLogo: boolean;
+  startsAt?: string; endsAt?: string;
 }
 
 export function getCompanyCertificateLogo(companyId: string): Promise<{ configured: boolean }> {
@@ -160,6 +186,88 @@ export interface CompanyLearningCatalog {
 export function requestCompanyLearning(companyId: string): Promise<CompanyLearningCatalog> {
   return requestJson(`/api/platform/companies/${companyId}/learning`);
 }
+/**
+ * A day of a SIPAT program, as in the "Seletor de módulos" sheet: a title or slogan, an optional date,
+ * a main subject, the videos picked for the day (in order) and its games, quizzes or forms.
+ */
+export interface ProgramDay {
+  /** Stable across edits; absent on a day that was never saved. */
+  id?: string;
+  title: string;
+  /** yyyy-MM-dd */
+  date: string | null;
+  subject: string | null;
+  videoIds: string[];
+  gameIds: string[];
+}
+export interface SipatProgram { id: string; title: string; days: ProgramDay[]; createdAt: string }
+export interface SipatProgramData { title: string; days: ProgramDay[] }
+
+/** Programs saved before days held videos come back without lists; they read as days with nothing in them. */
+function tidyProgram(program: SipatProgram): SipatProgram {
+  return {
+    ...program,
+    days: (program.days ?? []).map(day => ({
+      ...day, title: day.title ?? '', date: day.date ?? null, subject: day.subject ?? null,
+      videoIds: day.videoIds ?? [], gameIds: day.gameIds ?? [],
+    })),
+  };
+}
+export async function listSipatPrograms(): Promise<SipatProgram[]> {
+  return (await requestJson<SipatProgram[]>('/api/platform/catalog/programs')).map(tidyProgram);
+}
+export async function createSipatProgram(data: SipatProgramData): Promise<SipatProgram> {
+  return tidyProgram(await requestJson<SipatProgram>('/api/platform/catalog/programs', { method: 'POST', body: JSON.stringify(data) }));
+}
+export async function updateSipatProgram(programId: string, data: SipatProgramData): Promise<SipatProgram> {
+  return tidyProgram(await requestJson<SipatProgram>(`/api/platform/catalog/programs/${programId}`, { method: 'PUT', body: JSON.stringify(data) }));
+}
+export async function deletePlatformCourse(courseId: string): Promise<void> {
+  await request(`/api/platform/catalog/courses/${courseId}`, { method: 'DELETE' });
+}
+export async function deletePlatformVideo(videoId: string): Promise<void> {
+  await request(`/api/platform/catalog/videos/${videoId}`, { method: 'DELETE' });
+}
+/** What a day of a SIPAT can be made of: published themes, library videos and games. Read only, for the company's administrator and the operator. */
+export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibraryVideo[]; games: GameModule[]; categories?: CourseCategory[] }
+export function getSipatCatalog(): Promise<SipatCatalog> {
+  return requestJson<SipatCatalog>('/api/admin/sipat-catalog');
+}
+export interface SipatPlanSummary { sipatEventId: string; days: number; videos: number }
+export function listSipatPlans(): Promise<SipatPlanSummary[]> {
+  return requestJson<SipatPlanSummary[]>('/api/admin/sipat-plans');
+}
+export async function getSipatPlan(sipatId: string): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`));
+}
+export async function saveSipatPlan(sipatId: string, days: ProgramDay[]): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify({ days }) }));
+}
+export async function copySipatPlan(sipatId: string, sourceId: string): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan/copy-from/${sourceId}`, { method: 'POST', body: '{}' }));
+}
+/** Publishes the SIPAT (one at a time per company) and delivers each day to the participants. */
+export function launchSipat(sipatId: string): Promise<ProgramApplication> {
+  return requestJson<ProgramApplication>(`/api/admin/sipats/${sipatId}/plan/launch`, { method: 'POST', body: '{}' });
+}
+function tidyDays(days: ProgramDay[]): ProgramDay[] {
+  return (days ?? []).map(day => ({ ...day, title: day.title ?? '', date: day.date ?? null, subject: day.subject ?? null, videoIds: day.videoIds ?? [], gameIds: day.gameIds ?? [] }));
+}
+export async function deleteSipatProgram(programId: string): Promise<void> {
+  await request(`/api/platform/catalog/programs/${programId}`, { method: 'DELETE' });
+}
+export interface ProgramApplication {
+  days: number;
+  created: number;
+  /** Days nobody had started, refreshed with the program's current content. */
+  updated: number;
+  /** Days left as they were because participants already have progress in them. */
+  kept: number;
+}
+export function applyProgramToCompany(companyId: string, sipatId: string, programId: string): Promise<ProgramApplication> {
+  return requestJson(`/api/platform/companies/${companyId}/learning/sipats/${sipatId}/programs/${programId}`, { method: 'POST', body: '{}' });
+}
+
 export function distributeCompanyCourse(companyId: string, sipatId: string, courseId: string): Promise<{ trackId: string }> {
   return requestJson(`/api/platform/companies/${companyId}/learning/sipats/${sipatId}/courses/${courseId}`, {
     method: 'POST', body: '{}',
@@ -175,6 +283,8 @@ export interface PlatformCourseVideo {
   createdAt: string;
   fileUrl: string;
   checkpoints: VideoCheckpoint[];
+  lessonId?: string | null;
+  libraryTitle?: string | null;
 }
 
 export interface PlatformLibraryVideo {
@@ -199,6 +309,7 @@ export interface PlatformCompanyData {
   adminLoginIdentifier: string;
   adminDisplayName: string;
   adminPassword: string;
+  plan?: CompanyPlan;
 }
 
 export interface PlatformUserSummary {
@@ -335,6 +446,19 @@ export interface LearningTrackCard {
   completedLessonCount: number;
   progressPercentage: number;
   coverUrl?: string | null;
+  /** Day of the SIPAT program this course belongs to; absent when it was distributed on its own. */
+  dayTitle?: string | null;
+  dayPosition?: number | null;
+  coursePosition?: number | null;
+  /** yyyy-MM-dd, when the program gave the day a date. */
+  dayDate?: string | null;
+  /** Total length of the videos of the track. */
+  durationMilliseconds?: number;
+  /** The SIPAT (the year's week of training) the track belongs to. */
+  sipatTitle?: string | null;
+  sipatStartsAt?: string | null;
+  sipatStatus?: 'Draft' | 'Published' | 'Cancelled' | null;
+  sipatEndsAt?: string | null;
 }
 
 export interface ParticipantOutcomes {
@@ -358,6 +482,9 @@ export interface LearningParticipantProgress {
   completedLessonCount: number;
   progressPercentage: number;
   isCompleted: boolean;
+  watchedMilliseconds?: number;
+  completedAt?: string | null;
+  lastAccessedAt?: string | null;
 }
 
 export interface LearningLessonProgress {
@@ -370,6 +497,8 @@ export interface LearningLessonProgress {
   watchedPercentage: number;
   isCompleted: boolean;
   completedAt: string | null;
+  sectionTitle?: string | null;
+  watchedMilliseconds?: number;
 }
 
 export interface LearningExperience {
@@ -500,6 +629,8 @@ export interface TenantAppearanceData {
   secondaryColor: string;
   logoBase64?: string | null;
   removeLogo?: boolean;
+  bannerBase64?: string | null;
+  removeBanner?: boolean;
 }
 
 export function saveTenantAppearance(data: TenantAppearanceData): Promise<TenantBranding> {
@@ -545,6 +676,15 @@ export function listPlatformCompanies(): Promise<PlatformCompany[]> {
 
 export function getPlatformDashboard(): Promise<PlatformCompanyOverview[]> {
   return requestJson<PlatformCompanyOverview[]>('/api/platform/dashboard');
+}
+
+export interface PlatformEmployeeStatusChange { requested: number; changed: number }
+
+/** The operator activates or deactivates participants of one company, one or many at a time. */
+export function changePlatformCompanyEmployeesStatus(companyId: string, userIds: string[], isActive: boolean): Promise<PlatformEmployeeStatusChange> {
+  return requestJson<PlatformEmployeeStatusChange>(`/api/platform/companies/${encodeURIComponent(companyId)}/employees/status`, {
+    method: 'PUT', body: JSON.stringify({ userIds, isActive }),
+  });
 }
 
 export function getPlatformCompanyEmployees(
@@ -596,6 +736,16 @@ export function setPlatformCourseVideos(
   return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/videos`, {
     method: 'PUT',
     body: JSON.stringify({ videoIds }),
+  });
+}
+
+export function setPlatformCourseStructure(
+  courseId: string,
+  lessons: CourseLessonDraft[],
+): Promise<PlatformCourse> {
+  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/structure`, {
+    method: "PUT",
+    body: JSON.stringify({ lessons }),
   });
 }
 
@@ -678,6 +828,30 @@ export function setVideoCheckpoints(
   });
 }
 
+export function changeCompanyPlan(companyId: string, plan: CompanyPlan): Promise<{ plan: CompanyPlan }> {
+  return requestJson<{ plan: CompanyPlan }>(`/api/platform/companies/${companyId}/plan`, { method: 'PUT', body: JSON.stringify({ plan }) });
+}
+
+/** What the company can do (never the name of its plan, unless the operator is the one asking). */
+export interface CompanyCapabilities {
+  customizeGrid: boolean; customBranding: boolean; customCertificate: boolean; quizzes: boolean; internalVideos: boolean; plan?: CompanyPlan | null;
+}
+/** Which assuntos each plan cannot use (everything not listed is available). */
+export interface PlanSubjects {
+  courses: { id: string; title: string; description: string | null; videoCount: number; categoryId?: string | null }[];
+  excluded: Record<string, string[]>;
+}
+export function getPlanSubjects(): Promise<PlanSubjects> {
+  return requestJson<PlanSubjects>('/api/platform/catalog/plan-subjects');
+}
+export async function setPlanSubjects(plan: CompanyPlan, excludedCourseIds: string[]): Promise<void> {
+  await request(`/api/platform/catalog/plan-subjects/${plan}`, { method: 'PUT', body: JSON.stringify({ excludedCourseIds }) });
+}
+
+export function getCompanyCapabilities(): Promise<CompanyCapabilities> {
+  return requestJson<CompanyCapabilities>('/api/admin/capabilities');
+}
+
 export function createPlatformCompany(data: PlatformCompanyData): Promise<PlatformCompany> {
   return requestJson<PlatformCompany>('/api/platform/companies', {
     method: 'POST',
@@ -739,6 +913,42 @@ export function createParticipant(data: CreateParticipantData): Promise<Particip
 
 export function listTenantLearningTracks(): Promise<LearningTrackSummary[]> {
   return requestJson<LearningTrackSummary[]>('/api/admin/learning/tracks');
+}
+
+export interface LearningParticipantReport {
+  participantId: string;
+  loginIdentifier: string;
+  displayName: string;
+  tracks: LearningExperience[];
+}
+
+export function getLearningParticipantReport(participantId: string): Promise<LearningParticipantReport> {
+  return requestJson<LearningParticipantReport>(`/api/admin/learning/participants/${participantId}/report`);
+}
+
+/** The administrator corrects the name of a collaborator of the company. */
+export function renameUser(userId: string, displayName: string): Promise<ParticipantAccount> {
+  return requestJson<ParticipantAccount>(`/api/admin/users/${userId}/display-name`, {
+    method: 'PUT',
+    body: JSON.stringify({ displayName }),
+  });
+}
+
+/** The administrator changes the registration (login) a collaborator signs in with. */
+export function changeEmployeeLogin(userId: string, loginIdentifier: string): Promise<{ loginIdentifier: string }> {
+  return requestJson<{ loginIdentifier: string }>(`/api/admin/users/${userId}/login`, { method: 'PUT', body: JSON.stringify({ loginIdentifier }) });
+}
+
+/** The administrator sets a new password for a collaborator. */
+export async function resetEmployeePassword(userId: string, newPassword: string): Promise<void> {
+  await request(`/api/admin/users/${userId}/password`, { method: 'PUT', body: JSON.stringify({ newPassword }) });
+}
+
+export function changeUserStatus(userId: string, isActive: boolean): Promise<ParticipantAccount> {
+  return requestJson<ParticipantAccount>(`/api/admin/users/${userId}/status`, {
+    method: 'PUT',
+    body: JSON.stringify({ isActive }),
+  });
 }
 
 export function listLearningParticipation(): Promise<LearningParticipantProgress[]> {
@@ -816,6 +1026,13 @@ export async function publishSipatEvent(id: string): Promise<SipatEvent> {
   });
 }
 
+export async function reactivateSipatEvent(id: string): Promise<SipatEvent> {
+  return requestJson<SipatEvent>(`/api/admin/sipats/${id}/reactivate`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
 export async function cancelSipatEvent(id: string): Promise<SipatEvent> {
   return requestJson<SipatEvent>(`/api/admin/sipats/${id}/cancel`, {
     method: 'POST',
@@ -875,4 +1092,26 @@ export function recordLearningPlaybackRange(
       }),
     },
   );
+}
+
+export interface CourseCategory { id: string; name: string; courseCount: number }
+
+export function listCourseCategories(): Promise<CourseCategory[]> {
+  return requestJson<CourseCategory[]>('/api/platform/catalog/categories');
+}
+
+export function createCourseCategory(name: string): Promise<CourseCategory> {
+  return requestJson<CourseCategory>('/api/platform/catalog/categories', { method: 'POST', body: JSON.stringify({ name }) });
+}
+
+export async function renameCourseCategory(id: string, name: string): Promise<void> {
+  await request(`/api/platform/catalog/categories/${id}`, { method: 'PUT', body: JSON.stringify({ name }) });
+}
+
+export async function deleteCourseCategory(id: string): Promise<void> {
+  await request(`/api/platform/catalog/categories/${id}`, { method: 'DELETE' });
+}
+
+export async function setCourseCategory(courseId: string, categoryId: string | null): Promise<void> {
+  await request(`/api/platform/catalog/courses/${courseId}/category`, { method: 'PUT', body: JSON.stringify({ categoryId }) });
 }

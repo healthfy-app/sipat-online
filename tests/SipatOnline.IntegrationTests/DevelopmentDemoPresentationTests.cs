@@ -58,15 +58,21 @@ public sealed class DevelopmentDemoPresentationTests
         var assignments = await db.LearningAssignments.AsNoTracking().ToListAsync();
         Assert.Equal(20, participants.Count);
         Assert.Equal(180, tracks.Count);
-        Assert.Equal(360, assignments.Count);
+        // each participant receives the week of the company: the six days of option 1
+        Assert.Equal(120, assignments.Count);
 
         foreach (var tenant in tenants)
         {
             var tenantParticipants = participants.Where(user => user.TenantId == tenant.Id).ToArray();
-            var tenantTracks = tracks.Where(track => track.TenantId == tenant.Id)
-                .Select(track => track.Id).OrderBy(id => id).ToArray();
+            Assert.Equal(18, tracks.Count(track => track.TenantId == tenant.Id));
+            var days = tracks.Where(track => track.TenantId == tenant.Id && track.DayPosition != null)
+                .OrderBy(track => track.DayPosition).ToArray();
+            Assert.Equal([1, 2, 3, 4, 5, 6], days.Select(track => track.DayPosition!.Value));
+            Assert.Equal("Boa postura e movimento, mais saúde em cada momento!", days[0].DayTitle);
+            Assert.Equal(new DateOnly(2026, 11, 9), days[0].DayDate);
+            Assert.All(days, day => Assert.StartsWith("Opção 1 · ", day.Title));
+            var tenantTracks = days.Select(track => track.Id).OrderBy(id => id).ToArray();
             Assert.Equal(2, tenantParticipants.Length);
-            Assert.Equal(18, tenantTracks.Length);
             foreach (var participant in tenantParticipants)
             {
                 Assert.Equal(

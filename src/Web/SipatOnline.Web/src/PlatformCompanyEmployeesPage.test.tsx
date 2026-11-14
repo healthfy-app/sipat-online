@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
@@ -9,11 +9,21 @@ vi.mock('./api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./api')>()),
   getPlatformCompanyEmployees: vi.fn(),
   getPlatformDashboard: vi.fn(),
+  listPlatformUsers: vi.fn(),
+  listSipatPrograms: vi.fn(),
+  changePlatformCompanyEmployeesStatus: vi.fn(),
 }));
+
+/** the company opens on its SIPAT builder; these tests are about the participants */
+async function openParticipants() {
+  await userEvent.click(await screen.findByRole('tab', { name: /Participantes/ }));
+}
 
 afterEach(cleanup);
 
 beforeEach(() => {
+  vi.mocked(api.listSipatPrograms).mockResolvedValue([]);
+  vi.mocked(api.listPlatformUsers).mockResolvedValue({ offset: 0, limit: 50, totalCount: 0, items: [] });
   vi.mocked(api.getPlatformDashboard).mockResolvedValue([{
     id: 'company-1',
     key: 'acme',
@@ -30,7 +40,7 @@ function renderPage() {
   return render(
     <MemoryRouter initialEntries={['/platform/companies/company-1']}>
       <Routes>
-        <Route path="/platform/companies/:companyId" element={<PlatformCompanyEmployeesPage />} />
+        <Route path="/platform/companies/:companyId/:section?" element={<PlatformCompanyEmployeesPage />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -58,9 +68,31 @@ function employeePage(overrides: Partial<api.PlatformCompanyEmployeePage> = {}):
 }
 
 describe('Platform company employees', () => {
+  it('deactivates the chosen participants after asking, and reloads the list', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
+    vi.mocked(api.changePlatformCompanyEmployeesStatus).mockResolvedValue({ requested: 1, changed: 1 });
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    renderPage();
+    await openParticipants();
+
+    await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Ana Silva' }));
+    expect(screen.getByText('1 selecionado')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Inativar' }));
+    expect(api.changePlatformCompanyEmployeesStatus).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: 'Inativar' }));
+    expect(api.changePlatformCompanyEmployeesStatus).toHaveBeenCalledWith('company-1', ['employee-1'], false);
+    expect(await screen.findByRole('status')).toHaveTextContent('1 participante inativado.');
+    expect(screen.queryByText('1 selecionado')).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
   it('shows employee name, registration, completion and active status', async () => {
     vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
     renderPage();
+    await openParticipants();
 
     expect(await screen.findByRole('heading', { name: 'Acme' })).toBeInTheDocument();
     expect(screen.getByRole('cell', { name: 'Ana Silva' })).toBeInTheDocument();
@@ -69,10 +101,9 @@ describe('Platform company employees', () => {
       .toHaveAttribute('aria-valuenow', '50');
     expect(screen.getByText('Ativo')).toBeInTheDocument();
     expect(screen.getByText('Identificador · acme')).toBeInTheDocument();
-    expect(screen.getByText('Administradores')).toBeInTheDocument();
+    expect(within(screen.getByRole('region', { name: 'Resumo da empresa' })).getByText('Administradores')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Administradores/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Ver histórico' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Administrar empresa' }))
-      .toHaveAttribute('href', '/admin/dashboard?companyId=company-1');
     expect(screen.getByRole('columnheader', { name: 'Atividades e certificados' })).toBeInTheDocument();
     expect(screen.queryByText('Conclusão média')).not.toBeInTheDocument();
   });
@@ -94,9 +125,10 @@ describe('Platform company employees', () => {
       }));
     const user = userEvent.setup();
     renderPage();
+    await openParticipants();
     await screen.findByText('Ana Silva');
 
-    await user.type(screen.getByLabelText('Buscar por nome ou matrícula'), 'MAT-002');
+    await user.type(screen.getByLabelText('Buscar por nome ou login'), 'MAT-002');
     await user.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByText('Nenhum participante encontrado. Tente outro nome ou identificador.')).toBeInTheDocument();
     expect(api.getPlatformCompanyEmployees).toHaveBeenLastCalledWith(
@@ -130,6 +162,7 @@ describe('Platform company employees', () => {
       }));
     const user = userEvent.setup();
     renderPage();
+    await openParticipants();
     await screen.findByText('Ana Silva');
     expect(screen.getByText('Página 1 de 2 · 51 resultados')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Próxima' }));

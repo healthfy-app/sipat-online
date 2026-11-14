@@ -12,6 +12,11 @@ public sealed class TenantEntity
 
     public byte[]? PortalLogoData { get; set; }
 
+    /// <summary>Banner exibido na entrada (login) do portal da empresa.</summary>
+    public byte[]? PortalBannerData { get; set; }
+
+    public string? PortalBannerContentType { get; set; }
+
     public byte[]? CertificateLogoData { get; set; }
 
     public string? CertificateLogoContentType { get; set; }
@@ -25,4 +30,7 @@ public sealed class TenantEntity
     public DateTimeOffset CreatedAt { get; set; }
 
     public bool IsActive { get; set; }
+
+    /// <summary>The plan the company bought (see <see cref="CompanyPlan"/>). Companies created before plans existed keep every feature.</summary>
+    public int Plan { get; set; } = (int)CompanyPlan.Diamante;
 }

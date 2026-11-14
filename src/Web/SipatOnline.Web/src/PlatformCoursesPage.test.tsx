@@ -17,12 +17,27 @@ vi.mock('./api', async (importOriginal) => {
   const original = await importOriginal<typeof import('./api')>();
   return {
     ...original,
+    createGameModule: vi.fn(),
+    createCourseCategory: vi.fn(),
+    deleteCourseCategory: vi.fn(),
+    listCourseCategories: vi.fn(),
+    renameCourseCategory: vi.fn(),
+    setCourseCategory: vi.fn(),
+    createSipatProgram: vi.fn(),
+    deleteSipatProgram: vi.fn(),
+    deletePlatformCourse: vi.fn(),
+    deletePlatformVideo: vi.fn(),
+    listSipatPrograms: vi.fn(),
+    updateSipatProgram: vi.fn(),
     createPlatformCourse: vi.fn(),
+    deleteGameModule: vi.fn(),
     duplicatePlatformCourse: vi.fn(),
     listGameModules: vi.fn(),
     listPlatformCourses: vi.fn(),
     listPlatformLibraryVideos: vi.fn(),
     setPlatformCourseCover: vi.fn(),
+    setPlatformCourseModules: vi.fn(),
+    setPlatformCourseStructure: vi.fn(),
     setPlatformCourseVideos: vi.fn(),
     updatePlatformCourse: vi.fn(),
     uploadPlatformVideo: vi.fn(),
@@ -80,11 +95,26 @@ const fire: api.PlatformCourse = {
 };
 
 beforeEach(() => {
+  sessionStorage.clear();
   vi.mocked(api.createPlatformCourse).mockReset();
   vi.mocked(api.setPlatformCourseCover).mockReset();
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:course-cover') });
   Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
   vi.mocked(api.listGameModules).mockReset().mockResolvedValue([]);
+  vi.mocked(api.listCourseCategories).mockReset().mockResolvedValue([
+    { id: 'cat-food', name: 'Alimentação', courseCount: 0 },
+    { id: 'cat-safe', name: 'Segurança no trabalho', courseCount: 0 },
+  ]);
+  vi.mocked(api.createCourseCategory).mockReset();
+  vi.mocked(api.setCourseCategory).mockReset().mockResolvedValue(undefined);
+  vi.mocked(api.renameCourseCategory).mockReset().mockResolvedValue(undefined);
+  vi.mocked(api.deleteCourseCategory).mockReset().mockResolvedValue(undefined);
+  vi.mocked(api.listSipatPrograms).mockReset().mockResolvedValue([]);
+  vi.mocked(api.createSipatProgram).mockReset();
+  vi.mocked(api.updateSipatProgram).mockReset();
+  vi.mocked(api.deleteSipatProgram).mockReset();
+  vi.mocked(api.deletePlatformCourse).mockReset();
+  vi.mocked(api.deletePlatformVideo).mockReset();
   vi.mocked(api.listPlatformCourses).mockReset().mockResolvedValue([ergonomics, fire]);
   vi.mocked(api.listPlatformLibraryVideos).mockReset().mockResolvedValue([
     { video: opening, courseCount: 1 },
@@ -93,6 +123,8 @@ beforeEach(() => {
   vi.mocked(api.uploadPlatformVideo).mockReset();
   vi.mocked(api.duplicatePlatformCourse).mockReset();
   vi.mocked(api.setPlatformCourseVideos).mockReset();
+  vi.mocked(api.setPlatformCourseStructure).mockReset();
+  vi.mocked(api.setPlatformCourseModules).mockReset();
   vi.mocked(api.updatePlatformCourse).mockReset();
 });
 
@@ -118,7 +150,7 @@ describe('Platform course catalog', () => {
   it('opens the details popup, traps keyboard focus and restores the trigger on Escape', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
-    const trigger = screen.getByRole('button', { name: '+ Criar curso' });
+    const trigger = screen.getByRole('button', { name: 'Criar assunto' });
     await user.click(trigger);
 
     const dialog = screen.getByRole('dialog', { name: 'Detalhes do curso' });
@@ -137,13 +169,13 @@ describe('Platform course catalog', () => {
   it('cancels course creation without saving a draft', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Curso não salvo');
     await user.click(screen.getByRole('button', { name: 'Cancelar' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(api.createPlatformCourse).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: '+ Criar curso' })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Criar assunto' })).toHaveFocus();
   });
 
   it('prevents closing the popup while course creation is pending', async () => {
@@ -151,7 +183,7 @@ describe('Platform course catalog', () => {
     let finish!: (course: api.PlatformCourse) => void;
     vi.mocked(api.createPlatformCourse).mockReturnValue(new Promise(resolve => { finish = resolve; }));
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Combate a incêndio');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
@@ -176,7 +208,7 @@ describe('Platform course catalog', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('Catálogo indisponível.');
     await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
 
-    expect(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(api.listPlatformCourses).toHaveBeenCalledTimes(2);
   });
@@ -186,7 +218,7 @@ describe('Platform course catalog', () => {
     vi.mocked(api.createPlatformCourse).mockResolvedValue(fire);
     vi.mocked(api.setPlatformCourseCover).mockResolvedValue({ ...fire, coverUrl: '/new-cover.png' });
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
     const photo = new File(['cover'], 'capa.png', { type: 'image/png' });
     await user.upload(screen.getByLabelText('Adicionar capa'), photo);
     expect(await screen.findByAltText('Prévia da capa do curso')).toHaveAttribute('src', 'blob:course-cover');
@@ -195,7 +227,7 @@ describe('Platform course catalog', () => {
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
     expect(api.createPlatformCourse).toHaveBeenCalledWith({
-      title: 'Combate a incêndio', description: 'Opção 1\nTreinamento inicial', gamificationEnabled: false,
+      title: 'Combate a incêndio', description: 'Treinamento inicial', gamificationEnabled: false,
     });
 
     expect(api.setPlatformCourseCover).toHaveBeenCalledWith('c-2', photo);
@@ -206,44 +238,78 @@ describe('Platform course catalog', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:course-cover');
   });
 
-  it('creates a course inside the selected reference grade', async () => {
+  it('creates a course inside the chosen category', async () => {
     const user = userEvent.setup();
     vi.mocked(api.createPlatformCourse).mockResolvedValue(fire);
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
-    await user.selectOptions(screen.getByLabelText('Opção da grade'), '3');
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
+    await user.selectOptions(await screen.findByLabelText('Categoria'), 'cat-food');
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Qualidade do sono');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
     expect(api.createPlatformCourse).toHaveBeenCalledWith({
-      title: 'Qualidade do sono', description: 'Opção 3', gamificationEnabled: false,
+      title: 'Qualidade do sono', description: null, gamificationEnabled: false,
     });
+    expect(api.setCourseCategory).toHaveBeenCalledWith('c-2', 'cat-food');
   });
 
-  it('filters catalog records by the three reference grade options', async () => {
+  it('creates a new category right from the subject form, without leaving it', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.createCourseCategory).mockResolvedValue({ id: 'cat-new', name: 'Ergonomia', courseCount: 0 });
+    vi.mocked(api.createPlatformCourse).mockResolvedValue(fire);
+    render(<PlatformCoursesPage />);
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
+    await user.selectOptions(await screen.findByLabelText('Categoria'), '__create__');
+    await user.type(screen.getByLabelText('Nome da nova categoria'), 'Ergonomia{Enter}');
+
+    expect(api.createCourseCategory).toHaveBeenCalledWith('Ergonomia');
+    expect(await screen.findByRole('option', { name: 'Ergonomia' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Categoria')).toHaveValue('cat-new');
+  });
+
+  it('manages the categories in a dialog over the library: rename and delete', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<PlatformCoursesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Gerenciar categorias' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText('Alimentação')).toBeVisible();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Renomear Alimentação' }));
+    const field = within(dialog).getByLabelText('Novo nome de Alimentação');
+    await user.clear(field);
+    await user.type(field, 'Nutrição');
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar nome' }));
+    expect(api.renameCourseCategory).toHaveBeenCalledWith('cat-food', 'Nutrição');
+
+    await user.click(within(dialog).getByRole('button', { name: 'Excluir Segurança no trabalho' }));
+    expect(api.deleteCourseCategory).toHaveBeenCalledWith('cat-safe');
+  });
+
+  it('filters catalog records by category', async () => {
     const user = userEvent.setup();
     vi.mocked(api.listPlatformCourses).mockResolvedValue([
-      { ...ergonomics, description: 'Opção 1 · 4 aulas\nPostura' },
-      { ...fire, description: 'Opção 3 · 4 aulas\nSegurança' },
+      { ...ergonomics, categoryId: 'cat-food' },
+      { ...fire, categoryId: 'cat-safe' },
     ]);
     render(<PlatformCoursesPage />);
-    expect(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Abrir curso Combate a incêndio' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Abrir assunto Combate a incêndio' })).toBeVisible();
 
-    await user.click(screen.getByRole('button', { name: 'Opção 1' }));
-    expect(screen.getByRole('button', { name: 'Abrir curso Ergonomia' })).toBeVisible();
-    expect(screen.queryByRole('button', { name: 'Abrir curso Combate a incêndio' })).not.toBeInTheDocument();
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Filtrar por categoria' }), 'cat-food');
+    expect(screen.getByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Abrir assunto Combate a incêndio' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Opção 3' }));
-    expect(screen.queryByRole('button', { name: 'Abrir curso Ergonomia' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Abrir curso Combate a incêndio' })).toBeVisible();
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por categoria' }), 'cat-safe');
+    expect(screen.queryByRole('button', { name: 'Abrir assunto Ergonomia' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Abrir assunto Combate a incêndio' })).toBeVisible();
   });
 
   it('shows creation errors inside the popup and preserves the entered title', async () => {
     const user = userEvent.setup();
     vi.mocked(api.createPlatformCourse).mockRejectedValue(new Error('Não foi possível criar o curso.'));
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Segurança');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
 
@@ -260,7 +326,7 @@ describe('Platform course catalog', () => {
       .mockRejectedValueOnce(new Error('Falha no envio.'))
       .mockResolvedValueOnce({ ...fire, coverUrl: '/cover.png' });
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
     await user.upload(screen.getByLabelText('Adicionar capa'), new File(['cover'], 'capa.png', { type: 'image/png' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Combate a incêndio');
     await user.click(screen.getByRole('button', { name: 'Criar' }));
@@ -275,7 +341,7 @@ describe('Platform course catalog', () => {
   it('rejects a cover larger than two megabytes before uploading', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
     await user.upload(screen.getByLabelText('Adicionar capa'),
       new File([new Uint8Array(2 * 1024 * 1024 + 1)], 'grande.png', { type: 'image/png' }));
 
@@ -284,13 +350,13 @@ describe('Platform course catalog', () => {
     expect(api.setPlatformCourseCover).not.toHaveBeenCalled();
   });
 
-  it('uploads a library video, clears the form and refreshes without errors', async () => {
+  it('uploads a library video from the videos tab, closes the dialog and refreshes', async () => {
     const user = userEvent.setup();
     vi.mocked(api.uploadPlatformVideo).mockResolvedValue(makeVideo('v-3', 'Boas-vindas'));
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
-    await user.click(await screen.findByRole('tab', { name: /Biblioteca de vídeos/ }));
+    await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+    await user.click(screen.getByRole('button', { name: 'Enviar vídeo' }));
     await user.type(screen.getByLabelText('Título do vídeo'), 'Boas-vindas');
     await user.type(screen.getByLabelText('Duração (segundos)'), '90');
     await user.upload(
@@ -303,9 +369,111 @@ describe('Platform course catalog', () => {
 
     expect(await screen.findByRole('status')).toHaveTextContent('O vídeo "Boas-vindas" foi enviado ao catálogo.');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('Título do vídeo')).toHaveValue('');
+    expect(screen.queryByRole('dialog', { name: 'Enviar vídeo' })).not.toBeInTheDocument();
     expect(api.uploadPlatformVideo).toHaveBeenCalledWith('Boas-vindas', 90000, expect.any(File), undefined);
     await waitFor(() => expect(api.listPlatformCourses).toHaveBeenCalledTimes(2));
+  });
+
+  it('suggests the video title from the chosen file name', async () => {
+    const user = userEvent.setup();
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+    await user.click(screen.getByRole('button', { name: 'Enviar vídeo' }));
+    await user.upload(
+      screen.getByLabelText('Arquivo de vídeo'),
+      new File(['video'], 'uso_de-epi.mp4', { type: 'video/mp4' }),
+    );
+
+    expect(screen.getByLabelText('Título do vídeo')).toHaveValue('Uso de epi');
+  });
+
+  it('sends people with an existing training to the video library', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listPlatformCourses).mockResolvedValue([]);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('button', { name: /Tenho um treinamento já existente/ }));
+    expect(screen.getByRole('tab', { name: /Vídeos/ })).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Abertura')).toBeVisible();
+  });
+
+  it('creates a game from the games tab dialog', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.createGameModule).mockResolvedValue(memoryModule);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Jogos e perguntas/ }));
+    await user.click(screen.getByRole('button', { name: 'Novo jogo' }));
+    const dialog = screen.getByRole('dialog', { name: 'Novo jogo' });
+    await user.type(within(dialog).getByLabelText('Nome do jogo'), 'Quiz de EPI');
+    await user.type(within(dialog).getByLabelText('Texto da pergunta 1'), 'Qual EPI protege a cabeça?');
+    await user.type(within(dialog).getByLabelText('Alternativas da pergunta 1'), 'Capacete{Enter}Luva');
+    await user.click(within(dialog).getByRole('button', { name: 'Criar jogo' }));
+
+    expect(api.createGameModule).toHaveBeenCalledWith({
+      title: 'Quiz de EPI',
+      gameType: 'Quiz',
+      questions: [{ text: 'Qual EPI protege a cabeça?', options: ['Capacete', 'Luva'], correctIndex: 0 }],
+      content: null,
+    });
+    expect(await screen.findByRole('status')).toHaveTextContent('O jogo "Quiz de EPI" foi criado.');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('asks before removing a game that courses use', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listGameModules).mockResolvedValue([{ ...memoryModule, usageCount: 2 }]);
+    vi.mocked(api.deleteGameModule).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Jogos e perguntas/ }));
+    await user.click(screen.getByRole('button', { name: `Remover jogo ${memoryModule.title}` }));
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('2 assuntos'));
+    expect(api.deleteGameModule).not.toHaveBeenCalled();
+
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: `Remover jogo ${memoryModule.title}` }));
+    expect(api.deleteGameModule).toHaveBeenCalledWith('g-1');
+    confirm.mockRestore();
+  });
+
+  it('keeps the search when moving between the tabs and filters each list by it', async () => {
+    const user = userEvent.setup();
+    render(<PlatformCoursesPage />);
+    await screen.findByText('Ergonomia');
+    await user.type(screen.getByLabelText('Buscar assunto'), 'Enc');
+
+    await user.click(screen.getByRole('tab', { name: /Vídeos/ }));
+    // the same text still filters, now the videos: one of the two stays
+    expect(screen.getByLabelText('Buscar vídeo')).toHaveValue('Enc');
+    expect(await screen.findByText('Encerramento')).toBeVisible();
+    expect(screen.queryByText('Abertura')).not.toBeInTheDocument();
+    expect(screen.getByText('1 de 2')).toBeVisible();
+
+    await user.click(screen.getByRole('tab', { name: /Assuntos/ }));
+    expect(screen.getByLabelText('Buscar assunto')).toHaveValue('Enc');
+  });
+
+  it('opens the library the way it was left after leaving to another screen', async () => {
+    const user = userEvent.setup();
+    const first = render(<PlatformCoursesPage />);
+    await screen.findByText('Ergonomia');
+    await user.type(screen.getByLabelText('Buscar assunto'), 'incêndio');
+    await user.selectOptions(screen.getByLabelText('Filtrar por categoria'), 'cat-safe');
+    first.unmount();
+
+    render(<PlatformCoursesPage />);
+    expect(await screen.findByLabelText('Buscar assunto')).toHaveValue('incêndio');
+    expect(screen.getByLabelText('Filtrar por categoria')).toHaveValue('cat-safe');
+  });
+
+  it('does not repeat in the header the numbers the tabs already show', async () => {
+    render(<PlatformCoursesPage />);
+    await screen.findByText('Ergonomia');
+    expect(screen.queryByRole('list', { name: 'Resumo do acervo' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Assuntos/ })).toHaveTextContent('2');
   });
 
   it('filters courses by name and status', async () => {
@@ -313,11 +481,11 @@ describe('Platform course catalog', () => {
     render(<PlatformCoursesPage />);
 
     await screen.findByText('Ergonomia');
-    await user.type(screen.getByLabelText('Buscar curso'), 'incêndio');
+    await user.type(screen.getByLabelText('Buscar assunto'), 'incêndio');
     expect(screen.queryByText('Ergonomia')).not.toBeInTheDocument();
     expect(screen.getByText('Combate a incêndio')).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText('Buscar curso'));
+    await user.clear(screen.getByLabelText('Buscar assunto'));
     await user.selectOptions(screen.getByLabelText('Status'), 'Published');
     expect(screen.getByText('Ergonomia')).toBeInTheDocument();
     expect(screen.queryByText('Combate a incêndio')).not.toBeInTheDocument();
@@ -332,8 +500,7 @@ describe('Platform course catalog', () => {
       .mockResolvedValueOnce([ergonomics, fire, copy]);
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
-    await user.click(await screen.findByRole('button', { name: 'Duplicar curso Ergonomia' }));
+    await user.click(await screen.findByRole('button', { name: 'Duplicar assunto Ergonomia' }));
 
     expect(api.duplicatePlatformCourse).toHaveBeenCalledWith('c-1');
     expect(await screen.findByRole('heading', { name: 'Ergonomia (cópia)', level: 1 })).toBeInTheDocument();
@@ -345,8 +512,7 @@ describe('Platform course catalog', () => {
     vi.mocked(api.setPlatformCourseCover).mockResolvedValue({ ...ergonomics, coverUrl: '/cover?v=1' });
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
-    await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' }));
     await user.click(screen.getByRole('button', { name: 'Configurar' }));
     expect(screen.getByRole('heading', { name: 'Detalhes do curso' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Informações e preferências' })).toBeVisible();
@@ -360,18 +526,58 @@ describe('Platform course catalog', () => {
 
   it('reorders the videos of a course', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.setPlatformCourseVideos).mockResolvedValue({
+    vi.mocked(api.setPlatformCourseStructure).mockResolvedValue({
       ...ergonomics,
       videos: [closing, opening],
     });
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
-    await user.click(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' }));
     await user.click(screen.getByRole('button', { name: 'Mover Abertura para baixo' }));
 
-    expect(api.setPlatformCourseVideos).toHaveBeenCalledWith('c-1', ['v-2', 'v-1']);
+    expect(api.setPlatformCourseStructure).toHaveBeenCalledWith('c-1', [
+      expect.objectContaining({
+        title: 'Aula 1',
+        videos: [{ videoId: 'v-2', title: null }, { videoId: 'v-1', title: null }],
+      }),
+    ]);
     expect(screen.getByRole('button', { name: 'Mover Abertura para cima' })).toBeDisabled();
+  });
+
+  it('edits course-only video titles straight from the flat list of videos', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.setPlatformCourseStructure).mockResolvedValue(ergonomics);
+    render(<PlatformCoursesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' }));
+
+    const videoTitle = screen.getByLabelText('Título do vídeo 1');
+    await user.clear(videoTitle);
+    await user.type(videoTitle, 'Boas-vindas{Enter}');
+    expect(api.setPlatformCourseStructure).toHaveBeenLastCalledWith('c-1', [
+      expect.objectContaining({ videos: [{ videoId: 'v-1', title: 'Boas-vindas' }, { videoId: 'v-2', title: null }] }),
+    ]);
+
+    // the theme is a flat list of videos: there is no lesson level to edit
+    expect(screen.queryByRole('button', { name: 'Adicionar aula' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Nome da aula 1')).not.toBeInTheDocument();
+  });
+
+  it('adds an activity right after a video with one click from the track', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.listGameModules).mockResolvedValue([memoryModule]);
+    vi.mocked(api.setPlatformCourseModules).mockResolvedValue(ergonomics);
+    render(<PlatformCoursesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' }));
+
+    const buttons = screen.getAllByRole('button', { name: 'Atividade depois deste vídeo' });
+    await user.click(buttons[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Adicionar atividade' });
+    await user.click(within(dialog).getByRole('button', { name: new RegExp(memoryModule.title) }));
+
+    expect(api.setPlatformCourseModules).toHaveBeenCalledWith('c-1', [
+      ...ergonomics.modules,
+      { moduleId: memoryModule.id, afterVideoCount: 1 },
+    ]);
   });
 
   it('saves gamification and status changes of a course', async () => {
@@ -379,8 +585,7 @@ describe('Platform course catalog', () => {
     vi.mocked(api.updatePlatformCourse).mockResolvedValue({ ...fire, gamificationEnabled: true, gameType: 'Puzzle' });
     render(<PlatformCoursesPage />);
 
-    await user.click(screen.getByRole('button', { name: 'Pesquisar biblioteca' }));
-    await user.click(await screen.findByRole('button', { name: 'Abrir curso Combate a incêndio' }));
+    await user.click(await screen.findByRole('button', { name: 'Abrir assunto Combate a incêndio' }));
     await user.click(screen.getByRole('button', { name: 'Configurar' }));
     await user.click(screen.getByLabelText(/Gamificação após os vídeos/));
     await user.click(screen.getByLabelText(/Quebra-cabeça/));
@@ -397,13 +602,13 @@ describe('Platform course catalog', () => {
 
   it('shows existing courses directly without opening a popup', async () => {
     render(<PlatformCoursesPage />);
-    expect(await screen.findByRole('heading', { name: 'Cursos', level: 1 })).toBeVisible();
-    expect(screen.getByText('2 cursos no catálogo da plataforma')).toBeVisible();
-    expect(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Abrir curso Combate a incêndio' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Biblioteca', level: 1 })).toBeVisible();
+    expect(screen.getByText('2 assuntos no acervo da plataforma')).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Abrir assunto Combate a incêndio' })).toBeVisible();
     expect(screen.getByText('2 vídeos · 3:00')).toBeVisible();
     expect(screen.queryByText('Postura')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Todas as opções' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByRole('combobox', { name: 'Filtrar por categoria' })).toHaveValue('all');
     expect(screen.queryByRole('region', { name: 'Como deseja começar?' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
@@ -418,11 +623,11 @@ describe('Platform course catalog', () => {
   it('distinguishes a filtered empty result from an empty catalog', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
-    await user.type(await screen.findByLabelText('Buscar curso'), 'inexistente');
+    await user.type(await screen.findByLabelText('Buscar assunto'), 'inexistente');
     expect(screen.getByText('Nenhum curso corresponde aos filtros.')).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Como deseja começar?' })).not.toBeInTheDocument();
-    await user.clear(screen.getByLabelText('Buscar curso'));
-    expect(screen.getByRole('button', { name: 'Abrir curso Ergonomia' })).toBeVisible();
+    await user.clear(screen.getByLabelText('Buscar assunto'));
+    expect(screen.getByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
   });
 
   it('opens the dedicated editor route and previews the selected video', async () => {
@@ -431,11 +636,13 @@ describe('Platform course catalog', () => {
     expect(await screen.findByRole('heading', { name: 'Ergonomia' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Editar' })).toHaveAttribute('aria-current', 'step');
     expect(screen.getByLabelText('Prévia de Abertura')).toHaveAttribute('src', '/videos/v-1');
-    await user.click(screen.getByRole('button', { name: 'Encerramento' }));
+    await user.click(screen.getByLabelText('Título do vídeo 2'));
     expect(screen.getByLabelText('Prévia de Encerramento')).toHaveAttribute('src', '/videos/v-2');
     await user.click(screen.getByRole('button', { name: 'Desktop' }));
     expect(screen.getByRole('button', { name: 'Desktop' })).toHaveAttribute('aria-pressed', 'true');
     await user.click(screen.getByRole('button', { name: 'Próximo: Configurar →' }));
+    expect(screen.getByRole('button', { name: 'Configurar' })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('button', { name: 'Editar' })).toHaveTextContent('1');
     expect(screen.getByLabelText('Nome do curso')).toHaveValue('Ergonomia');
     await user.click(screen.getByRole('button', { name: 'Próximo: Publicar →' }));
     const review = screen.getByRole('region', { name: 'Revisar e publicar' });
@@ -461,10 +668,10 @@ describe('Platform course catalog', () => {
     expect(within(dialog).getByText('Sem pontos · nunca bloqueia o progresso')).toBeVisible();
     expect(within(dialog).getByLabelText('Atividade')).toBeVisible();
     expect(within(dialog).getByLabelText('Quando exibir')).toHaveValue('2');
-    expect(within(dialog).getByRole('button', { name: 'Adicionar à trilha' })).toBeDisabled();
+    expect(within(dialog).getByRole('button', { name: 'Adicionar ao assunto' })).toBeDisabled();
 
     await user.selectOptions(within(dialog).getByLabelText('Atividade'), 'g-1');
-    expect(within(dialog).getByRole('button', { name: 'Adicionar à trilha' })).toBeEnabled();
+    expect(within(dialog).getByRole('button', { name: 'Adicionar ao assunto' })).toBeEnabled();
     const firstVideo = within(dialog).getByText('Vídeo 1 · Abertura').closest('details')!;
     expect(firstVideo).not.toHaveAttribute('open');
     await user.click(within(dialog).getByText('Vídeo 1 · Abertura'));
@@ -510,7 +717,7 @@ describe('Platform course catalog', () => {
     expect(screen.getByLabelText('Nome do curso')).toBeVisible();
     confirm.mockReturnValue(true);
     await user.click(screen.getByRole('button', { name: '← Voltar ao conteúdo' }));
-    expect(await screen.findByRole('button', { name: 'Abrir curso Ergonomia' })).toBeVisible();
+    expect(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
     confirm.mockRestore();
   });
 
@@ -605,12 +812,41 @@ describe('Platform course catalog', () => {
     const user = userEvent.setup();
     vi.mocked(api.createPlatformCourse).mockResolvedValue(fire);
     render(<PlatformCoursesPage />);
-    await user.click(screen.getByRole('button', { name: '+ Criar curso' }));
+    await user.click(screen.getByRole('button', { name: 'Criar assunto' }));
     await user.type(screen.getByLabelText('Título (obrigatório)'), 'Novo curso');
     await user.click(screen.getByLabelText('Gamificação após os vídeos'));
     await user.click(screen.getByRole('button', { name: 'Criar' }));
     expect(api.createPlatformCourse).toHaveBeenCalledWith({
-      title: 'Novo curso', description: 'Opção 1', gamificationEnabled: true,
+      title: 'Novo curso', description: null, gamificationEnabled: true,
     });
+  });
+
+  it('deletes a theme only after asking', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.deletePlatformCourse).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('button', { name: 'Excluir assunto Ergonomia' }));
+    expect(api.deletePlatformCourse).not.toHaveBeenCalled();
+    confirm.mockReturnValue(true);
+    await user.click(screen.getByRole('button', { name: 'Excluir assunto Ergonomia' }));
+    expect(api.deletePlatformCourse).toHaveBeenCalledWith('c-1');
+    expect(await screen.findByText('O assunto "Ergonomia" foi excluído.')).toBeVisible();
+    confirm.mockRestore();
+  });
+
+  it('deletes a video from the library and shows why when it is still in use', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.deletePlatformVideo).mockRejectedValueOnce(new Error('Este vídeo ainda está em uso (1 assunto). Tire-o de lá antes de excluir.')).mockResolvedValue(undefined);
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+    await user.click((await screen.findAllByRole('button', { name: /^Excluir vídeo / }))[0]);
+    expect(await screen.findByRole('alert')).toHaveTextContent('ainda está em uso');
+    await user.click(screen.getAllByRole('button', { name: /^Excluir vídeo / })[0]);
+    await waitFor(() => expect(api.deletePlatformVideo).toHaveBeenCalledTimes(2));
+    confirm.mockRestore();
   });
 });

@@ -324,7 +324,10 @@ public sealed class EfLearningStore(
                 completedLessonCount == revisionLessons.Length
                     ? 100
                     : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
-                completedLessonCount == revisionLessons.Length));
+                completedLessonCount == revisionLessons.Length,
+                watchedDuration,
+                completedLessonCount == revisionLessons.Length ? participantProgress.Max(item => item.CompletedAt) : null,
+                participantProgress.Length == 0 ? null : LastAccess(progress, assignment.ParticipantId, revisionId)));
         }
 
         return rows
@@ -332,6 +335,11 @@ public sealed class EfLearningStore(
             .ThenBy(item => item.TrackTitle)
             .ToArray();
     }
+
+    private static DateTimeOffset? LastAccess(
+        IEnumerable<LearningProgressEntity> progress, Guid participantId, Guid revisionId) =>
+        progress.Where(item => item.ParticipantId == participantId && item.RevisionId == revisionId)
+            .Select(item => (DateTimeOffset?)item.LastAccessedAt).Max();
 
     public async Task<LearningExperience?> GetAssignedExperienceAsync(
         TenantId tenantId,
@@ -389,7 +397,9 @@ public sealed class EfLearningStore(
                 domainProgress?.LastPlaybackPositionMilliseconds ?? 0,
                 domainProgress?.WatchedPercentage ?? 0,
                 domainProgress?.IsCompleted ?? false,
-                domainProgress?.CompletedAt);
+                domainProgress?.CompletedAt,
+                entity.SectionTitle,
+                domainProgress?.WatchedMilliseconds ?? 0);
         }).ToArray();
 
         var totalDuration = lessonEntities.Sum(lesson => lesson.DurationMilliseconds);
@@ -399,6 +409,10 @@ public sealed class EfLearningStore(
         var completed = lessons.Count(lesson => lesson.IsCompleted);
         var hasCover = await dbContext.LearningContentSnapshots.AsNoTracking().AnyAsync(
             item => item.TenantId == tenantId.Value && item.RevisionId == revision.Id && item.CoverData != null, cancellationToken);
+        var sipat = await dbContext.SipatEvents.AsNoTracking()
+            .Where(item => item.Id == trackEntity.SipatEventId && item.TenantId == tenantId.Value)
+            .Select(item => new { item.Title, item.StartsAt, item.EndsAt, item.Status })
+            .SingleOrDefaultAsync(cancellationToken);
         var card = new LearningTrackCard(
             trackEntity.Id,
             trackEntity.SipatEventId,
@@ -410,7 +424,16 @@ public sealed class EfLearningStore(
             lessons.Length > 0 && completed == lessons.Length
                 ? 100
                 : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
-            hasCover ? $"/api/learning/tracks/{trackId:D}/cover" : null);
+            hasCover ? $"/api/learning/tracks/{trackId:D}/cover" : null,
+            trackEntity.DayTitle,
+            trackEntity.DayPosition,
+            trackEntity.CoursePosition,
+            trackEntity.DayDate,
+            totalDuration,
+            sipat?.Title,
+            sipat?.StartsAt,
+            sipat?.Status.ToString(),
+            sipat?.EndsAt);
 
         return new LearningExperience(card, lessons);
     }

@@ -252,7 +252,7 @@ public sealed class GameModuleService(
         {
             return Failure<(string, IReadOnlyList<GameQuestion>)>(
                 "learning.game_module.content_invalid",
-                "Preencha o conteúdo do jogo: imagem e riscos, imagem e grade, pares ou sequência de 2 a 12 itens.");
+                "Preencha o conteúdo do jogo: imagem e riscos, imagem e grade, pares, sequência de 2 a 12 itens ou de 3 a 20 cartas.");
         }
 
         return Result<(string, IReadOnlyList<GameQuestion>)>.Success((normalizedTitle, cleaned));
@@ -277,6 +277,8 @@ public sealed class GameModuleService(
                 risks.All(risk => risk is not null && Text(risk.Label) &&
                     risk.X >= 0 && risk.Y >= 0 && risk.Width > 0 && risk.Height > 0 &&
                     risk.X + risk.Width <= 100 && risk.Y + risk.Height <= 100),
+            GamificationGameType.SafeOrRisky => content.Cards is { Count: >= 3 and <= 20 } cards &&
+                cards.All(card => card is not null && Text(card.Text) && (card.Explanation is null || card.Explanation.Length <= 300)),
             _ => false
         };
     }
