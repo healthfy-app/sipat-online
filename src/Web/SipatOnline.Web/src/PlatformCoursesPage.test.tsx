@@ -95,6 +95,7 @@ const fire: api.PlatformCourse = {
 };
 
 beforeEach(() => {
+  sessionStorage.clear();
   vi.mocked(api.createPlatformCourse).mockReset();
   vi.mocked(api.setPlatformCourseCover).mockReset();
   Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:course-cover') });
@@ -438,16 +439,53 @@ describe('Platform course catalog', () => {
     confirm.mockRestore();
   });
 
+  it('keeps the search when moving between the tabs and filters each list by it', async () => {
+    const user = userEvent.setup();
+    render(<PlatformCoursesPage />);
+    await screen.findByText('Ergonomia');
+    await user.type(screen.getByLabelText('Buscar assunto'), 'Enc');
+
+    await user.click(screen.getByRole('tab', { name: /Vídeos/ }));
+    // the same text still filters, now the videos: one of the two stays
+    expect(screen.getByLabelText('Buscar vídeo')).toHaveValue('Enc');
+    expect(await screen.findByText('Encerramento')).toBeVisible();
+    expect(screen.queryByText('Abertura')).not.toBeInTheDocument();
+    expect(screen.getByText('1 de 2')).toBeVisible();
+
+    await user.click(screen.getByRole('tab', { name: /Assuntos/ }));
+    expect(screen.getByLabelText('Buscar assunto')).toHaveValue('Enc');
+  });
+
+  it('opens the library the way it was left after leaving to another screen', async () => {
+    const user = userEvent.setup();
+    const first = render(<PlatformCoursesPage />);
+    await screen.findByText('Ergonomia');
+    await user.type(screen.getByLabelText('Buscar assunto'), 'incêndio');
+    await user.selectOptions(screen.getByLabelText('Filtrar por categoria'), 'cat-safe');
+    first.unmount();
+
+    render(<PlatformCoursesPage />);
+    expect(await screen.findByLabelText('Buscar assunto')).toHaveValue('incêndio');
+    expect(screen.getByLabelText('Filtrar por categoria')).toHaveValue('cat-safe');
+  });
+
+  it('does not repeat in the header the numbers the tabs already show', async () => {
+    render(<PlatformCoursesPage />);
+    await screen.findByText('Ergonomia');
+    expect(screen.queryByRole('list', { name: 'Resumo do acervo' })).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: /Assuntos/ })).toHaveTextContent('2');
+  });
+
   it('filters courses by name and status', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
 
     await screen.findByText('Ergonomia');
-    await user.type(screen.getByLabelText('Buscar curso'), 'incêndio');
+    await user.type(screen.getByLabelText('Buscar assunto'), 'incêndio');
     expect(screen.queryByText('Ergonomia')).not.toBeInTheDocument();
     expect(screen.getByText('Combate a incêndio')).toBeInTheDocument();
 
-    await user.clear(screen.getByLabelText('Buscar curso'));
+    await user.clear(screen.getByLabelText('Buscar assunto'));
     await user.selectOptions(screen.getByLabelText('Status'), 'Published');
     expect(screen.getByText('Ergonomia')).toBeInTheDocument();
     expect(screen.queryByText('Combate a incêndio')).not.toBeInTheDocument();
@@ -585,10 +623,10 @@ describe('Platform course catalog', () => {
   it('distinguishes a filtered empty result from an empty catalog', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
-    await user.type(await screen.findByLabelText('Buscar curso'), 'inexistente');
+    await user.type(await screen.findByLabelText('Buscar assunto'), 'inexistente');
     expect(screen.getByText('Nenhum curso corresponde aos filtros.')).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Como deseja começar?' })).not.toBeInTheDocument();
-    await user.clear(screen.getByLabelText('Buscar curso'));
+    await user.clear(screen.getByLabelText('Buscar assunto'));
     expect(screen.getByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
   });
 

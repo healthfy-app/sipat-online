@@ -795,15 +795,10 @@
 
 
 /* Biblioteca: a mesma linguagem do /learning — palco escuro, abas em pílula, cartões arredondados */
-.library-tabs { padding-bottom: 0.25rem; }
-.library-tab {
-  padding: 0.65rem 1.15rem !important; border: 1px solid #dfe6e3 !important; border-radius: 14px !important; font-size: 1rem !important; letter-spacing: -0.01em; background: #fff !important;
-  color: #3d514b; font-weight: 700; transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
-}
-.library-tab::after { display: none; }
-.library-tab:hover { border-color: #12332c !important; color: #12332c; }
-.library-tab[data-state='active'] { background: #12332c !important; border-color: #12332c !important; color: #fff !important; }
-.library-tab[data-state='active'] span { background: rgb(255 255 255 / 18%); color: #fff; }
+.library-tab { color: #3d514b; font-weight: 700; }
+.library-tab:hover { color: #12332c; }
+.library-tab[data-state='active'] { color: #12332c !important; font-weight: 800; }
+.library-tab::after { height: 3px !important; border-radius: 3px 3px 0 0; background: #12332c !important; }
 .library-filters [role='group'] { background: #eef2f0; border-radius: 12px; }
 .library-filters [aria-pressed='true'] { background: #12332c !important; color: #fff !important; box-shadow: none !important; }
 .library-filters input:focus-visible, .library-filters select:focus-visible { outline: 3px solid #ffd166; outline-offset: 2px; }

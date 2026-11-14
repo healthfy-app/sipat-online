@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   deleteGameModule,
   deletePlatformCourse,
@@ -17,6 +18,8 @@ import { TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components
 import { VideoUploadForm } from '@/courseEditor/CourseMediaForms';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
+import CatalogToolbar, { type CatalogTab } from './CatalogToolbar';
+import { filterCourses, filterModules, filterVideos, hasCourseFilters, type CatalogFilters, type StatusFilter } from './catalogFilters';
 import CourseStartOptions from './CourseStartOptions';
 import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
@@ -28,7 +31,9 @@ import PlanSubjectsPanel from './PlanSubjectsPanel';
 import VideoLibraryPanel from './VideoLibraryPanel';
 import '@/OpsIdentity.css';
 
-type CatalogTab = 'courses' | 'videos' | 'modules' | 'plans';
+const catalogTabs: CatalogTab[] = ['courses', 'videos', 'modules', 'plans'];
+/** The last view of the library (tab, search and filters), kept for the session so coming back from an editor finds it as it was. */
+const viewKey = 'sipat-library-view';
 type CatalogDialog =
   | { kind: 'create' }
   | { kind: 'categories' }
@@ -67,13 +72,61 @@ export default function CourseCatalog({
   onProgramsChanged: (message: string) => Promise<void>;
   onError: (message: string) => void;
 }) {
-  const [tab, setTab] = useState<CatalogTab>('courses');
+  const [params, setParams] = useSearchParams();
+  const requestedTab = params.get('aba');
+  const tab: CatalogTab = catalogTabs.includes(requestedTab as CatalogTab) ? (requestedTab as CatalogTab) : 'courses';
+  const filters: CatalogFilters = {
+    query: params.get('q') ?? '',
+    status: (params.get('status') as StatusFilter | null) ?? 'all',
+    category: params.get('categoria') ?? 'all',
+  };
+
+  function patchParams(updates: Record<string, string | null>) {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      for (const [key, value] of Object.entries(updates)) {
+        if (value === null || value === '' || value === 'all') next.delete(key); else next.set(key, value);
+      }
+      return next;
+    }, { replace: true });
+  }
+  const setTab = (next: CatalogTab) => patchParams({ aba: next === 'courses' ? null : next });
+  const changeFilters = (patch: Partial<CatalogFilters>) => patchParams({
+    ...('query' in patch ? { q: patch.query ?? '' } : {}),
+    ...('status' in patch ? { status: patch.status ?? 'all' } : {}),
+    ...('category' in patch ? { categoria: patch.category ?? 'all' } : {}),
+  });
+  const clearFilters = () => patchParams({ q: null, status: null, categoria: null });
+
+  // coming back to the library (from an editor, another screen) restores the view it had
+  useEffect(() => {
+    try {
+      const saved = sessionStorage.getItem(viewKey);
+      if (saved && params.toString() === '') setParams(new URLSearchParams(saved), { replace: true });
+    } catch { /* no storage: the library simply opens clean */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try { sessionStorage.setItem(viewKey, params.toString()); } catch { /* idem */ }
+  }, [params]);
   const { categories, create: createCategory, reload: reloadCategories } = useCourseCategories();
   const [dialog, setDialog] = useState<CatalogDialog | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const shownCourses = useMemo(() => filterCourses(courses, categories, filters), [courses, categories, filters.query, filters.status, filters.category]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shownVideos = useMemo(() => filterVideos(library, filters.query), [library, filters.query]);
+  const shownModules = useMemo(() => filterModules(modules, filters.query), [modules, filters.query]);
+  const knownCategories = new Set(categories.map((item) => item.id));
+  const hasUncategorized = courses.some((course) => !course.categoryId || !knownCategories.has(course.categoryId));
+  const isFiltered = tab === 'courses' ? hasCourseFilters(filters) : filters.query.trim() !== '';
+  const countText = {
+    courses: isFiltered ? `${shownCourses.length} de ${courses.length}` : pluralize(courses.length, 'curso', 'cursos'),
+    videos: isFiltered ? `${shownVideos.length} de ${library.length}` : pluralize(library.length, 'vídeo', 'vídeos'),
+    modules: isFiltered ? `${shownModules.length} de ${modules.length}` : pluralize(modules.length, 'jogo', 'jogos'),
+    plans: '',
+  }[tab];
   const isEmptyCatalog = !isLoading && !error && courses.length === 0;
   const showTabs = !isEmptyCatalog || tab !== 'courses';
   const tabs: { id: CatalogTab; label: string; count: number }[] = [
@@ -154,13 +207,6 @@ export default function CourseCatalog({
             {import.meta.env.DEV && <Badge variant="outline">Apresentação demo</Badge>}
           </div>
           <p className="ops-hero-lead">{`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}</p>
-          <ul aria-label="Resumo do acervo" className="ops-hero-stats">
-            {[
-              [courses.length, 'assuntos'],
-              [library.length, 'vídeos'],
-              [modules.length, 'jogos e perguntas'],
-            ].map(([count, label]) => <li key={label}><strong>{count}</strong> {label}</li>)}
-          </ul>
         </div>
         {primaryAction && <div className="ops-hero-actions">{primaryAction}</div>}
       </header>
@@ -174,7 +220,7 @@ export default function CourseCatalog({
 
       <Tabs onValueChange={(value) => setTab(value as CatalogTab)} value={tab}>
         {showTabs && (
-          <TabsList aria-label="Seções do catálogo" className="library-tabs gap-2 border-0">
+          <TabsList aria-label="Seções do catálogo">
             {tabs.map((item) => (
               <TabsTrigger className="library-tab" key={item.id} value={item.id}>
                 {item.label} <TabCount>{item.count}</TabCount>
@@ -183,22 +229,38 @@ export default function CourseCatalog({
           </TabsList>
         )}
 
+        {showTabs && tab !== 'plans' && (
+          <CatalogToolbar
+            categories={categories}
+            countText={countText}
+            filters={filters}
+            hasUncategorized={hasUncategorized}
+            isFiltered={isFiltered}
+            onChange={changeFilters}
+            onClear={clearFilters}
+            onManageCategories={() => setDialog({ kind: 'categories' })}
+            tab={tab}
+          />
+        )}
+
         <TabsContent value="courses">
           {body ?? (isEmptyCatalog
             ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
-            : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} categories={categories} courses={courses} onManageCategories={() => setDialog({ kind: 'categories' })} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
+            : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} categories={categories} courses={shownCourses} onClearFilters={clearFilters} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
         </TabsContent>
         <TabsContent value="plans">
           {body ?? <PlanSubjectsPanel />}
         </TabsContent>
         <TabsContent value="videos">
-          {body ?? <VideoLibraryPanel busy={isDeleting} library={library} onDelete={(item) => void removeVideo(item)} onUpload={openUpload} />}
+          {body ?? <VideoLibraryPanel busy={isDeleting} hasVideos={library.length > 0} library={shownVideos} onClearFilters={clearFilters} onDelete={(item) => void removeVideo(item)} onUpload={openUpload} />}
         </TabsContent>
         <TabsContent value="modules">
           {body ?? (
             <GameModulesPanel
               busy={isDeleting}
-              modules={modules}
+              hasModules={modules.length > 0}
+              modules={shownModules}
+              onClearFilters={clearFilters}
               onCreate={() => setDialog({ kind: 'game', module: null })}
               onDelete={(module) => void removeGame(module)}
               onEdit={(module) => setDialog({ kind: 'game', module })}

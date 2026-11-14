@@ -8,24 +8,25 @@ import VideoPreview from '@/VideoPreview';
 
 export default function VideoLibraryPanel({
   library,
+  hasVideos = false,
+  onClearFilters = () => undefined,
   busy,
   onUpload,
   onDelete,
 }: {
   library: PlatformLibraryVideo[];
+  hasVideos?: boolean;
+  onClearFilters?: () => void;
   busy: boolean;
   onUpload: () => void;
   onDelete: (video: PlatformLibraryVideo) => void;
 }) {
   return (
     <section aria-label="Vídeos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <p className="m-0 text-sm text-muted-foreground">Vídeos reutilizáveis em qualquer assunto do acervo.</p>
-        <span className="text-[0.8125rem] tabular-nums text-muted-foreground">{pluralize(library.length, 'vídeo', 'vídeos')}</span>
-      </div>
-
       {library.length === 0 ? (
-        <EmptyState action={<Button onClick={onUpload}>Enviar o primeiro vídeo</Button>} title="A biblioteca ainda não tem vídeos." />
+        hasVideos
+          ? <EmptyState action={<Button onClick={onClearFilters} variant="outline">Limpar filtros</Button>} title="Nenhum vídeo corresponde à busca." />
+          : <EmptyState action={<Button onClick={onUpload}>Enviar o primeiro vídeo</Button>} title="A biblioteca ainda não tem vídeos." />
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {library.map((item) => {

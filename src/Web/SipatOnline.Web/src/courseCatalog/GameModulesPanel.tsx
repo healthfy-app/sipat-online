@@ -13,12 +13,16 @@ const warmTypes = new Set(['RiskSpotting', 'Scenario', 'SafeOrRisky']);
 
 export default function GameModulesPanel({
   modules,
+  hasModules = false,
+  onClearFilters = () => undefined,
   busy,
   onCreate,
   onEdit,
   onDelete,
 }: {
   modules: GameModule[];
+  hasModules?: boolean;
+  onClearFilters?: () => void;
   busy: boolean;
   onCreate: () => void;
   onEdit: (module: GameModule) => void;
@@ -27,13 +31,10 @@ export default function GameModulesPanel({
   const [testing, setTesting] = useState<GameModule | null>(null);
   return (
     <section aria-label="Jogos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <p className="m-0 text-sm text-muted-foreground">Jogos e perguntas para colocar entre os vídeos ou durante a reprodução.</p>
-        <span className="text-[0.8125rem] tabular-nums text-muted-foreground">{pluralize(modules.length, 'jogo', 'jogos')}</span>
-      </div>
-
       {modules.length === 0 ? (
-        <EmptyState action={<Button onClick={onCreate}>Criar o primeiro jogo</Button>} title="Nenhum jogo ainda." />
+        hasModules
+          ? <EmptyState action={<Button onClick={onClearFilters} variant="outline">Limpar filtros</Button>} title="Nenhum jogo corresponde à busca." />
+          : <EmptyState action={<Button onClick={onCreate}>Criar o primeiro jogo</Button>} title="Nenhum jogo ainda." />
       ) : (
         <ul className="m-0 grid list-none overflow-hidden rounded-lg bg-card p-0 shadow-card">
           {modules.map((module) => (
