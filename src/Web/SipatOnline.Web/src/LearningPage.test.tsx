@@ -735,6 +735,8 @@ describe('learning experience', () => {
     await user.click(toggle);
     expect(within(first).getByRole('button', { name: 'Abrir Dia 1' })).toHaveAttribute('aria-expanded', 'false');
     expect(first.querySelector('.week-day-body')).toHaveAttribute('inert');
+    // the way into the day stays at hand while it is collapsed
+    expect(within(first).getByRole('link', { name: 'Ir para o Dia 1' })).toHaveAttribute('href', '/learning/tracks/ergonomia');
     expect(await screen.findByRole('link', { name: /Respiração/ })).toBeVisible();
 
     await user.click(within(first).getByRole('button', { name: 'Abrir Dia 1' }));

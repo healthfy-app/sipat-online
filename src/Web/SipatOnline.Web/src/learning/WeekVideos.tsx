@@ -1,4 +1,4 @@
-import { Check, ChevronDown, Play } from 'lucide-react';
+import { ArrowRight, Check, ChevronDown, Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAssignedLearningTrack, type LearningLessonProgress, type LearningTrackCard } from '@/api';
@@ -72,6 +72,11 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
             <div className="week-day-progress">
               <ProgressBar label={`Progresso de ${day.title}`} value={total === 0 ? 0 : Math.round((done / total) * 100)} />
             </div>
+            {day.tracks[0] && <Link
+              aria-label={`Ir para o ${day.position ? `Dia ${day.position}` : day.title}`}
+              className="week-day-open"
+              to={getTrackPath(day.tracks[0], allTracks)}
+            >Abrir dia <ArrowRight aria-hidden="true" /></Link>}
             <button
               aria-controls={bodyId}
               aria-expanded={open}
