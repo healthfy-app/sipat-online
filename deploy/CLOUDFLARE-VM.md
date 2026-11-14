@@ -91,6 +91,29 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
 
 **Antes do go-live:** confirme nos termos de uso da Cloudflare que servir vídeo pelo R2 é permitido no seu plano. **Plano B:** se houver qualquer problema, defina `VIDEO_STORAGE_PROVIDER=File` (ou apague a variável) e reinicie a API; ela volta a servir os vídeos do volume `platform-videos`, que por isso deve continuar existindo e com cópia externa.
 
+### Backup diário do banco no R2
+O banco roda na própria VM; sem cópia externa, perder o disco é perder tudo. Todo dia às 03:00 um *timer* grava um `pg_dump` no R2 e apaga as cópias com mais de 30 dias.
+
+1. Instale o rclone: `sudo apt install rclone` (ou `curl https://rclone.org/install.sh | sudo bash`).
+2. No painel da Cloudflare, em **R2**, crie um bucket **privado** só para backups (por exemplo, `sipat-backups`, separado do bucket de vídeos). Crie uma chave de API do R2 com leitura e escrita **somente nesse bucket**.
+3. Configure o remote chamado `r2` (rode como o usuário que executará o backup, normalmente `root`): `rclone config`, `n`, nome `r2`, tipo `s3`, provedor `Cloudflare`, informe *Access Key ID* e *Secret Access Key*, e em *endpoint* `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`. Teste com `rclone lsd r2:`.
+4. No `deploy/.env.production`, acrescente `R2_BACKUP_BUCKET=sipat-backups`.
+5. Rode uma vez à mão e confira o arquivo: `deploy/scripts/backup-postgres.sh` e `rclone ls r2:sipat-backups/postgres`.
+6. Instale e ative o timer (ajuste `WorkingDirectory` e `ExecStart` em `sipat-backup.service` se o repositório não estiver em `/opt/sipat-online`):
+   ```bash
+   sudo cp deploy/systemd/sipat-backup.service deploy/systemd/sipat-backup.timer /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now sipat-backup.timer
+   systemctl list-timers sipat-backup.timer   # próxima execução
+   journalctl -u sipat-backup.service -e      # resultado da última
+   ```
+7. **Ensaie a restauração antes de 25/11.** Restaurar não toca no banco em uso: cria o banco novo `sipat_online_restore_test` (apagando-o antes, se existir) e imprime as contagens de `Tenants`, `LearningProgress` e `PlatformCourseVideos` para você comparar com a produção:
+   ```bash
+   deploy/scripts/restore-postgres.sh r2:sipat-backups/postgres/<arquivo>.dump
+   docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml exec -T postgres sh -c 'dropdb -U "$POSTGRES_USER" sipat_online_restore_test'   # ao terminar
+   ```
+   Os vídeos que ainda estiverem no volume `platform-videos` (plano B) não entram neste backup; os que estão no R2 já ficam fora da VM.
+
 ## 6. Atualizar
 ```bash
 git pull   # na VM, com o método autenticado de sua escolha

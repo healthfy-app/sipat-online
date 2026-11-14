@@ -1,0 +1,10 @@
+[Unit]
+Description=SIPAT Online daily Postgres backup to R2
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# Adjust the path to where the repository is cloned on the VM.
+WorkingDirectory=/opt/sipat-online
+ExecStart=/opt/sipat-online/deploy/scripts/backup-postgres.sh
