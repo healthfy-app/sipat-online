@@ -1,4 +1,4 @@
-import { Check, Play } from 'lucide-react';
+import { Check, ChevronDown, Play } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAssignedLearningTrack, type LearningLessonProgress, type LearningTrackCard } from '@/api';
@@ -26,6 +26,8 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
   days: DayGroup[]; allTracks: LearningTrackCard[]; selectedKey: string | null; onShowAll: () => void;
 }) {
   const [lessons, setLessons] = useState<LessonsByTrack>({});
+  const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
+  const toggle = (key: string) => setClosed(known => { const next = new Set(known); if (!next.delete(key)) next.add(key); return next; });
   const trackIds = days.flatMap(day => day.tracks.map(track => track.id)).join(',');
 
   useEffect(() => {
@@ -56,7 +58,9 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
         const date = formatDayDate(day.tracks[0]?.dayDate);
         const complete = total > 0 && done === total;
         const headingId = `week-day-${dayIndex}`;
-        return <section aria-labelledby={headingId} className="week-day" key={day.key}>
+        const bodyId = `week-day-body-${dayIndex}`;
+        const open = !closed.has(day.key);
+        return <section aria-labelledby={headingId} className={`week-day${open ? '' : ' is-collapsed'}`} key={day.key}>
           <header className="week-day-header">
             <span aria-hidden="true" className={`week-day-number${complete ? ' is-done' : done > 0 ? ' is-progress' : ''}`}>
               {complete ? <Check /> : day.position ?? '•'}
@@ -68,7 +72,17 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
             <div className="week-day-progress">
               <ProgressBar label={`Progresso de ${day.title}`} value={total === 0 ? 0 : Math.round((done / total) * 100)} />
             </div>
+            <button
+              aria-controls={bodyId}
+              aria-expanded={open}
+              aria-label={`${open ? 'Recolher' : 'Abrir'} ${day.position ? `Dia ${day.position}` : day.title}`}
+              className="week-day-toggle"
+              onClick={() => toggle(day.key)}
+              type="button"
+            ><ChevronDown aria-hidden="true" /></button>
           </header>
+          <div className="week-day-body" id={bodyId} inert={!open}>
+          <div className="week-day-body-inner">
 
           {day.tracks.map(track => {
             const items = lessons[track.id];
@@ -106,6 +120,8 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
               </ol>}
             </div>;
           })}
+          </div>
+          </div>
         </section>;
       })}
     </div>

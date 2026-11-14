@@ -18,7 +18,7 @@
 .portal-layout-learner .week-day {
   display: grid; gap: 1rem; padding: 1.25rem; border: 1px solid var(--learner-border); border-radius: 18px; background: var(--learner-surface);
 }
-.portal-layout-learner .week-day-header { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(8rem, 14rem); align-items: center; gap: 0.5rem 1rem; }
+.portal-layout-learner .week-day-header { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(8rem, 14rem) auto; align-items: center; gap: 0.5rem 1rem; }
 .portal-layout-learner .week-day-number {
   display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%;
   color: #fff; background: var(--learner-forest); font-size: 1.25rem; font-weight: 800; line-height: 1;
@@ -81,7 +81,7 @@
   .portal-layout-learner .week-video-grid { grid-template-columns: minmax(0, 1fr); }
   .portal-layout-learner .week-day { padding: 1rem; }
   .portal-layout-learner .week-day-header { grid-template-columns: auto minmax(0, 1fr); }
-  .portal-layout-learner .week-day-progress { grid-column: 1 / -1; }
+  .portal-layout-learner .week-day-progress { grid-column: 1 / -1; grid-row: 2; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -102,3 +102,19 @@
 .portal-layout-learner .sipat-year[aria-pressed="true"] { border-color: var(--learner-forest); background: var(--learner-forest); color: #fff; }
 .portal-layout-learner .sipat-year[aria-pressed="true"] span { color: rgb(255 255 255 / 80%); }
 .portal-layout-learner .sipat-year:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+
+.portal-layout-learner .week-day-toggle {
+  display: grid; place-items: center; width: 2.25rem; height: 2.25rem; padding: 0; border: 1px solid var(--learner-border, #d9e2de);
+  border-radius: 999px; color: var(--learner-forest); background: #fff; cursor: pointer;
+}
+.portal-layout-learner .week-day-toggle:hover { border-color: var(--learner-forest); }
+.portal-layout-learner .week-day-toggle:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+.portal-layout-learner .week-day-toggle svg { width: 1.25rem; height: 1.25rem; }
+.portal-layout-learner .week-day-body { display: grid; grid-template-rows: 1fr; margin-top: 0.9rem; }
+.portal-layout-learner .week-day-body-inner { display: grid; gap: 0.6rem; min-height: 0; overflow: hidden; }
+.portal-layout-learner .week-day.is-collapsed .week-day-body { grid-template-rows: 0fr; margin-top: 0; }
+.portal-layout-learner .week-day.is-collapsed .week-day-toggle svg { transform: rotate(-90deg); }
+@media (prefers-reduced-motion: no-preference) {
+  .portal-layout-learner .week-day-body { transition: grid-template-rows 320ms cubic-bezier(.16, 1, .3, 1), margin-top 320ms cubic-bezier(.16, 1, .3, 1); }
+  .portal-layout-learner .week-day-toggle svg { transition: transform 260ms cubic-bezier(.16, 1, .3, 1); }
+}

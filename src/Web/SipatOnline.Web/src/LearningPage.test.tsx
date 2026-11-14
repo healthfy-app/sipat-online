@@ -719,6 +719,28 @@ describe('learning experience', () => {
     expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
   });
 
+  it('lets each day of the week be collapsed and opened again', async () => {
+    const user = userEvent.setup();
+    const day1 = { ...trackCard, id: 'a', title: 'Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1 };
+    const day2 = { ...trackCard, id: 'b', title: 'Higiene', dayTitle: 'Mente tranquila', dayPosition: 2, coursePosition: 1 };
+    listAssignedTracks.mockResolvedValue([day1, day2]);
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'a' ? day1 : day2, lessons: [{ ...lesson, id: trackId, title: trackId === 'a' ? 'Ginástica' : 'Respiração' }] }));
+    renderAt('/learning');
+
+    const first = await screen.findByRole('region', { name: 'Dia 1 · Boa postura' });
+    expect(await within(first).findByRole('link', { name: /Ginástica/ })).toBeVisible();
+    const toggle = within(first).getByRole('button', { name: 'Recolher Dia 1' });
+    expect(toggle).toHaveAttribute('aria-expanded', 'true');
+
+    await user.click(toggle);
+    expect(within(first).getByRole('button', { name: 'Abrir Dia 1' })).toHaveAttribute('aria-expanded', 'false');
+    expect(first.querySelector('.week-day-body')).toHaveAttribute('inert');
+    expect(await screen.findByRole('link', { name: /Respiração/ })).toBeVisible();
+
+    await user.click(within(first).getByRole('button', { name: 'Abrir Dia 1' }));
+    expect(await within(first).findByRole('link', { name: /Ginástica/ })).toBeVisible();
+  });
+
   it('keeps the trail in front from the first visit, and a day on it filters the videos below', async () => {
     const user = userEvent.setup();
     const day1 = { ...trackCard, id: 'a', title: 'Uso de EPI', lessonCount: 2, completedLessonCount: 2, progressPercentage: 100, dayTitle: 'Segurança', dayPosition: 1, coursePosition: 1 };
