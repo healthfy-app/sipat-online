@@ -1,6 +1,7 @@
 using System.Globalization;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application.Catalog;
 
@@ -533,7 +534,7 @@ public static class PlatformCourseCatalogEndpoints
         {
             var published = (await courses.ListAsync(cancellationToken))
                 .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
-                .Select(course => new PlanSubjectCourse(course.Id, course.Title, course.Description, course.Videos.Count))
+                .Select(course => new PlanSubjectCourse(course.Id, course.Title, course.Description, course.Videos.Count, course.CategoryId))
                 .ToArray();
             var excluded = new Dictionary<string, IReadOnlyList<Guid>>();
             foreach (var plan in Enum.GetValues<SipatOnline.Infrastructure.Tenancy.CompanyPlan>())
@@ -585,6 +586,7 @@ public static class PlatformCourseCatalogEndpoints
             IPlatformCourseCatalogStore courses,
             IGameModuleStore modules,
             SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
+            SipatOnline.Infrastructure.PlatformDbContext db,
             CancellationToken cancellationToken) =>
         {
             var capabilities = await plans.CapabilitiesAsync(cancellationToken);
@@ -607,7 +609,9 @@ public static class PlatformCourseCatalogEndpoints
             var games = capabilities.Quizzes
                 ? (await modules.ListAsync(cancellationToken)).Select(item => ToResponse(item.Module, item.UsageCount)).ToArray()
                 : [];
-            return Results.Ok(new SipatCatalogResponse(themes, videos, games));
+            var categories = await db.CourseCategories.AsNoTracking().OrderBy(item => item.Position).ThenBy(item => item.Name)
+                .Select(item => new CourseCategoryResponse(item.Id, item.Name, 0)).ToArrayAsync(cancellationToken);
+            return Results.Ok(new SipatCatalogResponse(themes, videos, games, categories));
         })
         .WithName("GetSipatCatalog");
 
@@ -689,7 +693,8 @@ public static class PlatformCourseCatalogEndpoints
                 : $"/api/platform/catalog/courses/{course.Id:D}/cover?v={course.CoverUpdatedAt?.ToUnixTimeMilliseconds()}",
             (course.Lessons ?? [])
                 .Select(lesson => new PlatformCourseLessonDto(lesson.Id, lesson.Title, lesson.Description, lesson.VideoIds))
-                .ToArray());
+                .ToArray(),
+            course.CategoryId);
 
     private static PlatformCourseVideoResponse ToResponse(PlatformCourseVideo video) =>
         new(
@@ -792,14 +797,15 @@ public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Vi
 
 public sealed record PlanSubjectsResponse(IReadOnlyList<PlanSubjectCourse> Courses, IReadOnlyDictionary<string, IReadOnlyList<Guid>> Excluded);
 
-public sealed record PlanSubjectCourse(Guid Id, string Title, string? Description, int VideoCount);
+public sealed record PlanSubjectCourse(Guid Id, string Title, string? Description, int VideoCount, Guid? CategoryId = null);
 
 public sealed record SetPlanSubjectsRequest(IReadOnlyList<Guid>? ExcludedCourseIds);
 
 public sealed record SipatCatalogResponse(
     IReadOnlyList<PlatformCourseResponse> Courses,
     IReadOnlyList<PlatformLibraryVideoResponse> Videos,
-    IReadOnlyList<GameModuleResponse> Games);
+    IReadOnlyList<GameModuleResponse> Games,
+    IReadOnlyList<CourseCategoryResponse>? Categories = null);
 
 public sealed record PlatformCourseResponse(
     Guid Id,
@@ -812,7 +818,8 @@ public sealed record PlatformCourseResponse(
     string GameType,
     IReadOnlyList<CourseModulePlacementDto> Modules,
     string? CoverUrl,
-    IReadOnlyList<PlatformCourseLessonDto>? Lessons = null);
+    IReadOnlyList<PlatformCourseLessonDto>? Lessons = null,
+    Guid? CategoryId = null);
 
 public sealed record PlatformCourseLessonDto(Guid Id, string Title, string? Description, IReadOnlyList<Guid> VideoIds);
 
@@ -870,3 +877,5 @@ public sealed record PlatformCourseVideoResponse(
     IReadOnlyList<VideoCheckpointDto> Checkpoints,
     Guid? LessonId = null,
     string? LibraryTitle = null);
+
+public sealed record CourseCategoryResponse(Guid Id, string Name, int CourseCount);

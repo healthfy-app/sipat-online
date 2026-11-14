@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  setCourseCategory,
   setPlatformCourseModules,
   setPlatformCourseStructure,
   type CourseLessonDraft,
@@ -19,7 +20,7 @@ import CourseOutlinePanel, { type OutlineActions } from './CourseOutlinePanel';
 import CoursePreviewCanvas, { type PreviewSize } from './CoursePreviewCanvas';
 import CoursePropertiesPanel from './CoursePropertiesPanel';
 import CoursePublishStep from './CoursePublishStep';
-import { formatCourseOption, getCourseDescription, getCourseOption, getErrorMessage } from './courseFormat';
+import { getCourseDescription, getErrorMessage } from './courseFormat';
 import { buildTrack, groupTrackByLesson } from './courseTrack';
 import {
   addLesson, addVideoToLesson, describeLesson, moveLesson, moveVideoInStructure,
@@ -32,12 +33,13 @@ function settingsFrom(course: PlatformCourse): CourseSettingsValues {
     description: getCourseDescription(course.description),
     gamificationEnabled: course.gamificationEnabled,
     gameType: course.gameType,
+    categoryId: course.categoryId ?? null,
   };
 }
 
 const sameSettings = (a: CourseSettingsValues, b: CourseSettingsValues) =>
   a.title === b.title && a.description === b.description
-  && a.gamificationEnabled === b.gamificationEnabled && a.gameType === b.gameType;
+  && a.gamificationEnabled === b.gamificationEnabled && a.gameType === b.gameType && a.categoryId === b.categoryId;
 
 export default function CourseEditor({
   course,
@@ -99,12 +101,13 @@ export default function CourseEditor({
     try {
       const saved = await updatePlatformCourse(course.id, {
         title: values.title.trim(),
-        description: formatCourseOption(getCourseOption(course.description), values.description.trim()),
+        description: values.description.trim() || null,
         status: nextStatus,
         gamificationEnabled: values.gamificationEnabled,
         gameType: values.gameType,
       });
-      const next = settingsFrom(saved);
+      if ((saved.categoryId ?? null) !== values.categoryId) await setCourseCategory(course.id, values.categoryId);
+      const next = settingsFrom({ ...saved, categoryId: values.categoryId });
       setValues(next);
       setSavedValues(next);
       setStatus(saved.status);

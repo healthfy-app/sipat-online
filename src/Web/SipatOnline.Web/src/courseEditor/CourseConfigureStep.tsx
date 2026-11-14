@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Field, Switch } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { gameTypeOptions } from '@/gamificationGames';
+import CategorySelect from '@/courseCatalog/CategorySelect';
+import { useCourseCategories } from '@/courseCatalog/useCourseCategories';
 import { CourseCoverEditor } from './CourseMediaForms';
 import CourseStepHeading, { StepPage } from './CourseStepHeading';
 
@@ -13,6 +15,7 @@ export interface CourseSettingsValues {
   description: string;
   gamificationEnabled: boolean;
   gameType: GamificationGameType;
+  categoryId: string | null;
 }
 
 export default function CourseConfigureStep({
@@ -40,6 +43,8 @@ export default function CourseConfigureStep({
   onChanged: (message: string) => Promise<void>;
   onError: (message: string) => void;
 }) {
+  const { categories, create } = useCourseCategories();
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     onSubmit();
@@ -62,6 +67,10 @@ export default function CourseConfigureStep({
               <Field htmlFor="edit-course-title" label="Nome do curso">
                 <Input disabled={busy} id="edit-course-title" maxLength={200} required value={values.title}
                   onChange={(event) => onChange({ title: event.target.value })} />
+              </Field>
+              <Field htmlFor="edit-course-category" label="Categoria">
+                <CategorySelect categories={categories} disabled={busy} id="edit-course-category"
+                  onChange={(categoryId) => onChange({ categoryId })} onCreate={create} value={values.categoryId} />
               </Field>
               <Field htmlFor="edit-course-description" label="Descrição">
                 <Textarea className="min-h-28" disabled={busy} id="edit-course-description" maxLength={2000} rows={4} value={values.description}

@@ -473,7 +473,8 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             GamificationEnabled = course.GamificationEnabled,
             GameType = (int)course.GameType,
             CoverContentType = course.CoverContentType,
-            CoverUpdatedAt = course.CoverUpdatedAt
+            CoverUpdatedAt = course.CoverUpdatedAt,
+            CategoryId = course.CategoryId
         };
 
     private static PlatformCourse ToDomain(PlatformCourseEntity entity)
@@ -519,7 +520,8 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             (GamificationGameType)entity.GameType,
             entity.CoverContentType,
             entity.CoverUpdatedAt,
-            lessons);
+            lessons,
+            entity.CategoryId);
     }
 
     private static PlatformCourseVideo ToDomain(PlatformCourseVideoLinkEntity link, Guid lessonId) =>

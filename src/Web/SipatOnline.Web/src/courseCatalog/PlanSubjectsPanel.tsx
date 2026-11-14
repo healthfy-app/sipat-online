@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { getPlanSubjects, setPlanSubjects, type CompanyPlan, type PlanSubjects } from '@/api';
 import PlanSelect, { planInfo, planOptions } from '@/companies/PlanSelect';
 import { Badge } from '@/components/ui/badge';
-import { getCourseOption, getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
+import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
+import { useCourseCategories } from './useCourseCategories';
 import { cn } from '@/lib/utils';
 
 /**
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils';
  * here, and the companies of that plan stop seeing it when they build a SIPAT.
  */
 export default function PlanSubjectsPanel() {
+  const { categories } = useCourseCategories();
   const [data, setData] = useState<PlanSubjects | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
@@ -74,13 +76,13 @@ export default function PlanSubjectsPanel() {
         </thead>
         <tbody>
           {data.courses.map(course => {
-            const option = getCourseOption(course.description);
+            const categoryName = course.categoryId ? categories.find((item) => item.id === course.categoryId)?.name : undefined;
             return <tr className="border-b border-border last:border-0" key={course.id}>
               <th className="px-4 py-2.5 text-left font-medium" scope="row">
                 <span className="grid gap-0.5">
                   <span>{course.title}</span>
                   <span className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
-                    {option && <Badge variant="neutral">Opção {option}</Badge>}{pluralize(course.videoCount, 'vídeo', 'vídeos')}
+                    {categoryName && <Badge variant="neutral">{categoryName}</Badge>}{pluralize(course.videoCount, 'vídeo', 'vídeos')}
                   </span>
                 </span>
               </th>

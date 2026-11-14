@@ -40,7 +40,7 @@ function TrayCard({ subject }: { subject: Subject }) {
     <Cover className="size-10" subject={subject} />
     <div className="grid min-w-0 flex-1 gap-0.5">
       <strong className="truncate text-[0.8125rem] leading-tight" title={themeLabel(subject)}>{subject.title}</strong>
-      <span className="text-xs text-muted-foreground">{subject.option ? `Opção ${subject.option} · ` : ''}{summary(subject)}</span>
+      <span className="text-xs text-muted-foreground">{subject.option ? `${subject.option} · ` : ''}{summary(subject)}</span>
     </div>
   </div>;
 }
@@ -71,7 +71,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       ? <div className="flex items-center gap-2.5">
         <Cover className="size-11" subject={subject} />
         <div className="grid min-w-0 flex-1 gap-0.5">
-          <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={themeLabel(subject)}>{subject.title}{subject.option ? <span className="ml-1 font-normal text-muted-foreground">· Opção {subject.option}</span> : null}</strong>
+          <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={themeLabel(subject)}>{subject.title}{subject.option ? <span className="ml-1 font-normal text-muted-foreground">· {subject.option}</span> : null}</strong>
           {canEditThemes && <a className="inline-flex items-center gap-1 justify-self-start text-xs font-semibold text-primary hover:underline" href={`/platform/courses/${subject.id}/edit`} rel="noreferrer" target="_blank">
             Editar vídeos e jogos <ExternalLink aria-hidden="true" className="size-3" />
           </a>}

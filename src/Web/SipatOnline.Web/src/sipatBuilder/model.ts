@@ -1,5 +1,4 @@
 import type { GameModule, PlatformCourse, PlatformLibraryVideo, ProgramDay } from '@/api';
-import { getCourseOption } from '@/courseEditor/courseFormat';
 
 /** Rows shown for videos and games in the planner, as in the sheet (VÍDEO 1 to 5, and the games slots). */
 export const defaultVideoRows = 5;
@@ -22,7 +21,8 @@ export function videoCode(title: string): string | null {
 }
 
 /** Subjects are the courses of the catalog; videos that belong to no course go to "Sem assunto". */
-export function buildCatalog(courses: PlatformCourse[], library: PlatformLibraryVideo[], games: GameModule[]): Catalog {
+export function buildCatalog(courses: PlatformCourse[], library: PlatformLibraryVideo[], games: GameModule[], categories: { id: string; name: string }[] = []): Catalog {
+  const categoryNames = new Map(categories.map(item => [item.id, item.name]));
   const gameMap = new Map(games.map(game => [game.id, game]));
   const videos = new Map<string, CatalogVideo>();
   for (const item of library) {
@@ -36,7 +36,7 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
     if (ids.length === 0) continue;
     ids.forEach(id => used.add(id));
     const gameIds = [...new Set([...(course.modules ?? [])].sort((a, b) => a.afterVideoCount - b.afterVideoCount).map(placement => placement.moduleId))].filter(id => gameMap.has(id));
-    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, gameIds, option: getCourseOption(course.description), videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, gameIds, option: (course.categoryId && categoryNames.get(course.categoryId)) || null, videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
   }
   const loose = [...videos.keys()].filter(id => !used.has(id));
   if (loose.length > 0) {
@@ -146,9 +146,9 @@ export function subjectColor(subject: string): string {
   return palette[hash % palette.length];
 }
 
-/** Themes may share a title (the same subject in option 1, 2 and 3): the label tells them apart. */
+/** Themes may share a title (the same subject in two categories): the label tells them apart. */
 export function themeLabel(subject: Subject): string {
-  return subject.option ? `${subject.title} · Opção ${subject.option}` : subject.title;
+  return subject.option ? `${subject.title} · ${subject.option}` : subject.title;
 }
 
 /**

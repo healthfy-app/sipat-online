@@ -77,6 +77,24 @@ public sealed class CompanyPlanApiTests
         using (var back = await Raw(operatorClient, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = Array.Empty<Guid>() }))
             Assert.Equal(HttpStatusCode.NoContent, back.StatusCode);
         Assert.Equal(2, (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").GetArrayLength());
+
+        // categories: four come ready, the operator adds, renames and places a subject in one; deleting it only unplaces the subject
+        var seeded = await Get(operatorClient, "/api/platform/catalog/categories");
+        Assert.Equal(["Alimentação", "Segurança no trabalho", "Postura", "Saúde mental"], seeded.EnumerateArray().Select(item => item.GetProperty("name").GetString()));
+        var created = await Send(operatorClient, HttpMethod.Post, "/api/platform/catalog/categories", new { name = "  Ergonomia  " }, HttpStatusCode.Created);
+        var categoryId = created.GetProperty("id").GetGuid();
+        Assert.Equal("Ergonomia", created.GetProperty("name").GetString());
+        await Send(operatorClient, HttpMethod.Put, $"/api/platform/catalog/categories/{categoryId}", new { name = "Postura" }, HttpStatusCode.BadRequest);
+        await Send(operatorClient, HttpMethod.Put, $"/api/platform/catalog/categories/{categoryId}", new { name = "Ergonomia e movimento" }, HttpStatusCode.NoContent);
+        await Send(operatorClient, HttpMethod.Put, $"/api/platform/catalog/courses/{looseId}/category", new { categoryId }, HttpStatusCode.NoContent);
+        Assert.Equal(1, (await Get(operatorClient, "/api/platform/catalog/categories")).EnumerateArray().Single(item => item.GetProperty("id").GetGuid() == categoryId).GetProperty("courseCount").GetInt32());
+        Assert.Equal(categoryId, (await Get(operatorClient, "/api/platform/catalog/plan-subjects")).GetProperty("courses").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == looseId).GetProperty("categoryId").GetGuid());
+        await Send(operatorClient, HttpMethod.Delete, $"/api/platform/catalog/categories/{categoryId}", new { }, HttpStatusCode.NoContent);
+        Assert.Equal(JsonValueKind.Null, (await Get(operatorClient, "/api/platform/catalog/plan-subjects")).GetProperty("courses").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == looseId).GetProperty("categoryId").ValueKind);
+        using (var intruder = await Raw(admin, HttpMethod.Post, "/api/platform/catalog/categories", new { name = "Intrusa" }))
+            Assert.NotEqual(HttpStatusCode.Created, intruder.StatusCode);
         // a company cannot change what a plan offers
         using (var denied = await Raw(admin, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = new[] { looseId } }))
             Assert.NotEqual(HttpStatusCode.NoContent, denied.StatusCode);

@@ -29,7 +29,8 @@ public sealed record PlatformCourse(
     GamificationGameType GameType = GamificationGameType.Quiz,
     string? CoverContentType = null,
     DateTimeOffset? CoverUpdatedAt = null,
-    IReadOnlyList<PlatformCourseLesson>? Lessons = null);
+    IReadOnlyList<PlatformCourseLesson>? Lessons = null,
+    Guid? CategoryId = null);
 
 /// <summary>Aula de um curso, com os vídeos na ordem de exibição.</summary>
 public sealed record PlatformCourseLesson(Guid Id, string Title, string? Description, IReadOnlyList<Guid> VideoIds);

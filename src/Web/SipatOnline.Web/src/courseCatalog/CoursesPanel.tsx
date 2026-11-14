@@ -1,31 +1,28 @@
-import { Search } from 'lucide-react';
+import { Search, Settings2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import type { PlatformCourse, PlatformCourseStatus } from '@/api';
+import type { CourseCategory, PlatformCourse, PlatformCourseStatus } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/page';
-import { getCourseOption, pluralize, type CourseOption } from '@/courseEditor/courseFormat';
+import { pluralize } from '@/courseEditor/courseFormat';
 import CourseCard from './CourseCard';
 import { SegmentedControl } from './SegmentedControl';
 
 type StatusFilter = 'all' | PlatformCourseStatus;
-type OptionFilter = 'all' | CourseOption;
-
-const optionFilters: { value: OptionFilter; label: string; short?: string }[] = [
-  { value: 'all', label: 'Todas as opções', short: 'Todas' },
-  { value: '1', label: 'Opção 1' },
-  { value: '2', label: 'Opção 2' },
-  { value: '3', label: 'Opção 3' },
-];
+type CategoryFilter = 'all' | 'none' | string;
 
 export default function CoursesPanel({
   courses,
+  categories,
+  onManageCategories,
   busy,
   onOpen,
   onDuplicate,
   onDelete,
 }: {
   courses: PlatformCourse[];
+  categories: CourseCategory[];
+  onManageCategories: () => void;
   busy: boolean;
   onOpen: (course: PlatformCourse) => void;
   onDuplicate: (course: PlatformCourse) => void;
@@ -33,19 +30,26 @@ export default function CoursesPanel({
 }) {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<StatusFilter>('all');
-  const [option, setOption] = useState<OptionFilter>('all');
+  const [category, setCategory] = useState<CategoryFilter>('all');
+  const categoryNames = useMemo(() => new Map(categories.map((item) => [item.id, item.name])), [categories]);
+  const hasUncategorized = courses.some((course) => !course.categoryId || !categoryNames.has(course.categoryId));
 
   const filtered = useMemo(() => {
     const term = search.trim().toLocaleLowerCase('pt-BR');
     return courses.filter((course) =>
       (status === 'all' || course.status === status)
-      && (option === 'all' || getCourseOption(course.description) === option)
+      && (category === 'all' || (category === 'none' ? !course.categoryId || !categoryNames.has(course.categoryId) : course.categoryId === category))
       && (!term
         || course.title.toLocaleLowerCase('pt-BR').includes(term)
         || (course.description ?? '').toLocaleLowerCase('pt-BR').includes(term)));
-  }, [courses, option, search, status]);
+  }, [categoryNames, courses, category, search, status]);
 
-  const hasFilters = search.trim() !== '' || status !== 'all' || option !== 'all';
+  const hasFilters = search.trim() !== '' || status !== 'all' || category !== 'all';
+  const categoryFilters: { value: CategoryFilter; label: string }[] = [
+    { value: 'all', label: 'Todas' },
+    ...categories.map((item) => ({ value: item.id, label: item.name })),
+    ...(hasUncategorized && categories.length > 0 ? [{ value: 'none', label: 'Sem categoria' }] : []),
+  ];
 
   return (
     <section aria-label="Cursos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -68,11 +72,12 @@ export default function CoursesPanel({
         </NativeSelect>
         <SegmentedControl
           className="max-sm:order-3 max-sm:w-full"
-          label="Opções de grade"
-          onChange={setOption}
-          options={optionFilters}
-          value={option}
+          label="Categorias"
+          onChange={setCategory}
+          options={categoryFilters}
+          value={category}
         />
+        <Button className="max-sm:order-3" onClick={onManageCategories} size="sm" variant="outline"><Settings2 /> Gerenciar categorias</Button>
         <span aria-live="polite" className="ml-auto whitespace-nowrap text-[0.8125rem] tabular-nums text-muted-foreground max-sm:ml-0">
           {hasFilters ? `${filtered.length} de ${courses.length}` : pluralize(courses.length, 'curso', 'cursos')}
         </span>
@@ -81,7 +86,7 @@ export default function CoursesPanel({
       {filtered.length === 0 ? (
         <EmptyState
           action={(
-            <Button onClick={() => { setSearch(''); setStatus('all'); setOption('all'); }} variant="outline">
+            <Button onClick={() => { setSearch(''); setStatus('all'); setCategory('all'); }} variant="outline">
               Limpar filtros
             </Button>
           )}
@@ -90,7 +95,7 @@ export default function CoursesPanel({
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((course) => (
-            <CourseCard busy={busy} course={course} key={course.id}
+            <CourseCard busy={busy} categoryName={course.categoryId ? categoryNames.get(course.categoryId) : null} course={course} key={course.id}
               onDelete={() => onDelete(course)} onDuplicate={() => onDuplicate(course)} onOpen={() => onOpen(course)} />
           ))}
         </div>

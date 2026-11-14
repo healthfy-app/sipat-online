@@ -20,6 +20,8 @@ public sealed class PlatformCourseEntity
 
     public DateTimeOffset? CoverUpdatedAt { get; set; }
 
+    public Guid? CategoryId { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 
     public ICollection<PlatformCourseModuleLinkEntity> ModuleLinks { get; set; } = [];

@@ -61,7 +61,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     setLoading(true); setError('');
     try {
       const [content, events, summaries] = await Promise.all([getSipatCatalog(), listSipatEvents(0, 100), listSipatPlans()]);
-      setCatalog(buildCatalog(content.courses, content.videos, content.games));
+      setCatalog(buildCatalog(content.courses, content.videos, content.games, content.categories ?? []));
       setPlans(summaries);
       setOthers(events.items);
       if (!isNew && params.sipatId) {

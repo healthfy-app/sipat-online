@@ -20,6 +20,8 @@ import LoadingState from '@/LoadingState';
 import CourseStartOptions from './CourseStartOptions';
 import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
+import ManageCategoriesDialog from './ManageCategoriesDialog';
+import { useCourseCategories } from './useCourseCategories';
 import GameModuleForm from './GameModuleForm';
 import GameModulesPanel from './GameModulesPanel';
 import PlanSubjectsPanel from './PlanSubjectsPanel';
@@ -28,6 +30,7 @@ import VideoLibraryPanel from './VideoLibraryPanel';
 type CatalogTab = 'courses' | 'videos' | 'modules' | 'plans';
 type CatalogDialog =
   | { kind: 'create' }
+  | { kind: 'categories' }
   | { kind: 'upload' }
   | { kind: 'game'; module: GameModule | null }
 
@@ -64,6 +67,7 @@ export default function CourseCatalog({
   onError: (message: string) => void;
 }) {
   const [tab, setTab] = useState<CatalogTab>('courses');
+  const { categories, create: createCategory, reload: reloadCategories } = useCourseCategories();
   const [dialog, setDialog] = useState<CatalogDialog | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [uploadError, setUploadError] = useState('');
@@ -185,7 +189,7 @@ export default function CourseCatalog({
         <TabsContent value="courses">
           {body ?? (isEmptyCatalog
             ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
-            : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} courses={courses} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
+            : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} categories={categories} courses={courses} onManageCategories={() => setDialog({ kind: 'categories' })} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
         </TabsContent>
         <TabsContent value="plans">
           {body ?? <PlanSubjectsPanel />}
@@ -207,10 +211,14 @@ export default function CourseCatalog({
       </Tabs>
 
       {dialog?.kind === 'create' && (
-        <CreateCourseDialog onClose={() => setDialog(null)} onCreated={async (course) => {
+        <CreateCourseDialog categories={categories} onClose={() => setDialog(null)} onCreateCategory={createCategory} onCreated={async (course) => {
           setDialog(null);
           await onCreated(course);
         }} />
+      )}
+
+      {dialog?.kind === 'categories' && (
+        <ManageCategoriesDialog categories={categories} onChanged={async () => { await reloadCategories(); await onProgramsChanged('As categorias foram atualizadas.'); }} onClose={() => setDialog(null)} />
       )}
 
       {dialog?.kind === 'upload' && (

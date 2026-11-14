@@ -651,10 +651,37 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("PlatformCourseCovers", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.CourseCategoryEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Position");
+
+                    b.ToTable("CourseCategories", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("CategoryId")
                         .HasColumnType("uuid");
 
                     b.Property<string>("CoverContentType")

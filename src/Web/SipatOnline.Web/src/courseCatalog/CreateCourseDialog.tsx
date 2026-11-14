@@ -1,24 +1,29 @@
 import { ImagePlus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { createPlatformCourse, setPlatformCourseCover, type PlatformCourse } from '@/api';
+import { createPlatformCourse, setCourseCategory, setPlatformCourseCover, type CourseCategory, type PlatformCourse } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { Field, Switch } from '@/components/ui/field';
-import { Input, NativeSelect, Textarea } from '@/components/ui/input';
-import { formatCourseOption, getErrorMessage, maxCoverBytes, type CourseOption } from '@/courseEditor/courseFormat';
+import { Input, Textarea } from '@/components/ui/input';
+import { getErrorMessage, maxCoverBytes } from '@/courseEditor/courseFormat';
+import CategorySelect from './CategorySelect';
 
 const acceptedCoverTypes = ['image/png', 'image/jpeg', 'image/webp'];
 
 export default function CreateCourseDialog({
+  categories,
+  onCreateCategory,
   onCreated,
   onClose,
 }: {
+  categories: CourseCategory[];
+  onCreateCategory: (name: string) => Promise<CourseCategory>;
   onCreated: (course: PlatformCourse) => Promise<void>;
   onClose: () => void;
 }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [option, setOption] = useState<CourseOption>('1');
+  const [categoryId, setCategoryId] = useState<string | null>(null);
   const [gamificationEnabled, setGamificationEnabled] = useState(false);
   const [cover, setCover] = useState<File | null>(null);
   const [preview, setPreview] = useState('');
@@ -42,10 +47,15 @@ export default function CreateCourseDialog({
     try {
       course ??= await createPlatformCourse({
         title: title.trim(),
-        description: formatCourseOption(option, description.trim()),
+        description: description.trim() || null,
         gamificationEnabled,
       });
       setCreatedCourse(course);
+      if (categoryId && course.categoryId !== categoryId) {
+        await setCourseCategory(course.id, categoryId);
+        course = { ...course, categoryId };
+        setCreatedCourse(course);
+      }
       const savedCourse = cover ? await setPlatformCourseCover(course.id, cover) : course;
       await onCreated(savedCourse);
     } catch (saveError) {
@@ -88,13 +98,9 @@ export default function CreateCourseDialog({
           />
         </label>
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
-        <Field htmlFor="platform-course-option" label="Opção da grade">
-          <NativeSelect disabled={locked} id="platform-course-option" value={option}
-            onChange={(event) => setOption(event.target.value as CourseOption)}>
-            <option value="1">Opção 1</option>
-            <option value="2">Opção 2</option>
-            <option value="3">Opção 3</option>
-          </NativeSelect>
+        <Field htmlFor="platform-course-category" label="Categoria">
+          <CategorySelect categories={categories} disabled={locked} id="platform-course-category"
+            onChange={setCategoryId} onCreate={onCreateCategory} value={categoryId} />
         </Field>
         <Field htmlFor="platform-course-title" label="Título (obrigatório)">
           <Input data-autofocus disabled={locked} id="platform-course-title" maxLength={200} placeholder="Curso sem título"

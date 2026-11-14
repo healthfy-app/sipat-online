@@ -68,6 +68,7 @@ export interface PlatformCourse {
   modules: CourseModulePlacement[];
   coverUrl: string | null;
   lessons?: PlatformCourseLesson[];
+  categoryId?: string | null;
 }
 
 export interface PlatformCourseLesson {
@@ -228,7 +229,7 @@ export async function deletePlatformVideo(videoId: string): Promise<void> {
   await request(`/api/platform/catalog/videos/${videoId}`, { method: 'DELETE' });
 }
 /** What a day of a SIPAT can be made of: published themes, library videos and games. Read only, for the company's administrator and the operator. */
-export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibraryVideo[]; games: GameModule[] }
+export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibraryVideo[]; games: GameModule[]; categories?: CourseCategory[] }
 export function getSipatCatalog(): Promise<SipatCatalog> {
   return requestJson<SipatCatalog>('/api/admin/sipat-catalog');
 }
@@ -837,7 +838,7 @@ export interface CompanyCapabilities {
 }
 /** Which assuntos each plan cannot use (everything not listed is available). */
 export interface PlanSubjects {
-  courses: { id: string; title: string; description: string | null; videoCount: number }[];
+  courses: { id: string; title: string; description: string | null; videoCount: number; categoryId?: string | null }[];
   excluded: Record<string, string[]>;
 }
 export function getPlanSubjects(): Promise<PlanSubjects> {
@@ -1084,4 +1085,26 @@ export function recordLearningPlaybackRange(
       }),
     },
   );
+}
+
+export interface CourseCategory { id: string; name: string; courseCount: number }
+
+export function listCourseCategories(): Promise<CourseCategory[]> {
+  return requestJson<CourseCategory[]>('/api/platform/catalog/categories');
+}
+
+export function createCourseCategory(name: string): Promise<CourseCategory> {
+  return requestJson<CourseCategory>('/api/platform/catalog/categories', { method: 'POST', body: JSON.stringify({ name }) });
+}
+
+export async function renameCourseCategory(id: string, name: string): Promise<void> {
+  await request(`/api/platform/catalog/categories/${id}`, { method: 'PUT', body: JSON.stringify({ name }) });
+}
+
+export async function deleteCourseCategory(id: string): Promise<void> {
+  await request(`/api/platform/catalog/categories/${id}`, { method: 'DELETE' });
+}
+
+export async function setCourseCategory(courseId: string, categoryId: string | null): Promise<void> {
+  await request(`/api/platform/catalog/courses/${courseId}/category`, { method: 'PUT', body: JSON.stringify({ categoryId }) });
 }

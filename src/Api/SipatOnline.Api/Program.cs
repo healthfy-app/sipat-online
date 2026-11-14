@@ -111,6 +111,7 @@ app.MapHealthChecks("/health");
 app.MapIdentityEndpoints();
 app.MapPlatformEndpoints();
 app.MapPlatformCourseCatalogEndpoints();
+app.MapCourseCategoryEndpoints();
 app.MapUserManagementEndpoints();
 app.MapTenantEndpoints();
 app.MapTenantAppearanceEndpoints();
