@@ -213,7 +213,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
           {label && <Badge variant={label.variant}>{label.text}</Badge>}
           {dirty && <Badge variant="outline">Alterações não salvas</Badge>}
         </div>
-        <p className="ops-hero-lead">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</p>
+        <p className="ops-hero-lead is-keep">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</p>
         {stage === 'grid' && <ul aria-label="Resumo da SIPAT" className="ops-hero-stats">
           <li><strong>{days.length}</strong> {days.length === 1 ? 'dia' : 'dias'}</li>
           <li><Film aria-hidden="true" /><strong>{totals.videos}</strong> {totals.videos === 1 ? 'vídeo' : 'vídeos'}</li>

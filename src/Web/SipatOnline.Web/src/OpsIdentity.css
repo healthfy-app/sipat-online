@@ -2,31 +2,34 @@
  * The visual language of the learner screen (/learning), for the management screens: forest-green type, a yellow main
  * action, white rounded cards with a thin border. The big dark stage is kept for /learning; work screens get a compact header.
  */
+/* the page header is one white box and, as far as the width allows, one line: title, numbers, main action */
 .ops-hero {
-  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.75rem 1.25rem;
-  padding: 0.25rem 0 0.5rem; color: #12332c;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem 1.5rem;
+  padding: 0.9rem 1.25rem; border: 1px solid #dfe6e3; border-radius: 1.25rem; background: #fff; color: #12332c;
 }
-.ops-hero-copy { display: grid; min-width: 0; gap: 0.35rem; }
+.ops-hero-copy { display: flex; flex: 1 1 auto; flex-wrap: wrap; align-items: center; gap: 0.35rem 1.5rem; min-width: 0; }
 .ops-hero-back {
-  display: inline-flex; align-items: center; gap: 0.4rem; justify-self: start; margin-bottom: 0.25rem;
+  display: inline-flex; align-items: center; gap: 0.4rem; flex: 0 0 100%; margin-bottom: 0.1rem;
   color: #3d514b; font-size: 0.875rem; font-weight: 600; text-decoration: none;
 }
 .ops-hero-back:hover { color: #12332c; }
 .ops-hero-back svg { width: 1rem; height: 1rem; transition: transform 200ms ease; }
 .ops-hero-back:hover svg { transform: translateX(-3px); }
-.ops-hero-eyebrow { margin: 0; color: #0f7a3d; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.ops-hero-eyebrow { display: none; }
 .ops-hero-title {
-  margin: 0; color: #12332c; font-size: clamp(1.75rem, 3vw, 2.25rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.035em; overflow-wrap: anywhere;
+  margin: 0; color: #12332c; font-size: clamp(1.375rem, 2.2vw, 1.75rem); font-weight: 800; line-height: 1.15; letter-spacing: -0.03em; overflow-wrap: anywhere;
 }
-.ops-hero-lead { margin: 0; color: #3d514b; font-size: 0.9375rem; }
+/* the sentence repeats the numbers beside it: it stays for screen readers, and shows only where it explains something */
+.ops-hero-lead:not(.is-keep) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.ops-hero-lead.is-keep { flex: 0 0 100%; margin: 0; color: #3d514b; font-size: 0.8125rem; }
 .ops-hero-stats {
-  display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; margin: 0.15rem 0 0; padding: 0; list-style: none;
+  display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; margin: 0; padding: 0; list-style: none;
   color: #3d514b; font-size: 0.8125rem;
 }
 .ops-hero-stats li { display: inline-flex; align-items: center; gap: 0.35rem; }
 .ops-hero-stats strong { color: #12332c; font-size: 0.9375rem; font-weight: 800; font-variant-numeric: tabular-nums; }
 .ops-hero-stats svg { width: 1rem; height: 1rem; color: #0f7a3d; }
-.ops-hero-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; max-width: 46rem; }
+.ops-hero-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; }
 .ops-hero-actions > button, .ops-hero-actions > a {
   border: 1px solid #cdd7d3 !important; border-radius: 999px !important; background: #fff !important; color: #12332c !important;
 }

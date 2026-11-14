@@ -29,6 +29,7 @@ import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
 import CollaboratorsPage from './collaborators/CollaboratorsPage';
 import TenantLearningDashboardPage from './TenantLearningDashboardPage';
+import { isCompanyPanelMode } from './companies/companyContextMode';
 import PlatformCompaniesPage from './PlatformCompaniesPage';
 import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
 import PlatformUsersPage from './PlatformUsersPage';
@@ -535,7 +536,7 @@ function ProtectedPortal({
   const isPlatformOperator = session.roles.includes('PlatformOperator');
   const companyWorkspaceId = /^\/platform\/companies\/([^/]+)/.exec(location.pathname)?.[1] ?? null;
   // inside the company workspace the operator keeps the workspace menu, even though the company is set for the calls to its admin routes
-  const isPlatformCompanyContext = isPlatformOperator && getCompanyAdministrationId() !== null && companyWorkspaceId === null;
+  const isPlatformCompanyContext = isCompanyPanelMode(isPlatformOperator, location.pathname, getCompanyAdministrationId());
 
   async function handleSignOut() {
     setError('');
