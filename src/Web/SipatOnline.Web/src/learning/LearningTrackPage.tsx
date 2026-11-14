@@ -5,7 +5,9 @@ import LearningActivitiesPanel from '@/LearningActivitiesPanel';
 import {
   getAssignedLearningTrack,
   listAssignedLearningTracks,
+  primeAntiforgeryToken,
   recordLearningPlaybackRange,
+  sendPlaybackQuality,
   saveLearningPosition,
   startLearningPlayback,
   type LearningActivity,
@@ -28,6 +30,7 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import SipatPlayer from '@/player/SipatPlayer';
+import { trackPlaybackQuality, type QualityTracker } from '@/player/core/quality';
 import { formatDayDate } from './WeekVideos';
 import './LearningMotion.css';
 import './DayPage.css';
@@ -62,6 +65,7 @@ export default function LearningTrackPage({
   const furthestRef = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const qualityTrackerRef = useRef<QualityTracker | null>(null);
   const rangeStartRef = useRef<number | null>(null);
   const lastSampleRef = useRef<number | null>(null);
   const lastSavePositionRef = useRef(0);
@@ -351,6 +355,25 @@ export default function LearningTrackPage({
   }, [persistPlayback, playbackSession, selectedLesson]);
 
   useEffect(() => {
+    const video = videoRef.current;
+    const lessonId = selectedLesson?.id;
+    const sessionId = playbackSession?.sessionId;
+    if (!video || !lessonId || !sessionId || !apiTrackId) return;
+    void primeAntiforgeryToken();
+    const tracker = trackPlaybackQuality(video, {
+      lessonId,
+      playbackSessionId: sessionId,
+      quality: 'single',
+      onReport: (summary) => { void sendPlaybackQuality(apiTrackId, summary).catch(() => undefined); },
+    });
+    qualityTrackerRef.current = tracker;
+    return () => {
+      tracker.stop();
+      if (qualityTrackerRef.current === tracker) qualityTrackerRef.current = null;
+    };
+  }, [apiTrackId, selectedLesson?.id, playbackSession?.sessionId]);
+
+  useEffect(() => {
     function leave(event: MouseEvent) {
       if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       const link = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>('a[href]') : null;
@@ -361,6 +384,7 @@ export default function LearningTrackPage({
       if (switchingLessonRef.current) return;
       switchingLessonRef.current = true; setSwitchingLesson(true);
       videoRef.current.pause();
+      qualityTrackerRef.current?.flush('leave');
       void persistPlayback(true).then(saved => {
         if (saved) navigate(`${destination.pathname}${destination.search}${destination.hash}`);
       }).finally(() => { switchingLessonRef.current = false; setSwitchingLesson(false); });
@@ -369,7 +393,11 @@ export default function LearningTrackPage({
       if (!videoRef.current || (videoRef.current.paused && !saveInFlightRef.current && !saveFailed)) return;
       event.preventDefault(); event.returnValue = '';
     }
-    function visibility() { if (document.visibilityState === 'hidden') void persistPlayback(true); }
+    function visibility() {
+      if (document.visibilityState !== 'hidden') return;
+      qualityTrackerRef.current?.flush('hidden');
+      void persistPlayback(true);
+    }
     document.addEventListener('click', leave, true);
     document.addEventListener('visibilitychange', visibility);
     window.addEventListener('beforeunload', beforeUnload);

@@ -4,12 +4,14 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import LearningPage, { type LearningSummary } from './LearningPage';
 
-const { getAssignedTrack, listAssignedTracks, startPlayback, savePosition, recordRange } = vi.hoisted(() => ({
+const { getAssignedTrack, listAssignedTracks, startPlayback, savePosition, recordRange, sendQuality, primeToken } = vi.hoisted(() => ({
   getAssignedTrack: vi.fn(),
   listAssignedTracks: vi.fn(),
   startPlayback: vi.fn(),
   savePosition: vi.fn(),
   recordRange: vi.fn(),
+  sendQuality: vi.fn(),
+  primeToken: vi.fn(),
 }));
 
 vi.mock('./api', () => ({
@@ -23,6 +25,8 @@ vi.mock('./api', () => ({
   startLearningPlayback: startPlayback,
   saveLearningPosition: savePosition,
   recordLearningPlaybackRange: recordRange,
+  sendPlaybackQuality: sendQuality,
+  primeAntiforgeryToken: primeToken,
   getLearningActivities: vi.fn().mockResolvedValue({ revisionId: 'revision-1', items: [] }),
 }));
 
@@ -34,6 +38,8 @@ afterEach(() => {
 });
 
 beforeEach(() => {
+  sendQuality.mockResolvedValue(undefined);
+  primeToken.mockResolvedValue(undefined);
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(function (this: HTMLMediaElement) {
     Object.defineProperty(this, 'paused', { configurable: true, writable: true, value: true });
   });
@@ -863,5 +869,45 @@ describe('learning experience', () => {
     } finally {
       Reflect.deleteProperty(document, 'visibilityState');
     }
+  });
+
+  it('reports video quality when the tab is hidden', async () => {
+    const { video } = await playableCourse();
+    atTime(video, 0); fireEvent.play(video); fireEvent.playing(video);
+    atTime(video, 2);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => expect(sendQuality).toHaveBeenCalledWith('track-1',
+        expect.objectContaining({ playbackSessionId: 'session-lesson-1', lessonId: 'lesson-1' })));
+    } finally {
+      Reflect.deleteProperty(document, 'visibilityState');
+    }
+  });
+
+  it('keeps playing and shows nothing when the quality report fails', async () => {
+    sendQuality.mockRejectedValue(new Error('offline'));
+    const { video } = await playableCourse();
+    atTime(video, 0); fireEvent.play(video); fireEvent.playing(video);
+    atTime(video, 2);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => expect(sendQuality).toHaveBeenCalled());
+      await waitFor(() => expect(recordRange).toHaveBeenCalled());
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(document, 'visibilityState');
+    }
+  });
+
+  it('reports video quality before leaving through a link', async () => {
+    const user = userEvent.setup();
+    const { video } = await playableCourse();
+    atTime(video, 0); fireEvent.play(video); fireEvent.playing(video);
+    atTime(video, 2);
+    await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
+    await waitFor(() => expect(sendQuality).toHaveBeenCalledWith('track-1',
+      expect.objectContaining({ playbackSessionId: 'session-lesson-1' })));
   });
 });
