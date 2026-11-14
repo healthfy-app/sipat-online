@@ -40,10 +40,21 @@ public sealed class PlaybackEvidencePolicyTests
     [InlineData(-1, 1000)]
     [InlineData(1000, 1000)]
     [InlineData(2000, 1000)]
-    [InlineData(0, Duration + 1)]
     public void Rejects_negative_empty_or_beyond_duration(long start, long end)
     {
         Assert.Null(Accept([], start, end));
+    }
+
+    [Fact]
+    public void Rejects_a_range_that_ends_beyond_the_duration_even_with_plenty_of_elapsed_time()
+    {
+        Assert.Null(Accept([], 0, Duration + 1, Now.AddHours(-1)));
+    }
+
+    [Fact]
+    public void Accepts_a_range_that_ends_exactly_at_the_duration_with_enough_elapsed_time()
+    {
+        Assert.Equal([new WatchedRange(0, Duration)], Accept([], 0, Duration, Now.AddHours(-1)));
     }
 
     [Fact]
