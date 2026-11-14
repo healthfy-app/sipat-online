@@ -99,6 +99,35 @@ export function readPlaybackEnvironment(): PlaybackEnvironment {
   };
 }
 
+function safeEnvironment(): PlaybackEnvironment {
+  try {
+    return readPlaybackEnvironment();
+  } catch {
+    return { connectionType: null, downlinkMbps: null, device: 'desktop', timezoneOffsetMinutes: 0 };
+  }
+}
+
+// crypto.randomUUID is missing on non-HTTPS origins; fall back to a v4 UUID.
+function safeUuid(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // fall through
+  }
+  const bytes = new Uint8Array(16);
+  try {
+    crypto.getRandomValues(bytes);
+  } catch {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
 function errorKindOf(video: HTMLVideoElement): PlaybackQualitySummary['errorKind'] {
   switch (video.error?.code) {
     case 2:
@@ -122,8 +151,8 @@ export function trackPlaybackQuality(
     onReport: (summary: PlaybackQualitySummary, reason: FlushReason) => void;
   },
 ): QualityTracker {
-  const environment = options.environment ?? readPlaybackEnvironment();
-  const id = crypto.randomUUID();
+  const environment = options.environment ?? safeEnvironment();
+  const id = safeUuid();
 
   let stopped = false;
   let startedAt: string | null = null;
@@ -265,7 +294,7 @@ export function trackPlaybackQuality(
 
   function onError() {
     errorKind = errorKindOf(video);
-    if (startedAt === null) return;
+    if (startedAt === null) onPlay(); // an error before play starts the session
     if (!hasPlayed) {
       neverStarted = true;
       clearNeverStarted();
@@ -293,6 +322,14 @@ export function trackPlaybackQuality(
     video.addEventListener(name, wrapped);
     return [name, wrapped] as const;
   });
+
+  // The video may already be failed or playing when the tracker is created.
+  try {
+    if (video.error) onError();
+    else if (!video.paused) onPlay();
+  } catch {
+    // ignore
+  }
 
   return {
     flush(reason) {

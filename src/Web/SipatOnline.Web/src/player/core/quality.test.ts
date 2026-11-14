@@ -139,14 +139,81 @@ describe('trackPlaybackQuality', () => {
     expect(reports).toHaveLength(0);
   });
 
-  it('reports nothing before the first play', () => {
+  it('reports nothing before the first play for non-error events', () => {
     const { fire, tracker, reports } = setup();
+    fire('loadedmetadata');
+    fire('waiting');
     fire('pause');
-    fire('error');
     tracker.flush('leave');
     tracker.stop();
     vi.advanceTimersByTime(200_000);
     expect(reports).toHaveLength(0);
+  });
+
+  it('an error before the first play starts the session and reports it', () => {
+    const { video, fire, reports, last } = setup();
+    vi.advanceTimersByTime(5000);
+    Object.defineProperty(video, 'error', { value: { code: 4 }, configurable: true });
+    fire('error');
+    expect(reports).toHaveLength(1);
+    expect(last().reason).toBe('interval');
+    expect(last().s.neverStarted).toBe(true);
+    expect(last().s.errorKind).toBe('source');
+    expect(last().s.startedAt).toBe('2026-11-14T12:00:05.000Z');
+    vi.advanceTimersByTime(60_000);
+    expect(reports).toHaveLength(1);
+  });
+
+  it('reports a video that already has an error when the tracker is created', () => {
+    const video = document.createElement('video');
+    Object.defineProperty(video, 'error', { value: { code: 3 }, configurable: true });
+    const reports: PlaybackQualitySummary[] = [];
+    trackPlaybackQuality(video, {
+      lessonId: 'l',
+      playbackSessionId: 's',
+      quality: 'single',
+      environment: env,
+      onReport: (s) => reports.push(s),
+    });
+    expect(reports).toHaveLength(1);
+    expect(reports[0].neverStarted).toBe(true);
+    expect(reports[0].errorKind).toBe('decode');
+  });
+
+  it('treats a video that is already playing as if play just fired', () => {
+    const video = document.createElement('video');
+    Object.defineProperty(video, 'paused', { value: false, configurable: true });
+    const reports: Array<{ s: PlaybackQualitySummary; reason: FlushReason }> = [];
+    const tracker = trackPlaybackQuality(video, {
+      lessonId: 'l',
+      playbackSessionId: 's',
+      quality: 'single',
+      environment: env,
+      onReport: (s, reason) => reports.push({ s, reason }),
+    });
+    vi.advanceTimersByTime(800);
+    video.dispatchEvent(new Event('playing'));
+    vi.advanceTimersByTime(60_000);
+    expect(reports).toHaveLength(1);
+    expect(reports[0].s.startedAt).toBe('2026-11-14T12:00:00.000Z');
+    expect(reports[0].s.startupMs).toBe(800);
+    tracker.stop();
+    expect(reports[1].reason).toBe('stop');
+  });
+
+  it('works without crypto.randomUUID', () => {
+    const original = crypto.randomUUID;
+    Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true });
+    try {
+      const { fire, tracker, last } = setup();
+      fire('play');
+      tracker.flush('leave');
+      expect(last().s.id).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+      );
+    } finally {
+      Object.defineProperty(crypto, 'randomUUID', { value: original, configurable: true });
+    }
   });
 
   it.each([
