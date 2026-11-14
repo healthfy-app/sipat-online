@@ -558,26 +558,6 @@ function ProtectedPortal({
 
   return (
     <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${isPlatformCompanyContext ? ' portal-layout-company-context' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
-      {!isLearnerOnly && <header className="portal-header">
-        <Link
-          aria-label={`${tenant.tenantName} - início`}
-          className="brand-link"
-          to={getLandingPage(session)}
-        >
-          <TenantIdentity tenant={tenant} compact />
-        </Link>
-        <div className="header-actions">
-          <span className="user-name">{session.displayName}</span>
-          <button
-            className="button button-quiet"
-            disabled={isSigningOut}
-            onClick={handleSignOut}
-            type="button"
-          >
-            {isSigningOut ? 'Saindo...' : 'Sair'}
-          </button>
-        </div>
-      </header>}
       {!isLearnerOnly && isPlatformCompanyContext && (
         <aside aria-label="Modo de administração da empresa" className="company-context-banner" role="status">
           <span>
@@ -663,6 +643,13 @@ function ProtectedPortal({
           </aside>
         )}
         {!isLearnerOnly && <aside aria-label="Navegação principal" className="sidebar">
+          <Link
+            aria-label={`${tenant.tenantName} - início`}
+            className="brand-link sidebar-brand"
+            to={getLandingPage(session)}
+          >
+            <TenantIdentity tenant={tenant} compact />
+          </Link>
           {session.roles.includes('Participant') && !isPlatformCompanyContext && (
             <>
               <p className="sidebar-label">APRENDIZAGEM</p>
@@ -693,6 +680,17 @@ function ProtectedPortal({
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
             </>
           )}
+          <div className="sidebar-account">
+            <span className="user-name">{session.displayName}</span>
+            <button
+              className="sidebar-signout"
+              disabled={isSigningOut}
+              onClick={handleSignOut}
+              type="button"
+            >
+              {isSigningOut ? 'Saindo...' : 'Sair'}
+            </button>
+          </div>
           <div className="sidebar-footer">
             <span className="tenant-indicator" />
             <span>{tenant.tenantKey === 'platform' ? 'Operação SIPAT Online' : 'Portal da empresa'}</span>
