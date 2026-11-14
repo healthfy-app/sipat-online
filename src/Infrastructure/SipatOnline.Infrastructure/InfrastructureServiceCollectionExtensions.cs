@@ -1,3 +1,6 @@
+using Amazon.Runtime;
+using Amazon.S3;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
@@ -199,16 +202,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<ICertificatePdfRenderer, CertificatePdfRenderer>();
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<PlatformCourseCatalogService>();
-        services.AddSingleton<IPlatformCourseVideoStorage>(provider =>
-            new FilePlatformCourseVideoStorage(
-                configuration["SipatOnline:PlatformCatalog:StoragePath"],
-                provider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
-        services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
-        services.AddScoped<PlatformCourseCatalogService>();
-        services.AddSingleton<IPlatformCourseVideoStorage>(provider =>
-            new FilePlatformCourseVideoStorage(
-                configuration["SipatOnline:PlatformCatalog:StoragePath"],
-                provider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
+        AddPlatformCourseVideoStorage(services, configuration);
         services.AddScoped<IGameModuleStore, EfGameModuleStore>();
         services.AddScoped<GameModuleService>();
         services.AddScoped<ISipatProgramStore, EfSipatProgramStore>();
@@ -259,6 +253,45 @@ public static class InfrastructureServiceCollectionExtensions
 
         return services;
     }
+
+    private static void AddPlatformCourseVideoStorage(IServiceCollection services, IConfiguration configuration)
+    {
+        var provider = configuration["SipatOnline:VideoStorage:Provider"];
+        if (string.Equals(provider, "R2", StringComparison.OrdinalIgnoreCase))
+        {
+            var options = new R2StorageOptions
+            {
+                ServiceUrl = RequireR2Setting(configuration, nameof(R2StorageOptions.ServiceUrl)),
+                AccessKeyId = RequireR2Setting(configuration, nameof(R2StorageOptions.AccessKeyId)),
+                SecretAccessKey = RequireR2Setting(configuration, nameof(R2StorageOptions.SecretAccessKey)),
+                Bucket = RequireR2Setting(configuration, nameof(R2StorageOptions.Bucket))
+            };
+            services.AddSingleton(options);
+            services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
+                new BasicAWSCredentials(options.AccessKeyId, options.SecretAccessKey),
+                new AmazonS3Config
+                {
+                    ServiceURL = options.ServiceUrl,
+                    ForcePathStyle = true,
+                    AuthenticationRegion = "auto",
+                    RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                    ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED
+                }));
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddSingleton<IPlatformCourseVideoStorage, R2PlatformCourseVideoStorage>();
+            return;
+        }
+
+        services.AddSingleton<IPlatformCourseVideoStorage>(serviceProvider =>
+            new FilePlatformCourseVideoStorage(
+                configuration["SipatOnline:PlatformCatalog:StoragePath"],
+                serviceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
+    }
+
+    private static string RequireR2Setting(IConfiguration configuration, string field) =>
+        configuration[$"{R2StorageOptions.SectionName}:{field}"] is { Length: > 0 } value && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : throw new InvalidOperationException($"Configure {R2StorageOptions.SectionName}:{field}.");
 
     private static bool UseDevelopmentPlayback(IServiceProvider provider, IConfiguration configuration)
     {
