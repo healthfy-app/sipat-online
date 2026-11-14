@@ -65,6 +65,8 @@ public static class UserManagementEndpoints
             HttpContext context,
             IAntiforgery antiforgery,
             UserApplicationService userService,
+            SipatOnline.Infrastructure.Learning.LearningDistributionService distribution,
+            SipatOnline.BuildingBlocks.Application.ITenantContext tenantContext,
             CancellationToken cancellationToken) =>
         {
             var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
@@ -80,6 +82,12 @@ public static class UserManagementEndpoints
             }
 
             var user = result.Value;
+            // someone who arrives while a SIPAT is live starts with its days already there
+            if (request.Role == SipatOnline.BuildingBlocks.Application.PlatformRoles.Participant && tenantContext.CurrentTenantId is { IsEmpty: false } tenant)
+            {
+                await distribution.EnsureAssignmentsAsync(tenant.Value, user.Id.Value, cancellationToken);
+            }
+
             var response = ToResponse(user);
             return Results.Created($"/api/admin/users/{user.Id.Value:D}", response);
         })

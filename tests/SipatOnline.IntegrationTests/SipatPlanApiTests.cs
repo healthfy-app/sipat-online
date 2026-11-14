@@ -102,6 +102,45 @@ public sealed class SipatPlanApiTests
         await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{empty.GetProperty("id").GetGuid()}/plan/launch", new { }, HttpStatusCode.BadRequest);
     }
 
+    [DockerFact]
+    public async Task ParticipantWhoArrivesAfterThePublication_GetsTheLiveDays()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString(), developmentSampleEnabled: true);
+        Guid video;
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
+            video = await AddVideoAsync(scope.ServiceProvider.GetRequiredService<PlatformDbContext>(), "A1V1 - Abertura");
+        }
+
+        using var admin = Client(factory);
+        await Send(admin, HttpMethod.Post, "/api/identity/login", new LoginRequest("admin-root", "AdminPassword123"), HttpStatusCode.NoContent);
+        // a SIPAT that is live now (the sample company's own one is cancelled to leave room for it)
+        var existing = await Get(admin, "/api/admin/sipats");
+        foreach (var item in existing.GetProperty("items").EnumerateArray().Where(item => item.GetProperty("status").GetString() == "Published"))
+            await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{item.GetProperty("id").GetGuid()}/cancel", new { });
+        var start = new DateTimeOffset(DateTime.UtcNow.Date, TimeSpan.Zero); // the day of the plan decides when the SIPAT ends: today keeps it live
+        var created = await Send(admin, HttpMethod.Post, "/api/admin/sipats",
+            new SipatEventDataRequestBody("SIPAT em andamento", null, start, start.AddDays(5)), HttpStatusCode.Created);
+        var sipatId = created.GetProperty("id").GetGuid();
+        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Boa postura", start.ToString("yyyy-MM-dd"), video) } });
+        await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { });
+
+        // someone created after the publication starts with the day already there
+        await Send(admin, HttpMethod.Post, "/api/admin/users",
+            new { loginIdentifier = "chegou.depois", displayName = "Chegou Depois", initialPassword = "SenhaInicial123", role = "Participant" }, HttpStatusCode.Created);
+        using var participant = Client(factory);
+        await Send(participant, HttpMethod.Post, "/api/identity/login", new LoginRequest("chegou.depois", "SenhaInicial123"), HttpStatusCode.NoContent);
+        var tracks = await Get(participant, "/api/learning/tracks");
+        Assert.Equal(["Boa postura"], tracks.EnumerateArray().Select(item => item.GetProperty("dayTitle").GetString()));
+
+        // and a person already in the company before is also caught up when the days are updated
+        await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { });
+        Assert.Single((await Get(participant, "/api/learning/tracks")).EnumerateArray());
+    }
+
     private static object Day(string title, string date, params Guid[] videos) =>
         new { title, date, subject = (string?)null, videoIds = videos, gameIds = Array.Empty<Guid>() };
 

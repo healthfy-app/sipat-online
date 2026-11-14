@@ -179,9 +179,51 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         }
 
         await db.SaveChangesAsync(token);
+        // people who joined after the SIPAT was first delivered get its days now
+        await EnsureAssignmentsAsync(tenantId, null, token);
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(tenantId), auditAction,
             auditSubjectType, auditSubjectId.ToString("D"), clock.GetUtcNow()), token);
         return Result<ProgramApplication>.Success(new ProgramApplication(courses.Count, created, updated, kept));
+    }
+
+    /// <summary>
+    /// Gives the active participants of a company (or one of them) the days of the SIPATs that are live, where they do not have
+    /// them yet. Days are delivered when a SIPAT is published, so people who arrive later — a new hire, an import after the
+    /// publication — are caught up here. A day taken away from someone on purpose (revoked) is not given back.
+    /// </summary>
+    public async Task<int> EnsureAssignmentsAsync(Guid tenantId, Guid? onlyParticipantId, CancellationToken token)
+    {
+        var now = clock.GetUtcNow();
+        var trackIds = await (
+            from track in db.LearningTracks.AsNoTracking()
+            join sipat in db.SipatEvents.AsNoTracking() on track.SipatEventId equals sipat.Id
+            where track.TenantId == tenantId && sipat.TenantId == tenantId && sipat.Status == SipatEventStatus.Published && sipat.EndsAt > now
+            select track.Id).ToArrayAsync(token);
+        if (trackIds.Length == 0) return 0;
+
+        var people = db.Users.AsNoTracking().Where(item => item.TenantId == tenantId && item.IsActive);
+        if (onlyParticipantId is Guid one) people = people.Where(item => item.Id == one);
+        var participantIds = await people.Select(item => item.Id).ToArrayAsync(token);
+
+        var known = (await db.LearningAssignments.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && trackIds.Contains(item.TrackId))
+            .Select(item => new { item.TrackId, item.ParticipantId }).ToArrayAsync(token))
+            .Select(item => (item.TrackId, item.ParticipantId)).ToHashSet();
+
+        var tenant = new TenantId(tenantId);
+        var added = 0;
+        foreach (var participantId in participantIds)
+        {
+            if (!await learning.IsActiveParticipantAsync(tenant, participantId, token)) continue;
+            foreach (var trackId in trackIds.Where(id => !known.Contains((id, participantId))))
+            {
+                await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, trackId, participantId, now).Value, token);
+                added++;
+            }
+        }
+
+        if (added > 0) await db.SaveChangesAsync(token);
+        return added;
     }
 
     /// <summary>Replaces the lessons and activities of a day's track, unless some participant already has progress in it.</summary>

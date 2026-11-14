@@ -325,7 +325,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
           <span aria-hidden="true" className="learning-empty-mark">✓</span>
           <h2>Você ainda não tem uma SIPAT disponível</h2>
           <p>
-            Quando a sua empresa publicar a SIPAT, os dias aparecerão aqui.
+            Sua empresa ainda não abriu a próxima SIPAT. Assim que ela começar, os dias aparecem aqui — é só voltar a esta página.
           </p>
         </section>
       )}
