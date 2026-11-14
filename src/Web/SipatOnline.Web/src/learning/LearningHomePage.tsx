@@ -20,6 +20,7 @@ import {
   getTrackPath,
   getTrackProgress,
   getOverallProgress,
+  getMotivation,
   groupTracksByDay,
   sortTracksByProgram,
   formatDuration,
@@ -349,9 +350,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                 <p>{dayMode
                   ? `${completedDays} de ${programDays.length} ${programDays.length === 1 ? 'dia concluído' : 'dias concluídos'}`
                   : `${completedCourses} de ${tracks.length} cursos concluídos`} · {totalLessons} vídeos</p>
-                <p className="learning-catalog-first-note">
-                  Dê o primeiro passo. Cada vídeo é curto e você pode pausar quando quiser.
-                </p>
+                <p className="learning-catalog-first-note">{getMotivation(overallProgress)}</p>
               </div>
             </div>
             <div className="learning-catalog-first-next">
@@ -389,6 +388,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                   label={`Progresso da formação: ${completedCourses} de ${tracks.length} cursos concluídos`}
                   value={overallProgress}
                 />
+                <p className="learning-completion-motivation">{getMotivation(overallProgress)}</p>
               </div>
               {!isFormationComplete && continueTrack && (
                 <>

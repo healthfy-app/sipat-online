@@ -248,3 +248,13 @@ export function sortTracksByProgram(tracks: LearningTrackCard[]): LearningTrackC
       || (a.track.coursePosition ?? 0) - (b.track.coursePosition ?? 0) || a.index - b.index)
     .map(item => item.track);
 }
+
+/** A short, warm line for where the participant is — from "not started" to "done". */
+export function getMotivation(percentage: number): string {
+  if (percentage >= 100) return 'Missão cumprida! Cada vídeo assistido deixa o trabalho mais seguro.';
+  if (percentage >= 75) return 'Falta pouco! Mais um passo e você conclui.';
+  if (percentage >= 50) return 'Mais da metade! Você está no ritmo certo.';
+  if (percentage >= 25) return 'Ótimo começo! Continue, um vídeo de cada vez.';
+  if (percentage > 0) return 'Você já começou, e isso é o mais difícil. Siga em frente!';
+  return 'Ainda não começou? Sem pressa: o primeiro vídeo é curto e você pausa quando quiser.';
+}

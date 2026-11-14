@@ -34,7 +34,7 @@
 .portal-layout-learner .day-progress { display: grid; gap: 0.4rem; }
 .portal-layout-learner .day-progress-text { color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
 .portal-layout-learner .day-progress-steps { display: flex; gap: 4px; }
-.portal-layout-learner .day-progress-steps > span { position: relative; flex: 1; height: 8px; overflow: hidden; border-radius: 999px; background: var(--learner-progress-track, #e3e9e6); transition: background-color 400ms ease; }
+.portal-layout-learner .day-progress-steps > span { position: relative; flex: 1; height: 8px; overflow: hidden; border-radius: 999px; background: var(--learner-progress-track, #cfd8d4); transition: background-color 400ms ease; }
 .portal-layout-learner .day-progress-steps > span.is-done { background: var(--learner-action); }
 .portal-layout-learner .day-progress-steps > span > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--learner-progress-accent); transition: width 600ms cubic-bezier(.16, 1, .3, 1); }
 
@@ -118,7 +118,7 @@
 .portal-layout-learner .day-item:disabled { cursor: progress; }
 .portal-layout-learner .day-item-mark {
   display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%;
-  color: var(--learner-forest); background: var(--learner-progress-track, #e3e9e6); font-size: 0.9375rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  color: var(--learner-forest); background: var(--learner-progress-track, #cfd8d4); font-size: 0.9375rem; font-weight: 800; font-variant-numeric: tabular-nums;
   transition: background-color 250ms ease, color 250ms ease;
 }
 .portal-layout-learner .day-item-mark svg { width: 1.1rem; height: 1.1rem; stroke-width: 3; }
@@ -127,7 +127,7 @@
 .portal-layout-learner .day-item-copy { display: grid; gap: 0.15rem; min-width: 0; }
 .portal-layout-learner .day-item-title { font-size: 0.9375rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
 .portal-layout-learner .day-item-meta { display: flex; flex-wrap: wrap; gap: 0.35rem; color: var(--learner-text-secondary); font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
-.portal-layout-learner .day-item-progress { height: 4px; margin-top: 0.2rem; overflow: hidden; border-radius: 999px; background: var(--learner-progress-track, #e3e9e6); }
+.portal-layout-learner .day-item-progress { height: 4px; margin-top: 0.2rem; overflow: hidden; border-radius: 999px; background: var(--learner-progress-track, #cfd8d4); }
 .portal-layout-learner .day-item-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--learner-progress-accent); transition: width 600ms cubic-bezier(.16, 1, .3, 1); }
 .portal-layout-learner .day-item-mark .learning-playing-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 0.9rem; }
 .portal-layout-learner .day-item-mark .learning-playing-bars i { width: 3px; height: 100%; border-radius: 2px; background: currentColor; transform-origin: bottom; }

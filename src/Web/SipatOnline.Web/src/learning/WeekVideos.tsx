@@ -67,7 +67,7 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
             </span>
             <div className="week-day-heading">
               <h3 id={headingId}>{day.position ? `Dia ${day.position} · ` : ''}{day.title}</h3>
-              <p>{date ? `${date} · ` : ''}{done} de {total} {total === 1 ? 'vídeo assistido' : 'vídeos assistidos'}</p>
+              <p>{date ? `${date} · ` : ''}{done === 0 ? `Ainda não começou · ${total} ${total === 1 ? 'vídeo' : 'vídeos'}` : `${done} de ${total} ${total === 1 ? 'vídeo assistido' : 'vídeos assistidos'}`}</p>
             </div>
             <div className="week-day-progress">
               <ProgressBar label={`Progresso de ${day.title}`} value={total === 0 ? 0 : Math.round((done / total) * 100)} />
