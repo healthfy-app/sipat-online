@@ -901,6 +901,92 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("PlaybackGrants", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlaybackQualitySessionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConnectionType")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int?>("DayPosition")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Device")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<double?>("DownlinkMbps")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ErrorKind")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("LessonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("NeverStarted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PlaybackSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Quality")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("QualitySwitches")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("StallCount")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("StallMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("StartupMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TimezoneOffsetMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TrackId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("WatchedMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt");
+
+                    b.HasIndex("TenantId", "SipatEventId");
+
+                    b.ToTable("PlaybackQualitySessions", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatPlanEntity", b =>
                 {
                     b.Property<Guid>("SipatEventId")
