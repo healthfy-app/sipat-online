@@ -851,4 +851,17 @@ describe('learning experience', () => {
     expect(screen.getByRole('button', { name: /Próximo vídeo/ })).toBeEnabled();
     expect(screen.getByRole('button', { name: /Vídeo anterior/ })).toBeDisabled();
   });
+
+  it('saves the watched range when the tab is hidden', async () => {
+    const { video } = await playableCourse();
+    atTime(video, 0); fireEvent.playing(video);
+    atTime(video, 2);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    try {
+      document.dispatchEvent(new Event('visibilitychange'));
+      await waitFor(() => expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 2000, expect.any(Number)));
+    } finally {
+      Reflect.deleteProperty(document, 'visibilityState');
+    }
+  });
 });
