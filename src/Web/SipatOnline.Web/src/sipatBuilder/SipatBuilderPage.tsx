@@ -211,7 +211,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="ops-hero-title">{isNew && stage === 'setup' ? 'Nova SIPAT' : name || 'SIPAT'}</h1>
           {label && <Badge variant={label.variant}>{label.text}</Badge>}
-          {dirty && <Badge className="border-white/30 bg-transparent text-white" variant="outline">Alterações não salvas</Badge>}
+          {dirty && <Badge variant="outline">Alterações não salvas</Badge>}
         </div>
         <p className="ops-hero-lead">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</p>
         {stage === 'grid' && <ul aria-label="Resumo da SIPAT" className="ops-hero-stats">

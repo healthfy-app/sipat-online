@@ -26,6 +26,7 @@ import GameModuleForm from './GameModuleForm';
 import GameModulesPanel from './GameModulesPanel';
 import PlanSubjectsPanel from './PlanSubjectsPanel';
 import VideoLibraryPanel from './VideoLibraryPanel';
+import '@/OpsIdentity.css';
 
 type CatalogTab = 'courses' | 'videos' | 'modules' | 'plans';
 type CatalogDialog =
@@ -133,10 +134,10 @@ export default function CourseCatalog({
   }
 
   const primaryAction = {
-    courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar assunto</Button>,
+    courses: <Button className="ops-primary" onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar assunto</Button>,
     plans: undefined,
-    videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
-    modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
+    videos: <Button className="ops-primary" onClick={openUpload}><Plus /> Enviar vídeo</Button>,
+    modules: <Button className="ops-primary" onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
   }[tab];
 
   const body = isLoading ? (
@@ -145,27 +146,23 @@ export default function CourseCatalog({
 
   return (
     <Page>
-      <header className="library-hero" data-slot="page-header">
-        <div className="grid min-w-0 gap-2">
-          <p className="m-0 text-[0.75rem] font-bold uppercase tracking-[0.12em] text-[#7fe0a6]">Acervo da plataforma</p>
+      <header className="ops-hero" data-slot="page-header">
+        <div className="ops-hero-copy">
+          <p className="ops-hero-eyebrow">Acervo da plataforma</p>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="m-0 text-[clamp(2rem,4vw,2.75rem)] font-extrabold leading-none tracking-[-0.035em] text-white">Biblioteca</h1>
-            {import.meta.env.DEV && <Badge className="border-white/25 bg-white/10 text-white" variant="outline">Apresentação demo</Badge>}
+            <h1 className="ops-hero-title">Biblioteca</h1>
+            {import.meta.env.DEV && <Badge variant="outline">Apresentação demo</Badge>}
           </div>
-          <p className="m-0 text-[0.9375rem] text-white/75">{`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}</p>
-          <ul aria-label="Resumo do acervo" className="m-0 mt-3 flex list-none flex-wrap gap-x-6 gap-y-2 rounded-2xl bg-white/[0.07] px-4 py-3">
+          <p className="ops-hero-lead">{`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}</p>
+          <ul aria-label="Resumo do acervo" className="ops-hero-stats">
             {[
               [courses.length, 'assuntos'],
               [library.length, 'vídeos'],
               [modules.length, 'jogos e perguntas'],
-            ].map(([count, label]) => (
-              <li className="text-[0.8125rem] text-white/80" key={label}>
-                <strong className="mr-1 text-base font-extrabold tabular-nums text-white">{count}</strong>{label}
-              </li>
-            ))}
+            ].map(([count, label]) => <li key={label}><strong>{count}</strong> {label}</li>)}
           </ul>
         </div>
-        {primaryAction && <div className="library-hero-action flex flex-wrap gap-2 max-sm:w-full max-sm:[&>*]:flex-1">{primaryAction}</div>}
+        {primaryAction && <div className="ops-hero-actions">{primaryAction}</div>}
       </header>
 
       {error && (

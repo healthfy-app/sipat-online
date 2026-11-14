@@ -1,36 +1,36 @@
 /*
- * The visual language of the learner screen (/learning), for the management screens:
- * a flat dark-forest hero with an inset summary panel, a yellow main action, white rounded cards with a thin border.
+ * The visual language of the learner screen (/learning), for the management screens: forest-green type, a yellow main
+ * action, white rounded cards with a thin border. The big dark stage is kept for /learning; work screens get a compact header.
  */
 .ops-hero {
-  position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1.25rem;
-  padding: 1.75rem 2rem; border-radius: 1.5rem; color: #fff; background: #0e2a24;
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 0.75rem 1.25rem;
+  padding: 0.25rem 0 0.5rem; color: #12332c;
 }
-.ops-hero-copy { display: grid; min-width: 0; gap: 0.5rem; }
+.ops-hero-copy { display: grid; min-width: 0; gap: 0.35rem; }
 .ops-hero-back {
   display: inline-flex; align-items: center; gap: 0.4rem; justify-self: start; margin-bottom: 0.25rem;
-  color: rgb(255 255 255 / 72%); font-size: 0.875rem; font-weight: 600; text-decoration: none;
+  color: #3d514b; font-size: 0.875rem; font-weight: 600; text-decoration: none;
 }
-.ops-hero-back:hover { color: #fff; }
+.ops-hero-back:hover { color: #12332c; }
 .ops-hero-back svg { width: 1rem; height: 1rem; transition: transform 200ms ease; }
 .ops-hero-back:hover svg { transform: translateX(-3px); }
-.ops-hero-eyebrow { margin: 0; color: #7fe0a6; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.ops-hero-eyebrow { margin: 0; color: #0f7a3d; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
 .ops-hero-title {
-  margin: 0; color: #fff; font-size: clamp(1.75rem, 3.6vw, 2.5rem); font-weight: 800; line-height: 1.05; letter-spacing: -0.035em; overflow-wrap: anywhere;
+  margin: 0; color: #12332c; font-size: clamp(1.75rem, 3vw, 2.25rem); font-weight: 800; line-height: 1.1; letter-spacing: -0.035em; overflow-wrap: anywhere;
 }
-.ops-hero-lead { margin: 0; color: rgb(255 255 255 / 76%); font-size: 0.9375rem; }
+.ops-hero-lead { margin: 0; color: #3d514b; font-size: 0.9375rem; }
 .ops-hero-stats {
-  display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; justify-self: start; margin: 0.5rem 0 0; padding: 0.75rem 1rem; list-style: none;
-  border-radius: 1rem; background: rgb(255 255 255 / 7%); color: rgb(255 255 255 / 80%); font-size: 0.8125rem;
+  display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; margin: 0.15rem 0 0; padding: 0; list-style: none;
+  color: #3d514b; font-size: 0.8125rem;
 }
 .ops-hero-stats li { display: inline-flex; align-items: center; gap: 0.35rem; }
-.ops-hero-stats strong { color: #fff; font-size: 1rem; font-weight: 800; font-variant-numeric: tabular-nums; }
-.ops-hero-stats svg { width: 1rem; height: 1rem; color: #7fe0a6; }
-.ops-hero-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; max-width: 40rem; }
+.ops-hero-stats strong { color: #12332c; font-size: 0.9375rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.ops-hero-stats svg { width: 1rem; height: 1rem; color: #0f7a3d; }
+.ops-hero-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.5rem; max-width: 46rem; }
 .ops-hero-actions > button, .ops-hero-actions > a {
-  border: 1px solid rgb(255 255 255 / 22%) !important; border-radius: 999px !important; background: rgb(255 255 255 / 8%) !important; color: #fff !important;
+  border: 1px solid #cdd7d3 !important; border-radius: 999px !important; background: #fff !important; color: #12332c !important;
 }
-.ops-hero-actions > button:hover:not(:disabled), .ops-hero-actions > a:hover { background: rgb(255 255 255 / 16%) !important; }
+.ops-hero-actions > button:hover:not(:disabled), .ops-hero-actions > a:hover { border-color: #12332c !important; }
 .ops-hero-actions > .ops-primary {
   border-color: #ffd166 !important; background: #ffd166 !important; color: #12332c !important; font-weight: 800; padding-inline: 1.25rem;
 }
@@ -53,11 +53,10 @@
 .ops-table tbody [data-slot='table-row']:hover { background: #f4f6f5; }
 
 @media (max-width: 640px) {
-  .ops-hero { padding: 1.25rem; border-radius: 1.25rem; }
   .ops-hero-actions { justify-content: stretch; width: 100%; }
   .ops-hero-actions > * { flex: 1 1 auto; }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ops-hero { animation: ops-rise 420ms cubic-bezier(.16, 1, .3, 1) both; }
+  .ops-hero { animation: ops-rise 320ms cubic-bezier(.16, 1, .3, 1) both; }
 }
 @keyframes ops-rise { from { opacity: 0; transform: translateY(8px); } }
