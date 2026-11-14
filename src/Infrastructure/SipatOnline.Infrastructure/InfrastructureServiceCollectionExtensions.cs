@@ -218,6 +218,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<DevelopmentEngagementInitializer>();
         services.AddSingleton<DevelopmentSampleVideoProvider>();
         services.AddScoped<DevelopmentCatalogVideoProvider>();
+        services.AddScoped<CatalogVideoPlaybackProvider>();
         services.AddScoped<IVideoPlaybackProvider>(provider =>
             GetVideoPlaybackProvider(provider, configuration));
         services.AddScoped<IPlaybackEvidenceVerifier>(provider =>
@@ -259,29 +260,34 @@ public static class InfrastructureServiceCollectionExtensions
         return services;
     }
 
-    private static IVideoPlaybackProvider GetVideoPlaybackProvider(
-        IServiceProvider provider,
-        IConfiguration configuration)
+    private static bool UseDevelopmentPlayback(IServiceProvider provider, IConfiguration configuration)
     {
-        if (provider.GetRequiredService<IWebHostEnvironment>().IsDevelopment() &&
-            configuration.GetValue<bool>("SipatOnline:Learning:DevelopmentSampleEnabled"))
+        var configured = configuration["SipatOnline:Learning:Playback:Provider"];
+        if (string.Equals(configured, "Development", StringComparison.OrdinalIgnoreCase))
         {
-            return provider.GetRequiredService<DevelopmentCatalogVideoProvider>();
+            return true;
         }
 
-        return new UnconfiguredVideoPlaybackProvider();
+        if (string.Equals(configured, "Catalog", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return provider.GetRequiredService<IWebHostEnvironment>().IsDevelopment() &&
+               configuration.GetValue<bool>("SipatOnline:Learning:DevelopmentSampleEnabled");
     }
+
+    private static IVideoPlaybackProvider GetVideoPlaybackProvider(
+        IServiceProvider provider,
+        IConfiguration configuration) =>
+        UseDevelopmentPlayback(provider, configuration)
+            ? provider.GetRequiredService<DevelopmentCatalogVideoProvider>()
+            : provider.GetRequiredService<CatalogVideoPlaybackProvider>();
 
     private static IPlaybackEvidenceVerifier GetPlaybackEvidenceVerifier(
         IServiceProvider provider,
-        IConfiguration configuration)
-    {
-        if (provider.GetRequiredService<IWebHostEnvironment>().IsDevelopment() &&
-            configuration.GetValue<bool>("SipatOnline:Learning:DevelopmentSampleEnabled"))
-        {
-            return provider.GetRequiredService<DevelopmentSampleVideoProvider>();
-        }
-
-        return new UnconfiguredVideoPlaybackProvider();
-    }
+        IConfiguration configuration) =>
+        UseDevelopmentPlayback(provider, configuration)
+            ? provider.GetRequiredService<DevelopmentSampleVideoProvider>()
+            : provider.GetRequiredService<CatalogVideoPlaybackProvider>();
 }

@@ -13,5 +13,8 @@ public interface IPlatformCourseVideoStorage
 
     Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken);
 
+    /// <summary>A time-limited direct URL for the file, or null when the file is served by the API.</summary>
+    Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken);
+
     Task DeleteAsync(Guid videoId, CancellationToken cancellationToken);
 }

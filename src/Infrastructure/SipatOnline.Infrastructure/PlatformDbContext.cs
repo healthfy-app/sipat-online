@@ -29,6 +29,8 @@ public sealed class PlatformDbContext(
 
     public DbSet<LearningProgressEntity> LearningProgress => Set<LearningProgressEntity>();
 
+    public DbSet<PlaybackGrantEntity> PlaybackGrants => Set<PlaybackGrantEntity>();
+
     public DbSet<PlatformCourseEntity> PlatformCourses => Set<PlatformCourseEntity>();
 
     public DbSet<CourseCategoryEntity> CourseCategories => Set<CourseCategoryEntity>();
