@@ -1,0 +1,421 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>SIPAT Online — Manual do usuário</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  @page { size: A4; margin: 16mm 15mm 18mm 15mm; }
+  @page :first { margin: 0; }
+  :root { --forest: #12332c; --deep: #0b241f; --green: #0f7a3d; --mint: #7fe0a6; --yellow: #ffd166; --line: #dfe6e3; --ink: #12332c; --muted: #3d514b; --soft: #eef2f0; }
+  * { box-sizing: border-box; }
+  html { font-family: 'Plus Jakarta Sans', 'Segoe UI', Arial, sans-serif; color: var(--ink); font-size: 10.5pt; line-height: 1.5; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { margin: 0; }
+  h1, h2, h3, h4 { margin: 0; line-height: 1.15; letter-spacing: -0.02em; color: var(--forest); }
+  h1 { font-size: 26pt; font-weight: 800; }
+  h2 { font-size: 17pt; font-weight: 800; margin-bottom: 4mm; }
+  h3 { font-size: 12.5pt; font-weight: 800; margin: 6mm 0 2mm; }
+  h4 { font-size: 10.5pt; font-weight: 800; margin: 4mm 0 1mm; }
+  p { margin: 0 0 3mm; }
+  ul, ol { margin: 0 0 3mm; padding-left: 5mm; }
+  li { margin-bottom: 1mm; }
+  strong { font-weight: 800; }
+
+  /* cover */
+  .cover { height: 297mm; width: 210mm; background: radial-gradient(120% 90% at 100% 0%, #1d4d42 0%, #12332c 45%, #0b241f 100%); color: #fff; padding: 26mm 22mm; display: flex; flex-direction: column; justify-content: space-between; page-break-after: always; break-after: page; position: relative; overflow: hidden; }
+  .cover::after { content: ''; position: absolute; right: -30mm; top: -25mm; width: 120mm; height: 120mm; border-radius: 50%; background: rgba(127,224,166,.1); }
+  .cover > * { position: relative; z-index: 1; }
+  .cover .brand { display: flex; align-items: center; gap: 4mm; font-weight: 800; font-size: 15pt; }
+  .cover .brand img { width: 13mm; height: 13mm; border-radius: 3mm; background: #fff; padding: 1.5mm; }
+  .cover .kicker { color: var(--mint); letter-spacing: .16em; text-transform: uppercase; font-weight: 700; font-size: 9pt; margin-bottom: 4mm; }
+  .cover h1 { color: #fff; font-size: 42pt; line-height: 1.02; letter-spacing: -0.04em; }
+  .cover .lead { margin-top: 6mm; font-size: 14pt; color: rgba(255,255,255,.82); max-width: 135mm; }
+  .cover .shot { margin-top: 12mm; border-radius: 5mm; overflow: hidden; box-shadow: 0 8mm 20mm rgba(0,0,0,.35); width: 150mm; }
+  .cover .shot img { display: block; width: 100%; }
+  .cover .foot { font-size: 9pt; color: rgba(255,255,255,.7); display: flex; justify-content: space-between; }
+
+  section.page { page-break-before: always; break-before: page; }
+  .eyebrow { color: var(--green); font-weight: 800; letter-spacing: .14em; text-transform: uppercase; font-size: 8.5pt; margin-bottom: 2mm; }
+  .part { page-break-before: always; break-before: page; height: 255mm; display: flex; flex-direction: column; justify-content: center; }
+  .part .no { font-size: 70pt; font-weight: 800; color: var(--mint); line-height: 1; letter-spacing: -0.05em; }
+  .part h1 { font-size: 34pt; margin: 3mm 0 5mm; }
+  .part p { font-size: 13pt; color: var(--muted); max-width: 140mm; }
+  .part .who { display: inline-block; align-self: flex-start; background: var(--forest); color: #fff; border-radius: 99px; padding: 1.5mm 5mm; font-weight: 700; font-size: 10pt; margin-top: 4mm; }
+
+  .notice { border: 2px solid var(--yellow); background: #fff8e1; border-radius: 4mm; padding: 6mm 7mm; margin: 8mm 0; }
+  .notice h2 { margin-bottom: 2mm; font-size: 15pt; }
+  .note { border-left: 3px solid var(--green); background: var(--soft); border-radius: 0 3mm 3mm 0; padding: 3mm 4mm; margin: 4mm 0; font-size: 10pt; }
+  .tip { border-left: 3px solid var(--yellow); background: #fff8e1; border-radius: 0 3mm 3mm 0; padding: 3mm 4mm; margin: 4mm 0; font-size: 10pt; }
+  .note strong:first-child, .tip strong:first-child { color: var(--forest); }
+
+  figure { margin: 4mm 0 5mm; break-inside: avoid; page-break-inside: avoid; }
+  figure img { display: block; width: 100%; border: 1px solid var(--line); border-radius: 3mm; }
+  figure.narrow { width: 62%; margin-left: auto; margin-right: auto; }
+  figure.phones { display: flex; gap: 6mm; justify-content: center; }
+  figure.phones img { width: 46%; }
+  figure.phones figcaption { display: none; }
+  figcaption { margin-top: 1.5mm; font-size: 8.5pt; color: var(--muted); text-align: center; }
+  .phonecap { text-align: center; font-size: 8.5pt; color: var(--muted); margin-top: -3mm; margin-bottom: 4mm; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps > li { counter-increment: step; position: relative; padding: 0 0 3mm 11mm; margin: 0; break-inside: avoid; }
+  .steps > li::before { content: counter(step); position: absolute; left: 0; top: 0; width: 7mm; height: 7mm; border-radius: 50%; background: var(--forest); color: #fff; font-weight: 800; font-size: 9.5pt; display: grid; place-items: center; }
+  table { width: 100%; border-collapse: collapse; margin: 3mm 0 5mm; font-size: 9.5pt; break-inside: avoid; }
+  th { text-align: left; background: var(--soft); color: var(--forest); font-weight: 800; padding: 2mm 3mm; border-bottom: 1px solid var(--line); }
+  td { padding: 2mm 3mm; border-bottom: 1px solid var(--line); vertical-align: top; }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; }
+  .card { border: 1px solid var(--line); border-radius: 4mm; padding: 4mm 5mm; break-inside: avoid; }
+  .card h4 { margin-top: 0; }
+  .toc { list-style: none; padding: 0; }
+  .toc li { display: flex; gap: 3mm; padding: 2mm 0; border-bottom: 1px dotted #b9c6c1; }
+  .toc li b { color: var(--green); min-width: 14mm; }
+  .tag { display: inline-block; font-size: 8pt; font-weight: 800; border-radius: 99px; padding: .5mm 3mm; background: var(--forest); color: #fff; vertical-align: middle; }
+  .tag.y { background: var(--yellow); color: var(--forest); }
+  kbd { font-family: inherit; font-weight: 700; border: 1px solid #b9c6c1; border-bottom-width: 2px; border-radius: 1.5mm; padding: 0 1.5mm; background: #fff; font-size: 9pt; }
+  .hero-player { background: var(--forest); color: #fff; border-radius: 5mm; padding: 6mm 7mm; margin: 4mm 0 5mm; break-inside: avoid; }
+  .hero-player h3 { color: var(--yellow); margin-top: 0; }
+  .hero-player p, .hero-player li { color: rgba(255,255,255,.9); }
+  .hero-player strong { color: #fff; }
+  .hero-player kbd { color: var(--forest); background: #fff; border-color: #fff; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 6mm; align-items: start; margin: 4mm 0 5mm; }
+  .pair figure { margin: 0; }
+  figure.w80 { width: 80%; margin-left: auto; margin-right: auto; }
+  figure.w50 { width: 50%; margin-left: auto; margin-right: auto; }
+  h2, h3, h4 { break-after: avoid; page-break-after: avoid; }
+</style>
+</head>
+<body>
+
+<!-- ============ CAPA ============ -->
+<div class="cover">
+  <div class="brand"><img src="favicon.svg" alt=""> SIPAT Online</div>
+  <div>
+    <div class="kicker">Manual do usuário</div>
+    <h1>Treinamento de segurança que o trabalhador quer assistir.</h1>
+    <p class="lead">Como usar o SIPAT Online: a experiência do participante, a gestão da empresa e a operação da plataforma.</p>
+    <div class="shot"><img src="shots/02-learner-home.png" alt=""></div>
+  </div>
+  <div class="foot"><span>Versão de demonstração · ambiente fictício</span><span>sipatonline.com.br</span></div>
+</div>
+
+<!-- ============ AVISO ============ -->
+<section class="page" style="page-break-before: auto; break-before: auto;">
+  <p class="eyebrow">Antes de começar</p>
+  <h2>Este manual usa um ambiente totalmente fictício</h2>
+  <div class="notice">
+    <h2>Tudo o que você vê nas imagens é de exemplo.</h2>
+    <p>Para mostrar o produto funcionando, as telas deste manual foram feitas num <strong>ambiente de demonstração</strong>. Empresas, marcas, logotipos, pessoas, matrículas, datas, resultados e vídeos <strong>são fictícios</strong> e existem apenas para ilustrar o uso do sistema.</p>
+    <p>A empresa chamada <strong>“Microsoft”</strong>, com o seu logotipo, e as demais empresas listadas (como Adobe, Amazon e Google) <strong>não participam do SIPAT Online</strong> e não têm qualquer relação com este material. Os nomes e as marcas pertencem aos seus titulares e aparecem aqui somente para dar realismo à demonstração.</p>
+    <p>Os vídeos exibidos são arquivos de teste. O aviso “Vídeo de demonstração” que aparece em alguns ambientes indica que o progresso registrado ali <strong>não comprova participação oficial</strong> em nenhuma SIPAT.</p>
+  </div>
+
+  <h3>Como este manual está organizado</h3>
+  <p>O SIPAT Online tem três tipos de acesso, e o manual tem uma parte para cada um:</p>
+  <ul class="toc">
+    <li><b>Parte 1</b><span><strong>Participante</strong> — quem assiste ao treinamento. É a área principal do produto, onde está o nosso <strong>reprodutor de vídeo</strong>.</span></li>
+    <li><b>Parte 2</b><span><strong>Administrador da empresa</strong> — quem monta e publica a SIPAT da própria empresa e acompanha os colaboradores.</span></li>
+    <li><b>Parte 3</b><span><strong>Operador da plataforma</strong> — a equipe do SIPAT Online: cadastra empresas, define planos e mantém a Biblioteca de assuntos e vídeos.</span></li>
+    <li><b>Anexo</b><span>Regras importantes, glossário e perguntas frequentes.</span></li>
+  </ul>
+
+  <h3>O que é uma SIPAT</h3>
+  <p>Uma <strong>SIPAT</strong> é a semana de treinamento de segurança de uma empresa em um ano. Ela tem uma data de início e uma quantidade de <strong>dias</strong>. Cada dia tem um <strong>slogan</strong>, uma data, um <strong>assunto</strong> (por exemplo, “Boa postura e movimento”) com até 5 vídeos e, se a empresa quiser, jogos e perguntas. Só uma SIPAT fica publicada por vez; as dos anos anteriores continuam no histórico, e cada SIPAT emite o seu próprio certificado.</p>
+  <div class="note"><strong>Palavras que usamos.</strong> <em>SIPAT</em> é a semana inteira; <em>dia</em> é cada etapa dela; <em>assunto</em> é a lista de vídeos que alimenta um dia. Estamos padronizando o vocabulário: em algumas telas ainda podem aparecer “aula” ou “curso” com o mesmo sentido de “vídeo” e “assunto”.</div>
+</section>
+
+<!-- ============ PARTE 1 ============ -->
+<section class="part">
+  <div class="no">1</div>
+  <h1>Participante</h1>
+  <p>A área de quem assiste ao treinamento. Simples para o trabalhador de chão de fábrica, elegante para quem prefere o computador, e pensada para ser percorrida com o dedo no celular.</p>
+  <span class="who">Para quem recebe login e senha da empresa</span>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 1 · Participante</p>
+  <h2>Entrando no portal</h2>
+  <p>Cada empresa tem o seu endereço (por exemplo, <em>nome-da-empresa.sipatonline.com.br</em>). Na tela de entrada aparecem a logo e o banner da empresa. O participante digita o <strong>login</strong> (normalmente a matrícula) e a <strong>senha</strong> que a empresa forneceu e toca em <strong>Entrar no portal</strong>.</p>
+  <figure><img src="shots/01-login.png" alt=""><figcaption>Tela de entrada de uma empresa (ambiente fictício).</figcaption></figure>
+  <div class="tip"><strong>Esqueceu a senha?</strong> A senha é redefinida pelo administrador da empresa, na tela de Colaboradores (Parte 2). Não há recuperação por e-mail.</div>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 1 · Participante</p>
+  <h2>Minha formação: o hero e a trilha</h2>
+  <p>Ao entrar, o participante chega em <strong>Minha formação</strong>. No topo está o <strong>hero</strong>: uma saudação pelo nome, o andamento (“6 de 6 dias concluídos”, “100% da formação”) e uma mensagem de incentivo que muda conforme o progresso — do convite para começar até o “Missão cumprida!”. Quando ainda há trabalho a fazer, o hero traz também o botão para continuar do ponto em que parou.</p>
+  <figure><img src="shots/02-learner-home.png" alt=""><figcaption>O hero (palco escuro no topo), os chips de SIPAT e “Sua trilha”: um ponto por dia, em caminho curvo.</figcaption></figure>
+  <h4>O que há na tela, de cima para baixo</h4>
+  <ul>
+    <li><strong>Hero</strong> — saudação, progresso geral e mensagem de incentivo.</li>
+    <li><strong>Chips de SIPAT</strong> — aparecem quando há mais de uma SIPAT. Mostram o nome e a fase: <em>Em andamento</em>, <em>Em breve</em> ou <em>Concluída</em>.</li>
+    <li><strong>Sua trilha</strong> — o caminho dos dias da SIPAT. Cada ponto é um dia e mostra o slogan e quantos vídeos já foram assistidos. <strong>Tocar em um dia filtra os vídeos daquele dia</strong>; sem tocar em nenhum, aparecem os vídeos da semana toda. O participante pode assistir na ordem que preferir.</li>
+    <li><strong>Menu lateral</strong> — “Minha formação” e “Meus certificados”, o círculo de progresso e o botão <strong>Sair</strong>.</li>
+  </ul>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 1 · Participante</p>
+  <h2>Vídeos da semana</h2>
+  <p>Logo abaixo da trilha ficam os <strong>vídeos da semana</strong>, organizados em um bloco por dia. Cada bloco mostra o número e o slogan do dia, a <strong>data</strong>, quantos vídeos foram assistidos e uma barra de progresso.</p>
+  <figure><img src="shots/03-learner-week-videos.png" alt=""><figcaption>Um bloco por dia, com os cartões dos vídeos. O botão <strong>Abrir dia</strong> leva à página do dia.</figcaption></figure>
+  <ul>
+    <li><strong>Cartões de vídeo</strong> — até cinco por linha no computador, com a capa, o número, o título e o estado: <em>Para assistir</em>, <em>Próximo</em>, <em>Continuar · 40%</em> ou <em>Assistido</em>.</li>
+    <li><strong>Abrir dia</strong> — abre a página do dia no vídeo certo, mesmo com o bloco recolhido.</li>
+    <li><strong>Seta ao lado</strong> — recolhe ou abre o bloco do dia, para quem prefere ver só o que falta.</li>
+  </ul>
+  <figure class="narrow"><img src="shots/04-learner-day-collapsed.png" alt=""><figcaption>Com o Dia 1 recolhido, a lista fica enxuta e o botão Abrir dia continua à mão.</figcaption></figure>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 1 · Participante</p>
+  <h2>A página do dia</h2>
+  <p>É aqui que o treinamento acontece. A página tem um <strong>palco escuro para o vídeo</strong>, a lista dos <strong>vídeos do dia</strong> ao lado e, no topo, o número do dia, a data, o slogan e uma barra de progresso dividida em um segmento por vídeo.</p>
+  <figure><img src="shots/05-day-page.png" alt=""><figcaption>Página do dia: o vídeo no palco, os botões Vídeo anterior / Próximo vídeo e a lista de vídeos do dia.</figcaption></figure>
+  <h4>Sob o vídeo</h4>
+  <ul>
+    <li><strong>Vídeo anterior / Próximo vídeo</strong> — navegam entre os vídeos do dia. “Próximo vídeo” é o botão amarelo de destaque.</li>
+    <li><strong>Estado do vídeo</strong> — “Assista até o fim para concluir”, “40% assistido” ou “Concluído”.</li>
+    <li><strong>Sobre o vídeo</strong> — a descrição, quando existe.</li>
+    <li><strong>Vídeos do dia</strong> — a lista ao lado, com número ou check, duração e estado de cada vídeo. O vídeo atual fica destacado e mostra barrinhas animadas enquanto toca.</li>
+    <li><strong>Atividades para praticar</strong> — jogos e perguntas opcionais do dia.</li>
+  </ul>
+  <h4>Terminou o dia</h4>
+  <p>Ao concluir todos os vídeos aparece o cartão <strong>“Dia 1 concluído!”</strong>, com o atalho <strong>Ir para o Dia 2</strong> (ou <strong>Voltar à sua SIPAT</strong> no último dia). O participante pode rever qualquer vídeo quando quiser.</p>
+</section>
+
+<!-- ===== PLAYER ===== -->
+<section class="page">
+  <p class="eyebrow">Parte 1 · Participante · destaque</p>
+  <h2>O reprodutor de vídeo SIPAT</h2>
+  <p>O reprodutor é o coração do produto. Ele é uma <strong>extensão do player nativo do navegador</strong>: quem decodifica e exibe o vídeo continua sendo o próprio navegador (leve, compatível, sem plugins), e o SIPAT Online coloca por cima uma <strong>camada de controles própria</strong>, com a identidade do produto e as regras de um treinamento obrigatório.</p>
+  <figure><img src="shots/06-player-playing.png" alt=""><figcaption>O reprodutor em uso: linha do tempo, voltar 10 s, volume, tempo, contador de atividades e tela cheia.</figcaption></figure>
+  <div class="hero-player">
+    <h3>O que o nosso reprodutor faz a mais do que o nativo</h3>
+    <ul>
+      <li><strong>Linha do tempo com trava (“assista em ordem”)</strong> — o participante só avança até onde já assistiu. Ao tentar pular além disso, o sistema avisa. Ao terminar o vídeo, a trava se abre e ele pode rever qualquer trecho.</li>
+      <li><strong>Marcadores de atividades</strong> — jogos e perguntas aparecem como pontos na linha do tempo e <strong>pausam o vídeo</strong> no momento certo. O contador <strong>🎮 1/1</strong> mostra quantas atividades do vídeo já foram feitas.</li>
+      <li><strong>Progresso salvo automaticamente</strong> — o sistema registra até onde o participante assistiu. Se ele sair, volta exatamente de onde parou (“Você parou em 2:10”).</li>
+      <li><strong>Conclusão por cobertura</strong> — um vídeo conta como concluído quando pelo menos <strong>90%</strong> dele foi realmente reproduzido; arrastar a barra não conta como assistir.</li>
+      <li><strong>Velocidade fixa em 1x e sem picture-in-picture</strong> — para que o tempo assistido seja o tempo real do treinamento.</li>
+      <li><strong>Tela cheia com os nossos controles</strong> — inclusive no iPhone, onde o vídeo preenche a página em vez de entregar o controle ao player do sistema.</li>
+      <li><strong>Controle por teclado</strong> — com a linha do tempo em foco, <kbd>←</kbd> <kbd>→</kbd> movem 5 segundos e <kbd>Home</kbd> e <kbd>End</kbd> vão ao início e ao ponto liberado.</li>
+    </ul>
+  </div>
+  <figure><img src="shots/07-player-controls.png" alt=""><figcaption>Os controles em detalhe: reproduzir/pausar, voltar 10 s, mudo e volume, tempo, atividades e tela cheia.</figcaption></figure>
+  <div class="note"><strong>Um só reprodutor em todo o produto.</strong> O mesmo componente toca o vídeo do participante, a pré-visualização na Biblioteca e a prévia do editor de assuntos (Parte 3). O que melhora no reprodutor melhora em todas as telas.</div>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 1 · Participante</p>
+  <h2>Meus certificados</h2>
+  <p>Cada SIPAT concluída gera o seu <strong>certificado</strong>. A tela <strong>Meus certificados</strong> lista as SIPATs, da mais recente para a mais antiga, com o período de cada uma e quantos dias foram concluídos.</p>
+  <figure><img src="shots/08-learner-certificates.png" alt=""><figcaption>Um cartão por SIPAT, com o período e a situação do certificado.</figcaption></figure>
+  <ol class="steps">
+    <li>Conclua <strong>todos os dias</strong> da SIPAT.</li>
+    <li>Toque em <strong>Emitir certificado</strong>. Ele só fica disponível se a empresa já tiver cadastrado a sua logo.</li>
+    <li>Toque em <strong>Baixar certificado PDF</strong>. O documento traz o nome do participante, a empresa, o período e um identificador de autenticidade.</li>
+  </ol>
+  <p>Cada SIPAT tem o seu próprio certificado: o de 2026 não substitui o de 2027.</p>
+
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 1 · Participante</p>
+  <h2>No celular</h2>
+  <p>A área do participante foi desenhada primeiro para o celular. O menu vira uma faixa no topo, os vídeos aparecem em linha com rolagem para o lado e os botões ficam grandes para o dedo.</p>
+  <figure class="phones"><img src="shots/09-mobile-home.png" alt=""><img src="shots/10-mobile-day.png" alt=""></figure>
+  <p class="phonecap">À esquerda, a tela inicial; à direita, a página do dia, com o vídeo em primeiro lugar.</p>
+</section>
+
+<!-- ============ PARTE 2 ============ -->
+<section class="part">
+  <div class="no">2</div>
+  <h1>Administrador da empresa</h1>
+  <p>Quem organiza o treinamento da própria empresa: monta a SIPAT, publica, acompanha o andamento dos colaboradores e cuida dos acessos.</p>
+  <span class="who">Menu “Gestão da empresa”</span>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 2 · Administrador da empresa</p>
+  <h2>Visão geral</h2>
+  <p>A primeira tela do administrador resume a SIPAT em andamento: quantos <strong>participantes</strong> estão ativos, quantos <strong>dias foram entregues</strong>, quantos vídeos foram concluídos, a situação dos participantes e a <strong>conclusão média por dia</strong>.</p>
+  <figure><img src="shots/20-admin-overview.png" alt=""><figcaption>Visão geral da empresa (dados fictícios).</figcaption></figure>
+  <h4>O menu lateral</h4>
+  <table>
+    <tr><th>Item</th><th>Para que serve</th></tr>
+    <tr><td><strong>Visão geral</strong></td><td>Indicadores de participação e de conclusão.</td></tr>
+    <tr><td><strong>SIPATs</strong></td><td>Criar, montar, publicar, duplicar, cancelar e reativar as SIPATs da empresa.</td></tr>
+    <tr><td><strong>Identidade visual</strong></td><td>Logo, cores e banner da empresa, quando o plano contratado permite.</td></tr>
+    <tr><td><strong>Colaboradores</strong></td><td>Cadastro e acesso dos participantes, com os dados e a senha de cada um.</td></tr>
+  </table>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 2 · Administrador da empresa</p>
+  <h2>SIPATs da empresa</h2>
+  <p>A tela <strong>SIPATs</strong> lista as SIPATs por ano, da mais recente para a mais antiga. Cada cartão mostra o nome, o período, a quantidade de dias e vídeos e a <strong>fase</strong>:</p>
+  <table>
+    <tr><th>Fase</th><th>O que significa</th></tr>
+    <tr><td><span class="tag y">Rascunho</span></td><td>Ainda sendo montada. Os participantes não a veem.</td></tr>
+    <tr><td><span class="tag y">Criada</span></td><td>Com os dias montados, mas ainda não publicada.</td></tr>
+    <tr><td><span class="tag">Publicada</span></td><td>Entregue aos participantes, antes da data de início.</td></tr>
+    <tr><td><span class="tag">Em andamento</span></td><td>Publicada e dentro do período.</td></tr>
+    <tr><td><span class="tag">Concluída</span></td><td>Período encerrado; fica no histórico e continua valendo para certificados.</td></tr>
+  </table>
+  <figure><img src="shots/21-admin-sipats.png" alt=""><figcaption>Lista de SIPATs da empresa.</figcaption></figure>
+  <div class="note"><strong>Cancelar e reativar.</strong> Uma SIPAT cancelada aparece <em>desabilitada</em>, com um botão <strong>Reativar</strong>. Reativar a devolve como <em>rascunho</em>, com os dias que já estavam montados; é preciso conferir e publicar de novo. Enquanto estiver em rascunho, os participantes não a veem.</div>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 2 · Administrador da empresa</p>
+  <h2>Como montar uma SIPAT, passo a passo</h2>
+  <p>A mesma tela é usada pelo administrador da empresa e pelo operador da plataforma. Ela organiza a SIPAT como uma grade: <strong>uma coluna por dia</strong>.</p>
+  <figure class="w80" style="width:54%"><img src="shots/13-ops-sipat-builder.png" alt=""><figcaption>A tela de montar a SIPAT: o resumo no topo, o acervo de assuntos para arrastar e uma coluna para cada dia.</figcaption></figure>
+  <ol class="steps">
+    <li><strong>Crie a SIPAT.</strong> Em <em>SIPATs</em>, toque em <strong>Nova SIPAT</strong>. Informe a <strong>data de início</strong>, quantos <strong>dias</strong> terá e o <strong>nome</strong> (por exemplo, “SIPAT 2026”). Quer partir de uma anterior? Use <strong>Duplicar de outra SIPAT</strong>: os assuntos vêm junto e as datas ficam em aberto.</li>
+    <li><strong>Dê a data e o slogan de cada dia.</strong> No topo de cada coluna ficam o número do dia, a data e o <em>slogan</em> (“Boa postura e movimento, mais saúde em cada momento!”). Esse texto aparece para o participante.</li>
+    <li><strong>Escolha o assunto de cada dia.</strong> Em <em>Assuntos do acervo</em>, <strong>arraste um assunto para o dia</strong> (ou use “Escolher assunto” na coluna). O assunto traz os seus <strong>vídeos</strong> (até 5 por dia) e os <strong>jogos</strong>, e a coluna passa a mostrá-los em ordem, com a duração total do dia.</li>
+    <li><strong>Revise.</strong> No topo, o resumo conta <em>dias</em>, <em>vídeos</em>, <em>jogos</em> e o <em>tempo total</em>. Para editar vídeos e jogos de um assunto, use o link <em>Editar vídeos e jogos</em> (Parte 3).</li>
+    <li><strong>Salve o rascunho</strong> quantas vezes quiser. Há também <strong>Importar CSV</strong> e <strong>Exportar CSV</strong> para trabalhar a grade numa planilha.</li>
+    <li><strong>Publique.</strong> Toque em <strong>Publicar</strong>. Cada dia é entregue aos participantes ativos da empresa. <strong>Só uma SIPAT fica publicada por vez</strong>; para publicar outra, cancele a atual.</li>
+  </ol>
+  <div class="tip"><strong>Mudou de ideia depois de publicar?</strong> Use <strong>Atualizar os dias</strong>: os dias que ninguém começou são atualizados com os assuntos atuais; os que já têm progresso ficam como estão, para ninguém perder o que assistiu. Quem foi cadastrado depois da publicação também recebe os dias nessa atualização, e já ao ser criado.</div>
+  <div class="note"><strong>O plano da empresa.</strong> A empresa não vê o nome do plano, só o que ele libera (assuntos, jogos, identidade visual). Quadro completo na Parte 3.</div>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 2 · Administrador da empresa</p>
+  <h2>Colaboradores</h2>
+  <p>Em <strong>Colaboradores</strong> o administrador cadastra e cuida dos participantes. Num só lugar ele edita o <strong>nome</strong>, a <strong>matrícula</strong> (o login), a <strong>senha</strong> e o <strong>acesso</strong> (ativo ou inativo) de cada pessoa, e acompanha o andamento.</p>
+  <figure><img src="shots/22-admin-collaborators.png" alt=""><figcaption>Lista de colaboradores da empresa (nomes fictícios).</figcaption></figure>
+  <ul>
+    <li><strong>Redefinir a senha</strong> — o administrador define uma nova senha para o colaborador, que passa a valer de imediato e encerra as sessões antigas. É assim que se trata o “esqueci minha senha”.</li>
+    <li><strong>Trocar a matrícula</strong> — o login muda; o histórico e o progresso da pessoa continuam os mesmos.</li>
+    <li><strong>Inativar</strong> — a pessoa deixa de entrar, sem perder o histórico.</li>
+    <li><strong>Quem chega depois</strong> — um colaborador cadastrado com uma SIPAT já publicada recebe os dias da SIPAT em andamento automaticamente.</li>
+  </ul>
+  <div class="note"><strong>Identidade visual.</strong> Em planos que permitem, o administrador envia a logo, escolhe as cores e o banner da tela de entrada. A logo cadastrada também é usada no <strong>certificado</strong> dos participantes.</div>
+</section>
+
+<!-- ============ PARTE 3 ============ -->
+<section class="part">
+  <div class="no">3</div>
+  <h1>Operador da plataforma</h1>
+  <p>A equipe do SIPAT Online. Cadastra as empresas, define o plano de cada uma e mantém a <strong>Biblioteca</strong>: os assuntos, os vídeos, os jogos e as categorias que as empresas usam para montar as suas SIPATs.</p>
+  <span class="who">Endereço de operação: ops.sipatonline.com.br</span>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 3 · Operador</p>
+  <h2>Empresas</h2>
+  <p>A tela inicial do operador lista todas as <strong>empresas</strong> da plataforma, com o plano, o número de participantes e a situação (ativa ou inativa). Há busca por nome ou identificador, filtro por status e o botão <strong>Nova empresa</strong>.</p>
+  <figure><img src="shots/11-ops-companies.png" alt=""><figcaption>Empresas da plataforma (todas fictícias).</figcaption></figure>
+  <ol class="steps">
+    <li><strong>Cadastre a empresa.</strong> Toque em <strong>Nova empresa</strong>, informe o nome, o identificador e o <strong>plano</strong>, e crie o <strong>primeiro administrador</strong> (login, nome e senha inicial).</li>
+    <li><strong>Entre na empresa.</strong> O botão <strong>Entrar</strong> abre a área da empresa dentro da operação, com o seu próprio menu: <em>SIPATs</em>, <em>Participantes</em> e <em>Administradores</em>.</li>
+    <li><strong>Monte e publique</strong> a SIPAT ali mesmo, com as mesmas telas do administrador (Parte 2).</li>
+  </ol>
+  <figure><img src="shots/12-ops-company-sipats.png" alt=""><figcaption>Dentro da empresa: menu próprio, plano da empresa e as SIPATs dela.</figcaption></figure>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 3 · Operador</p>
+  <h2>Biblioteca</h2>
+  <p>A <strong>Biblioteca</strong> é o acervo da plataforma, com quatro abas: <strong>Assuntos</strong>, <strong>Vídeos</strong>, <strong>Jogos e perguntas</strong> e <strong>Planos</strong>. Abaixo das abas há uma barra de busca e filtros, que <strong>acompanha a aba</strong> e se mantém ao trocar de aba ou voltar de um editor.</p>
+  <figure><img src="shots/14-ops-library.png" alt=""><figcaption>Biblioteca, aba Assuntos: cartões com capa, categoria, quantidade de vídeos e o botão Abrir editor.</figcaption></figure>
+  <h4>Assuntos</h4>
+  <p>Um <strong>assunto</strong> é uma lista de vídeos (e jogos) pronta para ser usada em um dia de SIPAT. Cada cartão traz a <strong>categoria</strong>, o título, quantos vídeos tem e a situação (<em>Publicado</em> ou <em>Rascunho</em>). Dá para <strong>duplicar</strong> e <strong>excluir</strong> um assunto; excluir não apaga os vídeos, que continuam no acervo.</p>
+  <ol class="steps">
+    <li>Toque em <strong>Criar assunto</strong>.</li>
+    <li>Escolha a <strong>capa</strong> (PNG, JPEG ou WebP, até 2 MB), a <strong>categoria</strong>, o <strong>título</strong> e uma breve descrição.</li>
+    <li>Toque em <strong>Criar</strong> e siga para o editor para incluir os vídeos. A janela de criação aparece na próxima página.</li>
+  </ol>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 3 · Operador</p>
+  <h2>Categorias, vídeos, jogos e planos</h2>
+  <h4>Categorias</h4>
+  <p>As <strong>categorias</strong> agrupam os assuntos (Alimentação, Postura, Segurança no trabalho…). A lista é da operação: não há categorias prontas, o operador cria as que precisar. Em <strong>Gerenciar categorias</strong> ele cria, renomeia e exclui; excluir uma categoria <strong>não apaga os assuntos</strong>, só os deixa sem categoria. A barra de filtros da aba Assuntos filtra por categoria.</p>
+  <div class="pair">
+    <figure><img src="shots/16-ops-create-subject.png" alt=""><figcaption>Criar assunto: a categoria pode ser escolhida ou criada ali mesmo, em “＋ Criar categoria…”.</figcaption></figure>
+    <figure><img src="shots/15-ops-categories-dialog.png" alt=""><figcaption>Gerenciar categorias: criar, renomear e excluir.</figcaption></figure>
+  </div>
+  <h4>Vídeos</h4>
+  <p>A aba <strong>Vídeos</strong> guarda o acervo reutilizável: um vídeo enviado uma vez pode estar em vários assuntos. Cada cartão mostra a <strong>pré-visualização no reprodutor SIPAT</strong>, a duração, o tamanho e em quantos assuntos o vídeo é usado. Toque em <strong>Enviar vídeo</strong> para incluir um novo (até 250 MB por vídeo).</p>
+  <figure><img src="shots/17-ops-library-videos.png" alt=""><figcaption>Acervo de vídeos, com pré-visualização no nosso reprodutor.</figcaption></figure>
+  <h4>Jogos e perguntas</h4>
+  <p>Jogos (quiz, identificar riscos, quebra-cabeça, memória, cenário, ordenação, seguro ou arriscado) e perguntas podem ser colocados entre os vídeos ou <strong>durante a reprodução</strong>, pausando o vídeo. Ficam numa aba própria e podem ser testados antes de usar.</p>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 3 · Operador</p>
+  <h2>Planos</h2>
+  <p>Cada empresa tem um <strong>plano</strong>, escolhido pelo operador: <strong>Bronze</strong>, <strong>Prata</strong>, <strong>Ouro</strong> ou <strong>Diamante</strong>. A empresa não vê o nome do plano; ela só vê o que ele libera. Na aba <strong>Planos</strong> da Biblioteca fica a <strong>matriz de assuntos</strong>: uma tabela com os assuntos nas linhas e os planos nas colunas. Tudo começa liberado, e o operador desmarca o que um plano não oferece.</p>
+  <figure><img src="shots/18-ops-library-plans.png" alt=""><figcaption>Matriz de assuntos por plano.</figcaption></figure>
+  <table>
+    <tr><th>Recurso</th><th>Bronze</th><th>Prata</th><th>Ouro</th><th>Diamante</th></tr>
+    <tr><td>Montar a SIPAT com os assuntos liberados para o plano</td><td>●</td><td>●</td><td>●</td><td>●</td></tr>
+    <tr><td>Identidade visual da empresa (logo, cores, banner)</td><td></td><td></td><td>●</td><td>●</td></tr>
+    <tr><td>Logo da empresa no certificado</td><td></td><td></td><td>●</td><td>●</td></tr>
+    <tr><td>Jogos e perguntas nos dias da SIPAT</td><td></td><td></td><td></td><td>●</td></tr>
+  </table>
+  <div class="note"><strong>Em evolução.</strong> A personalização de vídeos no plano Prata e o envio de vídeos internos pela própria empresa (Diamante) estão no planejamento do produto e ainda não estão disponíveis. Os planos Bronze e Prata não diferem hoje nos recursos acima; a diferença prática entre eles é a lista de assuntos liberados.</div>
+</section>
+
+<section class="page">
+  <p class="eyebrow">Parte 3 · Operador</p>
+  <h2>O editor de assuntos</h2>
+  <p>Ao tocar em <strong>Abrir editor</strong> o operador entra numa tela cheia, feita para montar o conteúdo, em três etapas: <strong>Editar</strong>, <strong>Configurar</strong> e <strong>Publicar</strong>.</p>
+  <figure><img src="shots/19-ops-course-editor.png" alt=""><figcaption>O editor: lista de vídeos à esquerda, a prévia no centro, as propriedades à direita.</figcaption></figure>
+  <ul>
+    <li><strong>Esquerda — vídeos do assunto.</strong> A ordem em que o participante verá os vídeos. Dá para reordenar, remover, renomear só neste assunto e incluir um <em>Novo vídeo</em> (do acervo ou enviando um arquivo).</li>
+    <li><strong>Centro — prévia no reprodutor SIPAT.</strong> A mesma experiência do participante, no formato <strong>celular</strong> ou <strong>computador</strong>. Aqui o reprodutor toca <strong>sem a trava</strong>, para o operador navegar livremente pelo vídeo.</li>
+    <li><strong>Direita — propriedades.</strong> Título do vídeo neste assunto, duração e as <strong>atividades e perguntas</strong> do vídeo.</li>
+    <li><strong>Atividades.</strong> Um jogo ou pergunta pode entrar <em>depois de um vídeo</em> ou em um <strong>ponto exato da reprodução</strong>. No reprodutor ele vira um marcador na linha do tempo e pausa o vídeo naquele instante.</li>
+    <li><strong>Configurar e Publicar.</strong> Capa, título e descrição; o tipo de jogo; e a conferência final antes de publicar. Um assunto precisa ter ao menos um vídeo e uma descrição para ser publicado.</li>
+  </ul>
+  <div class="tip"><strong>Boa prática.</strong> Publique o assunto só depois de ver a prévia no formato celular: é como a maioria dos participantes vai assistir.</div>
+</section>
+
+<!-- ============ ANEXO ============ -->
+<section class="page">
+  <p class="eyebrow">Anexo</p>
+  <h2>Regras importantes</h2>
+  <table>
+    <tr><th>Regra</th><th>Como funciona</th></tr>
+    <tr><td>Uma SIPAT publicada por vez</td><td>Cada empresa tem no máximo uma SIPAT publicada ao mesmo tempo. Para publicar outra, cancele a atual.</td></tr>
+    <tr><td>Concluir um vídeo</td><td>É preciso reproduzir pelo menos 90% do vídeo. Arrastar a barra não conta.</td></tr>
+    <tr><td>Assistir em ordem</td><td>A linha do tempo só avança até onde o participante já assistiu.</td></tr>
+    <tr><td>Progresso ao atualizar os dias</td><td>Dias com progresso não mudam; só os dias que ninguém começou são atualizados.</td></tr>
+    <tr><td>Certificado</td><td>Um por SIPAT, emitido quando todos os dias foram concluídos e a empresa tem a logo cadastrada.</td></tr>
+    <tr><td>SIPAT cancelada</td><td>Some para o participante e não pode ser alterada nem publicada. Pode ser <em>reativada</em> como rascunho.</td></tr>
+    <tr><td>Senhas</td><td>Quem perde a senha pede ao administrador da empresa, que define uma nova. Não há recuperação por e-mail.</td></tr>
+    <tr><td>Quem entra depois</td><td>Participantes cadastrados depois da publicação recebem os dias da SIPAT em andamento.</td></tr>
+  </table>
+
+  <h2 style="margin-top: 7mm;">Glossário</h2>
+  <div class="two">
+    <div class="card"><h4>SIPAT</h4><p>A semana de treinamento de uma empresa em um ano.</p></div>
+    <div class="card"><h4>Dia</h4><p>Uma etapa da SIPAT, com data, slogan e assunto.</p></div>
+    <div class="card"><h4>Assunto</h4><p>A lista de vídeos (e jogos) que alimenta um dia.</p></div>
+    <div class="card"><h4>Categoria</h4><p>O agrupamento dos assuntos na Biblioteca.</p></div>
+    <div class="card"><h4>Acervo / Biblioteca</h4><p>Os assuntos, vídeos, jogos e planos da plataforma.</p></div>
+    <div class="card"><h4>Atividade</h4><p>Jogo ou pergunta que aparece junto ao vídeo.</p></div>
+  </div>
+
+  <h2 style="page-break-before: always; break-before: page;">Perguntas frequentes</h2>
+  <h4>O participante pode assistir fora de ordem?</h4>
+  <p>Os <strong>dias</strong> podem ser vistos na ordem que ele preferir. Dentro de um vídeo, porém, a linha do tempo só avança até onde ele já assistiu.</p>
+  <h4>O que acontece se o participante ainda não tem SIPAT?</h4>
+  <p>Ele vê uma mensagem informando que a empresa ainda não abriu a próxima SIPAT e que os dias aparecerão ali assim que ela começar.</p>
+  <h4>Os vídeos funcionam no celular?</h4>
+  <p>Sim, no navegador do celular, com a tela cheia e os mesmos controles do computador.</p>
+  <h4>Posso reaproveitar a SIPAT do ano passado?</h4>
+  <p>Sim: em uma nova SIPAT use <strong>Duplicar de outra SIPAT</strong>. Os assuntos vêm junto, e você só define as novas datas.</p>
+  <p style="margin-top: 8mm; font-size: 9pt; color: var(--muted);">Lembrete: as telas deste manual foram feitas num ambiente de demonstração fictício. Empresas, marcas, pessoas, vídeos e resultados são exemplos.</p>
+</section>
+
+</body>
+</html>

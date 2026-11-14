@@ -1,0 +1,3 @@
+# generated: the screenshots come from capture.cjs against the local demo environment, the PDF from pdf.cjs
+shots/
+*.pdf
