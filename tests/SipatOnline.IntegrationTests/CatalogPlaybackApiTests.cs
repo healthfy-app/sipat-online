@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using SipatOnline.Api.Endpoints;
 using SipatOnline.Infrastructure;
 using SipatOnline.Infrastructure.Identity;
@@ -113,6 +114,104 @@ public sealed class CatalogPlaybackApiTests
                 new { sessionId, startMilliseconds = 0, endMilliseconds = 500, positionMilliseconds = 500 });
         }
         finally { await Cleanup(restarted, seed); }
+    }
+
+    [DockerFact]
+    public async Task Redirects_both_file_routes_to_the_signed_link_after_the_access_checks()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = SignedLinkFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory, "second-participant");
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            using var media = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media");
+            Assert.Equal(HttpStatusCode.Redirect, media.StatusCode);
+            Assert.Equal(SignedLinkStorage.Link, media.Headers.Location);
+
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+                var outsiderId = await db.Users
+                    .Where(user => user.EmployeeIdentifier == "second-participant")
+                    .Select(user => user.Id).SingleAsync();
+                await db.LearningAssignments.Where(item => item.ParticipantId == outsiderId)
+                    .ExecuteUpdateAsync(update => update.SetProperty(item => item.RevokedAt, DateTimeOffset.UtcNow));
+            }
+
+            using var outsider = Client(factory);
+            await Login(outsider, "second-participant");
+            using var refused = await outsider.GetAsync($"/api/learning/lessons/{seed.LessonId}/media");
+            Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
+            Assert.Null(refused.Headers.Location);
+
+            using var platform = Client(factory, "ops.localhost");
+            using var anonymous = await platform.GetAsync($"/api/platform/catalog/videos/{seed.VideoId}/file");
+            Assert.NotEqual(HttpStatusCode.Redirect, anonymous.StatusCode);
+            Assert.Null(anonymous.Headers.Location);
+
+            await Call(platform, "/api/platform/identity/login", HttpMethod.Post,
+                new LoginRequest("platform-operator", "PlatformPassword123"), HttpStatusCode.NoContent);
+            using var file = await platform.GetAsync($"/api/platform/catalog/videos/{seed.VideoId}/file");
+            Assert.Equal(HttpStatusCode.Redirect, file.StatusCode);
+            Assert.Equal(SignedLinkStorage.Link, file.Headers.Location);
+
+            using var unknown = await platform.GetAsync($"/api/platform/catalog/videos/{Guid.NewGuid()}/file");
+            Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [Fact]
+    public void Startup_fails_when_an_r2_field_is_missing()
+    {
+        using var factory = new SipatOnlineApiFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("SipatOnline:VideoStorage:Provider", "R2");
+            builder.UseSetting("SipatOnline:VideoStorage:R2:ServiceUrl", "https://account.r2.cloudflarestorage.com");
+            builder.UseSetting("SipatOnline:VideoStorage:R2:AccessKeyId", "key");
+            builder.UseSetting("SipatOnline:VideoStorage:R2:SecretAccessKey", "secret");
+        });
+
+        var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+        Assert.Contains("Configure SipatOnline:VideoStorage:R2:Bucket.", error.ToString());
+    }
+
+    [Fact]
+    public void Startup_fails_on_an_unknown_storage_provider()
+    {
+        using var factory = new SipatOnlineApiFactory().WithWebHostBuilder(builder =>
+            builder.UseSetting("SipatOnline:VideoStorage:Provider", "Cloudflare"));
+
+        var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+        Assert.Contains("Configure SipatOnline:VideoStorage:Provider como File ou R2.", error.ToString());
+    }
+
+    private static WebApplicationFactory<Program> SignedLinkFactory(string connectionString) =>
+        CatalogFactory(connectionString).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
+        {
+            services.RemoveAll<IPlatformCourseVideoStorage>();
+            services.AddSingleton<IPlatformCourseVideoStorage, SignedLinkStorage>();
+        }));
+
+    /// <summary>Pretends to be a storage with signed links; the file itself is never served.</summary>
+    private sealed class SignedLinkStorage : IPlatformCourseVideoStorage
+    {
+        public static readonly Uri Link = new("https://videos.example.test/signed?X-Amz-Signature=abc");
+
+        public Task<SipatOnline.BuildingBlocks.Domain.Result<StoredPlatformVideo>> SaveAsync(
+            Guid videoId, Stream content, string contentType, long declaredSize, CancellationToken cancellationToken) =>
+            Task.FromResult(SipatOnline.BuildingBlocks.Domain.Result<StoredPlatformVideo>.Success(
+                new StoredPlatformVideo(contentType, declaredSize)));
+
+        public Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken) =>
+            Task.FromResult<Stream?>(new MemoryStream());
+
+        public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
+            Task.FromResult<Uri?>(Link);
+
+        public Task DeleteAsync(Guid videoId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 
     private sealed record Seeded(Guid VideoId, Guid TrackId, Guid LessonId);

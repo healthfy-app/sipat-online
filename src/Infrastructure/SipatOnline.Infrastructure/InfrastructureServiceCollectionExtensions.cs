@@ -257,7 +257,14 @@ public static class InfrastructureServiceCollectionExtensions
     private static void AddPlatformCourseVideoStorage(IServiceCollection services, IConfiguration configuration)
     {
         var provider = configuration["SipatOnline:VideoStorage:Provider"];
-        if (string.Equals(provider, "R2", StringComparison.OrdinalIgnoreCase))
+        var isR2 = string.Equals(provider, "R2", StringComparison.OrdinalIgnoreCase);
+        if (!isR2 && !string.IsNullOrEmpty(provider) &&
+            !string.Equals(provider, "File", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException("Configure SipatOnline:VideoStorage:Provider como File ou R2.");
+        }
+
+        if (isR2)
         {
             var options = new R2StorageOptions
             {
