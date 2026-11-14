@@ -78,6 +78,8 @@ public sealed class EfLearningEngagementStore(PlatformDbContext db, ILearningSto
         {
             var sipat = await db.SipatEvents.AsNoTracking().SingleAsync(item => item.TenantId == tenantId && item.Id == group.Key, token);
             var existing = issued.SingleOrDefault(item => item.SipatEventId == sipat.Id);
+            // a draft or cancelled SIPAT has nothing to certify, unless a certificate was already issued for it
+            if (existing is null && sipat.Status != SipatEventStatus.Published) continue;
             var basis = new List<string>();
             var completed = 0;
             long duration = 0;

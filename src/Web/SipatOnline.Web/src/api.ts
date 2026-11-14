@@ -147,6 +147,7 @@ export interface ParticipationCertificate {
 export interface CertificateEligibility {
   sipatEventId: string; eventTitle: string; totalCourses: number; completedCourses: number;
   isEligible: boolean; certificate: ParticipationCertificate | null; hasCompanyLogo: boolean;
+  startsAt?: string; endsAt?: string;
 }
 
 export function getCompanyCertificateLogo(companyId: string): Promise<{ configured: boolean }> {

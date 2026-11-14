@@ -13,18 +13,30 @@ const certificate: api.ParticipationCertificate = { id: 'cert', participantName:
   issuedAt: '2026-11-10T12:00:00Z', isDemonstration: true };
 
 describe('certificates', () => {
+  it('keeps each SIPAT in its own card, with its period', async () => {
+    vi.mocked(api.listCertificates).mockResolvedValue([
+      { ...pending, sipatEventId: 'new', eventTitle: 'SIPAT 2026', startsAt: '2026-11-09T00:00:00Z', endsAt: '2026-11-13T00:00:00Z' },
+      { ...pending, sipatEventId: 'old', eventTitle: 'SIPAT 2025', startsAt: '2025-11-10T00:00:00Z', endsAt: '2025-11-14T00:00:00Z', certificate },
+    ]);
+    render(<CertificatesPage />);
+    expect(await screen.findByRole('heading', { name: 'SIPAT 2026' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'SIPAT 2025' })).toBeVisible();
+    expect(screen.getByText('09/11/2026 a 13/11/2026')).toBeVisible();
+    expect(screen.getByText('10/11/2025 a 14/11/2025')).toBeVisible();
+    expect(screen.getAllByRole('button', { name: 'Emitir certificado' })).toHaveLength(1);
+  });
   it('explains a missing company logo without asking a completed participant to watch again', async () => {
     vi.mocked(api.listCertificates).mockResolvedValue([{ ...pending, completedCourses: 2, hasCompanyLogo: false }]);
     render(<CertificatesPage />);
     expect(await screen.findByText(/A empresa precisa cadastrar a logo/)).toBeVisible();
     expect(screen.getByRole('button', { name: 'Emitir certificado' })).toBeDisabled();
-    expect(screen.queryByText(/Conclua os cursos pendentes/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Conclua os dias pendentes/)).not.toBeInTheDocument();
     expect(api.issueCertificate).not.toHaveBeenCalled();
   });
   it('shows actual missing courses and prevents premature issuance', async () => {
     vi.mocked(api.listCertificates).mockResolvedValue([pending]);
     render(<CertificatesPage />);
-    expect(await screen.findByText('1 de 2 cursos concluídos')).toBeVisible();
+    expect(await screen.findByText('1 de 2 dias concluídos')).toBeVisible();
     expect(screen.getByRole('button', { name: 'Emitir certificado' })).toBeDisabled();
     expect(api.issueCertificate).not.toHaveBeenCalled();
   });

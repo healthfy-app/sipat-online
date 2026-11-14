@@ -13,7 +13,8 @@ public sealed record ParticipationCertificate(Guid Id, Guid TenantId, Guid Parti
     DateTimeOffset EndsAt, long DurationMilliseconds, DateTimeOffset IssuedAt, bool IsDemonstration,
     string CompletionBasis, CertificateLogo? CompanyLogo = null);
 public sealed record CertificateEligibility(Guid SipatEventId, string EventTitle, int TotalCourses,
-    int CompletedCourses, bool IsEligible, ParticipationCertificate? Certificate, bool HasCompanyLogo);
+    int CompletedCourses, bool IsEligible, ParticipationCertificate? Certificate, bool HasCompanyLogo,
+    DateTimeOffset StartsAt = default, DateTimeOffset EndsAt = default);
 public sealed record CertificateCandidate(ParticipationCertificate Snapshot, int TotalCourses,
     int CompletedCourses, bool IsEligible);
 
@@ -71,7 +72,8 @@ public sealed class LearningEngagementService(
         return Result<IReadOnlyList<CertificateEligibility>>.Success(candidates.Select(item =>
             new CertificateEligibility(item.Snapshot.SipatEventId, item.Snapshot.EventTitle, item.TotalCourses,
                 item.CompletedCourses, item.IsEligible, item.Snapshot.IssuedAt == default ? null : item.Snapshot,
-                item.Snapshot.CompanyLogo is not null)).ToArray());
+                item.Snapshot.CompanyLogo is not null, item.Snapshot.StartsAt, item.Snapshot.EndsAt))
+            .OrderByDescending(item => item.StartsAt).ToArray());
     }
 
     public async Task<Result<ParticipationCertificate>> IssueAsync(Guid sipatEventId, CancellationToken token)
