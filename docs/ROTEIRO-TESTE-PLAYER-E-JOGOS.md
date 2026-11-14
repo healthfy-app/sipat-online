@@ -96,7 +96,7 @@ com a mesma consulta (usuário e banco estão no arquivo `.env` do ambiente).
 | E2 | No Chrome: DevTools → Network → **Slow 4G**; tocar o vídeo até travar algumas vezes | Ao terminar ou fechar a sessão, a consulta acima mostra uma linha nova com `StallCount > 0` e `StallMilliseconds > 0` | |
 | E3 | Repetir E2 e **fechar a aba durante um travamento** | Mesmo assim a linha existe na consulta | |
 | E4 | Com `VIDEO_STORAGE_PROVIDER=R2`: abrir a aula com DevTools → Network aberto | As requisições do vídeo vão para `*.r2.cloudflarestorage.com` (link assinado) e o vídeo toca até o fim | |
-| E5 | **Reiniciar o contêiner da API no meio do vídeo** (`docker compose restart api`) | O vídeo continua e o progresso continua sendo salvo (a sessão de reprodução fica no Postgres, em `learning."PlaybackGrants"`) | |
+| E5 | **Reiniciar o contêiner da API no meio do vídeo** (`docker compose restart api`) | O vídeo continua e o progresso continua sendo salvo (a sessão de reprodução, que permite aceitar o avanço depois do reinício, fica em `learning."PlaybackGrants"`; o progresso assistido fica em `learning."LearningProgress"`) | |
 
 Anote em cada caso o aparelho, o navegador e a versão. Se E2 ou E3 não gerarem linha, anote o horário para
 procurar nos logs da API.
