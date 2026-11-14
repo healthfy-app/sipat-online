@@ -32,7 +32,6 @@ import TenantLearningDashboardPage from './TenantLearningDashboardPage';
 import PlatformCompaniesPage from './PlatformCompaniesPage';
 import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
 import PlatformUsersPage from './PlatformUsersPage';
-import PlatformDashboardPage from './PlatformDashboardPage';
 import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
@@ -271,7 +270,8 @@ export default function App() {
               element={
                 state.tenant.tenantKey === 'platform' &&
                 state.session?.roles.includes('PlatformOperator') ? (
-                  <PlatformDashboardPage />
+                  // the operator's overview left the menu: the companies list already says what it said
+                  <Navigate replace to="/platform" />
                 ) : (
                   <AccessDenied />
                 )
@@ -688,7 +688,6 @@ function ProtectedPortal({
             <>
               <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/dashboard">Visão geral</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Biblioteca</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
             </>
