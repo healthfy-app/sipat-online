@@ -2,6 +2,8 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.EntityFrameworkCore;
+using SipatOnline.BuildingBlocks.Domain;
+using SipatOnline.Learning.Application.Catalog;
 using SipatOnline.Infrastructure;
 using SipatOnline.Infrastructure.Learning;
 using Testcontainers.Minio;
@@ -78,7 +80,7 @@ public sealed class CatalogVideoCopierTests
             Assert.True(light.Copied);
             Assert.False(light.TooHeavy);
             Assert.Equal(0.08, light.Mbps, 3);
-            Assert.False(lines.Single(line => line.VideoId == missingId).Copied);
+            Assert.Equal(CatalogVideoCopyStatus.SourceMissing, lines.Single(line => line.VideoId == missingId).Status);
             await AssertExists(target, heavyId, 1_000_000);
             await AssertExists(target, lightId, 100_000);
             Assert.Null(await target.OpenReadAsync(missingId, default));
@@ -94,6 +96,81 @@ public sealed class CatalogVideoCopierTests
                 Directory.Delete(directory, recursive: true);
             }
         }
+    }
+
+    [DockerFact]
+    public async Task Tells_a_failed_upload_from_a_missing_file_and_survives_errors()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        var sourceDir = Path.Combine(Path.GetTempPath(), $"sipat-copier-{Guid.NewGuid():N}");
+        var targetDir = Path.Combine(Path.GetTempPath(), $"sipat-copier-{Guid.NewGuid():N}");
+        try
+        {
+            var source = new FilePlatformCourseVideoStorage(sourceDir, isDevelopment: false);
+            var okId = Guid.NewGuid();
+            var mismatchId = Guid.NewGuid();
+            var throwsId = Guid.NewGuid();
+            var missingId = Guid.NewGuid();
+            await SaveSource(source, okId, 1_000);
+            await SaveSource(source, mismatchId, 1_000);
+            await SaveSource(source, throwsId, 1_000);
+
+            var options = new DbContextOptionsBuilder<PlatformDbContext>()
+                .UseNpgsql(
+                    postgres.GetConnectionString(),
+                    npgsql => npgsql.MigrationsAssembly(typeof(PlatformDbContext).Assembly.FullName))
+                .Options;
+            await using var db = new PlatformDbContext(options);
+            await db.Database.MigrateAsync();
+            db.PlatformCourseVideos.AddRange(
+                Video(okId, "Ok", 1_000, 10_000),
+                Video(mismatchId, "Tamanho errado", 2_000, 10_000),
+                Video(throwsId, "Rede cai", 1_000, 10_000),
+                Video(missingId, "Sem arquivo", 1_000, 10_000));
+            await db.SaveChangesAsync();
+
+            var target = new ThrowingStorage(new FilePlatformCourseVideoStorage(targetDir, isDevelopment: false), throwsId);
+            var lines = await new CatalogVideoCopier(db, source, target).CopyAllAsync(CancellationToken.None);
+
+            Assert.Equal(4, lines.Count);
+            Assert.Equal(CatalogVideoCopyStatus.Copied, lines.Single(line => line.VideoId == okId).Status);
+            var mismatch = lines.Single(line => line.VideoId == mismatchId);
+            Assert.Equal(CatalogVideoCopyStatus.SaveFailed, mismatch.Status);
+            Assert.False(string.IsNullOrWhiteSpace(mismatch.Error));
+            var threw = lines.Single(line => line.VideoId == throwsId);
+            Assert.Equal(CatalogVideoCopyStatus.SaveFailed, threw.Status);
+            Assert.Equal("403 simulado", threw.Error);
+            Assert.Equal(CatalogVideoCopyStatus.SourceMissing, lines.Single(line => line.VideoId == missingId).Status);
+        }
+        finally
+        {
+            foreach (var directory in new[] { sourceDir, targetDir })
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+    }
+
+    private sealed class ThrowingStorage(IPlatformCourseVideoStorage inner, Guid failingId) : IPlatformCourseVideoStorage
+    {
+        public Task<Result<StoredPlatformVideo>> SaveAsync(
+            Guid videoId, Stream content, string contentType, long declaredSize, CancellationToken cancellationToken) =>
+            videoId == failingId
+                ? throw new InvalidOperationException("403 simulado")
+                : inner.SaveAsync(videoId, content, contentType, declaredSize, cancellationToken);
+
+        public Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken) =>
+            inner.OpenReadAsync(videoId, cancellationToken);
+
+        public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
+            inner.GetPlaybackUrlAsync(videoId, validFor, cancellationToken);
+
+        public Task DeleteAsync(Guid videoId, CancellationToken cancellationToken) =>
+            inner.DeleteAsync(videoId, cancellationToken);
     }
 
     private static PlatformCourseVideoEntity Video(Guid id, string title, long size, long durationMs) => new()

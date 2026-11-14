@@ -110,9 +110,13 @@ if (args.Contains("--copy-videos-to-r2", StringComparer.Ordinal))
     foreach (var line in lines)
     {
         var mbps = line.Mbps.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
-        Console.WriteLine(line.Copied
-            ? $"copiado  {line.Title}  {mbps} Mbps{(line.TooHeavy ? "  PESADO" : string.Empty)}"
-            : $"sem arquivo na origem  {line.Title}  {mbps} Mbps");
+        var heavy = line.TooHeavy ? "  PESADO" : string.Empty;
+        Console.WriteLine(line.Status switch
+        {
+            SipatOnline.Infrastructure.Learning.CatalogVideoCopyStatus.Copied => $"copiado  {line.Title}  {mbps} Mbps{heavy}",
+            SipatOnline.Infrastructure.Learning.CatalogVideoCopyStatus.SourceMissing => $"sem arquivo na origem  {line.Title}  {mbps} Mbps{heavy}",
+            _ => $"falha ao copiar: {line.Error}  {line.Title}  {mbps} Mbps{heavy}"
+        });
     }
 
     var copiedCount = lines.Count(line => line.Copied);

@@ -82,7 +82,7 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
    ```bash
    docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml run --rm api --copy-videos-to-r2
    ```
-   O comando imprime uma linha por vídeo (`copiado  <título>  <Mbps> Mbps`) e um resumo no fim. Ele pode ser repetido sem problema: copia de novo por cima. Vídeos acima de 3 Mbps saem marcados como `PESADO`; um vídeo sem arquivo no volume aparece como `sem arquivo na origem` e faz o comando terminar com erro.
+   O comando imprime uma linha por vídeo (`copiado  <título>  <Mbps> Mbps`) e um resumo no fim. Ele pode ser repetido sem problema: copia de novo por cima. Vídeos acima de 3 Mbps saem marcados como `PESADO`. Um vídeo sem arquivo no volume aparece como `sem arquivo na origem`; um envio que falha (chave ou bucket errados, rede, tamanho diferente do cadastrado) aparece como `falha ao copiar: <motivo>`. Nos dois casos o comando continua com os demais vídeos e termina com erro.
 5. Para cada vídeo marcado como `PESADO`, converta o original e envie de novo pelo painel (substituindo o vídeo):
    ```bash
    deploy/scripts/convert-video.sh original.mp4 convertido.mp4
