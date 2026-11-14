@@ -4,8 +4,8 @@ x-api-environment: &api-environment
   ASPNETCORE_ENVIRONMENT: Production
   ASPNETCORE_HTTP_PORTS: 8080
   ConnectionStrings__SipatOnline: Host=postgres;Port=5432;Database=${POSTGRES_DB:-sipat_online};Username=${POSTGRES_USER:-sipat_online};Password=${POSTGRES_PASSWORD:?Configure POSTGRES_PASSWORD in deploy/.env.production}
-  # the first company is optional: leave TENANT_ID, TENANT_KEY and TENANT_NAME empty and the platform starts with none
-  SipatOnline__Tenant__Id: ${TENANT_ID:-}
+  # the first company is optional: leave TENANT_ID, TENANT_KEY and TENANT_NAME empty and the platform starts with none (an empty ID is the zero GUID)
+  SipatOnline__Tenant__Id: ${TENANT_ID:-00000000-0000-0000-0000-000000000000}
   SipatOnline__Tenant__Key: ${TENANT_KEY:-}
   SipatOnline__Tenant__Name: ${TENANT_NAME:-}
   SipatOnline__Tenant__BaseDomain: ${TENANT_BASE_DOMAIN:?Configure TENANT_BASE_DOMAIN in deploy/.env.production}
@@ -78,6 +78,8 @@ services:
     networks:
       data:
       edge:
+        # fixed, so that it never takes the address 172.28.0.2 that the web container (the trusted proxy) needs
+        ipv4_address: 172.28.0.3
 
   web:
     image: sipat-online-web:production
