@@ -176,52 +176,29 @@ describe('learning experience', () => {
     expect(screen.queryByText('Aula 1')).not.toBeInTheDocument();
   });
 
-  it('does not repeat lesson completion status in the lesson details', async () => {
-    const user = userEvent.setup();
-    const completedLesson = {
-      ...lesson,
-      isCompleted: true,
-      watchedPercentage: 100,
-    };
+  it('says once, under the video, that a watched video is done', async () => {
+    const completedLesson = { ...lesson, isCompleted: true, watchedPercentage: 100 };
     const { container } = await playableCourse([completedLesson]);
 
-    expect(container.querySelector('.learning-lesson-navigation .learning-status')).toHaveTextContent('Concluída');
-    await user.click(screen.getByRole('button', { name: 'Ver detalhes do vídeo' }));
-    const lessonDetails = screen.getByRole('dialog', { name: 'Informações da aula' });
-    expect(lessonDetails.querySelector('.learning-lesson-heading .learning-status')).not.toBeInTheDocument();
+    expect(container.querySelector('.day-controls .day-status')).toHaveTextContent('Concluído');
+    expect(container.querySelectorAll('.day-status')).toHaveLength(1);
   });
 
-  it('opens lesson information and its tabs from the compact sidebar panel', async () => {
-    const user = userEvent.setup();
-    const { container, video } = await playableCourse();
-    const play = vi.spyOn(video, 'play').mockResolvedValue(undefined);
+  it('shows what the video is about on the stage, without a window or empty tabs', async () => {
+    await playableCourse();
 
-    expect(container.querySelector('.learning-course-sidebar .learning-lesson-info-launcher'))
-      .toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Sobre o vídeo' })).toHaveTextContent(lesson.description);
+    expect(screen.queryByRole('button', { name: 'Ver detalhes do vídeo' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Minhas anotações' })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Ver detalhes do vídeo' }));
-    expect(video.pause).toHaveBeenCalledOnce();
-
-    const dialog = screen.getByRole('dialog', { name: 'Informações da aula' });
-    expect(dialog).toBeVisible();
-    expect(dialog).toHaveClass('learning-dialog', 'learning-details-dialog');
-    expect(within(dialog).getByRole('tabpanel')).toHaveTextContent(lesson.description);
-    await user.click(within(dialog).getByRole('tab', { name: 'Minhas anotações' }));
-    expect(within(dialog).getByRole('tabpanel')).toHaveTextContent('Anotações ainda não estão disponíveis');
-    await user.click(within(dialog).getByRole('button', { name: 'Fechar informações da aula' }));
-    expect(screen.queryByRole('dialog', { name: 'Informações da aula' })).not.toBeInTheDocument();
-    await waitFor(() => expect(play).toHaveBeenCalledOnce());
+    expect(screen.queryByText('Quiz final')).not.toBeInTheDocument();
   });
 
-  it('keeps lesson navigation under the video and lesson details in the sidebar', async () => {
+  it('keeps the way forward under the video and the videos of the day on the side', async () => {
     const { container } = await playableCourse();
 
-    expect(container.querySelector('.learning-main-column .learning-player-frame + .learning-lesson-navigation'))
-      .toBeInTheDocument();
-    expect(container.querySelector('.learning-course-sidebar .learning-curriculum-card'))
-      .toBeInTheDocument();
-    expect(container.querySelector('.learning-course-sidebar [aria-label="Informações da aula"]'))
-      .toBeInTheDocument();
+    expect(container.querySelector('.day-stage .learning-player-frame + .day-controls')).toBeInTheDocument();
+    expect(container.querySelector('.day-rail .day-playlist')).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: 'Conteúdo do dia' })).toBeVisible();
   });
 
   it.each([
@@ -237,14 +214,13 @@ describe('learning experience', () => {
   });
 
   it('shows 100 course completion at the accepted threshold without changing watched coverage', async () => {
-    const user = userEvent.setup();
     const { video } = await playableCourse();
     recordRange.mockResolvedValue(progress(4500, 90));
     atTime(video, 0); fireEvent.playing(video);
     atTime(video, 4.5); fireEvent.pause(video);
-    await waitFor(() => expect(screen.getByRole('progressbar', { name: 'Progresso do curso' })).toHaveAttribute('aria-valuenow', '100'));
-    await user.click(screen.getByRole('button', { name: 'Ver detalhes do vídeo' }));
-    expect(screen.getByText('90% assistido')).toBeVisible();
+    await waitFor(() => expect(screen.getByRole('progressbar', { name: 'Progresso do dia' })).toHaveAttribute('aria-valuenow', '100'));
+    // done at the accepted threshold: the screen says it is done instead of a raw percentage
+    expect(screen.getByText('Concluído', { selector: '.day-status' })).toBeVisible();
     expect(screen.getByText('1 de 1 vídeos · 100%')).toBeVisible();
     expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 4500, 4500);
   });
@@ -355,13 +331,13 @@ describe('learning experience', () => {
     recordRange.mockRejectedValue(new Error('Não foi possível salvar. Tente novamente.'));
     atTime(video, 0); fireEvent.playing(video);
     atTime(video, 2);
-    await user.click(screen.getByRole('link', { name: /Minha formação/ }));
+    await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
     expect(await screen.findByText('Não foi possível salvar. Tente novamente.')).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).not.toBeInTheDocument();
     recordRange.mockResolvedValue(progress(2000));
     await user.click(screen.getByRole('button', { name: 'Tentar salvar progresso' }));
     expect(await screen.findByText('Progresso salvo')).toBeVisible();
-    await user.click(screen.getByRole('link', { name: /Minha formação/ }));
+    await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
     expect(await screen.findByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).toBeVisible();
   });
 
@@ -371,7 +347,7 @@ describe('learning experience', () => {
     atTime(video, 4.7); fireEvent.playing(video);
     atTime(video, 5); fireEvent.ended(video);
     await waitFor(() => expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 4700, 5000, 5000));
-    expect(screen.getByRole('progressbar', { name: 'Progresso do curso' })).toHaveAttribute('aria-valuenow', '100');
+    expect(screen.getByRole('progressbar', { name: 'Progresso do dia' })).toHaveAttribute('aria-valuenow', '100');
   });
 
   it('stops an expired playback session and requests an explicit retry', async () => {
@@ -545,12 +521,12 @@ describe('learning experience', () => {
     expect(await screen.findByRole('heading', { name: 'Identificação de riscos' })).toBeVisible();
     expect(screen.queryByRole('navigation', { name: 'Trilhas da SIPAT' })).not.toBeInTheDocument();
     expect(screen.queryByText('Ergonomia')).not.toBeInTheDocument();
-    expect(screen.getByRole('progressbar', { name: 'Progresso do curso' })).toHaveAttribute('aria-valuenow', '0');
-    await user.click(screen.getByRole('link', { name: '← Minha formação' }));
+    expect(screen.getByRole('progressbar', { name: 'Progresso do dia' })).toHaveAttribute('aria-valuenow', '0');
+    await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
     await user.click(await screen.findByRole('link', { name: 'Continuar curso Ergonomia' }));
 
     expect(await screen.findByRole('heading', { name: 'Postura no computador' })).toBeVisible();
-    expect(screen.getByRole('progressbar', { name: 'Progresso do curso' })).toHaveAttribute('aria-valuenow', '25');
+    expect(screen.getByRole('progressbar', { name: 'Progresso do dia' })).toHaveAttribute('aria-valuenow', '25');
     expect(getAssignedTrack).toHaveBeenLastCalledWith('track-2');
   });
 
@@ -693,7 +669,7 @@ describe('learning experience', () => {
       5000,
       5000,
     ));
-    expect(screen.getByRole('progressbar', { name: 'Progresso do curso' }))
+    expect(screen.getByRole('progressbar', { name: 'Progresso do dia' }))
       .toHaveAttribute('aria-valuenow', '100');
   });
 
@@ -824,5 +800,31 @@ describe('learning experience', () => {
     expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
     expect(screen.queryByRole('navigation', { name: 'SIPATs' })).not.toBeInTheDocument();
     expect(screen.queryByText('Teste antigo')).not.toBeInTheDocument();
+  });
+
+  it('names the day, its date and subject, and offers the next day once every video is watched', async () => {
+    const day1 = { ...trackCard, id: 'track-1', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura e movimento', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-09', lessonCount: 1, completedLessonCount: 1, progressPercentage: 100 };
+    const day2 = { ...trackCard, id: 'track-2', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 2, coursePosition: 1 };
+    listAssignedTracks.mockResolvedValue([day1, day2]);
+    getAssignedTrack.mockResolvedValue({ track: day1, lessons: [{ ...lesson, isCompleted: true, watchedPercentage: 100 }] });
+    startPlayback.mockReset().mockResolvedValue({ url: 'https://media.example.test/lesson-1.mp4', sessionId: 's', expiresAt: '2099-01-01T00:00:00Z', isDevelopmentDemo: false });
+    renderAt('/learning/tracks/track-1');
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'Boa postura e movimento' })).toBeVisible();
+    expect(screen.getByText('Dia 1')).toBeVisible();
+    expect(screen.getByText(/segunda-feira, 09\/11/i)).toBeVisible();
+    expect(screen.getByText('Ergonomia')).toBeVisible();
+    expect(screen.getByText('Vídeo 1 de 1')).toBeVisible();
+
+    const done = screen.getByRole('status', { name: 'Dia concluído' });
+    expect(done).toHaveTextContent('Dia 1 concluído!');
+    expect(within(done).getByRole('link', { name: /Ir para o Dia 2/ })).toHaveAttribute('href', '/learning/tracks/opcao-1-higiene-mental');
+  });
+
+  it('does not celebrate a day that still has a video to watch', async () => {
+    await playableCourse([lesson, { ...lesson, id: 'lesson-2', title: 'Próximos passos', position: 2 }]);
+    expect(screen.queryByRole('status', { name: 'Dia concluído' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Próximo vídeo/ })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /Vídeo anterior/ })).toBeDisabled();
   });
 });

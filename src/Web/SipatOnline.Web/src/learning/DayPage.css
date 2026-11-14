@@ -1,0 +1,185 @@
+/*
+ * The day of the SIPAT: where the participant watches. A dark stage holds the video and what moves it forward;
+ * a quiet rail on the side lists the videos of the day. One accent (the SIPAT yellow) marks what comes next,
+ * a check (never color alone) marks what is done, and motion only happens when something changes.
+ */
+.portal-layout-learner .day-page { display: grid; gap: 1.25rem; max-width: 96rem; margin: 0 auto; }
+
+/* ---------- top: where I am, and how far ---------- */
+.portal-layout-learner .day-top { display: grid; grid-template-columns: auto minmax(0, 1fr) minmax(12rem, 20rem); align-items: center; gap: 1rem 1.5rem; }
+.portal-layout-learner .day-back {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.75rem; padding: 0 0.9rem 0 0.7rem; border: 1px solid var(--learner-border); border-radius: 999px;
+  color: var(--learner-forest); background: var(--learner-surface); font-size: 0.9375rem; font-weight: 700; text-decoration: none;
+  transition: border-color 160ms ease, transform 200ms cubic-bezier(.16, 1, .3, 1);
+}
+.portal-layout-learner .day-back svg { width: 1.1rem; height: 1.1rem; transition: transform 200ms cubic-bezier(.16, 1, .3, 1); }
+.portal-layout-learner .day-back:hover { border-color: var(--learner-forest); }
+.portal-layout-learner .day-back:focus-visible,
+.portal-layout-learner .day-control:focus-visible,
+.portal-layout-learner .day-item:focus-visible,
+.portal-layout-learner .day-done-action:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
+
+.portal-layout-learner .day-heading { min-width: 0; }
+.portal-layout-learner .day-kicker { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 0.3rem; }
+.portal-layout-learner .day-chip {
+  padding: 0.15rem 0.6rem; border-radius: 999px; color: var(--learner-forest); background: var(--learner-progress-accent);
+  font-size: 0.75rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase;
+}
+.portal-layout-learner .day-date { display: inline-flex; align-items: center; gap: 0.3rem; color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 600; }
+.portal-layout-learner .day-date::first-letter { text-transform: uppercase; }
+.portal-layout-learner .day-date svg { width: 0.95rem; height: 0.95rem; }
+.portal-layout-learner .day-page .day-heading h1 { margin: 0; color: var(--learner-forest); font-size: clamp(1.375rem, 2.2vw, 1.875rem); font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.portal-layout-learner .day-subject { margin: 0.2rem 0 0; color: var(--learner-text-secondary); font-size: 0.9375rem; font-weight: 600; }
+
+.portal-layout-learner .day-progress { display: grid; gap: 0.4rem; }
+.portal-layout-learner .day-progress-text { color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: right; }
+.portal-layout-learner .day-progress-steps { display: flex; gap: 4px; }
+.portal-layout-learner .day-progress-steps > span { position: relative; flex: 1; height: 8px; overflow: hidden; border-radius: 999px; background: var(--learner-progress-track, #e3e9e6); transition: background-color 400ms ease; }
+.portal-layout-learner .day-progress-steps > span.is-done { background: var(--learner-action); }
+.portal-layout-learner .day-progress-steps > span > i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: var(--learner-progress-accent); transition: width 600ms cubic-bezier(.16, 1, .3, 1); }
+
+/* ---------- the day is over ---------- */
+.portal-layout-learner .day-done {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem 1rem; padding: 1rem 1.25rem;
+  border: 1px solid color-mix(in srgb, var(--learner-action) 30%, transparent); border-radius: 18px; background: var(--learner-complete-bg, #d6f3e1); color: var(--learner-forest);
+}
+.portal-layout-learner .day-done-icon { display: grid; place-items: center; width: 2.75rem; height: 2.75rem; border-radius: 50%; color: #fff; background: var(--learner-action); }
+.portal-layout-learner .day-done-icon svg { width: 1.4rem; height: 1.4rem; }
+.portal-layout-learner .day-done strong { font-size: 1.0625rem; font-weight: 800; }
+.portal-layout-learner .day-done p { margin: 0.1rem 0 0; font-size: 0.9375rem; }
+.portal-layout-learner .day-done-action {
+  display: inline-flex; align-items: center; gap: 0.4rem; min-height: 2.75rem; padding: 0 1.1rem; border-radius: 12px;
+  color: #fff; background: var(--learner-forest); font-size: 0.9375rem; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.portal-layout-learner .day-done-action svg { width: 1.1rem; height: 1.1rem; transition: transform 200ms cubic-bezier(.16, 1, .3, 1); }
+
+/* ---------- stage and rail ---------- */
+.portal-layout-learner .day-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(19rem, 24rem); align-items: start; gap: 1.25rem; }
+
+.portal-layout-learner .day-stage {
+  display: grid; gap: 1rem; min-width: 0; padding: clamp(1rem, 2vw, 1.5rem); border-radius: 24px; color: #fff;
+  background: radial-gradient(120% 90% at 100% 0%, color-mix(in srgb, var(--learner-forest) 86%, #fff) 0%, var(--learner-deep, #0b241f) 60%);
+  box-shadow: 0 24px 48px -28px rgb(11 36 31 / 55%);
+}
+.portal-layout-learner .day-stage-head p { margin: 0 0 0.25rem; color: var(--learner-progress-accent); font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.portal-layout-learner .day-page .day-stage-head h2 { margin: 0; color: #fff; font-size: clamp(1.25rem, 2vw, 1.75rem); font-weight: 800; line-height: 1.2; letter-spacing: -0.015em; overflow-wrap: anywhere; text-wrap: balance; }
+
+.portal-layout-learner .day-page .day-player {
+  min-height: 0; aspect-ratio: 16 / 9; border: 0; border-radius: 16px; background: #000;
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 8%), 0 18px 40px -20px rgb(0 0 0 / 70%);
+}
+.portal-layout-learner .day-page .learning-video { width: 100%; height: 100%; max-height: none; }
+
+.portal-layout-learner .day-controls { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; }
+.portal-layout-learner .day-control {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; min-height: 3rem; padding: 0 1.1rem; border: 1px solid rgb(255 255 255 / 22%); border-radius: 12px;
+  color: #fff; background: rgb(255 255 255 / 6%); font: inherit; font-size: 1rem; font-weight: 700; cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, opacity 160ms ease;
+}
+.portal-layout-learner .day-control svg { width: 1.2rem; height: 1.2rem; transition: transform 200ms cubic-bezier(.16, 1, .3, 1); }
+.portal-layout-learner .day-control:hover:not(:disabled) { border-color: rgb(255 255 255 / 55%); background: rgb(255 255 255 / 12%); }
+.portal-layout-learner .day-control.is-next { border-color: var(--learner-progress-accent); color: var(--learner-forest); background: var(--learner-progress-accent); }
+.portal-layout-learner .day-control.is-next:hover:not(:disabled) { border-color: #fff; background: #ffdc85; }
+.portal-layout-learner .day-control:disabled { opacity: 0.4; cursor: default; }
+
+.portal-layout-learner .day-status {
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.45rem; min-height: 2.25rem; padding: 0 0.9rem; border-radius: 999px; justify-self: center;
+  color: rgb(255 255 255 / 85%); background: rgb(255 255 255 / 8%); font-size: 0.9375rem; font-weight: 600; text-align: center;
+}
+.portal-layout-learner .day-status svg { width: 1rem; height: 1rem; flex: none; }
+.portal-layout-learner .day-status.is-complete { color: var(--learner-forest); background: var(--learner-highlight, #7fe0a6); font-weight: 800; }
+
+.portal-layout-learner .day-notices { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+.portal-layout-learner .day-notices:not(:has(:not(:empty))) { display: none; }
+.portal-layout-learner .day-notice { padding: 0.5rem 0.8rem; border-radius: 10px; color: var(--learner-forest); background: var(--learner-progress-accent); font-size: 0.9375rem; font-weight: 600; }
+.portal-layout-learner .day-save { color: rgb(255 255 255 / 70%); font-size: 0.875rem; opacity: 0; transition: opacity 300ms ease; }
+.portal-layout-learner .day-save.is-visible, .portal-layout-learner .day-save:not(:empty) { opacity: 1; }
+
+.portal-layout-learner .day-about { padding-top: 0.25rem; border-top: 1px solid rgb(255 255 255 / 12%); }
+.portal-layout-learner .day-about h3 { margin: 0.75rem 0 0.3rem; color: rgb(255 255 255 / 70%); font-size: 0.8125rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.portal-layout-learner .day-about p { margin: 0; max-width: 70ch; color: rgb(255 255 255 / 88%); font-size: 1rem; line-height: 1.6; }
+
+/* ---------- the videos of the day ---------- */
+.portal-layout-learner .day-rail { display: grid; gap: 1rem; min-width: 0; }
+.portal-layout-learner .day-playlist { padding: 1rem; border: 1px solid var(--learner-border); border-radius: 20px; background: var(--learner-surface); }
+.portal-layout-learner .day-playlist-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem; margin-bottom: 0.6rem; padding: 0 0.25rem; }
+.portal-layout-learner .day-playlist-head h2 { margin: 0; color: var(--learner-forest); font-size: 1.125rem; font-weight: 800; }
+.portal-layout-learner .day-playlist-head span { color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.portal-layout-learner .day-playlist ol { display: grid; gap: 0.35rem; margin: 0; padding: 0; list-style: none; }
+.portal-layout-learner .day-section { margin: 0.6rem 0.25rem 0.3rem; color: var(--learner-text-secondary); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+
+.portal-layout-learner .day-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.75rem; width: 100%; min-height: 3.75rem; padding: 0.6rem 0.75rem;
+  border: 1px solid transparent; border-radius: 14px; color: var(--learner-forest); background: transparent; font: inherit; text-align: left; cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease;
+}
+.portal-layout-learner .day-item:hover:not(:disabled) { background: var(--learner-canvas); }
+.portal-layout-learner .day-item.is-current { border-color: var(--learner-forest); background: var(--learner-canvas); }
+.portal-layout-learner .day-item:disabled { cursor: progress; }
+.portal-layout-learner .day-item-mark {
+  display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border-radius: 50%;
+  color: var(--learner-forest); background: var(--learner-progress-track, #e3e9e6); font-size: 0.9375rem; font-weight: 800; font-variant-numeric: tabular-nums;
+  transition: background-color 250ms ease, color 250ms ease;
+}
+.portal-layout-learner .day-item-mark svg { width: 1.1rem; height: 1.1rem; stroke-width: 3; }
+.portal-layout-learner .day-item.is-current .day-item-mark { color: var(--learner-forest); background: var(--learner-progress-accent); }
+.portal-layout-learner .day-item.is-complete .day-item-mark { color: #fff; background: var(--learner-action); }
+.portal-layout-learner .day-item-copy { display: grid; gap: 0.15rem; min-width: 0; }
+.portal-layout-learner .day-item-title { font-size: 0.9375rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.portal-layout-learner .day-item-meta { display: flex; flex-wrap: wrap; gap: 0.35rem; color: var(--learner-text-secondary); font-size: 0.8125rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.portal-layout-learner .day-item-progress { height: 4px; margin-top: 0.2rem; overflow: hidden; border-radius: 999px; background: var(--learner-progress-track, #e3e9e6); }
+.portal-layout-learner .day-item-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--learner-progress-accent); transition: width 600ms cubic-bezier(.16, 1, .3, 1); }
+.portal-layout-learner .day-item-mark .learning-playing-bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 0.9rem; }
+.portal-layout-learner .day-item-mark .learning-playing-bars i { width: 3px; height: 100%; border-radius: 2px; background: currentColor; transform-origin: bottom; }
+
+/* ---------- smaller screens ---------- */
+@media (max-width: 1100px) {
+  .portal-layout-learner .day-layout { grid-template-columns: minmax(0, 1fr); }
+  .portal-layout-learner .day-top { grid-template-columns: auto minmax(0, 1fr); }
+  .portal-layout-learner .day-progress { grid-column: 1 / -1; }
+  .portal-layout-learner .day-progress-text { text-align: left; }
+}
+@media (max-width: 640px) {
+  .portal-layout-learner .day-top { grid-template-columns: minmax(0, 1fr); }
+  .portal-layout-learner .day-back { justify-self: start; min-height: 2.5rem; }
+  .portal-layout-learner .day-page { gap: 0.9rem; }
+  .portal-layout-learner .day-page .day-heading h1 { font-size: 1.25rem; }
+  .portal-layout-learner .day-page .day-stage-head h2 { font-size: 1.125rem; }
+  /* on a phone the video comes first; the end-of-day card waits below it */
+  .portal-layout-learner .day-done { order: 3; }
+  .portal-layout-learner .day-stage { margin: 0 -0.5rem; padding: 0.9rem; border-radius: 18px; }
+  .portal-layout-learner .day-controls { grid-template-columns: auto minmax(0, 1fr); }
+  .portal-layout-learner .day-control:not(.is-next) span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .portal-layout-learner .day-control:not(.is-next) { width: 3rem; padding: 0; }
+  .portal-layout-learner .day-status { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+  .portal-layout-learner .day-done { grid-template-columns: auto minmax(0, 1fr); }
+  .portal-layout-learner .day-done-action { grid-column: 1 / -1; justify-content: center; }
+}
+
+/* ---------- motion: only for those who want it ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .portal-layout-learner .day-top { animation: day-rise 420ms cubic-bezier(.16, 1, .3, 1) both; }
+  .portal-layout-learner .day-stage { animation: day-rise 520ms cubic-bezier(.16, 1, .3, 1) 60ms both; }
+  .portal-layout-learner .day-rail { animation: day-rise 520ms cubic-bezier(.16, 1, .3, 1) 140ms both; }
+  .portal-layout-learner .day-playlist li { animation: day-rise 380ms cubic-bezier(.16, 1, .3, 1) both; animation-delay: calc(200ms + var(--i, 0) * 45ms); }
+  /* a new video: its name slides in, the old one is simply gone */
+  .portal-layout-learner .day-stage-head, .portal-layout-learner .day-about { animation: day-swap 360ms cubic-bezier(.16, 1, .3, 1) both; }
+  .portal-layout-learner .day-done { animation: day-pop 520ms cubic-bezier(.16, 1, .3, 1) both; }
+  .portal-layout-learner .day-done-icon { animation: day-trophy 900ms cubic-bezier(.34, 1.56, .64, 1) 200ms both; }
+  .portal-layout-learner .day-status.is-complete { animation: day-pop 420ms cubic-bezier(.34, 1.56, .64, 1) both; }
+  .portal-layout-learner .day-item.is-complete .day-item-mark svg { animation: day-check 380ms cubic-bezier(.34, 1.56, .64, 1) both; }
+  .portal-layout-learner .day-back:hover svg { transform: translateX(-3px); }
+  .portal-layout-learner .day-control.is-next:hover:not(:disabled) svg,
+  .portal-layout-learner .day-done-action:hover svg { transform: translateX(4px); }
+  .portal-layout-learner .day-control:not(.is-next):hover:not(:disabled) svg { transform: translateX(-3px); }
+  .portal-layout-learner .day-control:active:not(:disabled) { transform: scale(0.97); }
+  .portal-layout-learner .day-item-mark .learning-playing-bars i { animation: day-bars 900ms ease-in-out infinite; }
+  .portal-layout-learner .day-item-mark .learning-playing-bars i:nth-child(2) { animation-delay: 150ms; }
+  .portal-layout-learner .day-item-mark .learning-playing-bars i:nth-child(3) { animation-delay: 300ms; }
+}
+@keyframes day-rise { from { opacity: 0; transform: translateY(12px); } }
+@keyframes day-swap { from { opacity: 0; transform: translateX(14px); } }
+@keyframes day-pop { from { opacity: 0; transform: scale(0.96); } }
+@keyframes day-trophy { from { transform: scale(0.4) rotate(-18deg); } }
+@keyframes day-check { from { transform: scale(0.3); } }
+@keyframes day-bars { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }

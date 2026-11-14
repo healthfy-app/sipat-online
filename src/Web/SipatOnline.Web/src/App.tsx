@@ -402,7 +402,7 @@ function LoginPage({
               <p className="eyebrow">CONTEÚDOS PARA A SEMANA DA SIPAT</p>
               <h1>Aprender também faz parte de cuidar.</h1>
               <p>
-                Acesse os cursos e demais conteúdos que sua empresa preparou para
+                Acesse os vídeos e demais conteúdos que sua empresa preparou para
                 a semana da SIPAT.
               </p>
             </>
@@ -647,7 +647,7 @@ function ProtectedPortal({
                 </svg>
                 <div>
                   <strong>{learningSummary.percentage}% concluído</strong>
-                  <span>{learningSummary.completed} de {learningSummary.total} cursos</span>
+                  <span>{learningSummary.completed} de {learningSummary.total} dias</span>
                 </div>
               </div>
             )}
