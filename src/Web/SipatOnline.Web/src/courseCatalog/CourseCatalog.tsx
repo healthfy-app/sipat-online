@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Page, PageHeader } from '@/components/ui/page';
+import { Page } from '@/components/ui/page';
 import { TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { VideoUploadForm } from '@/courseEditor/CourseMediaForms';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
@@ -130,7 +130,7 @@ export default function CourseCatalog({
 
   const primaryAction = {
     courses: <Button onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar assunto</Button>,
-    plans: <span />,
+    plans: undefined,
     videos: <Button onClick={openUpload}><Plus /> Enviar vídeo</Button>,
     modules: <Button onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
   }[tab];
@@ -141,12 +141,28 @@ export default function CourseCatalog({
 
   return (
     <Page>
-      <PageHeader
-        actions={primaryAction}
-        badge={import.meta.env.DEV ? <Badge variant="outline">Apresentação demo</Badge> : undefined}
-        description={`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}
-        title="Biblioteca"
-      />
+      <header className="library-hero" data-slot="page-header">
+        <div className="grid min-w-0 gap-2">
+          <p className="m-0 text-[0.75rem] font-bold uppercase tracking-[0.12em] text-[#7fe0a6]">Acervo da plataforma</p>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="m-0 text-[clamp(2rem,4vw,2.75rem)] font-extrabold leading-none tracking-[-0.035em] text-white">Biblioteca</h1>
+            {import.meta.env.DEV && <Badge className="border-white/25 bg-white/10 text-white" variant="outline">Apresentação demo</Badge>}
+          </div>
+          <p className="m-0 text-[0.9375rem] text-white/75">{`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}</p>
+          <ul aria-label="Resumo do acervo" className="m-0 mt-2 flex list-none flex-wrap gap-2 p-0">
+            {[
+              [courses.length, 'assuntos'],
+              [library.length, 'vídeos'],
+              [modules.length, 'jogos e perguntas'],
+            ].map(([count, label]) => (
+              <li className="rounded-xl bg-white/10 px-3.5 py-1.5 text-[0.8125rem] text-white/85" key={label}>
+                <strong className="mr-1 text-base font-extrabold tabular-nums text-white">{count}</strong>{label}
+              </li>
+            ))}
+          </ul>
+        </div>
+        {primaryAction && <div className="library-hero-action flex flex-wrap gap-2 max-sm:w-full max-sm:[&>*]:flex-1">{primaryAction}</div>}
+      </header>
 
       {error && (
         <div className="flex flex-wrap items-center gap-3">
@@ -157,9 +173,9 @@ export default function CourseCatalog({
 
       <Tabs onValueChange={(value) => setTab(value as CatalogTab)} value={tab}>
         {showTabs && (
-          <TabsList aria-label="Seções do catálogo">
+          <TabsList aria-label="Seções do catálogo" className="library-tabs gap-2 border-0">
             {tabs.map((item) => (
-              <TabsTrigger key={item.id} value={item.id}>
+              <TabsTrigger className="library-tab" key={item.id} value={item.id}>
                 {item.label} <TabCount>{item.count}</TabCount>
               </TabsTrigger>
             ))}

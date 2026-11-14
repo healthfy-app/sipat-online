@@ -23,8 +23,8 @@ export default function CourseCard({
   const published = course.status === 'Published';
 
   return (
-    <article className="group relative flex min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-card transition-[box-shadow,transform] duration-200 ease-out-soft has-[button[data-open]:focus-visible]:outline-2 has-[button[data-open]:focus-visible]:outline-offset-2 has-[button[data-open]:focus-visible]:outline-ring hover:-translate-y-0.5 hover:shadow-card-hover motion-reduce:hover:translate-y-0">
-      <div className="relative aspect-video overflow-hidden bg-muted">
+    <article className="group relative flex min-w-0 flex-col overflow-hidden rounded-[1.25rem] border border-[#dfe6e3] bg-card shadow-[0_1px_2px_rgb(18_51_44/0.05)] transition-[box-shadow,transform,border-color] duration-200 ease-out-soft has-[button[data-open]:focus-visible]:outline-2 has-[button[data-open]:focus-visible]:outline-offset-2 has-[button[data-open]:focus-visible]:outline-ring hover:-translate-y-1 hover:border-[#12332c] hover:shadow-[0_18px_34px_-18px_rgb(18_51_44/0.5)] motion-reduce:hover:translate-y-0">
+      <div className="relative aspect-video overflow-hidden bg-[#12332c] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-1/3 after:bg-gradient-to-t after:from-[rgb(11_36_31/0.45)] after:to-transparent after:content-['']">
         <img
           alt=""
           className="block size-full object-cover transition-transform duration-500 ease-out-soft group-hover:scale-[1.03] motion-reduce:group-hover:scale-100"
@@ -34,19 +34,19 @@ export default function CourseCard({
         />
         <span
           className={published
-            ? 'absolute left-2.5 top-2.5 rounded-full bg-[rgb(14_74_52/0.88)] px-2 py-0.5 text-[0.6875rem] font-semibold text-white backdrop-blur-sm'
-            : 'absolute left-2.5 top-2.5 rounded-full bg-[rgb(255_245_217/0.94)] px-2 py-0.5 text-[0.6875rem] font-semibold text-warning backdrop-blur-sm'}
+            ? 'absolute left-3 top-3 z-10 rounded-full bg-[rgb(15_122_61/0.95)] px-2.5 py-0.5 text-[0.6875rem] font-bold text-white backdrop-blur-sm'
+            : 'absolute left-3 top-3 z-10 rounded-full bg-[#ffd166] px-2.5 py-0.5 text-[0.6875rem] font-bold text-[#12332c] backdrop-blur-sm'}
         >
           {statusLabels[course.status]}
         </span>
       </div>
 
-      <div className="grid flex-1 content-start gap-1.5 px-4 pb-2 pt-3.5">
+      <div className="grid flex-1 content-start gap-1.5 px-5 pb-3 pt-4">
         <div className="flex min-h-5 flex-wrap gap-1.5">
           {option && <Badge className="rounded-[0.3125rem] px-1.5 text-[0.6875rem]" variant="neutral">Opção {option}</Badge>}
           {course.gamificationEnabled && <Badge className="rounded-[0.3125rem] px-1.5 text-[0.6875rem]">Gamificação</Badge>}
         </div>
-        <h3 className="m-0 min-h-[2.7em] text-[0.9375rem] font-semibold leading-[1.35]">
+        <h3 className="m-0 min-h-[2.7em] text-[1.0625rem] font-extrabold leading-[1.3] tracking-[-0.01em] text-[#12332c]">
           {/* o botão cobre o card inteiro: um clique em qualquer lugar abre o curso */}
           <button
             aria-label={`Abrir assunto ${course.title}`}
@@ -64,8 +64,8 @@ export default function CourseCard({
         </p>
       </div>
 
-      <footer className="mt-1 flex items-center justify-between gap-2 border-t border-border py-2 pl-4 pr-2">
-        <span aria-hidden="true" className="whitespace-nowrap text-[0.8125rem] font-semibold text-muted-foreground transition-colors group-hover:text-primary">
+      <footer className="mt-1 flex items-center justify-between gap-2 border-t border-[#dfe6e3] px-4 py-3">
+        <span aria-hidden="true" className="whitespace-nowrap rounded-full bg-[#12332c] px-3.5 py-1.5 text-[0.8125rem] font-bold text-white transition-colors group-hover:bg-[#0f7a3d]">
           Abrir editor →
         </span>
         <div className="flex items-center">
