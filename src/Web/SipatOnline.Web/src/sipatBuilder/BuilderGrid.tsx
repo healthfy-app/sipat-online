@@ -66,7 +66,7 @@ export default function BuilderGrid({ days, catalog, onChange, canEditThemes = t
   return <DndContext onDragEnd={onDragEnd} sensors={sensors}>
     <div className="grid gap-4">
       <ThemeTray subjects={themes} />
-      <div className="overflow-hidden rounded-2xl border border-border bg-card shadow-card">
+      <div className="ops-card overflow-hidden">
         <div className="overflow-x-auto" ref={scroller}>
           <div className="grid min-w-full [grid-template-columns:var(--columns)]" role="table" style={layout}>
             {days.map((day, index) => {
@@ -74,7 +74,7 @@ export default function BuilderGrid({ days, catalog, onChange, canEditThemes = t
               const time = dayDuration(day, catalog);
               return <div className="builder-col grid content-start gap-2 border-r border-b border-border p-3" key={`head-${day.key}`} role="columnheader" style={{ ...column(index), borderTop: `4px solid ${color}`, gridColumn: index + 1, gridRow: 1 }}>
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                  <span className="rounded-md px-2 py-0.5 text-xs font-bold tracking-wide text-white" style={{ backgroundColor: color }}>DIA {index + 1}</span>
+                  <span className="rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wide text-white" style={{ backgroundColor: color }}>DIA {index + 1}</span>
                   <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground tabular-nums"><Clock aria-hidden="true" className="size-3.5" />{time > 0 ? formatSpan(time) : 'sem vídeos'}</span>
                   <Button aria-label={`Remover o dia ${index + 1}`} disabled={days.length === 1} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </div>
@@ -97,8 +97,8 @@ export default function BuilderGrid({ days, catalog, onChange, canEditThemes = t
 
             {days.map((day, index) => {
               const count = filled(day.videos).length;
-              return <div className="builder-col flex items-baseline justify-between gap-2 border-r border-border bg-primary/5 px-4 py-3" key={`time-${day.key}`} style={{ ...column(index), gridColumn: index + 1, gridRow: 3 }}>
-                <span className="text-xl font-semibold tabular-nums">{formatClock(dayDuration(day, catalog))}</span>
+              return <div className="builder-col flex items-baseline justify-between gap-2 border-r border-border bg-[#eef2f0] px-4 py-3" key={`time-${day.key}`} style={{ ...column(index), gridColumn: index + 1, gridRow: 3 }}>
+                <span className="text-xl font-extrabold tabular-nums text-[#12332c]">{formatClock(dayDuration(day, catalog))}</span>
                 <span className="text-xs text-muted-foreground">{count} {count === 1 ? 'vídeo' : 'vídeos'}</span>
               </div>;
             })}

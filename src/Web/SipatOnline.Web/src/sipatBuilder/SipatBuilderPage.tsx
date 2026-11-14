@@ -9,9 +9,10 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Page, PageHeader } from '@/components/ui/page';
+import { Page } from '@/components/ui/page';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
+import '@/OpsIdentity.css';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
@@ -203,23 +204,32 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const label = sipat ? phaseLabel[sipatPhase(sipat, days.filter(day => day.videos.some(Boolean)).length)] : null;
 
   return <Page className="builder-page">
-    <Link className="inline-flex items-center gap-1.5 justify-self-start text-sm font-medium text-muted-foreground no-underline hover:text-foreground" to={basePath}>
-      <ArrowLeft aria-hidden="true" className="size-4" /> Todas as SIPATs
-    </Link>
-    <PageHeader
-      actions={stage === 'grid' && !cancelled && <>
+    <header className="ops-hero" data-slot="page-header">
+      <div className="ops-hero-copy">
+        <Link className="ops-hero-back" to={basePath}><ArrowLeft aria-hidden="true" /> Todas as SIPATs</Link>
+        <p className="ops-hero-eyebrow">SIPAT</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="ops-hero-title">{isNew && stage === 'setup' ? 'Nova SIPAT' : name || 'SIPAT'}</h1>
+          {label && <Badge variant={label.variant}>{label.text}</Badge>}
+          {dirty && <Badge className="border-white/30 bg-transparent text-white" variant="outline">Alterações não salvas</Badge>}
+        </div>
+        <p className="ops-hero-lead">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</p>
+        {stage === 'grid' && <ul aria-label="Resumo da SIPAT" className="ops-hero-stats">
+          <li><strong>{days.length}</strong> {days.length === 1 ? 'dia' : 'dias'}</li>
+          <li><Film aria-hidden="true" /><strong>{totals.videos}</strong> {totals.videos === 1 ? 'vídeo' : 'vídeos'}</li>
+          <li><Gamepad2 aria-hidden="true" /><strong>{totals.games}</strong> {totals.games === 1 ? 'jogo' : 'jogos'}</li>
+          <li><Clock aria-hidden="true" />{totals.time > 0 ? formatSpan(totals.time) : 'sem vídeos'}</li>
+        </ul>}
+      </div>
+      {stage === 'grid' && !cancelled && <div className="ops-hero-actions">
         {sipat && <Button disabled={busy} onClick={() => void cancelThis()} variant="ghost"><Ban /> Cancelar SIPAT</Button>}
         {sources.length > 0 && <Button disabled={busy} onClick={() => setCopying(true)} variant="outline"><Copy /> Duplicar de outra SIPAT</Button>}
         <Button onClick={() => setImporting(true)} variant="outline"><FileSpreadsheet /> Importar CSV</Button>
         <Button disabled={days.length === 0} onClick={() => download(`${(name || 'sipat').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.csv`, planToCsv(days, catalog))} variant="outline"><FileDown /> Exportar CSV</Button>
         <Button disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
-        <Button disabled={busy || days.length === 0} onClick={() => (problems().length > 0 ? setError(problems().join(' ')) : setConfirmingLaunch(true))}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
-      </>}
-      badge={<>{label && <Badge variant={label.variant}>{label.text}</Badge>}{dirty && <Badge variant="outline">Alterações não salvas</Badge>}</>}
-      description={stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}
-      eyebrow="SIPAT"
-      title={isNew && stage === 'setup' ? 'Nova SIPAT' : name || 'SIPAT'}
-    />
+        <Button className="ops-primary" disabled={busy || days.length === 0} onClick={() => (problems().length > 0 ? setError(problems().join(' ')) : setConfirmingLaunch(true))}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
+      </div>}
+    </header>
 
     {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Esta SIPAT foi cancelada e não pode mais ser alterada. Use "Duplicar" em uma nova SIPAT para reaproveitar os dias.</p>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
@@ -231,21 +241,11 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         onStartDate={setStartDate} onTemplate={template} startDate={startDate}
         onCopy={sources.length > 0 ? () => setCopying(true) : undefined} />
       : <>
-        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-          <label className="grid gap-1.5 text-sm font-medium">
-            Nome da SIPAT
-            <Input className="h-11 text-base font-semibold" disabled={cancelled || (sipat !== null && sipat.status !== 'Draft')} maxLength={200}
-              onChange={event => { setName(event.target.value); setDirty(true); }} placeholder="Ex.: SIPAT 2026" value={name} />
-          </label>
-          <dl className="m-0 flex flex-wrap gap-2">
-            {[
-              { icon: <span aria-hidden="true" className="font-semibold">{days.length}</span>, label: days.length === 1 ? 'dia' : 'dias' },
-              { icon: <Film aria-hidden="true" className="size-4" />, label: `${totals.videos} ${totals.videos === 1 ? 'vídeo' : 'vídeos'}` },
-              { icon: <Gamepad2 aria-hidden="true" className="size-4" />, label: `${totals.games} ${totals.games === 1 ? 'jogo' : 'jogos'}` },
-              { icon: <Clock aria-hidden="true" className="size-4" />, label: totals.time > 0 ? formatSpan(totals.time) : 'sem vídeos' },
-            ].map(item => <div className="flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground" key={item.label}>{item.icon}{item.label}</div>)}
-          </dl>
-        </div>
+        <label className="ops-card grid gap-1.5 p-4 text-sm font-bold text-[#12332c]">
+          Nome da SIPAT
+          <Input className="h-11 text-base font-semibold" disabled={cancelled || (sipat !== null && sipat.status !== 'Draft')} maxLength={200}
+            onChange={event => { setName(event.target.value); setDirty(true); }} placeholder="Ex.: SIPAT 2026" value={name} />
+        </label>
         <BuilderGrid canEditThemes={canEditThemes} catalog={catalog} days={days} onChange={cancelled ? () => undefined : edit} />
       </>}
 

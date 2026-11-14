@@ -19,9 +19,9 @@ const summary = (subject: Subject) => `${subject.videoIds.length} ${subject.vide
 export function ThemeTray({ subjects }: { subjects: Subject[] }) {
   const [query, setQuery] = useState('');
   const shown = useMemo(() => subjects.filter(subject => normalize(subject.title).includes(normalize(query))), [subjects, query]);
-  return <section aria-label="Assuntos do acervo" className="grid gap-2 rounded-2xl border border-border bg-card p-3 shadow-card">
+  return <section aria-label="Assuntos do acervo" className="ops-card grid gap-3 p-4">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <h2 className="m-0 flex items-center gap-2 text-sm font-semibold"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo <span className="font-normal text-muted-foreground">· arraste para um dia</span></h2>
+      <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-[#12332c]"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo <span className="text-sm font-normal tracking-normal text-muted-foreground">· arraste para um dia</span></h2>
       <label className="relative">
         <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
         <Input aria-label="Buscar assunto" className="h-9 w-56 pl-8" onChange={event => setQuery(event.target.value)} placeholder="Buscar assunto" value={query} />
@@ -35,7 +35,7 @@ export function ThemeTray({ subjects }: { subjects: Subject[] }) {
 
 function TrayCard({ subject }: { subject: Subject }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `theme:${subject.id}`, data: { subject } });
-  return <div className={cn('flex w-60 items-center gap-2.5 rounded-xl border border-border bg-card p-2 transition-shadow hover:shadow-card-hover', isDragging && 'opacity-40')} ref={setNodeRef}>
+  return <div className={cn('flex w-60 items-center gap-2.5 rounded-[0.875rem] border border-[#dfe6e3] bg-white p-2 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-[#12332c] hover:shadow-[0_10px_24px_-14px_rgb(18_51_44/0.45)] motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef}>
     <button aria-label={`Arrastar o assunto ${subject.title}`} className="grid size-7 min-h-0 shrink-0 cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
     <Cover className="size-10" subject={subject} />
     <div className="grid min-w-0 flex-1 gap-0.5">
@@ -54,7 +54,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
   onChoose: (title: string) => void; onClear: () => void; canEditThemes?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId(dayIndex) });
-  const frame = cn('grid content-start gap-2 rounded-xl border p-2 transition-colors', isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : 'border-border bg-card');
+  const frame = cn('grid content-start gap-2 rounded-[0.875rem] border p-2 transition-colors', isOver ? 'border-[#12332c] bg-[#fff3cf] ring-2 ring-[#ffd166]' : 'border-[#dfe6e3] bg-white');
   const chooser = <select aria-label={`Assunto do dia ${dayIndex + 1}`} className="h-9 w-full rounded-md border border-input bg-background px-2 text-sm" onChange={event => onChoose(event.target.value)} value={subject?.id ?? ''}>
     <option value="">{subject ? 'Trocar assunto' : 'Escolher assunto'}</option>
     {themes.map(item => <option key={item.id} value={item.id}>{themeLabel(item)}</option>)}
@@ -84,8 +84,8 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       <ol className="m-0 grid list-none gap-1 p-0">
         {videoIds.map((id, index) => {
           const video = catalog.videos.get(id);
-          return <li className="flex items-center gap-2 rounded-lg bg-muted/60 px-2 py-1.5" key={id}>
-            <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded bg-accent text-[0.6875rem] font-bold text-accent-foreground">{index + 1}</span>
+          return <li className="flex items-center gap-2 rounded-lg bg-[#eef2f0] px-2 py-1.5" key={id}>
+            <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-[#12332c] text-[0.6875rem] font-bold text-white">{index + 1}</span>
             <span className="min-w-0 flex-1 text-xs leading-snug font-medium [overflow-wrap:anywhere]">{video?.title ?? 'Vídeo removido do catálogo'}</span>
             {video && <span className="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">{formatClock(video.durationMs)}</span>}
           </li>;

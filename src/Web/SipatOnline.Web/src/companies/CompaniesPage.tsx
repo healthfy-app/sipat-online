@@ -1,13 +1,14 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronRight, EllipsisVertical, LogIn, Plus, Search, UserPlus } from 'lucide-react';
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, EllipsisVertical, LogIn, Plus, Search, UserPlus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { getPlatformDashboard, type PlatformCompanyOverview } from '@/api';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { PlanBadge } from './PlanSelect';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input, NativeSelect } from '@/components/ui/input';
-import { EmptyState, Page, PageHeader } from '@/components/ui/page';
+import { EmptyState, Page } from '@/components/ui/page';
+import '@/OpsIdentity.css';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
@@ -99,18 +100,28 @@ export default function CompaniesPage() {
   return (
     <div className="page-content">
       <Page>
-        <PageHeader
-          actions={<Button onClick={() => setParam('nova-empresa', true)}><Plus /> Nova empresa</Button>}
-          description={isLoading ? 'Carregando empresas...'
-            : hasFilters ? `${visible.length} de ${companies.length} exibidas`
-              : `${pluralize(companies.length, 'empresa', 'empresas')} na plataforma`}
-          title="Empresas"
-        />
+        <header className="ops-hero" data-slot="page-header">
+          <div className="ops-hero-copy">
+            <p className="ops-hero-eyebrow">Operação da plataforma</p>
+            <h1 className="ops-hero-title">Empresas</h1>
+            <p className="ops-hero-lead">{isLoading ? 'Carregando empresas...'
+              : hasFilters ? `${visible.length} de ${companies.length} exibidas`
+                : `${pluralize(companies.length, 'empresa', 'empresas')} na plataforma`}</p>
+            {!isLoading && <ul aria-label="Resumo das empresas" className="ops-hero-stats">
+              <li><strong>{companies.length}</strong> {companies.length === 1 ? 'empresa' : 'empresas'}</li>
+              <li><strong>{companies.filter((company) => company.isActive).length}</strong> ativas</li>
+              <li><strong>{companies.reduce((sum, company) => sum + company.employeeCount, 0).toLocaleString('pt-BR')}</strong> participantes</li>
+            </ul>}
+          </div>
+          <div className="ops-hero-actions">
+            <Button className="ops-primary" onClick={() => setParam('nova-empresa', true)}><Plus /> Nova empresa</Button>
+          </div>
+        </header>
 
         {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="ops-card flex flex-wrap items-center gap-2.5 p-4">
           <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-sm">
             <Search className="pointer-events-none absolute left-3 size-4" />
             <Input aria-label="Buscar empresa" className="pl-9" placeholder="Buscar por nome ou identificador" type="search" value={search}
@@ -129,7 +140,7 @@ export default function CompaniesPage() {
         ) : sorted.length === 0 ? (
           <EmptyState description="Tente outro nome ou identificador, ou limpe os filtros." title="Nenhuma empresa encontrada." />
         ) : (
-          <Table aria-label="Diretório de empresas">
+          <div className="ops-table"><Table aria-label="Diretório de empresas">
             <TableHeader>
               <TableRow>
                 {sortable('name', 'Empresa')}
@@ -148,7 +159,7 @@ export default function CompaniesPage() {
                       <div className="grid min-w-0">
                         <Link
                           aria-label={`Abrir empresa ${company.name}`}
-                          className="truncate font-semibold text-foreground no-underline hover:underline"
+                          className="truncate font-extrabold tracking-[-0.01em] text-[#12332c] no-underline hover:underline"
                           onClick={(event) => event.stopPropagation()}
                           to={`/platform/companies/${company.id}`}
                         >
@@ -165,7 +176,7 @@ export default function CompaniesPage() {
                   </TableCell>
                   <TableCell className="py-2 pr-2 text-right" onClick={(event) => event.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
-                      <Link className={buttonVariants({ size: 'sm', variant: 'outline' })} to={`/platform/companies/${company.id}`}>Entrar</Link>
+                      <Link className="ops-pill" to={`/platform/companies/${company.id}`}>Entrar <ArrowRight aria-hidden="true" /></Link>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button aria-label={`Ações da empresa ${company.name}`} size="icon-sm" variant="ghost"><EllipsisVertical /></Button>
@@ -177,13 +188,12 @@ export default function CompaniesPage() {
                           <DropdownMenuItem onSelect={() => setAdminTarget(company)}><UserPlus /> Adicionar administrador</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
-                      <ChevronRight aria-hidden="true" className="size-4 text-muted-foreground max-sm:hidden" />
                     </div>
                   </TableCell>
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table></div>
         )}
 
         {sorted.length > pageSize && (
