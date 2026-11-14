@@ -6,7 +6,6 @@ import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState } from '@/components/ui/page';
 import { pluralize } from '@/courseEditor/courseFormat';
 import CourseCard from './CourseCard';
-import { SegmentedControl } from './SegmentedControl';
 
 type StatusFilter = 'all' | PlatformCourseStatus;
 type CategoryFilter = 'all' | 'none' | string;
@@ -45,11 +44,6 @@ export default function CoursesPanel({
   }, [categoryNames, courses, category, search, status]);
 
   const hasFilters = search.trim() !== '' || status !== 'all' || category !== 'all';
-  const categoryFilters: { value: CategoryFilter; label: string }[] = [
-    { value: 'all', label: 'Todas' },
-    ...categories.map((item) => ({ value: item.id, label: item.name })),
-    ...(hasUncategorized && categories.length > 0 ? [{ value: 'none', label: 'Sem categoria' }] : []),
-  ];
 
   return (
     <section aria-label="Cursos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -70,13 +64,11 @@ export default function CoursesPanel({
           <option value="Draft">Rascunho</option>
           <option value="Published">Publicado</option>
         </NativeSelect>
-        <SegmentedControl
-          className="max-sm:order-3 max-sm:w-full"
-          label="Categorias"
-          onChange={setCategory}
-          options={categoryFilters}
-          value={category}
-        />
+        <NativeSelect aria-label="Filtrar por categoria" className="w-auto max-sm:flex-1" onChange={(event) => setCategory(event.target.value)} value={category}>
+          <option value="all">Todas as categorias</option>
+          {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          {hasUncategorized && categories.length > 0 && <option value="none">Sem categoria</option>}
+        </NativeSelect>
         <Button className="max-sm:order-3" onClick={onManageCategories} size="sm" variant="outline"><Settings2 /> Gerenciar categorias</Button>
         <span aria-live="polite" className="ml-auto whitespace-nowrap text-[0.8125rem] tabular-nums text-muted-foreground max-sm:ml-0">
           {hasFilters ? `${filtered.length} de ${courses.length}` : pluralize(courses.length, 'curso', 'cursos')}

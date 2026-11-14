@@ -295,11 +295,11 @@ describe('Platform course catalog', () => {
     expect(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Abrir assunto Combate a incêndio' })).toBeVisible();
 
-    await user.click(await screen.findByRole('button', { name: 'Alimentação' }));
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Filtrar por categoria' }), 'cat-food');
     expect(screen.getByRole('button', { name: 'Abrir assunto Ergonomia' })).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Abrir assunto Combate a incêndio' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Segurança no trabalho' }));
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Filtrar por categoria' }), 'cat-safe');
     expect(screen.queryByRole('button', { name: 'Abrir assunto Ergonomia' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Abrir assunto Combate a incêndio' })).toBeVisible();
   });
@@ -570,7 +570,7 @@ describe('Platform course catalog', () => {
     expect(screen.getByRole('button', { name: 'Abrir assunto Combate a incêndio' })).toBeVisible();
     expect(screen.getByText('2 vídeos · 3:00')).toBeVisible();
     expect(screen.queryByText('Postura')).not.toBeInTheDocument();
-    expect(await screen.findByRole('button', { name: 'Todas' })).toHaveAttribute('aria-pressed', 'true');
+    expect(await screen.findByRole('combobox', { name: 'Filtrar por categoria' })).toHaveValue('all');
     expect(screen.queryByRole('region', { name: 'Como deseja começar?' })).not.toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
