@@ -84,23 +84,18 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
    ```
    O comando imprime uma linha por vídeo (`copiado  <título>  <Mbps> Mbps`) e um resumo no fim. Ele pode ser repetido sem problema: copia de novo por cima. Vídeos acima de 3 Mbps saem marcados como `PESADO`. Um vídeo sem arquivo no volume aparece como `sem arquivo na origem`; um envio que falha (chave ou bucket errados, rede) aparece como `falha ao copiar: <motivo>`. Nos dois casos o comando continua com os demais vídeos e termina com erro.
 5. **Depois troque.** Defina `VIDEO_STORAGE_PROVIDER=R2` no `deploy/.env.production` e reinicie a API (`docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml up -d api`).
-6. Para cada vídeo marcado como `PESADO`, **converta no próprio lugar, no volume `platform-videos`**, e rode a cópia de novo. Enviar um vídeo novo pelo painel cria um vídeo com **outro id** e **não** altera os Dias que já foram entregues (eles continuam apontando para o vídeo antigo); por isso a troca é feita no arquivo. O arquivo de cada vídeo se chama `<id sem hífens>.video` (ver `FilePlatformCourseVideoStorage`). Descubra o id e o caminho:
-   ```bash
-   docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' <<'SQL'
-   select "Id", "Title", "SizeBytes" from learning."PlatformCourseVideos" order by "Title";
-   SQL
-   DIR=$(docker volume inspect sipat-online-production_platform-videos --format '{{ .Mountpoint }}')
-   ID=<Id do vídeo pesado, sem os hífens>
-   ```
-   Converta para um arquivo temporário na mesma pasta, guarde o original e mova o convertido por cima (a API continua servindo o arquivo antigo até o `mv`):
-   ```bash
-   sudo deploy/scripts/convert-video.sh "$DIR/$ID.video" "$DIR/$ID.tmp.mp4"
-   sudo cp -p "$DIR/$ID.video" "/var/backups/$ID.original.video"   # opcional: guarda o original fora do volume
-   sudo chown --reference="$DIR/$ID.video" "$DIR/$ID.tmp.mp4"
-   sudo mv "$DIR/$ID.tmp.mp4" "$DIR/$ID.video"
-   ```
-   Em seguida rode a cópia (passo 4) outra vez. Ela envia o **tamanho real do arquivo** e, ao copiar com sucesso, corrige o `SizeBytes` cadastrado; o Mbps da linha já sai calculado com o tamanho novo.
-7. **Todo vídeo novo deve passar por `convert-video.sh` antes do envio.** O script gera H.264, no máximo 720p, cerca de 2 Mbps, áudio AAC de 128 kbps e `faststart`, que é o que mantém o vídeo leve para quem assiste no celular e na rede da fábrica. Requer o `ffmpeg` instalado (`sudo apt install ffmpeg`).
+6. Para cada vídeo marcado como `PESADO` (e para todo vídeo antigo, que ainda não tem a versão 480p), use a conversão da própria API (veja **Conversão automática** abaixo): `--convert-catalog-videos` coloca na fila todo vídeo pronto que ainda não tem 480p e a API em execução converte cada um **mantendo o mesmo id**, gravando a 720p e a 480p no armazenamento ativo (volume ou R2). Os Dias já entregues continuam funcionando, porque o id não muda, e o vídeo continua no ar durante a conversão. Não é mais preciso converter à mão com `deploy/scripts/convert-video.sh`.
+7. **Todo vídeo novo é convertido sozinho no envio** (H.264 720p de cerca de 2 Mbps e 480p de cerca de 1 Mbps, áudio AAC e `faststart`). Não é preciso preparar o arquivo antes.
+
+### Conversão automática
+- A imagem da API já traz o `ffmpeg`. Cada envio fica guardado no volume `video-work` (na API: `/var/sipat/video-work`) e aparece na biblioteca como **Processando**; a API converte **um vídeo por vez**, em prioridade baixa (`nice`), para não disputar a CPU com quem está assistindo. Ao terminar, o vídeo fica **Pronto** e o original sai da pasta. Um vídeo **Processando** não pode entrar num Dia.
+- Se o arquivo estiver corrompido, o vídeo fica como **Falhou**, com o motivo na biblioteca, e a fila segue com os próximos. Envie o arquivo de novo.
+- Se a API reiniciar no meio de uma conversão (atualização, queda da VM), o trabalho volta para a fila e roda de novo na partida; nada se perde.
+- Vídeos enviados antes desta versão não têm a versão 480p. Com a API no ar, coloque-os na fila (o comando só enfileira e sai; quem converte é a API em execução):
+  ```bash
+  docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml exec api dotnet SipatOnline.Api.dll --convert-catalog-videos
+  ```
+  Ele imprime `N vídeos na fila de conversão.`. Acompanhe na biblioteca da operação; os vídeos continuam disponíveis enquanto são convertidos. Pode ser repetido: vídeos que já estão na fila ou já têm 480p não entram de novo.
 
 **Antes do go-live:** confirme nos termos de uso da Cloudflare que servir vídeo pelo R2 é permitido no seu plano. **Plano B:** se houver qualquer problema, defina `VIDEO_STORAGE_PROVIDER=File` (ou apague a variável) e reinicie a API; ela volta a servir os vídeos do volume `platform-videos`, que por isso deve continuar existindo e com cópia externa. **Atenção:** vídeos enviados enquanto o R2 estava ativo existem **somente no R2** e não estão no volume. Antes de voltar para `File`, reenvie esses vídeos pelo painel ou copie-os de volta do bucket para o volume; do contrário eles ficam sem arquivo.
 
@@ -140,7 +135,7 @@ docker compose --env-file deploy/.env.production -f deploy/compose.production.ya
 docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml up --build -d api web
 ```
 
-**Nesta versão o `db-init` é obrigatório, antes de subir a API nova.** Ele cria as tabelas `PlaybackGrants` (sessões de reprodução) e `PlaybackQualitySessions` (medição de qualidade do vídeo). Sem elas, toda reprodução de vídeo falha. Rode o `db-init` primeiro e só depois o `up --build -d api web`.
+**Nesta versão o `db-init` é obrigatório, antes de subir a API nova.** Ele cria as tabelas `PlaybackGrants` (sessões de reprodução), `PlaybackQualitySessions` (medição de qualidade do vídeo) e `VideoConversionJobs` (fila de conversão), além do estado de conversão de cada vídeo. Sem elas, toda reprodução e todo envio de vídeo falham. Depois de subir a API nova, rode `--convert-catalog-videos` (seção 5) para gerar a 480p dos vídeos antigos. Rode o `db-init` primeiro e só depois o `up --build -d api web`.
 
 ## Limites desta topologia
 Uma VM, sem alta disponibilidade, banco não gerenciado e sem CDN para vídeo. Para o MVP e um cliente de 600+ pessoas é um começo razoável, desde que haja cópia externa testada e um plano para o dia do pico.

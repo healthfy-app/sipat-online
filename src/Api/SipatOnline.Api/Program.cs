@@ -126,6 +126,25 @@ if (args.Contains("--copy-videos-to-r2", StringComparer.Ordinal))
     return;
 }
 
+if (args.Contains("--convert-catalog-videos", StringComparer.Ordinal))
+{
+    var conversion = app.Services.GetRequiredService<SipatOnline.Infrastructure.Learning.VideoConversionOptions>();
+    if (!conversion.Enabled)
+    {
+        Console.WriteLine("Ligue SipatOnline:VideoConversion:Enabled antes de converter.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    // Only queues: the running API converts them in the background, one at a time.
+    await using var scope = app.Services.CreateAsyncScope();
+    var queued = await scope.ServiceProvider
+        .GetRequiredService<SipatOnline.Infrastructure.Learning.VideoConversionProcessor>()
+        .EnqueueMissingSd480Async(CancellationToken.None);
+    Console.WriteLine($"{queued} vídeos na fila de conversão.");
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

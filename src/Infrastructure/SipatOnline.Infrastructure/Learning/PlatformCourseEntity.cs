@@ -59,6 +59,13 @@ public sealed class PlatformCourseVideoEntity
 
     public DateTimeOffset CreatedAt { get; set; }
 
+    /// <summary>Ready, Processing or Failed (see <c>PlatformVideoStatus</c>).</summary>
+    public string Status { get; set; } = "Ready";
+
+    public string? ProcessingError { get; set; }
+
+    public bool HasSd480 { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> CourseLinks { get; set; } = [];
 
     public ICollection<PlatformVideoCheckpointEntity> Checkpoints { get; set; } = [];

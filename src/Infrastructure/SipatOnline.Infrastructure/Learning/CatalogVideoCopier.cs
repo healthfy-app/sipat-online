@@ -55,6 +55,11 @@ public sealed class CatalogVideoCopier(
                         video.Id, stream, video.ContentType, actualSize, cancellationToken);
                     if (saved.IsSuccess)
                     {
+                        if (source.FindFile(video.Id, VideoRendition.Sd480) is { } sd480)
+                        {
+                            await target.SaveRenditionAsync(video.Id, VideoRendition.Sd480, sd480, cancellationToken);
+                        }
+
                         status = CatalogVideoCopyStatus.Copied;
                         if (actualSize != video.SizeBytes)
                         {

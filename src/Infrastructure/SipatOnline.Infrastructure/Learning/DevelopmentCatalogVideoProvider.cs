@@ -15,8 +15,10 @@ public sealed class DevelopmentCatalogVideoProvider(PlatformDbContext db, Develo
         if (!Guid.TryParse(reference["catalog:".Length..], out var videoId))
             return Result<PlaybackSession>.Failure(new DomainError("learning.video_asset_unavailable", "Referência de vídeo inválida."));
         var video = await db.PlatformCourseVideos.AsNoTracking().SingleOrDefaultAsync(item => item.Id == videoId, token);
-        return video is null
-            ? Result<PlaybackSession>.Failure(new DomainError("learning.video_asset_unavailable", "Vídeo não encontrado."))
+        if (video is null)
+            return Result<PlaybackSession>.Failure(new DomainError("learning.video_asset_unavailable", "Vídeo não encontrado."));
+        return video.Status != nameof(SipatOnline.Learning.Application.Catalog.PlatformVideoStatus.Ready)
+            ? CatalogVideoPlaybackProvider.NotReady()
             : await samples.CreateLocalSession($"/api/learning/lessons/{lessonId:D}/media",
                 video.ContentType, video.DurationMilliseconds, participantId, lessonId);
     }

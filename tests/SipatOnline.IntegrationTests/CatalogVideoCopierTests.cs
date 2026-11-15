@@ -54,6 +54,10 @@ public sealed class CatalogVideoCopierTests
             var missingId = Guid.NewGuid();
             await SaveSource(source, heavyId, 1_000_000);
             await SaveSource(source, lightId, 100_000);
+            var sdFile = Path.Combine(Path.GetTempPath(), $"sipat-copier-480p-{Guid.NewGuid():N}.mp4");
+            await File.WriteAllBytesAsync(sdFile, new byte[4_321]);
+            await source.SaveRenditionAsync(heavyId, VideoRendition.Sd480, sdFile, default);
+            File.Delete(sdFile);
 
             var options = new DbContextOptionsBuilder<PlatformDbContext>()
                 .UseNpgsql(
@@ -84,6 +88,16 @@ public sealed class CatalogVideoCopierTests
             await AssertExists(target, heavyId, 1_000_000);
             await AssertExists(target, lightId, 100_000);
             Assert.Null(await target.OpenReadAsync(missingId, VideoRendition.Hd720, default));
+            // The 480p goes along when the source has it.
+            await using (var sd = await target.OpenReadAsync(heavyId, VideoRendition.Sd480, default))
+            {
+                Assert.NotNull(sd);
+                using var copy = new MemoryStream();
+                await sd!.CopyToAsync(copy);
+                Assert.Equal(4_321, copy.Length);
+            }
+
+            Assert.Null(await target.OpenReadAsync(lightId, VideoRendition.Sd480, default));
 
             var again = await copier.CopyAllAsync(CancellationToken.None);
             Assert.Equal(2, again.Count(line => line.Copied));

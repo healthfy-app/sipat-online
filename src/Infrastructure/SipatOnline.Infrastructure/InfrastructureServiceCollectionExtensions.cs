@@ -208,6 +208,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<PlatformCourseCatalogService>();
         AddPlatformCourseVideoStorage(services, configuration);
+        AddVideoConversion(services, configuration);
         ValidatePlaybackProviderSetting(configuration);
         services.AddSingleton<IHostedService>(provider =>
             new PlaybackProviderStartupCheck(provider.GetRequiredService<IHostEnvironment>(), configuration));
@@ -301,6 +302,27 @@ public static class InfrastructureServiceCollectionExtensions
             new FilePlatformCourseVideoStorage(
                 configuration["SipatOnline:PlatformCatalog:StoragePath"],
                 serviceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
+    }
+
+    private static void AddVideoConversion(IServiceCollection services, IConfiguration configuration)
+    {
+        var options = configuration.GetSection(VideoConversionOptions.SectionName).Get<VideoConversionOptions>()
+            ?? new VideoConversionOptions();
+        if (options.Enabled && string.IsNullOrWhiteSpace(options.WorkPath))
+        {
+            throw new InvalidOperationException($"Configure {VideoConversionOptions.SectionName}:WorkPath.");
+        }
+
+        services.AddSingleton(options);
+        services.AddSingleton<VideoConversionSignal>();
+        services.AddSingleton<FfmpegVideoTranscoder>();
+        services.AddScoped<IVideoConversionQueue, EfVideoConversionQueue>();
+        services.AddScoped<VideoConversionProcessor>();
+        if (options.Enabled && options.RunInBackground)
+        {
+            // A single worker: conversions run one at a time.
+            services.AddHostedService<VideoConversionWorker>();
+        }
     }
 
     private static string RequireR2Setting(IConfiguration configuration, string field) =>

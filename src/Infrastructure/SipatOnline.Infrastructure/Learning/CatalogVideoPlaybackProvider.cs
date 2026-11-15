@@ -40,6 +40,11 @@ public sealed class CatalogVideoPlaybackProvider(
             return Unavailable();
         }
 
+        if (video.Status != nameof(PlatformVideoStatus.Ready))
+        {
+            return NotReady();
+        }
+
         var now = clock.GetUtcNow();
         var expiresAt = now.Add(SessionLifetime);
         var grant = new PlaybackGrantEntity
@@ -94,6 +99,11 @@ public sealed class CatalogVideoPlaybackProvider(
         await db.SaveChangesAsync(cancellationToken);
         return Result<bool>.Success(true);
     }
+
+    /// <summary>The refusal for a video that is still converting (or whose conversion failed).</summary>
+    public static Result<PlaybackSession> NotReady() =>
+        Result<PlaybackSession>.Failure(
+            new DomainError("learning.video_asset_unavailable", "Este vídeo ainda está sendo preparado."));
 
     private static Result<PlaybackSession> Unavailable() =>
         Result<PlaybackSession>.Failure(

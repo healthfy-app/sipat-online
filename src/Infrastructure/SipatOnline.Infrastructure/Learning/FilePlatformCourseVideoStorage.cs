@@ -192,6 +192,19 @@ public sealed class FilePlatformCourseVideoStorage(
         return Task.CompletedTask;
     }
 
+    /// <summary>The absolute path of a stored version, or null when it is not there.</summary>
+    public string? FindFile(Guid videoId, VideoRendition rendition)
+    {
+        var storagePath = StoragePath;
+        if (storagePath is null)
+        {
+            return null;
+        }
+
+        var filePath = GetFilePath(storagePath, videoId, rendition);
+        return File.Exists(filePath) ? filePath : null;
+    }
+
     private static string GetFilePath(string storagePath, Guid videoId, VideoRendition rendition) =>
         Path.Combine(
             storagePath,
