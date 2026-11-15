@@ -80,7 +80,7 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
 3. No `deploy/.env.production`, descomente e preencha `R2_SERVICE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e `R2_VIDEO_BUCKET`. **Ainda não** ative `VIDEO_STORAGE_PROVIDER=R2`: primeiro copie os vídeos (passo 4), depois troque (passo 5). Assim ninguém tenta assistir a um vídeo que ainda não está no bucket.
 4. **Copie primeiro.** Copie os vídeos que já estão no volume da VM para o bucket (as variáveis do R2 já estão no arquivo; o `-e` só diz ao comando que o destino é o R2):
    ```bash
-   docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml run --rm -e SipatOnline__VideoStorage__Provider=R2 api --copy-videos-to-r2
+   docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml exec -e SipatOnline__VideoStorage__Provider=R2 api dotnet SipatOnline.Api.dll --copy-videos-to-r2
    ```
    O comando imprime uma linha por vídeo (`copiado  <título>  <Mbps> Mbps`) e um resumo no fim. Ele pode ser repetido sem problema: copia de novo por cima. Vídeos acima de 3 Mbps saem marcados como `PESADO`. Um vídeo sem arquivo no volume aparece como `sem arquivo na origem`; um envio que falha (chave ou bucket errados, rede) aparece como `falha ao copiar: <motivo>`. Nos dois casos o comando continua com os demais vídeos e termina com erro.
 5. **Depois troque.** Defina `VIDEO_STORAGE_PROVIDER=R2` no `deploy/.env.production` e reinicie a API (`docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml up -d api`).
