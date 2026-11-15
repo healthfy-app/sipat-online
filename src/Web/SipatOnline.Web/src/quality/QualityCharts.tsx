@@ -9,12 +9,15 @@ const baseline = 132;
 const plotTop = 12;
 const step = width / 24;
 
+const hourText = (item: Hour) => `${item.hour}h: ${item.stalledSessions} de ${item.sessions} ${item.sessions === 1 ? 'sessão' : 'sessões'} com travamento`;
+
 /** Barra = % das sessões da hora que travaram. Hora sem sessões fica sem barra. */
 export function HourChart({ hours }: { hours: Hour[] }) {
   const byHour = new Map(hours.map(item => [item.hour, item]));
   const max = Math.max(10, ...hours.filter(item => item.sessions > 0).map(item => item.stalledSessions * 100 / item.sessions));
   return (
-    <svg aria-label="Sessões com travamento por hora do dia" className="h-auto w-full" role="img" viewBox={`0 0 ${width} ${height}`}>
+    <div>
+    <svg aria-hidden="true" className="h-auto w-full" viewBox={`0 0 ${width} ${height}`}>
       <line className="stroke-border" x1="0" x2={width} y1={baseline} y2={baseline} />
       <text className="fill-muted-foreground text-[10px]" x="0" y={plotTop - 2}>{formatPercent(max)}</text>
       {Array.from({ length: 24 }, (_, hour) => {
@@ -24,7 +27,7 @@ export function HourChart({ hours }: { hours: Hour[] }) {
         const barHeight = percent === null ? 0 : Math.max(percent > 0 ? 2 : 0, percent / max * (baseline - plotTop - 10));
         return (
           <g data-testid="hour-column" key={hour}>
-            {item && item.sessions > 0 && <title>{`${hour}h: ${item.stalledSessions} de ${item.sessions} ${item.sessions === 1 ? 'sessão' : 'sessões'} com travamento`}</title>}
+            {item && item.sessions > 0 && <title>{hourText(item)}</title>}
             <rect fill="transparent" height={baseline} width={step} x={x} y="0" />
             {barHeight > 0 && <rect className="fill-muted-foreground" height={barHeight} rx="3" width={step - 8} x={x + 4} y={baseline - barHeight} />}
             {hour % 3 === 0 && <text className="fill-muted-foreground text-[10px]" textAnchor="middle" x={x + step / 2} y={baseline + 16}>{hour}h</text>}
@@ -32,6 +35,11 @@ export function HourChart({ hours }: { hours: Hour[] }) {
         );
       })}
     </svg>
+    {/* the <title> hover is invisible to screen readers and keyboards: the same numbers live here */}
+    <ul aria-label="Sessões com travamento por hora do dia" className="sr-only">
+      {hours.filter(item => item.sessions > 0).map(item => <li key={item.hour}>{hourText(item)}</li>)}
+    </ul>
+    </div>
   );
 }
 
