@@ -2,6 +2,7 @@ import { createCheckpointWatcher, watchCheckpoints, type Checkpoint, type Checkp
 import { createCoverage } from './coverage';
 import type { PlayerErrorKind, PlayerEvent, PlayerEventHandler, SaveReason, WatchedRange } from './events';
 import { bounceNativeSeek, clampSeek, enforcedRate, unlockedSeconds, type PlayerRules } from './rules';
+import { trackPlaybackQuality, type QualityLabel } from './quality';
 import { SAVE_INTERVAL_MS, planSave } from './saveSchedule';
 
 export interface AttachOptions {
@@ -14,6 +15,8 @@ export interface AttachOptions {
   pauseAtCheckpoints?: boolean;
   /** Default true. */
   reopenOnRewind?: boolean;
+  /** The quality being played, for the quality report. Default 'single' (one source). */
+  quality?: QualityLabel;
   onEvent: PlayerEventHandler;
 }
 
@@ -22,6 +25,7 @@ export interface AttachedPlayer {
   unlocked(): number;
   /** Applies the seek rule; a blocked jump goes to the unlocked point and reports `seekBlocked`. */
   seekTo(seconds: number): void;
+  /** For 'hidden' and 'leave' the quality report goes out first, while the page is still there. */
   requestSave(reason: SaveReason): Promise<boolean>;
   /** Closes the open activity and plays on. */
   resumeAfterActivity(): void;
@@ -34,7 +38,7 @@ const toMs = (seconds: number) => Math.floor(seconds * 1000);
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 const errorKind = (code: number | undefined): PlayerErrorKind => code === 2 ? 'network' : code === 3 ? 'decode' : 'source';
 
-/** Wires a real `<video>` to the pure core: coverage, rules, save schedule and checkpoints. */
+/** Wires a real `<video>` to the pure core: coverage, rules, save schedule, checkpoints and the quality meter. */
 export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): AttachedPlayer {
   const rules = options.rules ?? {};
   const coverage = createCoverage(options.furthest ?? 0);
@@ -44,6 +48,7 @@ export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): A
   let activityOpen = false;
   let detached = false;
   let queue: Promise<unknown> = Promise.resolve();
+  let inFlight = 0;
 
   const emit = (event: PlayerEvent) => { if (!detached) return options.onEvent(event); };
   const durationS = () => Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
@@ -59,12 +64,17 @@ export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): A
     return { startMs: clamp(range.startMs, 0, max), endMs: clamp(range.endMs, 0, max) };
   }
 
-  /** Saves one at a time, in order, so a slow save never overlaps the next one. */
-  function save(reason: SaveReason, snapshot?: { positionMs: number; range: WatchedRange }): Promise<boolean> {
+  /**
+   * Saves one at a time, in order, so a slow save never overlaps the next one. The position and the
+   * range are taken when the save is asked (a queued save still sends the moment it stands for); with
+   * nothing pending the page is asked in the same tick.
+   */
+  function save(reason: SaveReason, snapshot?: { positionMs: number; range: WatchedRange | null }): Promise<boolean> {
+    const positionMs = snapshot ? snapshot.positionMs : toMs(positionS());
+    const asked = snapshot ? snapshot.range : coverage.open(positionS());
     const run = async (): Promise<boolean> => {
       if (detached) return true;
-      const positionMs = snapshot ? snapshot.positionMs : toMs(positionS());
-      const range = clampRange(snapshot ? snapshot.range : coverage.open(positionMs / 1000));
+      const range = clampRange(asked);
       const plan = planSave({ reason, positionMs, range, lastSavedPositionMs: lastSavedMs });
       if (!plan) return true;
       let saved = false;
@@ -77,9 +87,21 @@ export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): A
       lastSavedMs = plan.positionMs;
       return true;
     };
-    const result = queue.then(run, run);
+    const start = () => run().finally(() => { inFlight -= 1; });
+    inFlight += 1;
+    const result = inFlight === 1 ? start() : queue.then(start, start);
     queue = result.catch(() => undefined);
     return result;
+  }
+
+  const tracker = trackPlaybackQuality(video, {
+    quality: options.quality ?? 'single',
+    onReport: (summary, reason) => { emit({ type: 'quality', summary, reason }); },
+  });
+
+  function requestSave(reason: SaveReason): Promise<boolean> {
+    if (reason === 'hidden' || reason === 'leave') tracker.flush(reason);
+    return save(reason);
   }
 
   const on = <K extends keyof HTMLVideoElementEventMap>(name: K, handler: () => void) => {
@@ -128,7 +150,7 @@ export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): A
   video.addEventListener('error', onError, true);
   cleanups.push(() => video.removeEventListener('error', onError, true));
 
-  const onVisibility = () => { if (document.visibilityState === 'hidden') void save('hidden'); };
+  const onVisibility = () => { if (document.visibilityState === 'hidden') void requestSave('hidden'); };
   document.addEventListener('visibilitychange', onVisibility);
   cleanups.push(() => document.removeEventListener('visibilitychange', onVisibility));
 
@@ -153,7 +175,7 @@ export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): A
       if (result.blocked) emit({ type: 'seekBlocked' });
       video.currentTime = clamp(result.seconds, 0, limit);
     },
-    requestSave: reason => save(reason),
+    requestSave,
     resumeAfterActivity() {
       if (!activityOpen) return;
       activityOpen = false;
@@ -162,6 +184,7 @@ export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): A
     firedCheckpoints: () => watcher.fired(),
     detach() {
       if (detached) return;
+      tracker.stop(); // its last report still reaches the page
       detached = true;
       cleanups.forEach(cleanup => cleanup());
     },

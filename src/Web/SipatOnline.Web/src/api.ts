@@ -1,4 +1,4 @@
-import type { PlaybackQualitySummary } from '@sipat/video-player';
+import type { PlayerQualitySummary } from '@sipat/video-player';
 
 export interface TenantBranding {
   tenantKey: string;
@@ -1069,6 +1069,9 @@ export async function primeAntiforgeryToken(): Promise<void> {
     // The measurement must never disturb the video.
   }
 }
+
+/** The player's quality summary plus the lesson and the API playback session it belongs to. */
+export interface PlaybackQualitySummary extends PlayerQualitySummary { lessonId: string; playbackSessionId: string }
 
 export async function sendPlaybackQuality(
   trackId: string,

@@ -29,7 +29,14 @@ import {
   type LearningSummary,
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
-import { SipatPlayer, trackPlaybackQuality, type QualityTracker } from '@sipat/video-player';
+import {
+  SipatVideoPlayer,
+  type PlayerEvent,
+  type PlayerQualitySummary,
+  type SaveReason,
+  type SipatVideoPlayerHandle,
+  type WatchedRange,
+} from '@sipat/video-player';
 import { formatDayDate } from './WeekVideos';
 import './LearningMotion.css';
 import './DayPage.css';
@@ -50,7 +57,8 @@ export default function LearningTrackPage({
   const [selectedLessonId, setSelectedLessonId] = useState<string | null>(null);
   const [query] = useSearchParams();
   const askedVideoId = query.get('video');
-  const [playbackSession, setPlaybackSession] = useState<LearningPlaybackSession | null>(null);
+  // the session remembers its lesson, so a player never mounts with one lesson's session under another lesson
+  const [playbackSession, setPlaybackSession] = useState<(LearningPlaybackSession & { lessonId: string }) | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isStartingPlayback, setIsStartingPlayback] = useState(false);
   const [error, setError] = useState('');
@@ -61,21 +69,19 @@ export default function LearningTrackPage({
   const [seekNotice, setSeekNotice] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [activities, setActivities] = useState<LearningActivity[]>([]);
-  const furthestRef = useRef(0);
   const [isSaving, setIsSaving] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const qualityTrackerRef = useRef<QualityTracker | null>(null);
-  const rangeStartRef = useRef<number | null>(null);
-  const lastSampleRef = useRef<number | null>(null);
+  const playerRef = useRef<SipatVideoPlayerHandle>(null);
   const lastSavePositionRef = useRef(0);
   const saveInFlightRef = useRef(false);
   const pendingSaveRef = useRef<Promise<boolean> | null>(null);
   const playbackIdentityRef = useRef('');
   const advanceAfterCompletionRef = useRef(false);
+  // what the save of the end of the video did: the 'ended' event that follows only advances when neither happened
+  const endedSaveRef = useRef<'failed' | 'moved' | null>(null);
   const switchingLessonRef = useRef(false);
   const [switchingLesson, setSwitchingLesson] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
-  playbackIdentityRef.current = `${apiTrackId}/${selectedLessonId}/${playbackSession?.sessionId}`;
 
   useEffect(() => {
     setIsPlaying(false);
@@ -145,6 +151,8 @@ export default function LearningTrackPage({
   const completedLessonIdsRef = useRef(new Set<string>());
   experienceRef.current = experience;
   selectedLessonRef.current = selectedLesson;
+  const activeSession = playbackSession && playbackSession.lessonId === selectedLesson?.id ? playbackSession : null;
+  playbackIdentityRef.current = `${apiTrackId}/${selectedLessonId}/${activeSession?.sessionId}`;
 
   const journeyTracks = useMemo(
     () => experience
@@ -192,17 +200,15 @@ export default function LearningTrackPage({
     setPlaybackSession(null);
     setPlaybackError('');
     setSaveMessage('');
-    rangeStartRef.current = null;
-    lastSampleRef.current = null;
     lastSavePositionRef.current = selectedLesson.lastPlaybackPositionMilliseconds;
-    // aula já concluída pode ser revista livremente; as demais só andam até onde a pessoa já assistiu
-    furthestRef.current = selectedLesson.isCompleted ? Number.POSITIVE_INFINITY : selectedLesson.lastPlaybackPositionMilliseconds / 1000;
+    endedSaveRef.current = null;
     setSeekNotice(false);
 
-    startLearningPlayback(apiTrackId, selectedLesson.id)
+    const lessonId = selectedLesson.id;
+    startLearningPlayback(apiTrackId, lessonId)
       .then((session) => {
         if (active) {
-          setPlaybackSession(session);
+          setPlaybackSession({ ...session, lessonId });
         }
       })
       .catch((playbackErrorValue: unknown) => {
@@ -262,65 +268,51 @@ export default function LearningTrackPage({
     });
   }, []);
 
-  const persistPlayback = useCallback(async function save(
-    force: boolean, snapshot?: { position: number; rangeStart: number | null },
+  /** Sends one save the player asked for. One at a time; the range is clamped to the lesson's duration. */
+  const savePlayback = useCallback(async function save(
+    reason: SaveReason, positionMs: number, range: WatchedRange | null,
   ): Promise<boolean> {
-    const video = videoRef.current;
     const lesson = selectedLesson;
-    const session = playbackSession;
+    const session = activeSession;
     const assignedTrackId = apiTrackId;
-    if (!video || !lesson || !session || !assignedTrackId) {
+    if (!lesson || !session || !assignedTrackId) {
       return true;
     }
     const identity = `${assignedTrackId}/${lesson.id}/${session.sessionId}`;
-    const captured = snapshot ?? { position: Math.floor(video.currentTime * 1000), rangeStart: rangeStartRef.current };
-    if (pendingSaveRef.current) {
+    while (pendingSaveRef.current) {
       await pendingSaveRef.current;
-      return playbackIdentityRef.current === identity && videoRef.current === video ? save(force, captured) : true;
     }
     if (playbackIdentityRef.current !== identity) return true;
 
-    const positionMilliseconds = Math.min(
-      lesson.durationMilliseconds,
-      Math.max(0, captured.position),
-    );
-    const rangeStart = captured.rangeStart === null
-      ? null
-      : Math.min(
-          lesson.durationMilliseconds,
-          Math.max(0, captured.rangeStart),
-        );
-    const hasRange = rangeStart !== null && positionMilliseconds - rangeStart >= (force ? 1 : 1000);
-    const positionChanged = Math.abs(positionMilliseconds - lastSavePositionRef.current) >= (force ? 1 : 1000);
-    if (!hasRange && !positionChanged) {
+    const clamp = (value: number) => Math.min(lesson.durationMilliseconds, Math.max(0, value));
+    const positionMilliseconds = clamp(positionMs);
+    const rangeStart = range === null ? null : clamp(range.startMs);
+    const rangeEnd = range === null ? null : clamp(range.endMs);
+    // a range that clamping leaves under 1 ms is saved as a position only
+    const hasRange = rangeStart !== null && rangeEnd !== null && rangeEnd - rangeStart >= 1;
+    if (!hasRange && Math.abs(positionMilliseconds - lastSavePositionRef.current) < 1) {
       return true;
     }
 
-    if (!force && hasRange && positionMilliseconds - rangeStart < 8000) {
-      return true;
+    if (reason === 'ended') {
+      advanceAfterCompletionRef.current = true;
+      endedSaveRef.current = null;
     }
-
     saveInFlightRef.current = true;
     setIsSaving(true);
     const work = (async () => { try {
-      if (hasRange) {
-        const progress = await recordLearningPlaybackRange(
+      const progress = hasRange
+        ? await recordLearningPlaybackRange(
           assignedTrackId,
           lesson.id,
           session.sessionId,
           rangeStart,
+          rangeEnd,
           positionMilliseconds,
-          positionMilliseconds,
-        );
-        applyProgress(progress);
-        advanceToNextLessonIfCompleted(progress);
-        if (playbackIdentityRef.current === identity && rangeStartRef.current === rangeStart)
-          rangeStartRef.current = positionMilliseconds;
-      } else {
-        const progress = await saveLearningPosition(assignedTrackId, lesson.id, positionMilliseconds);
-        applyProgress(progress);
-        advanceToNextLessonIfCompleted(progress);
-      }
+        )
+        : await saveLearningPosition(assignedTrackId, lesson.id, positionMilliseconds);
+      applyProgress(progress);
+      advanceToNextLessonIfCompleted(progress);
       if (playbackIdentityRef.current === identity) {
         lastSavePositionRef.current = positionMilliseconds;
         setSaveMessage('Progresso salvo');
@@ -328,6 +320,10 @@ export default function LearningTrackPage({
       }
       return true;
     } catch (saveError) {
+      if (reason === 'ended') {
+        advanceAfterCompletionRef.current = false;
+        endedSaveRef.current = 'failed';
+      }
       setSaveMessage(getLearningErrorMessage(saveError));
       setSaveFailed(true);
       return false;
@@ -338,39 +334,12 @@ export default function LearningTrackPage({
       saveInFlightRef.current = false;
       setIsSaving(false);
     }
-  }, [apiTrackId, applyProgress, experience, playbackSession, selectedLesson]);
+  }, [activeSession, apiTrackId, applyProgress, experience, selectedLesson]);
 
+  const activeSessionId = activeSession?.sessionId;
   useEffect(() => {
-    if (!playbackSession || !selectedLesson) {
-      return;
-    }
-
-    const interval = window.setInterval(() => {
-      void persistPlayback(false);
-    }, 10000);
-    return () => {
-      window.clearInterval(interval);
-    };
-  }, [persistPlayback, playbackSession, selectedLesson]);
-
-  useEffect(() => {
-    const video = videoRef.current;
-    const lessonId = selectedLesson?.id;
-    const sessionId = playbackSession?.sessionId;
-    if (!video || !lessonId || !sessionId || !apiTrackId) return;
-    void primeAntiforgeryToken();
-    const tracker = trackPlaybackQuality(video, {
-      lessonId,
-      playbackSessionId: sessionId,
-      quality: 'single',
-      onReport: (summary) => { void sendPlaybackQuality(apiTrackId, summary).catch(() => undefined); },
-    });
-    qualityTrackerRef.current = tracker;
-    return () => {
-      tracker.stop();
-      if (qualityTrackerRef.current === tracker) qualityTrackerRef.current = null;
-    };
-  }, [apiTrackId, selectedLesson?.id, playbackSession?.sessionId]);
+    if (activeSessionId) void primeAntiforgeryToken();
+  }, [activeSessionId]);
 
   useEffect(() => {
     function leave(event: MouseEvent) {
@@ -382,9 +351,10 @@ export default function LearningTrackPage({
       event.preventDefault();
       if (switchingLessonRef.current) return;
       switchingLessonRef.current = true; setSwitchingLesson(true);
-      videoRef.current.pause();
-      qualityTrackerRef.current?.flush('leave');
-      void persistPlayback(true).then(saved => {
+      const player = playerRef.current;
+      player?.pause();
+      // the player sends the quality report first, then the last range
+      void (player?.requestSave('leave') ?? Promise.resolve(true)).then(saved => {
         if (saved) navigate(`${destination.pathname}${destination.search}${destination.hash}`);
       }).finally(() => { switchingLessonRef.current = false; setSwitchingLesson(false); });
     }
@@ -392,88 +362,57 @@ export default function LearningTrackPage({
       if (!videoRef.current || (videoRef.current.paused && !saveInFlightRef.current && !saveFailed)) return;
       event.preventDefault(); event.returnValue = '';
     }
-    function visibility() {
-      if (document.visibilityState !== 'hidden') return;
-      qualityTrackerRef.current?.flush('hidden');
-      void persistPlayback(true);
-    }
     document.addEventListener('click', leave, true);
-    document.addEventListener('visibilitychange', visibility);
     window.addEventListener('beforeunload', beforeUnload);
     return () => {
       document.removeEventListener('click', leave, true);
-      document.removeEventListener('visibilitychange', visibility);
       window.removeEventListener('beforeunload', beforeUnload);
     };
-  }, [navigate, persistPlayback, saveFailed]);
+  }, [navigate, saveFailed]);
 
-  function handlePlaying() {
-    const video = videoRef.current;
-    if (!video) {
-      return;
-    }
-    if (playbackSession?.expiresAt && Date.parse(playbackSession.expiresAt) <= Date.now()) {
-      video.pause();
-      setPlaybackError('Sua sessão de vídeo expirou. Inicie uma nova sessão para continuar.');
-      setPlaybackSession(null);
-      return;
-    }
-
-    if (rangeStartRef.current === null || lastSampleRef.current === null ||
-      Math.abs(video.currentTime - lastSampleRef.current) > 0.5)
-      rangeStartRef.current = Math.floor(video.currentTime * 1000);
-    lastSampleRef.current = video.currentTime;
-  }
-
-  function handleTimeUpdate() {
-    const video = videoRef.current;
-    if (!video || video.paused || video.seeking) {
-      return;
-    }
-
-    const currentTime = video.currentTime;
-    const previousTime = lastSampleRef.current;
-    if (previousTime === null) {
-      rangeStartRef.current = Math.floor(currentTime * 1000);
-      lastSampleRef.current = currentTime;
-      return;
-    }
-
-    if (currentTime < previousTime || currentTime - previousTime > 5) {
-      rangeStartRef.current = Math.floor(currentTime * 1000);
-    } else if (currentTime > furthestRef.current) {
-      furthestRef.current = currentTime;
-    }
-    lastSampleRef.current = currentTime;
-  }
-
-  function handleSeeking() {
-    const video = videoRef.current;
-    if (video && video.currentTime > furthestRef.current + 1) {
-      // tentativa de pular o que ainda não foi assistido: volta ao ponto liberado
-      video.currentTime = furthestRef.current;
-      setSeekNotice(true);
-      return;
-    }
-    if (video) {
-      if (lastSampleRef.current !== null && rangeStartRef.current !== null)
-        void persistPlayback(true, { position: Math.floor(lastSampleRef.current * 1000), rangeStart: rangeStartRef.current });
-      rangeStartRef.current = Math.floor(video.currentTime * 1000);
-      lastSampleRef.current = video.currentTime;
+  function sendQuality(summary: PlayerQualitySummary) {
+    const lessonId = selectedLesson?.id;
+    const sessionId = activeSession?.sessionId;
+    if (!apiTrackId || !lessonId || !sessionId) return;
+    // the measurement never disturbs the video: a failed report is dropped
+    try {
+      void Promise.resolve(sendPlaybackQuality(apiTrackId, { ...summary, lessonId, playbackSessionId: sessionId }))
+        .catch(() => undefined);
+    } catch {
+      // ignore
     }
   }
 
-  function handleLoadedMetadata() {
-    const video = videoRef.current;
-    if (!video || !selectedLesson) {
-      return;
+  function handlePlayerEvent(event: PlayerEvent): void | Promise<boolean> {
+    switch (event.type) {
+      case 'save':
+        return savePlayback(event.reason, event.positionMs, event.range);
+      case 'playing':
+        setIsPlaying(true);
+        if (activeSession?.expiresAt && Date.parse(activeSession.expiresAt) <= Date.now()) {
+          playerRef.current?.pause();
+          setPlaybackError('Sua sessão de vídeo expirou. Inicie uma nova sessão para continuar.');
+          setPlaybackSession(null);
+        }
+        return;
+      case 'paused':
+        setIsPlaying(false);
+        return;
+      case 'ended':
+        setIsPlaying(false);
+        handleVideoEnded();
+        return;
+      case 'seekBlocked':
+        setSeekNotice(true);
+        return;
+      case 'error':
+        setPlaybackSession(null);
+        setPlaybackError('Não foi possível carregar o vídeo. Verifique sua conexão e tente novamente.');
+        return;
+      case 'quality':
+        sendQuality(event.summary);
+        return;
     }
-
-    const resumeAt = selectedLesson.lastPlaybackPositionMilliseconds / 1000;
-    if (resumeAt > 0 && resumeAt < video.duration) {
-      video.currentTime = resumeAt;
-    }
-    video.playbackRate = 1;
   }
 
   async function selectLesson(lesson: LearningLessonProgress) {
@@ -481,9 +420,10 @@ export default function LearningTrackPage({
       return;
     }
     switchingLessonRef.current = true; setSwitchingLesson(true);
-    videoRef.current?.pause();
+    const player = playerRef.current;
+    player?.pause();
     try {
-      if (await persistPlayback(true)) setSelectedLessonId(lesson.id);
+      if (await (player?.requestSave('pause') ?? Promise.resolve(true))) setSelectedLessonId(lesson.id);
     } finally { switchingLessonRef.current = false; setSwitchingLesson(false); }
   }
 
@@ -492,6 +432,7 @@ export default function LearningTrackPage({
       return;
     }
     advanceAfterCompletionRef.current = false;
+    endedSaveRef.current = 'moved';
     moveToNextIncompleteLesson(selectedLesson.id);
   }
 
@@ -506,24 +447,19 @@ export default function LearningTrackPage({
     }
   }
 
-  async function handleVideoEnded() {
+  /** The player saved the end of the video before this: advance only if that save worked and did not advance already. */
+  function handleVideoEnded() {
     const endedLessonId = selectedLesson?.id;
-    if (!endedLessonId) {
+    const outcome = endedSaveRef.current;
+    endedSaveRef.current = null;
+    advanceAfterCompletionRef.current = false;
+    if (!endedLessonId || outcome !== null) {
       return;
     }
-    advanceAfterCompletionRef.current = true;
-    const saved = await persistPlayback(true);
-    if (!saved) {
-      advanceAfterCompletionRef.current = false;
-      return;
-    }
-    if (advanceAfterCompletionRef.current && (
-      completedLessonIdsRef.current.has(endedLessonId) ||
-      (selectedLessonRef.current?.id === endedLessonId && selectedLessonRef.current.isCompleted)
-    )) {
+    if (completedLessonIdsRef.current.has(endedLessonId) ||
+      (selectedLessonRef.current?.id === endedLessonId && selectedLessonRef.current.isCompleted)) {
       moveToNextIncompleteLesson(endedLessonId);
     }
-    advanceAfterCompletionRef.current = false;
   }
 
   if (isLoading) {
@@ -610,35 +546,23 @@ export default function LearningTrackPage({
           )}
 
           <div className="learning-player-frame day-player">
-            {playbackSession ? (
+            {activeSession && selectedLesson ? (
               <>
-                <SipatPlayer key={`${selectedLesson?.id}-${playbackSession.sessionId}`} lock={{ furthest: furthestRef, onBlocked: () => setSeekNotice(true) }} markers={markers} videoRef={videoRef}>
-                <video
-                  aria-label={selectedLesson?.title ?? 'Vídeo do dia'}
-                  className="learning-video"
-                  disablePictureInPicture
-                  slot="media"
-                  onError={() => {
-                    setPlaybackSession(null);
-                    setPlaybackError('Não foi possível carregar o vídeo. Verifique sua conexão e tente novamente.');
-                  }}
-                  onEnded={() => { setIsPlaying(false); void handleVideoEnded(); }}
-                  onLoadedMetadata={handleLoadedMetadata}
-                  onPause={() => { setIsPlaying(false); void persistPlayback(true); }}
-                  onPlaying={() => { setIsPlaying(true); handlePlaying(); }}
-                  onRateChange={(event) => { if (event.currentTarget.playbackRate !== 1) event.currentTarget.playbackRate = 1; }}
-                  onSeeking={handleSeeking}
-                  onSeeked={() => void persistPlayback(true)}
-                  onTimeUpdate={handleTimeUpdate}
-                  playsInline
-                  preload="metadata"
-                  ref={videoRef}
-                  src={playbackSession.url}
-                >
-                  Seu navegador não oferece suporte à reprodução deste vídeo.
-                </video>
-                </SipatPlayer>
-                {playbackSession.isDevelopmentDemo && (
+                <SipatVideoPlayer
+                  checkpoints={markers}
+                  // aula já concluída pode ser revista livremente; as demais só andam até onde a pessoa já assistiu
+                  furthest={selectedLesson.isCompleted ? Number.POSITIVE_INFINITY : selectedLesson.lastPlaybackPositionMilliseconds / 1000}
+                  key={`${selectedLesson.id}-${activeSession.sessionId}`}
+                  onEvent={handlePlayerEvent}
+                  pauseAtCheckpoints={false}
+                  ref={playerRef}
+                  resumeAt={selectedLesson.lastPlaybackPositionMilliseconds / 1000}
+                  rules={{ watchInOrder: true, fixedSpeed: true }}
+                  sources={[{ src: activeSession.url }]}
+                  title={selectedLesson.title}
+                  videoRef={videoRef}
+                />
+                {activeSession.isDevelopmentDemo && (
                   <p className="learning-demo-notice" role="note">
                     Vídeo de demonstração. O progresso registrado aqui não comprova participação oficial.
                   </p>
@@ -707,7 +631,7 @@ export default function LearningTrackPage({
               {isSaving ? 'Salvando progresso...' : saveMessage}
             </span>
             {saveFailed && <button className="button button-secondary" disabled={isSaving}
-              onClick={() => void persistPlayback(true)} type="button">Tentar salvar progresso</button>}
+              onClick={() => void playerRef.current?.requestSave('pause')} type="button">Tentar salvar progresso</button>}
           </div>
 
           {selectedLesson?.description && (
@@ -766,7 +690,7 @@ export default function LearningTrackPage({
             lessonId={selectedLesson?.id ?? null}
             lessonPosition={selectedLesson?.position ?? 1}
             onActivities={setActivities}
-            playbackKey={playbackSession?.sessionId}
+            playbackKey={activeSession?.sessionId}
             videoRef={videoRef}
           />
         </aside>

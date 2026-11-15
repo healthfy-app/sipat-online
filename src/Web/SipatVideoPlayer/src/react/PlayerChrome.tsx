@@ -8,7 +8,7 @@ import './SipatVideoPlayer.css';
 
 /**
  * The player frame: Media Chrome controls, our timeline and a fullscreen that keeps them
- * (on iPhone it fills the page instead of handing over to the system player).
+ * Used by `SipatVideoPlayer`.
  * Shared by `SipatVideoPlayer` and by the lesson page's `SipatPlayer` while that one still exists.
  */
 export default function PlayerChrome({ videoRef, locked, unlocked, markers, onSeek, overlay, children }: {

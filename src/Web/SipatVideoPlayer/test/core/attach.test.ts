@@ -146,7 +146,86 @@ describe('attachPlayer', () => {
     player = attachPlayer(h.video, { onEvent: saving(events, true) });
     Object.defineProperty(h.video, 'error', { configurable: true, value: { code: 3 } });
     h.video.dispatchEvent(new Event('error'));
-    expect(events).toEqual([{ type: 'error', kind: 'decode' }]);
+    expect(events.filter(event => event.type !== 'quality')).toEqual([{ type: 'error', kind: 'decode' }]);
+    // an error before playing still reaches the quality report, as a session that never started
+    const quality = events.find(event => event.type === 'quality');
+    expect(quality?.type === 'quality' && quality.summary).toMatchObject({ errorKind: 'decode', neverStarted: true });
+  });
+
+  it('reports quality summaries without app data', async () => {
+    const h = makeVideo(); const events: PlayerEvent[] = [];
+    player = attachPlayer(h.video, { onEvent: saving(events, true) });
+    h.video.dispatchEvent(new Event('play')); playTo(h, 0, 3);
+    await player.requestSave('leave');
+    const quality = events.filter(event => event.type === 'quality');
+    expect(quality).toHaveLength(1);
+    const [report] = quality;
+    if (report.type !== 'quality') throw new Error('not a quality event');
+    expect(report.reason).toBe('leave');
+    expect(report.summary.quality).toBe('single');
+    expect(report.summary).not.toHaveProperty('lessonId');
+    expect(report.summary).not.toHaveProperty('playbackSessionId');
+  });
+
+  it('flushes quality before saving when the tab is hidden or the page is left', async () => {
+    const h = makeVideo(); const events: PlayerEvent[] = [];
+    player = attachPlayer(h.video, { onEvent: saving(events, true) });
+    h.video.dispatchEvent(new Event('play')); playTo(h, 0, 3);
+    Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+    try { document.dispatchEvent(new Event('visibilitychange')); } finally { Reflect.deleteProperty(document, 'visibilityState'); }
+    await flush();
+    h.define('currentTime', 5);
+    await player.requestSave('leave');
+    expect(events.filter(event => event.type === 'quality' || event.type === 'save').map(event =>
+      event.type === 'quality' ? `quality:${event.reason}` : event.type === 'save' ? `save:${event.reason}` : '')).toEqual([
+      'quality:hidden', 'save:hidden', 'quality:leave', 'save:leave',
+    ]);
+  });
+
+  it('does not flush quality for the other save reasons', async () => {
+    const h = makeVideo(); const events: PlayerEvent[] = [];
+    player = attachPlayer(h.video, { onEvent: saving(events, true) });
+    h.video.dispatchEvent(new Event('play')); playTo(h, 0, 3);
+    await player.requestSave('pause');
+    expect(events.some(event => event.type === 'quality')).toBe(false);
+  });
+
+  it('sends the last quality report when detached', () => {
+    const h = makeVideo(); const events: PlayerEvent[] = [];
+    const attached = attachPlayer(h.video, { onEvent: saving(events, true) });
+    h.video.dispatchEvent(new Event('play')); playTo(h, 0, 3);
+    attached.detach();
+    expect(events.filter(event => event.type === 'quality').map(event => event.type === 'quality' && event.reason)).toEqual(['stop']);
+  });
+
+  it('asks the page to save right away when no save is pending', () => {
+    const h = makeVideo(); const events: PlayerEvent[] = [];
+    player = attachPlayer(h.video, { onEvent: saving(events, true) });
+    playTo(h, 0, 2); pauseAt(h, 2);
+    // no await: the page sends the range in the same tick, as it did before the player moved
+    expect(saves(events)).toEqual([{ type: 'save', reason: 'pause', positionMs: 2000, range: { startMs: 0, endMs: 2000 } }]);
+  });
+
+  it('keeps the moment a save was asked while an earlier one is still pending', async () => {
+    const h = makeVideo(); const events: PlayerEvent[] = [];
+    let finish!: (saved: boolean) => void;
+    let first = true;
+    player = attachPlayer(h.video, { onEvent: event => {
+      events.push(event);
+      if (event.type !== 'save') return undefined;
+      if (first) { first = false; return new Promise<boolean>(resolve => { finish = resolve; }); }
+      return Promise.resolve(true);
+    } });
+    playTo(h, 0, 2); pauseAt(h, 2);
+    h.define('paused', false); h.define('currentTime', 3.9);
+    const ended = player.requestSave('ended');
+    h.define('currentTime', 0); // the next lesson's video may already be loading
+    finish(true);
+    await ended;
+    expect(saves(events)).toEqual([
+      { type: 'save', reason: 'pause', positionMs: 2000, range: { startMs: 0, endMs: 2000 } },
+      { type: 'save', reason: 'ended', positionMs: 3900, range: { startMs: 0, endMs: 3900 } },
+    ]);
   });
 
   it('stops listening when detached', async () => {

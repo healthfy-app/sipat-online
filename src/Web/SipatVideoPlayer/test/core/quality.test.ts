@@ -5,7 +5,7 @@ import {
   trackPlaybackQuality,
   type FlushReason,
   type PlaybackEnvironment,
-  type PlaybackQualitySummary,
+  type PlayerQualitySummary,
 } from '../../src/core/quality';
 
 const env: PlaybackEnvironment = {
@@ -17,10 +17,8 @@ const env: PlaybackEnvironment = {
 
 function setup() {
   const video = document.createElement('video');
-  const reports: Array<{ s: PlaybackQualitySummary; reason: FlushReason }> = [];
+  const reports: Array<{ s: PlayerQualitySummary; reason: FlushReason }> = [];
   const tracker = trackPlaybackQuality(video, {
-    lessonId: 'lesson-1',
-    playbackSessionId: 'session-1',
     quality: '720p',
     environment: env,
     onReport: (s, reason) => reports.push({ s, reason }),
@@ -53,8 +51,8 @@ describe('trackPlaybackQuality', () => {
     expect(last().s.startupMs).toBe(1200);
     expect(last().s.neverStarted).toBe(false);
     expect(last().s.startedAt).toBe('2026-11-14T12:00:00.000Z');
-    expect(last().s.lessonId).toBe('lesson-1');
-    expect(last().s.playbackSessionId).toBe('session-1');
+    expect(last().s).not.toHaveProperty('lessonId');
+    expect(last().s).not.toHaveProperty('playbackSessionId');
     expect(last().s.quality).toBe('720p');
     expect(last().s.timezoneOffsetMinutes).toBe(-180);
     expect(last().s.id).toMatch(/^[0-9a-f-]{36}$/);
@@ -194,10 +192,8 @@ describe('trackPlaybackQuality', () => {
   it('reports a video that already has an error when the tracker is created', () => {
     const video = document.createElement('video');
     Object.defineProperty(video, 'error', { value: { code: 3 }, configurable: true });
-    const reports: PlaybackQualitySummary[] = [];
+    const reports: PlayerQualitySummary[] = [];
     trackPlaybackQuality(video, {
-      lessonId: 'l',
-      playbackSessionId: 's',
       quality: 'single',
       environment: env,
       onReport: (s) => reports.push(s),
@@ -210,10 +206,8 @@ describe('trackPlaybackQuality', () => {
   it('treats a video that is already playing as if play just fired', () => {
     const video = document.createElement('video');
     Object.defineProperty(video, 'paused', { value: false, configurable: true });
-    const reports: Array<{ s: PlaybackQualitySummary; reason: FlushReason }> = [];
+    const reports: Array<{ s: PlayerQualitySummary; reason: FlushReason }> = [];
     const tracker = trackPlaybackQuality(video, {
-      lessonId: 'l',
-      playbackSessionId: 's',
       quality: 'single',
       environment: env,
       onReport: (s, reason) => reports.push({ s, reason }),
@@ -277,8 +271,6 @@ describe('trackPlaybackQuality', () => {
   it('survives a throwing onReport', () => {
     const video = document.createElement('video');
     const tracker = trackPlaybackQuality(video, {
-      lessonId: 'l',
-      playbackSessionId: 's',
       quality: 'single',
       environment: env,
       onReport: () => {

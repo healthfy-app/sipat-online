@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
+import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
 import { attachPlayer, type AttachedPlayer } from '../core/attach';
 import type { Checkpoint } from '../core/checkpoints';
 import type { PlayerEvent, PlayerEventHandler, SaveReason } from '../core/events';
+import type { QualityLabel } from '../core/quality';
 import type { PlayerRules } from '../core/rules';
 import PlayerChrome from './PlayerChrome';
 import { texts } from './texts';
@@ -49,12 +50,15 @@ export default function SipatVideoPlayer({
   const [fired, setFired] = useState<ReadonlySet<string>>(new Set());
 
   // Latest props for the long-lived listeners, so the player is not re-attached on every render.
-  const latest = useRef({ onEvent, checkpoints, resumeAt, furthest });
-  latest.current = { onEvent, checkpoints, resumeAt, furthest };
+  // One source is reported as 'single'.
+  const quality: QualityLabel = sources.length === 1 ? 'single' : sources[0]?.quality ?? 'single';
+  const latest = useRef({ onEvent, checkpoints, resumeAt, furthest, quality });
+  latest.current = { onEvent, checkpoints, resumeAt, furthest, quality };
 
   const watchInOrder = rules?.watchInOrder;
   const fixedSpeed = rules?.fixedSpeed;
-  useEffect(() => {
+  // Attached in the layout phase: the first 'playing' or 'timeupdate' can come right after the commit.
+  useLayoutEffect(() => {
     const element = video.current;
     if (!element) return;
     const syncFired = () => {
@@ -65,6 +69,7 @@ export default function SipatVideoPlayer({
       rules: { watchInOrder, fixedSpeed },
       resumeAt: latest.current.resumeAt,
       furthest: latest.current.furthest,
+      quality: latest.current.quality,
       checkpoints: () => latest.current.checkpoints,
       pauseAtCheckpoints,
       onEvent: (event: PlayerEvent) => {

@@ -1,6 +1,8 @@
+import { useLayoutEffect, useRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import SipatVideoPlayer from '../../src/react/SipatVideoPlayer';
+import type { PlayerEventHandler } from '../../src/core/events';
 
 afterEach(cleanup);
 
@@ -52,6 +54,18 @@ describe('SipatVideoPlayer', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Tentar de novo' }));
     expect(video.load).toHaveBeenCalledOnce();
     expect(screen.queryByText(/Não foi possível carregar/)).not.toBeInTheDocument();
+  });
+
+  it('listens to the video as soon as it is on the page', () => {
+    // a parent's layout effect runs right after the commit, before any passive effect
+    function Page({ onEvent }: { onEvent: PlayerEventHandler }) {
+      const videoRef = useRef<HTMLVideoElement | null>(null);
+      useLayoutEffect(() => { videoRef.current?.dispatchEvent(new Event('playing')); }, []);
+      return <SipatVideoPlayer onEvent={onEvent} sources={[{ src: '/a.mp4' }]} title="Aula" videoRef={videoRef} />;
+    }
+    const onEvent = vi.fn();
+    render(<Page onEvent={onEvent} />);
+    expect(onEvent).toHaveBeenCalledWith({ type: 'playing' });
   });
 
   it('stops the End key at what was already watched', () => {

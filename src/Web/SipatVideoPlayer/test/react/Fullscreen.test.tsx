@@ -1,7 +1,7 @@
-import { createRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import SipatPlayer, { type PlayerLock } from '../../src/react/SipatPlayer';
+import SipatVideoPlayer from '../../src/react/SipatVideoPlayer';
+import type { PlayerEventHandler } from '../../src/core/events';
 
 afterEach(() => {
   cleanup();
@@ -10,20 +10,20 @@ afterEach(() => {
   document.body.style.overflow = '';
 });
 
-function mount(lock?: PlayerLock) {
-  const videoRef = createRef<HTMLVideoElement>();
-  const result = render(<SipatPlayer lock={lock} videoRef={videoRef}><video ref={videoRef} slot="media" /></SipatPlayer>);
-  const video = videoRef.current!;
+function mount(lock?: { furthest: number; onEvent: PlayerEventHandler }) {
+  const result = render(<SipatVideoPlayer furthest={lock?.furthest} onEvent={lock?.onEvent}
+    rules={lock ? { watchInOrder: true } : undefined} sources={[{ src: '/a.mp4' }]} title="Aula" />);
+  const video = result.container.querySelector('video')!;
   Object.defineProperty(video, 'duration', { configurable: true, value: 60 });
   Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: 5 });
   act(() => { video.dispatchEvent(new Event('durationchange')); });
   return { ...result, video };
 }
 
-describe('SipatPlayer', () => {
+describe('SipatVideoPlayer timeline and fullscreen', () => {
   it('stops the End key at what was already watched and reports the block', () => {
-    const onBlocked = vi.fn();
-    const { video } = mount({ furthest: { current: 10 }, onBlocked });
+    const onEvent = vi.fn();
+    const { video } = mount({ furthest: 10, onEvent });
     const slider = screen.getByRole('slider');
     slider.focus();
     fireEvent.keyDown(slider, { key: 'End' });
@@ -32,7 +32,7 @@ describe('SipatPlayer', () => {
     video.currentTime = 10;
     fireEvent.keyDown(slider, { key: 'ArrowRight' });
     expect(video.currentTime).toBe(10);
-    expect(onBlocked).toHaveBeenCalled();
+    expect(onEvent).toHaveBeenCalledWith({ type: 'seekBlocked' });
   });
 
   it('lets the keyboard move freely without a lock', () => {

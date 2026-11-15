@@ -1,5 +1,5 @@
 // Measures the quality of one video playback session. Pure TypeScript: no React and no
-// imports from the app, so it can move into the player package unchanged.
+// imports from the app; the player knows nothing about lessons or API sessions.
 
 export type QualityLabel = 'single' | '720p' | '480p';
 export type PlaybackDevice = 'phone' | 'tablet' | 'desktop';
@@ -11,10 +11,9 @@ export interface PlaybackEnvironment {
   timezoneOffsetMinutes: number;
 }
 
-export interface PlaybackQualitySummary {
+/** One playback session's quality, as the player measures it. The app adds the lesson and its API session. */
+export interface PlayerQualitySummary {
   id: string;
-  lessonId: string;
-  playbackSessionId: string;
   startedAt: string;
   timezoneOffsetMinutes: number;
   startupMs: number | null;
@@ -128,7 +127,7 @@ function safeUuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function errorKindOf(video: HTMLVideoElement): PlaybackQualitySummary['errorKind'] {
+function errorKindOf(video: HTMLVideoElement): PlayerQualitySummary['errorKind'] {
   switch (video.error?.code) {
     case 2:
       return 'network';
@@ -144,11 +143,9 @@ function errorKindOf(video: HTMLVideoElement): PlaybackQualitySummary['errorKind
 export function trackPlaybackQuality(
   video: HTMLVideoElement,
   options: {
-    lessonId: string;
-    playbackSessionId: string;
     quality: QualityLabel;
     environment?: PlaybackEnvironment;
-    onReport: (summary: PlaybackQualitySummary, reason: FlushReason) => void;
+    onReport: (summary: PlayerQualitySummary, reason: FlushReason) => void;
   },
 ): QualityTracker {
   const environment = options.environment ?? safeEnvironment();
@@ -165,7 +162,7 @@ export function trackPlaybackQuality(
   let watchedMs = 0;
   let playingSince: number | null = null;
   let waitingSince: number | null = null;
-  let errorKind: PlaybackQualitySummary['errorKind'] = null;
+  let errorKind: PlayerQualitySummary['errorKind'] = null;
 
   let neverStartedTimer: ReturnType<typeof setTimeout> | null = null;
   let intervalTimer: ReturnType<typeof setInterval> | null = null;
@@ -193,7 +190,7 @@ export function trackPlaybackQuality(
     }
   }
 
-  function buildSummary(): PlaybackQualitySummary {
+  function buildSummary(): PlayerQualitySummary {
     const t = now();
     const watched = watchedMs + (playingSince !== null ? t - playingSince : 0);
     // A stall still open at flush is reported without touching the accumulators,
@@ -202,8 +199,6 @@ export function trackPlaybackQuality(
     const reportOpen = openStall >= MIN_STALL_MS;
     return {
       id,
-      lessonId: options.lessonId,
-      playbackSessionId: options.playbackSessionId,
       startedAt: startedAt ?? new Date().toISOString(),
       timezoneOffsetMinutes: environment.timezoneOffsetMinutes,
       startupMs: startupMs === null ? null : clampInt(startupMs, MAX_STARTUP_MS),
