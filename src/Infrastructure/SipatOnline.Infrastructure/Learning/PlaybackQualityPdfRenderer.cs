@@ -34,6 +34,7 @@ public sealed class PlaybackQualityPdfRenderer : IPlaybackQualityPdfRenderer
         page.Width = XUnit.FromPoint(PageWidth);
         page.Height = XUnit.FromPoint(PageHeight);
         using var graphics = XGraphics.FromPdfPage(page);
+        PdfAccentGlyphs.Embed(graphics, Family);
         var ink = new XSolidBrush(XColor.FromArgb(16, 45, 38));
         var muted = new XSolidBrush(XColor.FromArgb(90, 105, 100));
         var width = PageWidth - Margin * 2;

@@ -26,6 +26,7 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         page.Width = XUnit.FromPoint(842);
         page.Height = XUnit.FromPoint(595);
         using var graphics = XGraphics.FromPdfPage(page);
+        PdfAccentGlyphs.Embed(graphics, "SipatCertificate");
         var ink = new XSolidBrush(XColor.FromArgb(16, 45, 38));
         graphics.DrawRectangle(new XSolidBrush(XColor.FromArgb(247, 249, 246)), 0, 0, page.Width.Point, page.Height.Point);
         graphics.DrawRectangle(new XPen(XColor.FromArgb(16, 45, 38), 2), 24, 24, 794, 547);
