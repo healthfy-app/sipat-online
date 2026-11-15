@@ -12,7 +12,7 @@ public sealed class EfLessonMediaStore(PlatformDbContext db) : ILessonMediaStore
         Guid tenantId, Guid participantId, Guid lessonId, CancellationToken cancellationToken)
     {
         var lesson = await db.LearningLessons.AsNoTracking().SingleOrDefaultAsync(item =>
-            item.Id == lessonId && item.TenantId == tenantId &&
+            item.Id == lessonId && item.TenantId == tenantId && !item.IsBonus &&
             db.LearningTracks.Any(track => track.Id == item.TrackId && track.TenantId == tenantId &&
                 track.CurrentRevisionId == item.RevisionId) &&
             db.LearningAssignments.Any(assignment => assignment.TrackId == item.TrackId &&

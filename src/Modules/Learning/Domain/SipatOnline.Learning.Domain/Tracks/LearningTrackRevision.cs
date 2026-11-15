@@ -128,7 +128,8 @@ public sealed class LearningTrackRevision
         string? title,
         string? description,
         string? providerAssetReference,
-        long durationMilliseconds)
+        long durationMilliseconds,
+        bool isBonus = false)
     {
         if (Status != LearningTrackRevisionStatus.Draft)
         {
@@ -145,7 +146,8 @@ public sealed class LearningTrackRevision
             description,
             providerAssetReference,
             durationMilliseconds,
-            lessons.Count + 1);
+            lessons.Count + 1,
+            isBonus);
         if (!lesson.IsSuccess)
         {
             return lesson;

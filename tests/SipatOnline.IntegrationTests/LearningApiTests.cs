@@ -236,6 +236,136 @@ public sealed class LearningApiTests
         }
     }
 
+    [DockerFact]
+    public async Task Experience_lists_the_extra_in_position()
+    {
+        await using var scenario = await BonusLessonScenario.StartAsync();
+
+        var lessons = (await scenario.Experience()).GetProperty("lessons").EnumerateArray().ToArray();
+
+        Assert.Equal(3, lessons.Length);
+        Assert.Equal(["Vídeo A", "Extra do YouTube", "Vídeo B"], lessons.Select(item => item.GetProperty("title").GetString()));
+        Assert.Equal([1, 2, 3], lessons.Select(item => item.GetProperty("position").GetInt32()));
+        Assert.Equal([false, true, false], lessons.Select(item => item.GetProperty("isBonus").GetBoolean()));
+        Assert.Equal("YouTube", lessons[1].GetProperty("provider").GetString());
+        Assert.Equal(BonusLessonScenario.YouTubeId, lessons[1].GetProperty("externalId").GetString());
+        Assert.Equal(JsonValueKind.Null, lessons[0].GetProperty("provider").ValueKind);
+        Assert.Equal(JsonValueKind.Null, lessons[0].GetProperty("externalId").ValueKind);
+    }
+
+    [DockerFact]
+    public async Task Track_counts_only_house_videos()
+    {
+        await using var scenario = await BonusLessonScenario.StartAsync();
+        var lessonIds = await scenario.LessonIdsAsync();
+
+        var track = (await scenario.Experience()).GetProperty("track");
+        Assert.Equal(2, track.GetProperty("lessonCount").GetInt32());
+        Assert.Equal(2 * BonusLessonScenario.HouseDuration, track.GetProperty("durationMilliseconds").GetInt64());
+
+        await scenario.CompleteAsync(lessonIds[0]);
+        track = (await scenario.Experience()).GetProperty("track");
+        Assert.Equal(50, track.GetProperty("progressPercentage").GetInt32());
+
+        await scenario.CompleteAsync(lessonIds[2]);
+        track = (await scenario.Experience()).GetProperty("track");
+        Assert.Equal(100, track.GetProperty("progressPercentage").GetInt32());
+        Assert.Equal(2, track.GetProperty("completedLessonCount").GetInt32());
+        var card = Assert.Single((await scenario.Participant.GetFromJsonAsync<JsonElement>("/api/learning/tracks")).EnumerateArray());
+        Assert.Equal(2, card.GetProperty("lessonCount").GetInt32());
+        Assert.Equal(100, card.GetProperty("progressPercentage").GetInt32());
+        var row = Assert.Single(
+            (await scenario.Admin.GetFromJsonAsync<JsonElement>("/api/admin/learning/participation")).EnumerateArray(),
+            item => item.GetProperty("trackId").GetGuid() == scenario.TrackId);
+        Assert.True(row.GetProperty("isCompleted").GetBoolean());
+        Assert.Equal(100, row.GetProperty("progressPercentage").GetInt32());
+    }
+
+    [DockerFact]
+    public async Task Extra_refuses_playback_and_ranges()
+    {
+        await using var scenario = await BonusLessonScenario.StartAsync();
+        var extraId = (await scenario.LessonIdsAsync())[1];
+        var lessonPath = $"/api/learning/tracks/{scenario.TrackId}/lessons/{extraId}";
+
+        var refusals = new[]
+        {
+            await scenario.Call(scenario.Participant, $"{lessonPath}/playback", HttpMethod.Post, new { }, HttpStatusCode.Conflict),
+            await scenario.Call(scenario.Participant, $"{lessonPath}/position", HttpMethod.Put,
+                new { positionMilliseconds = 1000 }, HttpStatusCode.Conflict),
+            await scenario.Call(scenario.Participant, $"{lessonPath}/ranges", HttpMethod.Post,
+                new { sessionId = Guid.NewGuid(), startMilliseconds = 0, endMilliseconds = 1000, positionMilliseconds = 1000 },
+                HttpStatusCode.Conflict),
+            await scenario.Call(scenario.Participant, $"/api/learning/tracks/{scenario.TrackId}/playback-quality", HttpMethod.Post,
+                new Dictionary<string, object?>
+                {
+                    ["id"] = Guid.NewGuid(),
+                    ["lessonId"] = extraId,
+                    ["playbackSessionId"] = Guid.NewGuid(),
+                    ["startedAt"] = DateTimeOffset.UtcNow.AddMinutes(-2),
+                    ["timezoneOffsetMinutes"] = -180,
+                    ["startupMs"] = 800,
+                    ["neverStarted"] = false,
+                    ["stallCount"] = 0,
+                    ["stallMs"] = 0,
+                    ["watchedMs"] = 1000,
+                    ["errorKind"] = null,
+                    ["quality"] = "720p",
+                    ["qualitySwitches"] = 0,
+                    ["connectionType"] = "4g",
+                    ["downlinkMbps"] = 8.5,
+                    ["device"] = "phone"
+                }, HttpStatusCode.Conflict)
+        };
+
+        Assert.All(refusals, item =>
+        {
+            Assert.Equal("learning.lesson.bonus", item.GetProperty("code").GetString());
+            Assert.Equal("Este vídeo é um extra e não registra progresso.", item.GetProperty("detail").GetString());
+        });
+        using var media = await scenario.Participant.GetAsync($"/api/learning/lessons/{extraId}/media");
+        Assert.Equal(HttpStatusCode.NotFound, media.StatusCode);
+    }
+
+    [DockerFact]
+    public async Task Company_report_counts_two_lessons()
+    {
+        await using var scenario = await BonusLessonScenario.StartAsync();
+        var lessonIds = await scenario.LessonIdsAsync();
+        await scenario.CompleteAsync(lessonIds[0]);
+
+        var row = Assert.Single(
+            (await scenario.Admin.GetFromJsonAsync<JsonElement>("/api/admin/learning/participation")).EnumerateArray(),
+            item => item.GetProperty("trackId").GetGuid() == scenario.TrackId);
+        Assert.Equal(2, row.GetProperty("lessonCount").GetInt32());
+        Assert.Equal(1, row.GetProperty("completedLessonCount").GetInt32());
+        Assert.Equal(50, row.GetProperty("progressPercentage").GetInt32());
+        Assert.False(row.GetProperty("isCompleted").GetBoolean());
+
+        var summary = Assert.Single(
+            (await scenario.Admin.GetFromJsonAsync<JsonElement>("/api/admin/learning/tracks")).EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == scenario.TrackId);
+        Assert.Equal(2, summary.GetProperty("lessonCount").GetInt32());
+
+        var employees = await scenario.Platform.GetFromJsonAsync<JsonElement>(
+            $"/api/platform/companies/{SipatOnlineApiFactory.DefaultTenantId:D}/employees?search=participant-demo");
+        var employee = Assert.Single(employees.GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("loginIdentifier").GetString() == "participant-demo");
+        Assert.Equal(2, employee.GetProperty("lessonCount").GetInt32());
+        Assert.Equal(1, employee.GetProperty("completedLessonCount").GetInt32());
+        Assert.Equal(50, employee.GetProperty("progressPercentage").GetInt32());
+    }
+
+    [DockerFact]
+    public async Task Section_title_survives_an_extra()
+    {
+        await using var scenario = await BonusLessonScenario.StartAsync();
+
+        var lessons = (await scenario.Experience()).GetProperty("lessons").EnumerateArray();
+
+        Assert.Equal(["Aula 1", "Aula 1", "Aula 2"], lessons.Select(item => item.GetProperty("sectionTitle").GetString()));
+    }
+
     private sealed class TestClock(DateTimeOffset now) : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = now;

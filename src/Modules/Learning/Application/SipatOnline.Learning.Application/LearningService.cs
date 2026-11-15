@@ -508,6 +508,11 @@ public sealed class LearningService(
                 "O vídeo não foi encontrado ou não está disponível para você.");
         }
 
+        if (lesson.IsBonus)
+        {
+            return Result<PlaybackSession>.Failure(BonusLesson.Refused);
+        }
+
         return await videoPlaybackProvider.CreateSessionAsync(
             lesson.ProviderAssetReference,
             participant.Value,
@@ -544,6 +549,11 @@ public sealed class LearningService(
             return Failure<LearningProgress>(
                 "learning.lesson_not_found",
                 "O vídeo não foi encontrado ou não está disponível para você.");
+        }
+
+        if (lesson.IsBonus)
+        {
+            return Result<LearningProgress>.Failure(BonusLesson.Refused);
         }
 
         var progress = await learningStore.FindProgressAsync(
@@ -629,6 +639,11 @@ public sealed class LearningService(
             return Failure<LearningProgress>(
                 "learning.lesson_not_found",
                 "O vídeo não foi encontrado ou não está disponível para você.");
+        }
+
+        if (lesson.IsBonus)
+        {
+            return Result<LearningProgress>.Failure(BonusLesson.Refused);
         }
 
         var evidenceResult = await playbackEvidenceVerifier.VerifyRangeAsync(

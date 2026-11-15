@@ -42,7 +42,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var existing = access.Value.Courses.SingleOrDefault(item => item.SipatEventId == sipatId && item.SourceCourseId == courseId);
         if (existing is not null) return Result<Guid>.Success(existing.TrackId);
         var course = await catalog.FindCourseAsync(courseId, token);
-        if (course is null || course.Status != PlatformCourseStatus.Published || course.Videos.Count == 0)
+        // extras never count, so a course made only of extras would have nothing to complete
+        if (course is null || course.Status != PlatformCourseStatus.Published || !HasHouseVideo(course.Videos))
             return Failure<Guid>("learning.course_invalid", "Escolha um curso publicado com vídeos.");
         return await CreateTrackFromCourseAsync(tenantId, sipatId, course, token);
     }
@@ -62,7 +63,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             .ToDictionary(item => item.id, item => item.Title);
         foreach (var video in course.Videos)
         {
-            var lesson = revision.AddLesson(video.Title, null, $"catalog:{video.Id:D}", video.DurationMilliseconds);
+            var lesson = revision.AddLesson(video.Title, null, LessonReference.For(video), video.DurationMilliseconds, IsBonus(video));
             if (!lesson.IsSuccess) return Result<Guid>.Failure(lesson.Error);
         }
         var published = revision.Publish(now);
@@ -83,7 +84,9 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             Position = item.Position,
             ProviderAssetReference = item.ProviderAssetReference,
             DurationMilliseconds = item.DurationMilliseconds,
-            SectionTitle = sectionByVideo.GetValueOrDefault(Guid.Parse(item.ProviderAssetReference.Replace("catalog:", "")))
+            IsBonus = item.IsBonus,
+            // lessons follow the course's videos one to one, so the position finds the video (an extra's reference is no id)
+            SectionTitle = sectionByVideo.GetValueOrDefault(course.Videos[item.Position - 1].Id)
         }));
         var cover = await catalog.GetCoverAsync(course.Id, token);
         db.LearningContentSnapshots.Add(new LearningContentSnapshotEntity
@@ -148,6 +151,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
                     return Failure<ProgramApplication>("learning.program_video_invalid", $"Um vídeo do dia \"{day.Title}\" não existe mais. Revise o programa.");
                 videos.Add(video);
             }
+            if (!HasHouseVideo(videos))
+                return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra a SIPAT em Construção SIPAT, escolha um tema para cada dia e salve.");
             var placements = (day.GameIds ?? []).Select(gameId => new CourseModulePlacement(gameId, videos.Count)).ToArray();
             var course = new PlatformCourse(day.Id, day.Title, day.Subject, now, PlatformCourseStatus.Published, true, videos, placements);
             var snapshot = await CreateSnapshotAsync(course, token);
@@ -238,7 +243,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var current = await db.LearningLessons.Where(item => item.RevisionId == revisionId).ToListAsync(token);
         var fresh = current.Count == course.Videos.Count
             && current.OrderBy(item => item.Position).Select(item => item.ProviderAssetReference)
-                .SequenceEqual(course.Videos.Select(video => $"catalog:{video.Id:D}"));
+                .SequenceEqual(course.Videos.Select(LessonReference.For));
 
         track.Title = course.Title;
         track.Description = course.Description;
@@ -246,7 +251,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         if (fresh) return true;
 
         var scratch = LearningTrackRevision.CreateDraft(track.Id, new TenantId(track.TenantId), 1, clock.GetUtcNow()).Value;
-        foreach (var video in course.Videos) scratch.AddLesson(video.Title, null, $"catalog:{video.Id:D}", video.DurationMilliseconds);
+        foreach (var video in course.Videos)
+            scratch.AddLesson(video.Title, null, LessonReference.For(video), video.DurationMilliseconds, IsBonus(video));
         db.LearningLessons.RemoveRange(current);
         db.LearningLessons.AddRange(scratch.Lessons.Select(item => new LearningLessonEntity
         {
@@ -258,7 +264,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             Description = item.Description,
             Position = item.Position,
             ProviderAssetReference = item.ProviderAssetReference,
-            DurationMilliseconds = item.DurationMilliseconds
+            DurationMilliseconds = item.DurationMilliseconds,
+            IsBonus = item.IsBonus
         }));
         return true;
     }
@@ -280,6 +287,10 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             course.GamificationEnabled || games.Count > 0, games, course.Modules,
             course.Videos.Select(item => new SnapshotVideo(item.Id, item.Checkpoints)).ToArray()));
     }
+
+    private static bool IsBonus(PlatformCourseVideo video) => video.Provider != VideoProvider.Sipat;
+
+    private static bool HasHouseVideo(IReadOnlyList<PlatformCourseVideo> videos) => videos.Any(video => !IsBonus(video));
 
     private static Result<T> Failure<T>(string code, string message) where T : notnull =>
         Result<T>.Failure(new DomainError(code, message));

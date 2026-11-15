@@ -446,6 +446,9 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<long>("DurationMilliseconds")
                         .HasColumnType("bigint");
 
+                    b.Property<bool>("IsBonus")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 
@@ -481,7 +484,7 @@ namespace SipatOnline.Infrastructure.Migrations
 
                     b.ToTable("LearningLessons", "learning", t =>
                         {
-                            t.HasCheckConstraint("CK_LearningLessons_Duration", "\"DurationMilliseconds\" > 0");
+                            t.HasCheckConstraint("CK_LearningLessons_Duration", "\"DurationMilliseconds\" > 0 OR (\"IsBonus\" AND \"DurationMilliseconds\" = 0)");
 
                             t.HasCheckConstraint("CK_LearningLessons_Position", "\"Position\" > 0");
                         });

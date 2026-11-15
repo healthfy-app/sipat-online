@@ -66,6 +66,9 @@ public sealed class LearningLessonEntity
     public long DurationMilliseconds { get; set; }
 
     public int Position { get; set; }
+
+    /// <summary>Extra (YouTube ou Vimeo): aparece para o participante, mas nunca conta para progresso ou certificado.</summary>
+    public bool IsBonus { get; set; }
 }
 
 public sealed class LearningAssignmentEntity

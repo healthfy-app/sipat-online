@@ -313,6 +313,87 @@ public sealed class LearningEngagementApiTests
         finally { await storage.DeleteAsync(videoId, CancellationToken.None); }
     }
 
+    [DockerFact]
+    public async Task Certificate_is_ready_without_watching_the_extra()
+    {
+        await using var scenario = await BonusLessonScenario.StartAsync();
+        await using (var scope = scenario.Factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Tenants
+                .Where(item => item.Id == SipatOnlineApiFactory.DefaultTenantId)
+                .ExecuteUpdateAsync(update => update.SetProperty(item => item.CertificateLogoData, Logo)
+                    .SetProperty(item => item.CertificateLogoContentType, "image/png"));
+        }
+
+        var lessonIds = (await scenario.Experience()).GetProperty("lessons").EnumerateArray()
+            .Select(item => item.GetProperty("id").GetGuid()).ToArray();
+        await scenario.CompleteAsync(lessonIds[0]);
+        await scenario.Call(scenario.Participant, $"/api/learning/sipats/{scenario.SipatId}/certificate", HttpMethod.Post,
+            new { }, HttpStatusCode.Conflict);
+        await scenario.CompleteAsync(lessonIds[2]);
+
+        var candidate = Assert.Single(
+            (await scenario.Participant.GetFromJsonAsync<JsonElement>("/api/learning/certificates")).EnumerateArray(),
+            item => item.GetProperty("sipatEventId").GetGuid() == scenario.SipatId);
+        Assert.True(candidate.GetProperty("isEligible").GetBoolean());
+        var certificate = await scenario.Call(scenario.Participant, $"/api/learning/sipats/{scenario.SipatId}/certificate",
+            HttpMethod.Post, new { });
+        Assert.Equal(2 * BonusLessonScenario.HouseDuration, certificate.GetProperty("durationMilliseconds").GetInt64());
+    }
+
+    [DockerFact]
+    public async Task End_game_after_a_trailing_extra_is_due_after_the_last_house_video()
+    {
+        await using var scenario = await BonusLessonScenario.StartWithTrailingExtraAsync();
+
+        var lessons = (await scenario.Experience()).GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Equal([false, true], lessons.Select(item => item.GetProperty("isBonus").GetBoolean()));
+        Assert.Equal(0, lessons[1].GetProperty("durationMilliseconds").GetInt64());
+        var activities = await scenario.Participant.GetFromJsonAsync<JsonElement>($"/api/learning/tracks/{scenario.TrackId}/activities");
+
+        var activity = Assert.Single(activities.GetProperty("items").EnumerateArray());
+        Assert.Equal(1, activity.GetProperty("afterVideoCount").GetInt32());
+    }
+
+    [DockerFact]
+    public async Task Course_of_only_extras_is_not_delivered()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        var extra = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var courseId = await scenario.CreateCourseAsync();
+        await scenario.Call(scenario.Platform, $"/api/platform/catalog/courses/{courseId}/videos", HttpMethod.Put,
+            new { videoIds = new[] { extra } });
+        await scenario.PublishCourseAsync(courseId);
+
+        var refused = await scenario.Call(scenario.Platform,
+            $"{BonusLessonScenario.CompanyPath}/sipats/{scenario.SipatId}/courses/{courseId}", HttpMethod.Post, new { },
+            HttpStatusCode.BadRequest);
+
+        Assert.Equal("learning.course_invalid", refused.GetProperty("code").GetString());
+        Assert.Equal("Escolha um curso publicado com vídeos.", refused.GetProperty("detail").GetString());
+    }
+
+    [DockerFact]
+    public async Task Day_of_only_extras_is_not_delivered()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        var extra = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var program = await scenario.Call(scenario.Platform, "/api/platform/catalog/programs", HttpMethod.Post, new
+        {
+            title = "SIPAT só de extras",
+            days = new[] { new { id = (Guid?)null, title = "Dia 1", date = (string?)null, subject = (string?)null, videoIds = new[] { extra }, gameIds = Array.Empty<Guid>() } }
+        }, HttpStatusCode.Created);
+
+        var refused = await scenario.Call(scenario.Platform,
+            $"{BonusLessonScenario.CompanyPath}/sipats/{scenario.SipatId}/programs/{program.GetProperty("id").GetGuid()}",
+            HttpMethod.Post, new { }, HttpStatusCode.BadRequest);
+
+        Assert.Equal("learning.program_day_empty", refused.GetProperty("code").GetString());
+        await using var scope = scenario.Factory.Services.CreateAsyncScope();
+        Assert.False(await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().LearningTracks
+            .AnyAsync(item => item.SipatEventId == scenario.SipatId && item.DayTitle != null));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

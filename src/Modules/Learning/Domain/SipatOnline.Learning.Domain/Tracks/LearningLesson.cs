@@ -14,7 +14,8 @@ public sealed class LearningLesson
         string? description,
         string providerAssetReference,
         long durationMilliseconds,
-        int position)
+        int position,
+        bool isBonus)
     {
         Id = id;
         Title = title;
@@ -22,6 +23,7 @@ public sealed class LearningLesson
         ProviderAssetReference = providerAssetReference;
         DurationMilliseconds = durationMilliseconds;
         Position = position;
+        IsBonus = isBonus;
     }
 
     public Guid Id { get; }
@@ -36,12 +38,16 @@ public sealed class LearningLesson
 
     public int Position { get; }
 
+    /// <summary>An extra (YouTube or Vimeo): listed for the participant, never counted for progress or certificate.</summary>
+    public bool IsBonus { get; }
+
     public static Result<LearningLesson> Create(
         string? title,
         string? description,
         string? providerAssetReference,
         long durationMilliseconds,
-        int position)
+        int position,
+        bool isBonus = false)
     {
         var normalizedTitle = title?.Trim();
         var normalizedReference = providerAssetReference?.Trim();
@@ -71,7 +77,8 @@ public sealed class LearningLesson
                 "A referência de mídia do provedor é obrigatória e deve ser válida.");
         }
 
-        if (durationMilliseconds <= 0)
+        // an extra may come without a known duration; a house video always has one
+        if (durationMilliseconds < 0 || (durationMilliseconds == 0 && !isBonus))
         {
             return Failure("learning.lesson.duration_invalid", "A duração do vídeo deve ser positiva.");
         }
@@ -88,7 +95,8 @@ public sealed class LearningLesson
                 normalizedDescription,
                 normalizedReference,
                 durationMilliseconds,
-                position));
+                position,
+                isBonus));
     }
 
     public static Result<LearningLesson> Reconstitute(
@@ -97,7 +105,8 @@ public sealed class LearningLesson
         string? description,
         string providerAssetReference,
         long durationMilliseconds,
-        int position)
+        int position,
+        bool isBonus = false)
     {
         if (id == Guid.Empty)
         {
@@ -109,7 +118,8 @@ public sealed class LearningLesson
             description,
             providerAssetReference,
             durationMilliseconds,
-            position);
+            position,
+            isBonus);
         if (!result.IsSuccess)
         {
             return result;
@@ -122,7 +132,8 @@ public sealed class LearningLesson
                 result.Value.Description,
                 result.Value.ProviderAssetReference,
                 result.Value.DurationMilliseconds,
-                result.Value.Position));
+                result.Value.Position,
+                result.Value.IsBonus));
     }
 
     internal LearningLesson CopyForNewRevision(int position) =>
@@ -132,7 +143,8 @@ public sealed class LearningLesson
             Description,
             ProviderAssetReference,
             DurationMilliseconds,
-            position);
+            position,
+            IsBonus);
 
     private static Result<LearningLesson> Failure(string code, string message) =>
         Result<LearningLesson>.Failure(new DomainError(code, message));

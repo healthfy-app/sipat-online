@@ -133,4 +133,40 @@ public sealed class LearningTrackRevisionTests
         Assert.False(result.IsSuccess);
         Assert.Equal("learning.revision.empty", result.Error.Code);
     }
+
+    [Fact]
+    public void Bonus_lesson_accepts_zero_duration()
+    {
+        var revision = LearningTrackRevision.CreateDraft(Guid.NewGuid(), TenantId, 1, DateTimeOffset.UtcNow).Value;
+
+        var lesson = revision.AddLesson("Extra do YouTube", null, "youtube:dQw4w9WgXcQ", 0, isBonus: true);
+
+        Assert.True(lesson.IsSuccess);
+        Assert.True(lesson.Value.IsBonus);
+        Assert.Equal(0, lesson.Value.DurationMilliseconds);
+    }
+
+    [Fact]
+    public void House_lesson_still_refuses_zero_duration()
+    {
+        var revision = LearningTrackRevision.CreateDraft(Guid.NewGuid(), TenantId, 1, DateTimeOffset.UtcNow).Value;
+
+        var lesson = revision.AddLesson("Vídeo da casa", null, $"catalog:{Guid.NewGuid():D}", 0);
+
+        Assert.False(lesson.IsSuccess);
+        Assert.Equal("learning.lesson.duration_invalid", lesson.Error.Code);
+    }
+
+    [Fact]
+    public void Next_revision_keeps_the_bonus_flag()
+    {
+        var now = DateTimeOffset.UtcNow;
+        var revision = LearningTrackRevision.CreateDraft(Guid.NewGuid(), TenantId, 1, now).Value;
+        Assert.True(revision.AddLesson("Extra", null, "vimeo:76979871", 0, isBonus: true).IsSuccess);
+        Assert.True(revision.Publish(now.AddMinutes(1)).IsSuccess);
+
+        var next = revision.CreateNextDraft(now.AddMinutes(2));
+
+        Assert.True(Assert.Single(next.Value.Lessons).IsBonus);
+    }
 }

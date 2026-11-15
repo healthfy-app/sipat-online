@@ -57,6 +57,11 @@ public sealed class PlaybackQualityService(
             return Failure("learning.lesson_not_found", "O vídeo não foi encontrado ou não está disponível para você.");
         }
 
+        if (lesson.IsBonus)
+        {
+            return Result<bool>.Failure(BonusLesson.Refused);
+        }
+
         if (!TryParse<PlaybackDevice>(request.Device, out var device)
             || !TryParseOptional<PlaybackErrorKind>(request.ErrorKind, out var errorKind))
         {
