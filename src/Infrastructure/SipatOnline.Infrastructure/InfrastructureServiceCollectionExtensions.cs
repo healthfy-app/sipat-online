@@ -205,6 +205,9 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<PlatformCourseCatalogService>();
         AddPlatformCourseVideoStorage(services, configuration);
+        ValidatePlaybackProviderSetting(configuration);
+        services.AddSingleton<IHostedService>(provider =>
+            new PlaybackProviderStartupCheck(provider.GetRequiredService<IHostEnvironment>(), configuration));
         services.AddScoped<IGameModuleStore, EfGameModuleStore>();
         services.AddScoped<GameModuleService>();
         services.AddScoped<ISipatProgramStore, EfSipatProgramStore>();
@@ -301,6 +304,40 @@ public static class InfrastructureServiceCollectionExtensions
         configuration[$"{R2StorageOptions.SectionName}:{field}"] is { Length: > 0 } value && !string.IsNullOrWhiteSpace(value)
             ? value
             : throw new InvalidOperationException($"Configure {R2StorageOptions.SectionName}:{field}.");
+
+    private static void ValidatePlaybackProviderSetting(IConfiguration configuration)
+    {
+        var configured = configuration["SipatOnline:Learning:Playback:Provider"];
+        if (!string.IsNullOrEmpty(configured) &&
+            !string.Equals(configured, "Development", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(configured, "Catalog", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Configure SipatOnline:Learning:Playback:Provider como Development ou Catalog.");
+        }
+    }
+
+    /// <summary>Stops the API at startup when the development playback provider is set outside development.</summary>
+    private sealed class PlaybackProviderStartupCheck(IHostEnvironment environment, IConfiguration configuration)
+        : IHostedService
+    {
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            if (string.Equals(
+                    configuration["SipatOnline:Learning:Playback:Provider"],
+                    "Development",
+                    StringComparison.OrdinalIgnoreCase) &&
+                !environment.IsDevelopment())
+            {
+                throw new InvalidOperationException(
+                    "SipatOnline:Learning:Playback:Provider=Development só pode ser usado em desenvolvimento.");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
 
     private static bool UseDevelopmentPlayback(IServiceProvider provider, IConfiguration configuration)
     {

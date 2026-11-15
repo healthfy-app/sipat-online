@@ -14,6 +14,10 @@ public sealed class CatalogVideoPlaybackProvider(
 {
     public static readonly TimeSpan SessionLifetime = TimeSpan.FromHours(2);
 
+    // The signed link outlives the session by a margin, so a long pause near the end
+    // meets the session-expiry check instead of a 403 from storage.
+    public static readonly TimeSpan StorageLinkMargin = TimeSpan.FromMinutes(10);
+
     private const string Prefix = "catalog:";
 
     public async Task<Result<PlaybackSession>> CreateSessionAsync(
@@ -51,7 +55,8 @@ public sealed class CatalogVideoPlaybackProvider(
         db.PlaybackGrants.Add(grant);
         await db.SaveChangesAsync(cancellationToken);
 
-        var direct = await storage.GetPlaybackUrlAsync(videoId, SessionLifetime, cancellationToken);
+        var direct = await storage.GetPlaybackUrlAsync(
+            videoId, SessionLifetime + StorageLinkMargin, cancellationToken);
         var url = direct?.ToString() ?? $"/api/learning/lessons/{lessonId:D}/media";
         return Result<PlaybackSession>.Success(
             new PlaybackSession(url, video.ContentType, expiresAt, grant.Id, false));

@@ -117,6 +117,26 @@ public sealed class CatalogPlaybackApiTests
     }
 
     [DockerFact]
+    public async Task Signs_the_storage_link_for_longer_than_the_session()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = SignedLinkFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory);
+        try
+        {
+            SignedLinkStorage.LastValidFor = null;
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{seed.TrackId}/lessons/{seed.LessonId}/playback", HttpMethod.Post, new { });
+            Assert.Equal(SignedLinkStorage.Link.ToString(), playback.GetProperty("url").GetString());
+            var expiresAt = playback.GetProperty("expiresAt").GetDateTimeOffset();
+            Assert.InRange(expiresAt, DateTimeOffset.UtcNow.AddHours(2).AddMinutes(-1), DateTimeOffset.UtcNow.AddHours(2).AddMinutes(1));
+            Assert.Equal(TimeSpan.FromHours(2) + TimeSpan.FromMinutes(10), SignedLinkStorage.LastValidFor);
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
     public async Task Redirects_both_file_routes_to_the_signed_link_after_the_access_checks()
     {
         await using var postgres = await StartPostgres();
@@ -188,6 +208,31 @@ public sealed class CatalogPlaybackApiTests
         Assert.Contains("Configure SipatOnline:VideoStorage:Provider como File ou R2.", error.ToString());
     }
 
+    [Fact]
+    public void Startup_fails_when_the_development_playback_provider_runs_outside_development()
+    {
+        using var factory = new SipatOnlineApiFactory().WithWebHostBuilder(builder =>
+        {
+            builder.UseEnvironment("Production");
+            builder.UseSetting("SipatOnline:Learning:Playback:Provider", "Development");
+        });
+
+        var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+        Assert.Contains(
+            "SipatOnline:Learning:Playback:Provider=Development só pode ser usado em desenvolvimento.",
+            error.ToString());
+    }
+
+    [Fact]
+    public void Startup_fails_on_an_unknown_playback_provider()
+    {
+        using var factory = new SipatOnlineApiFactory().WithWebHostBuilder(builder =>
+            builder.UseSetting("SipatOnline:Learning:Playback:Provider", "Cloudflare"));
+
+        var error = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+        Assert.Contains("Configure SipatOnline:Learning:Playback:Provider como Development ou Catalog.", error.ToString());
+    }
+
     private static WebApplicationFactory<Program> SignedLinkFactory(string connectionString) =>
         CatalogFactory(connectionString).WithWebHostBuilder(builder => builder.ConfigureServices(services =>
         {
@@ -199,6 +244,7 @@ public sealed class CatalogPlaybackApiTests
     private sealed class SignedLinkStorage : IPlatformCourseVideoStorage
     {
         public static readonly Uri Link = new("https://videos.example.test/signed?X-Amz-Signature=abc");
+        public static TimeSpan? LastValidFor { get; set; }
 
         public Task<SipatOnline.BuildingBlocks.Domain.Result<StoredPlatformVideo>> SaveAsync(
             Guid videoId, Stream content, string contentType, long declaredSize, CancellationToken cancellationToken) =>
@@ -209,7 +255,13 @@ public sealed class CatalogPlaybackApiTests
             Task.FromResult<Stream?>(new MemoryStream());
 
         public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
-            Task.FromResult<Uri?>(Link);
+            Task.FromResult<Uri?>(RememberLink(validFor));
+
+        private static Uri RememberLink(TimeSpan validFor)
+        {
+            LastValidFor = validFor;
+            return Link;
+        }
 
         public Task DeleteAsync(Guid videoId, CancellationToken cancellationToken) => Task.CompletedTask;
     }
