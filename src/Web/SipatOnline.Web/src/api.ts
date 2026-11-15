@@ -518,6 +518,7 @@ export interface LearningPlaybackSession {
   expiresAt: string;
   sessionId: string;
   isDevelopmentDemo: boolean;
+  sources?: { url: string; quality: '720p' | '480p' | null }[];
 }
 
 export interface LearningProgress {

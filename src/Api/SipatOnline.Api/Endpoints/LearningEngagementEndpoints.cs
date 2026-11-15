@@ -81,27 +81,6 @@ public static class LearningEngagementEndpoints
                 ? Results.File(renderer.Render(result.Value), "application/pdf", $"certificado-sipat-{certificateId:N}.pdf")
                 : Problem(result.Error);
         }).RequireAuthorization();
-        learning.MapGet("/lessons/{lessonId:guid}/media", async (
-            Guid lessonId, ITenantContext tenant, ICurrentActor actor, PlatformDbContext db,
-            IPlatformCourseVideoStorage storage, CancellationToken token) =>
-        {
-            if (tenant.CurrentTenantId is not { } tenantId || !Guid.TryParse(actor.UserId, out var participantId))
-                return Results.Forbid();
-            var lesson = await db.LearningLessons.AsNoTracking().SingleOrDefaultAsync(item =>
-                item.Id == lessonId && item.TenantId == tenantId.Value &&
-                db.LearningTracks.Any(track => track.Id == item.TrackId && track.TenantId == tenantId.Value && track.CurrentRevisionId == item.RevisionId) &&
-                db.LearningAssignments.Any(assignment => assignment.TrackId == item.TrackId && assignment.TenantId == tenantId.Value &&
-                    assignment.ParticipantId == participantId && assignment.RevokedAt == null), token);
-            if (lesson is null || !lesson.ProviderAssetReference.StartsWith("catalog:", StringComparison.Ordinal) ||
-                !Guid.TryParse(lesson.ProviderAssetReference["catalog:".Length..], out var videoId)) return Results.NotFound();
-            var video = await db.PlatformCourseVideos.AsNoTracking().SingleOrDefaultAsync(item => item.Id == videoId, token);
-            if (video is null) return Results.NotFound();
-            var signedUrl = await storage.GetPlaybackUrlAsync(videoId, VideoRendition.Hd720, TimeSpan.FromMinutes(10), token);
-            if (signedUrl is not null) return Results.Redirect(signedUrl.AbsoluteUri);
-            var stream = await storage.OpenReadAsync(videoId, VideoRendition.Hd720, token);
-            return stream is null ? Results.Problem(statusCode: 503, detail: "O arquivo do vídeo não está disponível.") :
-                Results.File(stream, video.ContentType, enableRangeProcessing: true);
-        });
         learning.MapGet("/tracks/{trackId:guid}/cover", async (Guid trackId, LearningService service,
             PlatformDbContext db, ITenantContext tenant, CancellationToken token) =>
         {

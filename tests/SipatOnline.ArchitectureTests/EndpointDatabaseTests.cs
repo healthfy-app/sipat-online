@@ -4,7 +4,8 @@ public sealed class EndpointDatabaseTests
 {
     private static readonly string[] Files =
     [
-        "src/Api/SipatOnline.Api/Endpoints/PlaybackQualityDashboardEndpoints.cs"
+        "src/Api/SipatOnline.Api/Endpoints/PlaybackQualityDashboardEndpoints.cs",
+        "src/Api/SipatOnline.Api/Endpoints/LessonMediaEndpoints.cs"
     ];
 
     [Fact]

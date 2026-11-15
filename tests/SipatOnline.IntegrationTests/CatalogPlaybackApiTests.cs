@@ -46,6 +46,75 @@ public sealed class CatalogPlaybackApiTests
     }
 
     [DockerFact]
+    public async Task Offers_both_renditions_when_the_video_has_480p()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = CatalogFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory, hasSd480: true);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{seed.TrackId}/lessons/{seed.LessonId}/playback", HttpMethod.Post, new { });
+            var sources = playback.GetProperty("sources").EnumerateArray().ToArray();
+            Assert.Equal(2, sources.Length);
+            Assert.Equal($"/api/learning/lessons/{seed.LessonId}/media", sources[0].GetProperty("url").GetString());
+            Assert.Equal("720p", sources[0].GetProperty("quality").GetString());
+            Assert.Equal($"/api/learning/lessons/{seed.LessonId}/media?quality=480p", sources[1].GetProperty("url").GetString());
+            Assert.Equal("480p", sources[1].GetProperty("quality").GetString());
+            Assert.Equal(sources[0].GetProperty("url").GetString(), playback.GetProperty("url").GetString());
+            using var request = new HttpRequestMessage(HttpMethod.Get, sources[1].GetProperty("url").GetString());
+            request.Headers.Range = new RangeHeaderValue(0, 7);
+            using var media = await participant.SendAsync(request);
+            Assert.Equal(HttpStatusCode.PartialContent, media.StatusCode);
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
+    public async Task Offers_a_single_source_for_older_videos()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = CatalogFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{seed.TrackId}/lessons/{seed.LessonId}/playback", HttpMethod.Post, new { });
+            var sources = playback.GetProperty("sources").EnumerateArray().ToArray();
+            Assert.Single(sources);
+            Assert.Equal(playback.GetProperty("url").GetString(), sources[0].GetProperty("url").GetString());
+            Assert.Equal(JsonValueKind.Null, sources[0].GetProperty("quality").ValueKind);
+            using var missing = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media?quality=480p");
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
+    public async Task Refuses_media_of_a_revoked_assignment()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = CatalogFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+                await db.LearningAssignments.ExecuteUpdateAsync(update => update.SetProperty(item => item.RevokedAt, DateTimeOffset.UtcNow));
+            }
+
+            using var refused = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media");
+            Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
     public async Task Accepts_plausible_ranges_and_refuses_impossible_ones()
     {
         await using var postgres = await StartPostgres();
@@ -284,7 +353,7 @@ public sealed class CatalogPlaybackApiTests
         new SipatOnlineApiFactory(connectionString, developmentSampleEnabled: true)
             .WithWebHostBuilder(builder => builder.UseSetting("SipatOnline:Learning:Playback:Provider", "Catalog"));
 
-    private static async Task<Seeded> Seed(WebApplicationFactory<Program> factory, string? secondParticipant = null)
+    private static async Task<Seeded> Seed(WebApplicationFactory<Program> factory, string? secondParticipant = null, bool hasSd480 = false)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
@@ -313,6 +382,17 @@ public sealed class CatalogPlaybackApiTests
         var storage = scope.ServiceProvider.GetRequiredService<IPlatformCourseVideoStorage>();
         await using var stream = new MemoryStream(VideoBytes);
         Assert.True((await storage.SaveAsync(videoId, stream, "video/mp4", VideoBytes.Length, CancellationToken.None)).IsSuccess);
+        if (hasSd480)
+        {
+            var path = Path.GetTempFileName();
+            try
+            {
+                await File.WriteAllBytesAsync(path, VideoBytes);
+                await storage.SaveRenditionAsync(videoId, VideoRendition.Sd480, path, CancellationToken.None);
+            }
+            finally { File.Delete(path); }
+        }
+
         db.PlatformCourseVideos.Add(new PlatformCourseVideoEntity
         {
             Id = videoId,
@@ -320,6 +400,7 @@ public sealed class CatalogPlaybackApiTests
             ContentType = "video/mp4",
             SizeBytes = VideoBytes.Length,
             DurationMilliseconds = 1000,
+            HasSd480 = hasSd480,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();

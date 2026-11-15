@@ -177,6 +177,7 @@ app.MapSipatCatalogEndpoints();
 app.MapPlanSubjectEndpoints();
 app.MapLearningEndpoints();
 app.MapLearningEngagementEndpoints();
+app.MapLessonMediaEndpoints();
 app.MapPlaybackQualityDashboardEndpoints();
 
 app.Run();
