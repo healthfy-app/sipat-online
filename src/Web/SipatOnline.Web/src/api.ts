@@ -1075,13 +1075,15 @@ export async function sendPlaybackQuality(
   summary: PlaybackQualitySummary,
 ): Promise<void> {
   const token = cachedAntiforgeryToken ?? (cachedAntiforgeryToken = await getAntiforgeryToken());
-  await fetch(`/api/learning/tracks/${trackId}/playback-quality`, {
+  const response = await fetch(`/api/learning/tracks/${trackId}/playback-quality`, {
     method: 'POST',
     keepalive: true,
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
     body: JSON.stringify(summary),
   });
+  // A rejected send may mean a stale token: the next send fetches a fresh one. No retry here.
+  if (!response.ok) cachedAntiforgeryToken = null;
 }
 
 export function saveLearningPosition(
