@@ -26,6 +26,7 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
   const gameMap = new Map(games.map(game => [game.id, game]));
   const videos = new Map<string, CatalogVideo>();
   for (const item of library) {
+    if (item.video.status !== 'Ready') continue;
     const title = item.video.libraryTitle ?? item.video.title;
     videos.set(item.video.id, { id: item.video.id, title, durationMs: item.video.durationMilliseconds, code: videoCode(title) });
   }

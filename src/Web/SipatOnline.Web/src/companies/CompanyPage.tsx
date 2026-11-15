@@ -1,6 +1,6 @@
 import { ChevronRight, LogIn, Search, UserPlus } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   changePlatformCompanyEmployeesStatus,
   getPlatformCompanyEmployees,
@@ -27,12 +27,13 @@ const pageSize = 50;
 export default function CompanyPage() {
   const { companyId = '', section } = useParams<{ companyId: string; section?: string }>();
   const navigate = useNavigate();
+  const initialSearch = useSearchParams()[0].get('busca')?.trim() ?? '';
   const tab = section === 'administradores' ? 'administrators' : 'participants';
   const [page, setPage] = useState<PlatformCompanyEmployeePage | null>(null);
   const [overview, setOverview] = useState<PlatformCompanyOverview | null>(null);
   const [administrators, setAdministrators] = useState<PlatformUserSummary[] | null>(null);
-  const [searchInput, setSearchInput] = useState('');
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState(initialSearch);
+  const [search, setSearch] = useState(initialSearch);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [offset, setOffset] = useState(0);
   const [isLoading, setIsLoading] = useState(true);

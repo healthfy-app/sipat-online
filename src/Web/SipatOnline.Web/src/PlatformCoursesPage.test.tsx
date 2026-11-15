@@ -54,6 +54,9 @@ function makeVideo(id: string, title: string): api.PlatformCourseVideo {
     createdAt: '2026-11-10T12:00:00Z',
     fileUrl: `/videos/${id}`,
     checkpoints: [],
+    status: 'Ready',
+    processingError: null,
+    hasSd480: true,
   };
 }
 
@@ -656,6 +659,22 @@ describe('Platform course catalog', () => {
     expect(api.updatePlatformCourse).not.toHaveBeenCalled();
   });
 
+  it('offers only ready library videos when adding a video to a course', async () => {
+    const user = userEvent.setup();
+    const processing = { ...makeVideo('v-5', 'Ainda convertendo'), status: 'Processing' as const, hasSd480: false };
+    const failed = { ...makeVideo('v-6', 'Conversão com falha'), status: 'Failed' as const, processingError: 'Arquivo inválido.' };
+    const ready = makeVideo('v-7', 'Pronto para usar');
+    vi.mocked(api.listPlatformLibraryVideos).mockResolvedValue([
+      { video: opening, courseCount: 1 }, { video: processing, courseCount: 0 }, { video: failed, courseCount: 0 }, { video: ready, courseCount: 0 },
+    ]);
+    render(<PlatformCoursesPage />, '/platform/courses/c-2/edit');
+
+    await user.click((await screen.findAllByRole('button', { name: 'Adicionar vídeo' }))[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Adicionar vídeo' });
+    const options = within(within(dialog).getByLabelText('Vincular da biblioteca')).getAllByRole('option').map(option => option.textContent);
+    expect(options).toEqual(['Selecione um vídeo', 'Abertura', 'Pronto para usar']);
+  });
+
   it('explains where optional activities appear and how to configure a video question', async () => {
     const user = userEvent.setup();
     vi.mocked(api.listGameModules).mockResolvedValue([memoryModule]);
@@ -687,8 +706,7 @@ describe('Platform course catalog', () => {
     const video = await screen.findByLabelText('Prévia de Abertura');
     fireEvent.error(video);
     expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar o vídeo.');
-    expect(screen.queryByLabelText('Prévia de Abertura')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Tentar reproduzir novamente' }));
+    await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
     expect(screen.getByLabelText('Prévia de Abertura')).toHaveAttribute('src', '/videos/v-1');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(api.updatePlatformCourse).not.toHaveBeenCalled();
@@ -848,5 +866,66 @@ describe('Platform course catalog', () => {
     await user.click(screen.getAllByRole('button', { name: /^Excluir vídeo / })[0]);
     await waitFor(() => expect(api.deletePlatformVideo).toHaveBeenCalledTimes(2));
     confirm.mockRestore();
+  });
+
+  it('shows a processing video without a preview', async () => {
+    const user = userEvent.setup();
+    const converting = { ...makeVideo('v-3', 'Treinamento novo'), status: 'Processing' as const, hasSd480: false };
+    vi.mocked(api.listPlatformLibraryVideos).mockResolvedValue([{ video: opening, courseCount: 1 }, { video: converting, courseCount: 0 }]);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+    const card = (await screen.findByRole('heading', { name: 'Treinamento novo' })).closest('article') as HTMLElement;
+    expect(within(card).getByText('Processando')).toBeVisible();
+    expect(within(card).getByText('Convertendo para 720p e 480p. O vídeo fica disponível para os Dias quando terminar.')).toBeVisible();
+    expect(card.querySelector('video')).toBeNull();
+  });
+
+  it('shows why a conversion failed', async () => {
+    const user = userEvent.setup();
+    const broken = { ...makeVideo('v-4', 'Arquivo quebrado'), status: 'Failed' as const, processingError: 'Arquivo de vídeo inválido.' };
+    vi.mocked(api.listPlatformLibraryVideos).mockResolvedValue([{ video: broken, courseCount: 0 }]);
+    render(<PlatformCoursesPage />);
+
+    await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+    const card = (await screen.findByRole('heading', { name: 'Arquivo quebrado' })).closest('article') as HTMLElement;
+    expect(within(card).getByText('Falhou')).toBeVisible();
+    expect(within(card).getByText('Arquivo de vídeo inválido.')).toBeVisible();
+    expect(card.querySelector('video')).toBeNull();
+  });
+
+  it('refreshes the library while a video is processing and stops when all are ready', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const converting = { ...makeVideo('v-3', 'Treinamento novo'), status: 'Processing' as const };
+      vi.mocked(api.listPlatformLibraryVideos)
+        .mockReset()
+        .mockResolvedValueOnce([{ video: converting, courseCount: 0 }])
+        .mockResolvedValue([{ video: { ...converting, status: 'Ready' as const }, courseCount: 0 }]);
+      render(<PlatformCoursesPage />);
+
+      await waitFor(() => expect(api.listPlatformLibraryVideos).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(15_000);
+      await waitFor(() => expect(api.listPlatformLibraryVideos).toHaveBeenCalledTimes(2));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(api.listPlatformLibraryVideos).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops refreshing when leaving the screen', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const converting = { ...makeVideo('v-3', 'Treinamento novo'), status: 'Processing' as const };
+      vi.mocked(api.listPlatformLibraryVideos).mockReset().mockResolvedValue([{ video: converting, courseCount: 0 }]);
+      const view = render(<PlatformCoursesPage />);
+      await waitFor(() => expect(api.listPlatformLibraryVideos).toHaveBeenCalledTimes(1));
+      view.unmount();
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(api.listPlatformLibraryVideos).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

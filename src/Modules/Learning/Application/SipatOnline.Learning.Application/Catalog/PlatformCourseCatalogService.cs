@@ -10,8 +10,11 @@ public sealed class PlatformCourseCatalogService(
     IPlatformCourseVideoStorage videoStorage,
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    IVideoConversionQueue conversionQueue)
 {
+    private static readonly TimeSpan PreviewLinkLifetime = TimeSpan.FromMinutes(10);
+
     public const long MaximumVideoSizeBytes = 250 * 1024 * 1024;
     public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
@@ -267,6 +270,12 @@ public sealed class PlatformCourseCatalogService(
                 "Um curso publicado precisa ter ao menos um vídeo.");
         }
 
+        var unready = await RefuseUnreadyNewVideosAsync(course, videoIds, cancellationToken);
+        if (unready is not null)
+        {
+            return unready;
+        }
+
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         if (!await catalogStore.SetCourseVideosAsync(courseId, videoIds, cancellationToken))
         {
@@ -281,6 +290,30 @@ public sealed class PlatformCourseCatalogService(
         return refreshed is null
             ? CourseNotFound<PlatformCourse>()
             : Result<PlatformCourse>.Success(refreshed);
+    }
+
+    /// <summary>
+    /// A video that is not in the course yet must be ready to be added. A video still converting that
+    /// was uploaded straight into this course is already linked, so saving the course keeps it.
+    /// </summary>
+    private async Task<Result<PlatformCourse>?> RefuseUnreadyNewVideosAsync(
+        PlatformCourse course,
+        IReadOnlyCollection<Guid> requestedIds,
+        CancellationToken cancellationToken)
+    {
+        var linked = course.Videos.Select(video => video.Id).ToHashSet();
+        foreach (var videoId in requestedIds.Where(id => !linked.Contains(id)))
+        {
+            var video = await catalogStore.FindVideoAsync(videoId, cancellationToken);
+            if (video is not null && video.Status != PlatformVideoStatus.Ready)
+            {
+                return Failure<PlatformCourse>(
+                    "learning.platform_course.video_not_ready",
+                    $"O vídeo \"{video.Title}\" ainda não está pronto e não pode entrar num curso.");
+            }
+        }
+
+        return null;
     }
 
     public async Task<Result<PlatformCourse>> SetStructureAsync(
@@ -349,6 +382,12 @@ public sealed class PlatformCourseCatalogService(
             return Failure<PlatformCourse>(
                 "learning.platform_course.publish_requires_video",
                 "Um curso publicado precisa ter ao menos um vídeo.");
+        }
+
+        var unready = await RefuseUnreadyNewVideosAsync(course, allVideoIds, cancellationToken);
+        if (unready is not null)
+        {
+            return unready;
         }
 
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
@@ -421,12 +460,11 @@ public sealed class PlatformCourseCatalogService(
         }
 
         var videoId = Guid.NewGuid();
-        var storageResult = await videoStorage.SaveAsync(
-            videoId,
-            content,
-            contentType,
-            declaredSize,
-            cancellationToken);
+        // With conversion on, the upload waits in the work folder and only the converted files reach the storage.
+        var converts = conversionQueue.IsEnabled;
+        var storageResult = converts
+            ? await conversionQueue.SaveSourceAsync(videoId, content, contentType, declaredSize, cancellationToken)
+            : await videoStorage.SaveAsync(videoId, content, contentType, declaredSize, cancellationToken);
         if (!storageResult.IsSuccess)
         {
             return Result<PlatformCourseVideo>.Failure(storageResult.Error);
@@ -439,13 +477,19 @@ public sealed class PlatformCourseCatalogService(
             storageResult.Value.SizeBytes,
             durationMilliseconds,
             timeProvider.GetUtcNow(),
-            []);
+            [],
+            Status: converts ? PlatformVideoStatus.Processing : PlatformVideoStatus.Ready);
 
         var metadataPersisted = false;
         try
         {
             await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
             await catalogStore.AddVideoAsync(video, courseId, cancellationToken);
+            if (converts)
+            {
+                await conversionQueue.EnqueueAsync(videoId, cancellationToken);
+            }
+
             await auditTrail.WriteAsync(
                 new AuditRecord(
                     actorId.ToString("D"),
@@ -462,37 +506,64 @@ public sealed class PlatformCourseCatalogService(
         {
             if (!metadataPersisted)
             {
-                await videoStorage.DeleteAsync(videoId, CancellationToken.None);
+                if (converts)
+                {
+                    await conversionQueue.DiscardSourceAsync(videoId, CancellationToken.None);
+                }
+                else
+                {
+                    await videoStorage.DeleteAsync(videoId, CancellationToken.None);
+                }
             }
         }
 
         return Result<PlatformCourseVideo>.Success(video);
     }
 
-    public async Task<Result<(Stream Content, string ContentType)>> OpenVideoAsync(
+    /// <summary>The operator preview: asks for a signed link first and opens the file only when there is none.</summary>
+    public async Task<Result<PlatformVideoFile>> GetVideoFileAsync(
         Guid videoId,
         CancellationToken cancellationToken)
     {
         var permission = EnsurePlatformOperator();
         if (!permission.IsSuccess)
         {
-            return Failure<(Stream Content, string ContentType)>(permission.Error.Code, permission.Error.Message);
+            return Result<PlatformVideoFile>.Failure(permission.Error);
         }
 
         var video = await catalogStore.FindVideoAsync(videoId, cancellationToken);
         if (video is null)
         {
-            return Failure<(Stream Content, string ContentType)>(
+            return Failure<PlatformVideoFile>(
                 "learning.platform_course.video_not_found",
                 "O vídeo não foi encontrado.");
         }
 
-        var content = await videoStorage.OpenReadAsync(videoId, cancellationToken);
+        switch (video.Status)
+        {
+            case PlatformVideoStatus.Processing:
+                return Failure<PlatformVideoFile>(
+                    "learning.platform_course.video_processing",
+                    "O vídeo ainda está sendo preparado.");
+            case PlatformVideoStatus.Failed:
+                return Failure<PlatformVideoFile>(
+                    "learning.platform_course.video_failed",
+                    "A conversão deste vídeo falhou. Envie o arquivo de novo.");
+        }
+
+        var link = await videoStorage.GetPlaybackUrlAsync(
+            videoId, VideoRendition.Hd720, PreviewLinkLifetime, cancellationToken);
+        if (link is not null)
+        {
+            return Result<PlatformVideoFile>.Success(new PlatformVideoFile(link, null, video.ContentType));
+        }
+
+        var content = await videoStorage.OpenReadAsync(videoId, VideoRendition.Hd720, cancellationToken);
         return content is null
-            ? Failure<(Stream Content, string ContentType)>(
+            ? Failure<PlatformVideoFile>(
                 "learning.platform_course.video_file_missing",
                 "O arquivo do vídeo não está disponível no armazenamento.")
-            : Result<(Stream Content, string ContentType)>.Success((content, video.ContentType));
+            : Result<PlatformVideoFile>.Success(new PlatformVideoFile(null, content, video.ContentType));
     }
 
     private Task WriteAuditAsync(

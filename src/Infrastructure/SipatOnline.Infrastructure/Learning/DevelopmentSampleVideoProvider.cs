@@ -1,6 +1,7 @@
 using System.Collections.Concurrent;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application;
+using SipatOnline.Learning.Domain.Progress;
 
 namespace SipatOnline.Infrastructure.Learning;
 
@@ -59,7 +60,12 @@ public sealed class DevelopmentSampleVideoProvider(TimeProvider timeProvider) :
     }
 
     public Task<Result<PlaybackSession>> CreateLocalSession(
-        string url, string contentType, long durationMilliseconds, Guid participantId, Guid lessonId)
+        string url,
+        string contentType,
+        long durationMilliseconds,
+        Guid participantId,
+        Guid lessonId,
+        IReadOnlyList<PlaybackSource>? sources = null)
     {
         var now = timeProvider.GetUtcNow();
         var sessionId = Guid.NewGuid();
@@ -71,7 +77,7 @@ public sealed class DevelopmentSampleVideoProvider(TimeProvider timeProvider) :
             now,
             expiresAt);
         return Task.FromResult(Result<PlaybackSession>.Success(
-            new PlaybackSession(url, contentType, expiresAt, sessionId, true)));
+            new PlaybackSession(url, contentType, expiresAt, sessionId, true, sources ?? [new PlaybackSource(url, null)])));
     }
 
     public Task<Result<bool>> VerifyRangeAsync(
@@ -90,54 +96,28 @@ public sealed class DevelopmentSampleVideoProvider(TimeProvider timeProvider) :
 
         lock (grant.Sync)
         {
-            var now = timeProvider.GetUtcNow();
-            if (grant.ParticipantId != participantId ||
-                grant.LessonId != lessonId ||
-                now > grant.ExpiresAt ||
-                startMilliseconds < 0 ||
-                endMilliseconds <= startMilliseconds ||
-                endMilliseconds > grant.DurationMilliseconds)
+            if (grant.ParticipantId != participantId || grant.LessonId != lessonId)
             {
                 return Task.FromResult(Result<bool>.Success(false));
             }
 
-            var ranges = Merge(grant.WatchedRanges, new WatchedRange(startMilliseconds, endMilliseconds));
-            var coveredMilliseconds = ranges.Sum(range => range.EndMilliseconds - range.StartMilliseconds);
-            var maximumCoveredMilliseconds = (long)Math.Max(
-                0,
-                (now - grant.StartedAt).TotalMilliseconds * 2 + 2000);
-            if (coveredMilliseconds > maximumCoveredMilliseconds)
+            var merged = PlaybackEvidencePolicy.Accept(
+                grant.WatchedRanges,
+                startMilliseconds,
+                endMilliseconds,
+                grant.DurationMilliseconds,
+                grant.StartedAt,
+                grant.ExpiresAt,
+                timeProvider.GetUtcNow());
+            if (merged is null)
             {
                 return Task.FromResult(Result<bool>.Success(false));
             }
 
             grant.WatchedRanges.Clear();
-            grant.WatchedRanges.AddRange(ranges);
+            grant.WatchedRanges.AddRange(merged);
             return Task.FromResult(Result<bool>.Success(true));
         }
-    }
-
-    private static List<WatchedRange> Merge(
-        IEnumerable<WatchedRange> existingRanges,
-        WatchedRange incoming)
-    {
-        var ranges = existingRanges.Append(incoming).OrderBy(range => range.StartMilliseconds).ToArray();
-        var merged = new List<WatchedRange>(ranges.Length);
-        foreach (var range in ranges)
-        {
-            if (merged.Count == 0 || merged[^1].EndMilliseconds < range.StartMilliseconds)
-            {
-                merged.Add(range);
-                continue;
-            }
-
-            var previous = merged[^1];
-            merged[^1] = new WatchedRange(
-                previous.StartMilliseconds,
-                Math.Max(previous.EndMilliseconds, range.EndMilliseconds));
-        }
-
-        return merged;
     }
 
     private sealed class PlaybackGrant(
@@ -164,5 +144,4 @@ public sealed class DevelopmentSampleVideoProvider(TimeProvider timeProvider) :
 
     private sealed record SampleVideo(string Url, string ContentType, long DurationMilliseconds);
 
-    private readonly record struct WatchedRange(long StartMilliseconds, long EndMilliseconds);
 }

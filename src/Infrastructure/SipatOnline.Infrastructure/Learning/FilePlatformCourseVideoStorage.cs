@@ -52,7 +52,7 @@ public sealed class FilePlatformCourseVideoStorage(
         }
 
         Directory.CreateDirectory(storagePath);
-        var filePath = GetFilePath(storagePath, videoId);
+        var filePath = GetFilePath(storagePath, videoId, VideoRendition.Hd720);
         var completed = false;
         try
         {
@@ -113,7 +113,7 @@ public sealed class FilePlatformCourseVideoStorage(
         }
     }
 
-    public Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken)
+    public Task<Stream?> OpenReadAsync(Guid videoId, VideoRendition rendition, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var storagePath = StoragePath;
@@ -122,21 +122,56 @@ public sealed class FilePlatformCourseVideoStorage(
             return Task.FromResult<Stream?>(null);
         }
 
-        var filePath = GetFilePath(storagePath, videoId);
+        var filePath = GetFilePath(storagePath, videoId, rendition);
         Stream? stream = File.Exists(filePath)
             ? new FileStream(
                 filePath,
                 FileMode.Open,
                 FileAccess.Read,
-                FileShare.Read,
+                FileShare.Read | FileShare.Delete,
                 CopyBufferSize,
                 FileOptions.Asynchronous | FileOptions.SequentialScan)
             : null;
         return Task.FromResult(stream);
     }
 
-    public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
+    public Task<Uri?> GetPlaybackUrlAsync(
+        Guid videoId, VideoRendition rendition, TimeSpan validFor, CancellationToken cancellationToken) =>
         Task.FromResult<Uri?>(null);
+
+    public Task SaveRenditionAsync(
+        Guid videoId, VideoRendition rendition, string filePath, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var storagePath = StoragePath
+            ?? throw new InvalidOperationException("O armazenamento de vídeos do catálogo não está configurado.");
+        Directory.CreateDirectory(storagePath);
+        var destination = GetFilePath(storagePath, videoId, rendition);
+        // Never rewrite the live file in place: a player may be reading byte ranges from it.
+        var temporary = Path.Combine(storagePath, $"{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.Copy(filePath, temporary, overwrite: true);
+            if (File.Exists(destination))
+            {
+                // ReplaceFile swaps atomically and works while readers hold the old file open with FileShare.Delete.
+                File.Replace(temporary, destination, destinationBackupFileName: null);
+            }
+            else
+            {
+                File.Move(temporary, destination);
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
+
+        return Task.CompletedTask;
+    }
 
     public Task DeleteAsync(Guid videoId, CancellationToken cancellationToken)
     {
@@ -144,18 +179,36 @@ public sealed class FilePlatformCourseVideoStorage(
         var storagePath = StoragePath;
         if (storagePath is not null)
         {
-            var filePath = GetFilePath(storagePath, videoId);
-            if (File.Exists(filePath))
+            foreach (var rendition in Enum.GetValues<VideoRendition>())
             {
-                File.Delete(filePath);
+                var filePath = GetFilePath(storagePath, videoId, rendition);
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
             }
         }
 
         return Task.CompletedTask;
     }
 
-    private static string GetFilePath(string storagePath, Guid videoId) =>
-        Path.Combine(storagePath, $"{videoId:N}.video");
+    /// <summary>The absolute path of a stored version, or null when it is not there.</summary>
+    public string? FindFile(Guid videoId, VideoRendition rendition)
+    {
+        var storagePath = StoragePath;
+        if (storagePath is null)
+        {
+            return null;
+        }
+
+        var filePath = GetFilePath(storagePath, videoId, rendition);
+        return File.Exists(filePath) ? filePath : null;
+    }
+
+    private static string GetFilePath(string storagePath, Guid videoId, VideoRendition rendition) =>
+        Path.Combine(
+            storagePath,
+            rendition == VideoRendition.Sd480 ? $"{videoId:N}.480p.video" : $"{videoId:N}.video");
 
     private static bool HasExpectedSignature(byte[] header, int headerLength, string contentType) =>
         contentType switch

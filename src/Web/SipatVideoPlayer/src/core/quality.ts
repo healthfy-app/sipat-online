@@ -1,5 +1,5 @@
 // Measures the quality of one video playback session. Pure TypeScript: no React and no
-// imports from the app, so it can move into the player package unchanged.
+// imports from the app; the player knows nothing about lessons or API sessions.
 
 export type QualityLabel = 'single' | '720p' | '480p';
 export type PlaybackDevice = 'phone' | 'tablet' | 'desktop';
@@ -11,10 +11,9 @@ export interface PlaybackEnvironment {
   timezoneOffsetMinutes: number;
 }
 
-export interface PlaybackQualitySummary {
+/** One playback session's quality, as the player measures it. The app adds the lesson and its API session. */
+export interface PlayerQualitySummary {
   id: string;
-  lessonId: string;
-  playbackSessionId: string;
   startedAt: string;
   timezoneOffsetMinutes: number;
   startupMs: number | null;
@@ -35,6 +34,8 @@ export type FlushReason = 'interval' | 'paused' | 'ended' | 'hidden' | 'leave' |
 export interface QualityTracker {
   flush(reason: FlushReason): void;
   stop(): void;
+  /** The source changed: counts a switch and ignores the waiting it causes until the next 'playing'. */
+  setQuality(quality: QualityLabel): void;
 }
 
 const NEVER_STARTED_MS = 30_000;
@@ -47,6 +48,7 @@ const MAX_STARTUP_MS = 600_000;
 const MAX_STALL_COUNT = 10_000;
 const MAX_DURATION_MS = 21_600_000;
 const MAX_DOWNLINK = 10_000;
+const MAX_QUALITY_SWITCHES = 1000;
 const MAX_TZ = 840;
 
 const CONNECTION_TYPES = ['slow-2g', '2g', '3g', '4g'] as const;
@@ -128,7 +130,7 @@ function safeUuid(): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 }
 
-function errorKindOf(video: HTMLVideoElement): PlaybackQualitySummary['errorKind'] {
+function errorKindOf(video: HTMLVideoElement): PlayerQualitySummary['errorKind'] {
   switch (video.error?.code) {
     case 2:
       return 'network';
@@ -144,11 +146,11 @@ function errorKindOf(video: HTMLVideoElement): PlaybackQualitySummary['errorKind
 export function trackPlaybackQuality(
   video: HTMLVideoElement,
   options: {
-    lessonId: string;
-    playbackSessionId: string;
     quality: QualityLabel;
     environment?: PlaybackEnvironment;
-    onReport: (summary: PlaybackQualitySummary, reason: FlushReason) => void;
+    /** Called when a counted stall (500 ms or more) ends. */
+    onStall?: (durationMs: number) => void;
+    onReport: (summary: PlayerQualitySummary, reason: FlushReason) => void;
   },
 ): QualityTracker {
   const environment = options.environment ?? safeEnvironment();
@@ -165,7 +167,10 @@ export function trackPlaybackQuality(
   let watchedMs = 0;
   let playingSince: number | null = null;
   let waitingSince: number | null = null;
-  let errorKind: PlaybackQualitySummary['errorKind'] = null;
+  let errorKind: PlayerQualitySummary['errorKind'] = null;
+  let quality = options.quality;
+  let qualitySwitches = 0;
+  let switching = false; // a source change is loading: its waiting is not a stall
 
   let neverStartedTimer: ReturnType<typeof setTimeout> | null = null;
   let intervalTimer: ReturnType<typeof setInterval> | null = null;
@@ -193,7 +198,7 @@ export function trackPlaybackQuality(
     }
   }
 
-  function buildSummary(): PlaybackQualitySummary {
+  function buildSummary(): PlayerQualitySummary {
     const t = now();
     const watched = watchedMs + (playingSince !== null ? t - playingSince : 0);
     // A stall still open at flush is reported without touching the accumulators,
@@ -202,8 +207,6 @@ export function trackPlaybackQuality(
     const reportOpen = openStall >= MIN_STALL_MS;
     return {
       id,
-      lessonId: options.lessonId,
-      playbackSessionId: options.playbackSessionId,
       startedAt: startedAt ?? new Date().toISOString(),
       timezoneOffsetMinutes: environment.timezoneOffsetMinutes,
       startupMs: startupMs === null ? null : clampInt(startupMs, MAX_STARTUP_MS),
@@ -212,8 +215,8 @@ export function trackPlaybackQuality(
       stallMs: clampInt(stallMs + (reportOpen ? openStall : 0), MAX_DURATION_MS),
       watchedMs: clampInt(watched, MAX_DURATION_MS),
       errorKind,
-      quality: options.quality,
-      qualitySwitches: 0,
+      quality,
+      qualitySwitches: clampInt(qualitySwitches, MAX_QUALITY_SWITCHES),
       connectionType: environment.connectionType,
       downlinkMbps: environment.downlinkMbps,
       device: environment.device,
@@ -257,12 +260,14 @@ export function trackPlaybackQuality(
       neverStarted = false;
       clearNeverStarted();
     }
+    switching = false;
     if (waitingSince !== null) {
       const duration = now() - waitingSince;
       waitingSince = null;
       if (duration >= MIN_STALL_MS) {
         stallCount += 1;
         stallMs += duration;
+        try { options.onStall?.(duration); } catch { /* the page's reaction must not break the meter */ }
       }
     }
     if (playingSince === null) playingSince = now();
@@ -272,7 +277,7 @@ export function trackPlaybackQuality(
   function onWaiting() {
     if (!hasPlayed) return;
     closeWatched();
-    if (video.seeking) return;
+    if (video.seeking || switching) return;
     if (waitingSince === null) waitingSince = now();
   }
 
@@ -312,6 +317,7 @@ export function trackPlaybackQuality(
     ['playing', onPlaying],
     ['waiting', onWaiting],
     ['pause', onPause],
+    ['emptied', () => { if (switching) waitingSince = null; }],
     ['ended', onEnded],
     ['error', onError],
   ];
@@ -340,6 +346,14 @@ export function trackPlaybackQuality(
     flush(reason) {
       if (stopped) return;
       flush(reason);
+    },
+    setQuality(next) {
+      if (stopped) return;
+      quality = next;
+      qualitySwitches += 1;
+      switching = true;
+      closeWatched();
+      waitingSince = null;
     },
     stop() {
       if (stopped) return;

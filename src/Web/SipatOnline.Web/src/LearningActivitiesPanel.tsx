@@ -5,6 +5,7 @@ import GamePlayer from '@/games/LazyGamePlayer';
 import { Button } from '@/components/ui/button';
 import type { GameOutcome } from '@/games/gameKit';
 import GameStage from '@/games/GameStage';
+import { createCheckpointWatcher, watchCheckpoints, type Checkpoint } from '@sipat/video-player';
 
 export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosition, playbackKey, videoRef, onActivities }: {
   trackId: string; lessonId: string | null; playbackKey: string | undefined;
@@ -78,19 +79,26 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
     };
     const onPlaying = () => atBoundary(lessonPosition - 1, true);
     const onEnded = () => atBoundary(lessonPosition, false);
-    const onTime = () => {
-      if (activeRef.current || video.paused || video.seeking) return;
-      const due = activities.find(item => !item.outcome && !opened.current.has(item.id) &&
-        item.lessonId === lessonId && item.timeMilliseconds !== null &&
-        video.currentTime * 1000 >= item.timeMilliseconds);
+    // activities at a moment of this video; none is due while another one is open
+    const checkpoints = (): Checkpoint[] => activeRef.current ? [] : activities
+      .filter(item => item.lessonId === lessonId && item.timeMilliseconds !== null)
+      .map(item => ({ id: item.id, seconds: item.timeMilliseconds! / 1000, title: item.module.title,
+        done: !!item.outcome || opened.current.has(item.id) }));
+    const onDue = (checkpoint: Checkpoint) => {
+      const due = activities.find(item => item.id === checkpoint.id);
       if (due) open(due);
     };
-    video.addEventListener('timeupdate', onTime);
+    const watcher = createCheckpointWatcher({ reopenOnRewind: false });
+    const stopWatching = watchCheckpoints(video, { checkpoints, reopenOnRewind: false, onDue }, watcher);
     video.addEventListener('playing', onPlaying);
     video.addEventListener('ended', onEnded);
-    if (!video.paused) { onPlaying(); onTime(); }
+    if (!video.paused) {
+      onPlaying();
+      const due = watcher.due(checkpoints(), video.currentTime, true, video.seeking);
+      if (due) { watcher.fire(due.id); onDue(due); }
+    }
     return () => {
-      video.removeEventListener('timeupdate', onTime);
+      stopWatching();
       video.removeEventListener('playing', onPlaying);
       video.removeEventListener('ended', onEnded);
     };

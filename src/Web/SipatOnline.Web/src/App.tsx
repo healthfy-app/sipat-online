@@ -37,6 +37,8 @@ import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
 import CompanyNav from './companies/CompanyNav';
+import PlaybackQualityPage from './quality/PlaybackQualityPage';
+import PlaybackQualityComparisonPage from './quality/PlaybackQualityComparisonPage';
 import PlatformSettingsPage from './PlatformSettingsPage';
 import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
@@ -292,6 +294,14 @@ export default function App() {
             <Route
               path="/platform/companies/:companyId"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <CompanyHome /> : <AccessDenied />}
+            />
+            <Route
+              path="/platform/qualidade"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <PlaybackQualityComparisonPage /> : <AccessDenied />}
+            />
+            <Route
+              path="/platform/companies/:companyId/qualidade"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <PlaybackQualityPage /> : <AccessDenied />}
             />
             <Route
               path="/platform/companies/:companyId/:section"
@@ -677,6 +687,7 @@ function ProtectedPortal({
               <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Biblioteca</NavLink>
+              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Qualidade do vídeo</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
             </>
           )}

@@ -1,0 +1,12 @@
+{
+  "name": "sipat-online-web-workspace",
+  "private": true,
+  "workspaces": ["SipatOnline.Web", "SipatVideoPlayer"],
+  "scripts": {
+    "dev": "npm run dev -w SipatOnline.Web",
+    "build": "npm run build -w SipatOnline.Web",
+    "lint": "npm run lint --workspaces",
+    "test": "npm test --workspaces",
+    "player": "npm run playground -w @sipat/video-player"
+  }
+}

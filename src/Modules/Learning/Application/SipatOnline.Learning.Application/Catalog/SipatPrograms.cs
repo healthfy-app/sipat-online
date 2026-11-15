@@ -162,8 +162,11 @@ public static class ProgramDayRules
                 return Fail("learning.program.video_repeated", $"O dia \"{dayTitle}\" tem um vídeo repetido.");
             foreach (var videoId in videoIds)
             {
-                if (await catalogStore.FindVideoAsync(videoId, cancellationToken) is null)
+                var video = await catalogStore.FindVideoAsync(videoId, cancellationToken);
+                if (video is null)
                     return Fail("learning.program.video_not_found", $"Um dos vídeos do dia \"{dayTitle}\" não existe mais.");
+                if (video.Status != PlatformVideoStatus.Ready)
+                    return Fail("learning.program.video_processing", $"O vídeo \"{video.Title}\" ainda está sendo preparado e não pode entrar num Dia.");
             }
 
             var gameIds = day.GameIds ?? [];

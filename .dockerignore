@@ -8,7 +8,7 @@ local-data
 deploy
 docs
 tests
-src/Web/SipatOnline.Web
+src/Web
 **/bin
 **/obj
 **/TestResults

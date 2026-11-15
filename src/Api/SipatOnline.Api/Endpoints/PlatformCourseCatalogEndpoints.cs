@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Domain;
+using SipatOnline.Infrastructure.Learning;
 using SipatOnline.Learning.Application.Catalog;
 
 namespace SipatOnline.Api.Endpoints;
@@ -313,24 +314,21 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapGet("/videos/{videoId:guid}/file", async (
             Guid videoId,
             PlatformCourseCatalogService catalogService,
-            IPlatformCourseVideoStorage storage,
             CancellationToken cancellationToken) =>
         {
-            var result = await catalogService.OpenVideoAsync(videoId, cancellationToken);
+            var result = await catalogService.GetVideoFileAsync(videoId, cancellationToken);
             if (!result.IsSuccess)
             {
                 return ToProblem(result.Error);
             }
 
-            var signedUrl = await storage.GetPlaybackUrlAsync(videoId, TimeSpan.FromMinutes(10), cancellationToken);
-            if (signedUrl is not null)
+            if (result.Value.RedirectTo is { } link)
             {
-                await result.Value.Content.DisposeAsync();
-                return Results.Redirect(signedUrl.AbsoluteUri);
+                return Results.Redirect(link.AbsoluteUri);
             }
 
             return Results.File(
-                result.Value.Content,
+                result.Value.Content!,
                 result.Value.ContentType,
                 enableRangeProcessing: true);
         })
@@ -678,11 +676,20 @@ public static class PlatformCourseCatalogEndpoints
             file.ContentType,
             file.Length,
             cancellationToken);
-        return result.IsSuccess
-            ? Results.Created(
-                $"/api/platform/catalog/videos/{result.Value.Id:D}/file",
-                ToResponse(result.Value))
-            : ToProblem(result.Error);
+        if (!result.IsSuccess)
+        {
+            return ToProblem(result.Error);
+        }
+
+        if (result.Value.Status == PlatformVideoStatus.Processing)
+        {
+            // The queue row is committed by now: wake the worker instead of waiting for its next poll.
+            context.RequestServices.GetRequiredService<VideoConversionSignal>().Notify();
+        }
+
+        return Results.Created(
+            $"/api/platform/catalog/videos/{result.Value.Id:D}/file",
+            ToResponse(result.Value));
     }
 
     private static PlatformCourseResponse ToResponse(PlatformCourse course) =>
@@ -715,7 +722,10 @@ public static class PlatformCourseCatalogEndpoints
             $"/api/platform/catalog/videos/{video.Id:D}/file",
             video.Checkpoints.Select(item => new VideoCheckpointDto(item.TimeMilliseconds, item.ModuleId)).ToArray(),
             video.LessonId,
-            video.LibraryTitle);
+            video.LibraryTitle,
+            video.Status.ToString(),
+            video.ProcessingError,
+            video.HasSd480);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -758,7 +768,9 @@ public static class PlatformCourseCatalogEndpoints
             "learning.platform_course.storage_unconfigured" or
                 "learning.platform_course.video_file_missing" => StatusCodes.Status503ServiceUnavailable,
             "learning.platform_course.actor_required" => StatusCodes.Status400BadRequest,
-            "learning.platform_course.video_in_use" => StatusCodes.Status409Conflict,
+            "learning.platform_course.video_in_use" or
+                "learning.platform_course.video_processing" or
+                "learning.platform_course.video_failed" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 
@@ -884,6 +896,9 @@ public sealed record PlatformCourseVideoResponse(
     string FileUrl,
     IReadOnlyList<VideoCheckpointDto> Checkpoints,
     Guid? LessonId = null,
-    string? LibraryTitle = null);
+    string? LibraryTitle = null,
+    string Status = "Ready",
+    string? ProcessingError = null,
+    bool HasSd480 = false);
 
 public sealed record CourseCategoryResponse(Guid Id, string Name, int CourseCount);

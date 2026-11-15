@@ -22,6 +22,7 @@
     <ProjectReference Include="..\..\src\Modules\Identity\Application\SipatOnline.Identity.Application\SipatOnline.Identity.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Tenancy\Application\SipatOnline.Tenancy.Application\SipatOnline.Tenancy.Application.csproj" />
     <ProjectReference Include="..\..\src\Modules\Sipats\Application\SipatOnline.Sipats.Application\SipatOnline.Sipats.Application.csproj" />
+    <ProjectReference Include="..\..\src\Modules\Learning\Application\SipatOnline.Learning.Application\SipatOnline.Learning.Application.csproj" />
   </ItemGroup>
 
 </Project>
