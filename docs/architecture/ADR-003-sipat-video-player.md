@@ -1,6 +1,6 @@
 # ADR-003: SIPAT Video Player como componente próprio
 
-**Status:** Proposto
+**Status:** Aceito
 **Data:** 2026-11-14
 **Decisores:** dono do produto (HealthEz)
 **Relacionados:** ADR-001 (player e entrega de vídeo; a parte de entrega será substituída pelo ADR-002: VM + Cloudflare R2, vídeos em 720p e 480p, link assinado)
@@ -178,11 +178,11 @@ Ficaram de fora por enquanto: legendas e janela de Libras, toque duplo e aviso d
 
 ## Plano de implementação
 
-1. [ ] Criar o workspace npm em `src/Web` e o pacote vazio `@sipat/video-player`, ajustando os Dockerfiles do frontend e o CI.
-2. [ ] Mover o `SipatPlayer` (componente, CSS, carregador do Media Chrome) para o pacote, sem mudar comportamento. Os testes atuais continuam verdes.
-3. [ ] Extrair para o `core`, **com testes primeiro**: faixas assistidas, ponto mais distante, bloqueio, velocidade fixa e "quando salvar", a partir do `LearningTrackPage`.
-4. [ ] Extrair a pausa em pontos de atividade e trocar as duas cópias (participante e prévia) por ela.
-5. [ ] Ligar o `LearningTrackPage` e o `VideoPreview` ao novo componente por eventos; a tela fica só com a API e as mensagens.
-6. [ ] Criar o playground (`npm run player`).
-7. [ ] Adicionar o teste de arquitetura: o pacote não importa nada do app.
+1. [x] Criar o workspace npm em `src/Web` e o pacote vazio `@sipat/video-player`, ajustando os Dockerfiles do frontend e o CI.
+2. [x] Mover o `SipatPlayer` (componente, CSS, carregador do Media Chrome) para o pacote, sem mudar comportamento. Os testes atuais continuam verdes.
+3. [x] Extrair para o `core`, **com testes primeiro**: faixas assistidas, ponto mais distante, bloqueio, velocidade fixa e "quando salvar", a partir do `LearningTrackPage`.
+4. [x] Extrair a pausa em pontos de atividade e trocar as duas cópias (participante e prévia) por ela.
+5. [x] Ligar o `LearningTrackPage` e o `VideoPreview` ao novo componente por eventos; a tela fica só com a API e as mensagens.
+6. [x] Criar o playground (`npm run player`).
+7. [x] Adicionar o teste de arquitetura: o pacote não importa nada do app.
 8. [ ] Rodar o roteiro manual em Chrome, Safari e celular antes de publicar.

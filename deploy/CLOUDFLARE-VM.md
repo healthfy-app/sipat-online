@@ -111,7 +111,7 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
   ```bash
   docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml exec api dotnet SipatOnline.Api.dll --convert-catalog-videos
   ```
-  Ele imprime `N vídeos na fila de conversão.`. Acompanhe na biblioteca da operação; os vídeos continuam disponíveis enquanto são convertidos. Pode ser repetido: vídeos que já estão na fila ou já têm 480p não entram de novo.
+  Ele imprime `N vídeos na fila de conversão.`. Acompanhe na biblioteca da operação; os vídeos continuam disponíveis enquanto são convertidos. Pode ser repetido: vídeos que já estão na fila ou já têm 480p não entram de novo. **Espaço em disco:** cada vídeo enfileirado tem a 720p atual copiada antes para o volume `video-work`; confira que há espaço livre de aproximadamente o tamanho de toda a biblioteca antes de rodar o comando.
 
 **Antes do go-live:** confirme nos termos de uso da Cloudflare que servir vídeo pelo R2 é permitido no seu plano. **Plano B:** se houver qualquer problema, defina `VIDEO_STORAGE_PROVIDER=File` (ou apague a variável) e reinicie a API; ela volta a servir os vídeos do volume `platform-videos`, que por isso deve continuar existindo e com cópia externa. **Atenção:** vídeos enviados enquanto o R2 estava ativo existem **somente no R2** e não estão no volume. Antes de voltar para `File`, reenvie esses vídeos pelo painel ou copie-os de volta do bucket para o volume; do contrário eles ficam sem arquivo.
 
