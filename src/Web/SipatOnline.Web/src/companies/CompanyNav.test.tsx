@@ -18,4 +18,11 @@ describe('company sidebar', () => {
     expect(screen.getByRole('link', { name: 'Participantes' })).toHaveAttribute('href', '/platform/companies/c-1/participantes');
     expect(screen.getByRole('link', { name: 'Administradores' })).toHaveAttribute('href', '/platform/companies/c-1/administradores');
   });
+
+  it('links to the video quality of the company', async () => {
+    vi.mocked(api.getPlatformDashboard).mockResolvedValue([] as never);
+    render(<MemoryRouter initialEntries={['/platform/companies/c1/sipats']}><CompanyNav companyId="c1" /></MemoryRouter>);
+
+    expect(await screen.findByRole('link', { name: 'Qualidade do vídeo' })).toHaveAttribute('href', '/platform/companies/c1/qualidade');
+  });
 });

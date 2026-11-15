@@ -1,4 +1,4 @@
-import type { PlaybackQualitySummary } from './player/core/quality';
+import type { PlayerQualitySummary } from '@sipat/video-player';
 
 export interface TenantBranding {
   tenantKey: string;
@@ -33,6 +33,8 @@ export interface PlatformCompanyOverview extends PlatformCompany {
   employeeCount: number;
   administratorCount: number;
   totalUserCount: number;
+  /** The company's portal logo; absent when it has none. */
+  logoReference?: string | null;
 }
 
 export interface PlatformCompanyEmployee {
@@ -284,6 +286,10 @@ export interface PlatformCourseVideo {
   durationMilliseconds: number;
   createdAt: string;
   fileUrl: string;
+  /** Every upload is converted in the background; only Ready videos can be watched or put in a Day. */
+  status: 'Ready' | 'Processing' | 'Failed';
+  processingError: string | null;
+  hasSd480: boolean;
   checkpoints: VideoCheckpoint[];
   lessonId?: string | null;
   libraryTitle?: string | null;
@@ -514,6 +520,7 @@ export interface LearningPlaybackSession {
   expiresAt: string;
   sessionId: string;
   isDevelopmentDemo: boolean;
+  sources?: { url: string; quality: '720p' | '480p' | null }[];
 }
 
 export interface LearningProgress {
@@ -1070,6 +1077,9 @@ export async function primeAntiforgeryToken(): Promise<void> {
   }
 }
 
+/** The player's quality summary plus the lesson and the API playback session it belongs to. */
+export interface PlaybackQualitySummary extends PlayerQualitySummary { lessonId: string; playbackSessionId: string }
+
 export async function sendPlaybackQuality(
   trackId: string,
   summary: PlaybackQualitySummary,
@@ -1142,4 +1152,50 @@ export async function deleteCourseCategory(id: string): Promise<void> {
 
 export async function setCourseCategory(courseId: string, categoryId: string | null): Promise<void> {
   await request(`/api/platform/catalog/courses/${courseId}/category`, { method: 'PUT', body: JSON.stringify({ categoryId }) });
+}
+
+export type QualityLevel = 'Good' | 'Attention' | 'Poor';
+export interface QualityIndicator { value: number | null; level: QualityLevel | null }
+export interface QualityIndicators {
+  sessions: number; startedSessions: number; neverStartedPercent: QualityIndicator;
+  stalledSessionsPercent: QualityIndicator; averageStartupMilliseconds: QualityIndicator; stalledTimePercent: QualityIndicator;
+}
+export interface QualityBreakdownItem { key: string | null; indicators: QualityIndicators }
+export interface CompanyPlaybackQuality {
+  companyId: string; companyName: string; companyKey: string;
+  sipats: { id: string; title: string; startsAt: string }[]; sipatId: string | null; day: number | null; days: number[];
+  indicators: QualityIndicators; byHour: { hour: number; sessions: number; stalledSessions: number }[];
+  byConnection: QualityBreakdownItem[]; byDevice: QualityBreakdownItem[]; byQuality: QualityBreakdownItem[]; byDay: QualityBreakdownItem[];
+  videos: { videoId: string | null; title: string; indicators: QualityIndicators }[];
+  people: { participantId: string; displayName: string; loginIdentifier: string; sessions: number; neverStarted: number; stalledTimePercent: number }[];
+}
+export interface QualityFilter { sipatId?: string | null; day?: number | null }
+
+function qualityQuery(filter: QualityFilter = {}): string {
+  const query = new URLSearchParams();
+  if (filter.sipatId) query.set('sipatId', filter.sipatId);
+  if (filter.day !== null && filter.day !== undefined) query.set('day', String(filter.day));
+  const text = query.toString();
+  return text ? `?${text}` : '';
+}
+
+export function getCompanyPlaybackQuality(companyId: string, filter: QualityFilter = {}): Promise<CompanyPlaybackQuality> {
+  return requestJson<CompanyPlaybackQuality>(`/api/platform/companies/${encodeURIComponent(companyId)}/playback-quality${qualityQuery(filter)}`);
+}
+
+export function playbackQualitySummaryUrl(companyId: string, filter: QualityFilter = {}): string {
+  return `/api/platform/companies/${encodeURIComponent(companyId)}/playback-quality/summary.pdf${qualityQuery(filter)}`;
+}
+
+export interface PlaybackQualityComparison {
+  from: string; to: string;
+  companies: { companyId: string; name: string; indicators: QualityIndicators }[];
+}
+
+export function getPlaybackQualityComparison(period: { from?: string; to?: string } = {}): Promise<PlaybackQualityComparison> {
+  const query = new URLSearchParams();
+  if (period.from) query.set('from', period.from);
+  if (period.to) query.set('to', period.to);
+  const text = query.toString();
+  return requestJson<PlaybackQualityComparison>(`/api/platform/playback-quality${text ? `?${text}` : ''}`);
 }

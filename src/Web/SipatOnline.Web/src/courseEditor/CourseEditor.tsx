@@ -87,7 +87,7 @@ export default function CourseEditor({
   const selectedIndex = foundIndex >= 0 ? foundIndex : 0;
   const selectedItem = selectedLesson ? undefined : track[selectedIndex];
   const linkedIds = course.videos.map((video) => video.id);
-  const availableVideos = library.filter((item) => !linkedIds.includes(item.video.id));
+  const availableVideos = library.filter((item) => item.video.status === 'Ready' && !linkedIds.includes(item.video.id));
 
   useEffect(() => { heading.current?.focus(); }, []);
 

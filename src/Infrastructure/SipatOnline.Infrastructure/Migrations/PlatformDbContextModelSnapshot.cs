@@ -799,8 +799,24 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<long>("DurationMilliseconds")
                         .HasColumnType("bigint");
 
+                    b.Property<bool>("HasSd480")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
+                    b.Property<string>("ProcessingError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Ready");
 
                     b.Property<string>("Title")
                         .IsRequired()
@@ -1029,6 +1045,42 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("SipatPrograms", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.VideoConversionJobEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Error")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<DateTimeOffset?>("FinishedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Status", "CreatedAt");
+
+                    b.ToTable("VideoConversionJobs", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventEntity", b =>

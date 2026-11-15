@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { getCompanyAdministrationId, getParticipantOutcomes, type ParticipantOutcomes } from './api';
 import CourseDialog from './CourseDialog';
 
-export default function ParticipantOutcomesPanel({ participantId, companyId }: { participantId: string; companyId?: string }) {
+/** `quiet` draws the trigger as a light link ("Histórico →") for lists where every row has one. */
+export default function ParticipantOutcomesPanel({ participantId, companyId, quiet = false }: { participantId: string; companyId?: string; quiet?: boolean }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<ParticipantOutcomes | null>(null);
   const [error, setError] = useState('');
@@ -18,8 +19,13 @@ export default function ParticipantOutcomesPanel({ participantId, companyId }: {
     finally { setBusy(false); }
   }
   return <>
-    <button className="button button-quiet participant-outcomes-trigger" disabled={!participantId}
-      onClick={() => void load()} type="button">Ver histórico</button>
+    {quiet
+      ? <button className="participant-outcomes-trigger inline-flex min-h-0 cursor-pointer items-center gap-1 rounded-md border-0 bg-transparent px-2.5 py-1.5 text-sm font-semibold text-primary hover:bg-accent"
+        disabled={!participantId} onClick={(event) => { event.stopPropagation(); void load(); }} type="button">
+        Histórico <span aria-hidden="true">→</span>
+      </button>
+      : <button className="button button-quiet participant-outcomes-trigger" disabled={!participantId}
+        onClick={() => void load()} type="button">Ver histórico</button>}
     {open && <CourseDialog busy={busy} onClose={() => setOpen(false)} title="Atividades e certificados">
       {busy && <LoadingState className="loading-state-compact">Carregando resultados...</LoadingState>}
       {error && <div role="alert"><p>{error}</p><button className="button button-secondary" onClick={() => void load()} type="button">Tentar novamente</button></div>}

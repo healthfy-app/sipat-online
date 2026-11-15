@@ -124,7 +124,10 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             ContentType = video.ContentType,
             SizeBytes = video.SizeBytes,
             DurationMilliseconds = video.DurationMilliseconds,
-            CreatedAt = video.CreatedAt
+            CreatedAt = video.CreatedAt,
+            Status = video.Status.ToString(),
+            ProcessingError = video.ProcessingError,
+            HasSd480 = video.HasSd480
         });
 
         if (courseId is { } linkedCourseId)
@@ -543,5 +546,9 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             entity.Checkpoints
                 .OrderBy(checkpoint => checkpoint.TimeMilliseconds)
                 .Select(checkpoint => new VideoCheckpoint(checkpoint.TimeMilliseconds, checkpoint.ModuleId))
-                .ToArray());
+                .ToArray(),
+            // An unknown value is never treated as ready, so it cannot slip into a Day.
+            Status: Enum.TryParse<PlatformVideoStatus>(entity.Status, out var status) ? status : PlatformVideoStatus.Failed,
+            ProcessingError: entity.ProcessingError,
+            HasSd480: entity.HasSd480);
 }

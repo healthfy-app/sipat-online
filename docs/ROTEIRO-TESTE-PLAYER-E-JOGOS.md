@@ -101,6 +101,41 @@ com a mesma consulta (usuário e banco estão no arquivo `.env` do ambiente).
 Anote em cada caso o aparelho, o navegador e a versão. Se E2 ou E3 não gerarem linha, anote o horário para
 procurar nos logs da API.
 
+## G. Dashboard de qualidade
+
+Confere o painel de qualidade do vídeo da operação (`/platform/qualidade` e `/platform/companies/{id}/qualidade`).
+Precisa de uma conta da operação da plataforma e de uma conta de administrador de empresa.
+
+| # | O que fazer | O que deve acontecer | Resultado |
+|---|---|---|---|
+| G1 | Chrome com **Slow 4G**: provocar travamentos num Dia e abrir `/platform/companies/{id}/qualidade` | A sessão aparece em "Sessões com travamento", na hora certa do gráfico e em "Por conexão" | |
+| G2 | Na mesma tela, baixar o resumo e abrir o PDF | O PDF abre com uma página e o nome da empresa inteiro (sem cortar) | |
+| G3 | Abrir `/platform/qualidade` | A empresa aparece com os quatro semáforos; clicar nela abre a tela da empresa | |
+| G4 | Escolher um período de 366 dias e depois de 367 dias | 366 carrega; 367 mostra "Escolha um período de até um ano." sem pedir nada ao servidor | |
+| G5 | Entrar como **administrador da empresa** | Não há "Qualidade do vídeo" no menu; a rota da API `/api/platform/…/playback-quality` no endereço da empresa responde **404** (não 403: a rota da operação nem existe nesse endereço) | |
+
+## H. Conversão e qualidade 720p/480p
+
+Confere o envio com conversão automática e a escolha de qualidade no player.
+
+| # | O que fazer | O que deve acontecer | Resultado |
+|---|---|---|---|
+| H1 | Enviar um vídeo na Biblioteca | Aparece "Processando"; não aparece no planejador do Dia nem na lista "Vincular da biblioteca" do editor de curso; em poucos minutos fica "Pronto" | |
+| H2 | Abrir o vídeo pronto num Dia | O player mostra o botão de qualidade com Automática, 720p e 480p | |
+| H3 | **Android** com 3G simulado | Começa em 480p | |
+| H4 | **iPhone** | Começa em 720p | |
+| H5 | Escolher 480p e recarregar | Continua em 480p | |
+| H6 | Em 720p com **Slow 4G**: provocar 2 travamentos em 1 minuto | Troca sozinho para 480p, sem perder a posição e sem liberar o avanço | |
+| H7 | Depois do H6, abrir o menu e escolher **Automática** de novo | Continua em 480p (não volta para 720p sozinho) | |
+| H8 | Abrir o menu de qualidade | A opção em uso tem o sinal de marcado (✓) e o botão mostra a qualidade atual | |
+| H9 | Chrome e **iPhone Safari**: trocar a qualidade no meio do vídeo e observar a ordem dos eventos (playground `npm run player` em `src/Web`, ou o console) | Ordem esperada: `qualityChange`, nova carga do arquivo, volta à posição, `playing`. Sem dois "carregando" seguidos e sem salto para o início | |
+| H10 | **iPhone em tela cheia nativa**: deixar o vídeo cair sozinho para 480p e, durante a troca, fazer um **avanço (seek)** | A troca acontece sem sair da tela cheia; o avanço respeita o ponto liberado e a posição não se perde | |
+| H11 | iPhone: depois da troca de arquivo (manual ou automática) com o vídeo tocando | O `play()` volta a tocar sozinho depois que o arquivo muda; se parar, anote a versão do iOS | |
+| H12 | Repetir os itens de **A. Player** (bloqueio, 1x, tela cheia no iPhone, jogos, salvar ao sair) | Tudo igual ao que era antes | |
+| H13 | `npm run player` em `src/Web` | O playground abre e mostra os eventos | |
+
+Anote em cada caso o aparelho, o navegador e a versão.
+
 ## F. Fora do escopo deste roteiro
 
 - Vídeos longos e conexão lenta (streaming adaptativo não existe hoje).

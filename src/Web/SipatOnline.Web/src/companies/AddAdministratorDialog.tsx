@@ -46,7 +46,7 @@ export default function AddAdministratorDialog({
   }
 
   return (
-    <Dialog busy={isSaving} description={`Quem vai administrar o SIPAT da ${companyName}.`} onClose={onClose} title="Adicionar administrador">
+    <Dialog busy={isSaving} description={`Quem vai administrar a SIPAT da ${companyName}.`} onClose={onClose} title="Adicionar administrador">
       <form className="grid gap-4" onSubmit={handleSubmit}>
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
         <Field htmlFor="admin-name" label="Nome">

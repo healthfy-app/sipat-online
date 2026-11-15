@@ -51,7 +51,21 @@ public sealed record PlatformCourseVideo(
     DateTimeOffset CreatedAt,
     IReadOnlyList<VideoCheckpoint> Checkpoints,
     Guid? LessonId = null,
-    string? LibraryTitle = null);
+    string? LibraryTitle = null,
+    PlatformVideoStatus Status = PlatformVideoStatus.Ready,
+    string? ProcessingError = null,
+    bool HasSd480 = false);
+
+/// <summary>A video is "Processing" while it is converted; only "Ready" videos can enter a Day.</summary>
+public enum PlatformVideoStatus
+{
+    Ready,
+    Processing,
+    Failed
+}
+
+/// <summary>The operator preview: a signed link to follow, or the file itself.</summary>
+public sealed record PlatformVideoFile(Uri? RedirectTo, Stream? Content, string ContentType);
 
 public sealed record PlatformLibraryVideo(PlatformCourseVideo Video, int CourseCount);
 

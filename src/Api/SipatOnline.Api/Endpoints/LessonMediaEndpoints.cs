@@ -1,0 +1,74 @@
+using SipatOnline.BuildingBlocks.Domain;
+using SipatOnline.Learning.Application;
+using SipatOnline.Learning.Application.Catalog;
+
+namespace SipatOnline.Api.Endpoints;
+
+/// <summary>The video file of a lesson, for the participant it is assigned to.</summary>
+public static class LessonMediaEndpoints
+{
+    /// <summary>The 480p is always produced as MP4, whatever type the original was stored with.</summary>
+    private const string Mp4ContentType = "video/mp4";
+
+    public static IEndpointRouteBuilder MapLessonMediaEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        endpoints.MapGroup("/api/learning")
+            .RequireAuthorization("ParticipateInLearning")
+            .WithTags("Learning activities")
+            .MapGet("/lessons/{lessonId:guid}/media", async (
+                Guid lessonId,
+                string? quality,
+                LessonMediaAccessService access,
+                IPlatformCourseVideoStorage storage,
+                CancellationToken cancellationToken) =>
+            {
+                var rendition = quality switch
+                {
+                    null or "" or "720p" => VideoRendition.Hd720,
+                    "480p" => VideoRendition.Sd480,
+                    _ => (VideoRendition?)null
+                };
+                if (rendition is null)
+                {
+                    return Results.NotFound();
+                }
+
+                var result = await access.AuthorizeAsync(lessonId, cancellationToken);
+                if (!result.IsSuccess)
+                {
+                    return ToProblem(result.Error);
+                }
+
+                var media = result.Value;
+                if (rendition == VideoRendition.Sd480 && !media.HasSd480)
+                {
+                    return Results.NotFound();
+                }
+
+                var signedUrl = await storage.GetPlaybackUrlAsync(
+                    media.VideoId, rendition.Value, TimeSpan.FromMinutes(10), cancellationToken);
+                if (signedUrl is not null)
+                {
+                    return Results.Redirect(signedUrl.AbsoluteUri);
+                }
+
+                var stream = await storage.OpenReadAsync(media.VideoId, rendition.Value, cancellationToken);
+                return stream is null
+                    ? Results.Problem(statusCode: 503, detail: "O arquivo do vídeo não está disponível.")
+                    : Results.File(stream, rendition == VideoRendition.Sd480 ? Mp4ContentType : media.ContentType, enableRangeProcessing: true);
+            });
+        return endpoints;
+    }
+
+    private static IResult ToProblem(DomainError error) =>
+        Results.Problem(
+            statusCode: error.Code switch
+            {
+                "learning.forbidden" => StatusCodes.Status403Forbidden,
+                "learning.lesson_not_found" => StatusCodes.Status404NotFound,
+                _ => StatusCodes.Status400BadRequest
+            },
+            title: error.Code,
+            detail: error.Message,
+            extensions: new Dictionary<string, object?> { ["code"] = error.Code });
+}

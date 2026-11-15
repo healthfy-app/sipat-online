@@ -2,6 +2,9 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Amazon.Runtime;
+using Amazon.S3;
+using Amazon.S3.Model;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -14,6 +17,7 @@ using SipatOnline.Infrastructure.Identity;
 using SipatOnline.Infrastructure.Learning;
 using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.Learning.Application.Catalog;
+using Testcontainers.Minio;
 using Testcontainers.PostgreSql;
 
 namespace SipatOnline.IntegrationTests;
@@ -21,6 +25,9 @@ namespace SipatOnline.IntegrationTests;
 public sealed class CatalogPlaybackApiTests
 {
     private static readonly byte[] VideoBytes = [0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 0, 0, 0, 0];
+    private static readonly byte[] WebmBytes = [0x1A, 0x45, 0xDF, 0xA3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    // Different from VideoBytes so a test can tell which rendition was served.
+    private static readonly byte[] Sd480Bytes = [0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 9, 9, 9, 9, 8, 8, 8, 8];
 
     [DockerFact]
     public async Task Plays_a_catalog_video_outside_the_development_provider()
@@ -43,6 +50,167 @@ public sealed class CatalogPlaybackApiTests
             Assert.Equal(HttpStatusCode.PartialContent, media.StatusCode);
         }
         finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
+    public async Task Offers_both_renditions_when_the_video_has_480p()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = CatalogFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory, hasSd480: true);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{seed.TrackId}/lessons/{seed.LessonId}/playback", HttpMethod.Post, new { });
+            var sources = playback.GetProperty("sources").EnumerateArray().ToArray();
+            Assert.Equal(2, sources.Length);
+            Assert.Equal($"/api/learning/lessons/{seed.LessonId}/media", sources[0].GetProperty("url").GetString());
+            Assert.Equal("720p", sources[0].GetProperty("quality").GetString());
+            Assert.Equal($"/api/learning/lessons/{seed.LessonId}/media?quality=480p", sources[1].GetProperty("url").GetString());
+            Assert.Equal("480p", sources[1].GetProperty("quality").GetString());
+            Assert.Equal(sources[0].GetProperty("url").GetString(), playback.GetProperty("url").GetString());
+            using var sd = await participant.GetAsync(sources[1].GetProperty("url").GetString());
+            Assert.Equal(HttpStatusCode.OK, sd.StatusCode);
+            Assert.Equal(Sd480Bytes, await sd.Content.ReadAsByteArrayAsync());
+            using var hd = await participant.GetAsync(sources[0].GetProperty("url").GetString());
+            Assert.Equal(HttpStatusCode.OK, hd.StatusCode);
+            Assert.Equal(VideoBytes, await hd.Content.ReadAsByteArrayAsync());
+            using var request = new HttpRequestMessage(HttpMethod.Get, sources[1].GetProperty("url").GetString());
+            request.Headers.Range = new RangeHeaderValue(0, 7);
+            using var ranged = await participant.SendAsync(request);
+            Assert.Equal(HttpStatusCode.PartialContent, ranged.StatusCode);
+            Assert.Equal(Sd480Bytes[..8], await ranged.Content.ReadAsByteArrayAsync());
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
+    public async Task Offers_a_single_source_for_older_videos()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = CatalogFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{seed.TrackId}/lessons/{seed.LessonId}/playback", HttpMethod.Post, new { });
+            var sources = playback.GetProperty("sources").EnumerateArray().ToArray();
+            Assert.Single(sources);
+            Assert.Equal(playback.GetProperty("url").GetString(), sources[0].GetProperty("url").GetString());
+            Assert.Equal(JsonValueKind.Null, sources[0].GetProperty("quality").ValueKind);
+            using var missing = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media?quality=480p");
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
+    public async Task Refuses_media_of_a_revoked_assignment()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = CatalogFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            using (var allowed = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media"))
+            {
+                Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+            }
+
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+                await db.LearningAssignments.ExecuteUpdateAsync(update => update.SetProperty(item => item.RevokedAt, DateTimeOffset.UtcNow));
+            }
+
+            using var refused = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media");
+            Assert.Equal(HttpStatusCode.NotFound, refused.StatusCode);
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
+    public async Task Serves_the_480p_as_mp4_whatever_the_stored_type_of_the_video()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = CatalogFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory, hasSd480: true, webm: true);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            using var hd = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media");
+            Assert.Equal("video/webm", hd.Content.Headers.ContentType?.MediaType);
+            using var sd = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media?quality=480p");
+            Assert.Equal("video/mp4", sd.Content.Headers.ContentType?.MediaType);
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
+    public async Task Signs_each_rendition_with_its_own_key_in_the_r2_storage()
+    {
+        await using var postgres = await StartPostgres();
+        await using var minio = new MinioBuilder(TestImages.Minio).Build();
+        await minio.StartAsync();
+        using (var s3 = new AmazonS3Client(
+            new BasicAWSCredentials(minio.GetAccessKey(), minio.GetSecretKey()),
+            new AmazonS3Config
+            {
+                ServiceURL = minio.GetConnectionString(),
+                ForcePathStyle = true,
+                AuthenticationRegion = "auto",
+                RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED
+            }))
+        {
+            await s3.PutBucketAsync(new PutBucketRequest { BucketName = "videos" });
+        }
+
+        await using var factory = CatalogFactory(postgres.GetConnectionString()).WithWebHostBuilder(builder =>
+        {
+            builder.UseSetting("SipatOnline:VideoStorage:Provider", "R2");
+            builder.UseSetting("SipatOnline:VideoStorage:R2:ServiceUrl", minio.GetConnectionString());
+            builder.UseSetting("SipatOnline:VideoStorage:R2:AccessKeyId", minio.GetAccessKey());
+            builder.UseSetting("SipatOnline:VideoStorage:R2:SecretAccessKey", minio.GetSecretKey());
+            builder.UseSetting("SipatOnline:VideoStorage:R2:Bucket", "videos");
+        });
+        var withBoth = await Seed(factory, hasSd480: true);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{withBoth.TrackId}/lessons/{withBoth.LessonId}/playback", HttpMethod.Post, new { });
+            var sources = playback.GetProperty("sources").EnumerateArray().ToArray();
+            Assert.Equal(["720p", "480p"], sources.Select(source => source.GetProperty("quality").GetString()));
+
+            // With signed links the session carries the storage links themselves, one per rendition.
+            var hdUrl = new Uri(sources[0].GetProperty("url").GetString()!);
+            var sdUrl = new Uri(sources[1].GetProperty("url").GetString()!);
+            Assert.EndsWith($"/videos/{withBoth.VideoId:N}/720p.mp4", hdUrl.AbsolutePath);
+            Assert.EndsWith($"/videos/{withBoth.VideoId:N}/480p.mp4", sdUrl.AbsolutePath);
+            Assert.Contains("X-Amz-Signature=", hdUrl.Query);
+            Assert.Contains("X-Amz-Signature=", sdUrl.Query);
+            Assert.Equal(sources[0].GetProperty("url").GetString(), playback.GetProperty("url").GetString());
+        }
+        finally { await Cleanup(factory, withBoth); }
+
+        var onlyHd = await Seed(factory);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{onlyHd.TrackId}/lessons/{onlyHd.LessonId}/playback", HttpMethod.Post, new { });
+            var sources = playback.GetProperty("sources").EnumerateArray().ToArray();
+            Assert.Single(sources);
+            using var missing = await participant.GetAsync($"/api/learning/lessons/{onlyHd.LessonId}/media?quality=480p");
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
+        }
+        finally { await Cleanup(factory, onlyHd); }
     }
 
     [DockerFact]
@@ -251,10 +419,15 @@ public sealed class CatalogPlaybackApiTests
             Task.FromResult(SipatOnline.BuildingBlocks.Domain.Result<StoredPlatformVideo>.Success(
                 new StoredPlatformVideo(contentType, declaredSize)));
 
-        public Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken) =>
+        public Task<Stream?> OpenReadAsync(Guid videoId, VideoRendition rendition, CancellationToken cancellationToken) =>
             Task.FromResult<Stream?>(new MemoryStream());
 
-        public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
+        public Task SaveRenditionAsync(
+            Guid videoId, VideoRendition rendition, string filePath, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<Uri?> GetPlaybackUrlAsync(
+            Guid videoId, VideoRendition rendition, TimeSpan validFor, CancellationToken cancellationToken) =>
             Task.FromResult<Uri?>(RememberLink(validFor));
 
         private static Uri RememberLink(TimeSpan validFor)
@@ -279,7 +452,7 @@ public sealed class CatalogPlaybackApiTests
         new SipatOnlineApiFactory(connectionString, developmentSampleEnabled: true)
             .WithWebHostBuilder(builder => builder.UseSetting("SipatOnline:Learning:Playback:Provider", "Catalog"));
 
-    private static async Task<Seeded> Seed(WebApplicationFactory<Program> factory, string? secondParticipant = null)
+    private static async Task<Seeded> Seed(WebApplicationFactory<Program> factory, string? secondParticipant = null, bool hasSd480 = false, bool webm = false)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
@@ -305,16 +478,30 @@ public sealed class CatalogPlaybackApiTests
         }
 
         var videoId = Guid.NewGuid();
+        var sourceBytes = webm ? WebmBytes : VideoBytes;
+        var contentType = webm ? "video/webm" : "video/mp4";
         var storage = scope.ServiceProvider.GetRequiredService<IPlatformCourseVideoStorage>();
-        await using var stream = new MemoryStream(VideoBytes);
-        Assert.True((await storage.SaveAsync(videoId, stream, "video/mp4", VideoBytes.Length, CancellationToken.None)).IsSuccess);
+        await using var stream = new MemoryStream(sourceBytes);
+        Assert.True((await storage.SaveAsync(videoId, stream, contentType, sourceBytes.Length, CancellationToken.None)).IsSuccess);
+        if (hasSd480)
+        {
+            var path = Path.GetTempFileName();
+            try
+            {
+                await File.WriteAllBytesAsync(path, Sd480Bytes);
+                await storage.SaveRenditionAsync(videoId, VideoRendition.Sd480, path, CancellationToken.None);
+            }
+            finally { File.Delete(path); }
+        }
+
         db.PlatformCourseVideos.Add(new PlatformCourseVideoEntity
         {
             Id = videoId,
             Title = "Vídeo de produção",
-            ContentType = "video/mp4",
-            SizeBytes = VideoBytes.Length,
+            ContentType = contentType,
+            SizeBytes = sourceBytes.Length,
             DurationMilliseconds = 1000,
+            HasSd480 = hasSd480,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();

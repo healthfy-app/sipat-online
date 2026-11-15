@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
@@ -14,9 +14,9 @@ vi.mock('./api', async (importOriginal) => ({
   changePlatformCompanyEmployeesStatus: vi.fn(),
 }));
 
-/** the company opens on its SIPAT builder; these tests are about the participants */
+/** the company page opens on its participants (the sidebar picks the section; there are no tabs) */
 async function openParticipants() {
-  await userEvent.click(await screen.findByRole('tab', { name: /Participantes/ }));
+  await screen.findByRole('heading', { name: /Participantes/ });
 }
 
 afterEach(cleanup);
@@ -84,7 +84,7 @@ describe('Platform company employees', () => {
     confirm.mockReturnValue(true);
     await user.click(screen.getByRole('button', { name: 'Inativar' }));
     expect(api.changePlatformCompanyEmployeesStatus).toHaveBeenCalledWith('company-1', ['employee-1'], false);
-    expect(await screen.findByRole('status')).toHaveTextContent('1 participante inativado.');
+    expect(await screen.findByText('1 participante inativado.')).toHaveAttribute('role', 'status');
     expect(screen.queryByText('1 selecionado')).not.toBeInTheDocument();
     confirm.mockRestore();
   });
@@ -101,10 +101,12 @@ describe('Platform company employees', () => {
       .toHaveAttribute('aria-valuenow', '50');
     expect(screen.getByText('Ativo')).toBeInTheDocument();
     expect(screen.getByText('Identificador · acme')).toBeInTheDocument();
-    expect(within(screen.getByRole('region', { name: 'Resumo da empresa' })).getByText('Administradores')).toBeInTheDocument();
-    expect(screen.getByRole('tab', { name: /Administradores/ })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Ver histórico' })).toBeInTheDocument();
-    expect(screen.getByRole('columnheader', { name: 'Atividades e certificados' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Resumo da empresa' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Histórico/ })).toBeInTheDocument();
+    expect(screen.getByRole('columnheader', { name: 'Histórico' })).toBeInTheDocument();
+    // one page of results: no pagination buttons that would do nothing
+    expect(screen.queryByRole('button', { name: 'Próxima' })).not.toBeInTheDocument();
     expect(screen.queryByText('Conclusão média')).not.toBeInTheDocument();
   });
 
@@ -128,8 +130,9 @@ describe('Platform company employees', () => {
     await openParticipants();
     await screen.findByText('Ana Silva');
 
+    // it filters as the operator types, without a search button
+    expect(screen.queryByRole('button', { name: 'Buscar' })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Buscar por nome ou login'), 'MAT-002');
-    await user.click(screen.getByRole('button', { name: 'Buscar' }));
     expect(await screen.findByText('Nenhum participante encontrado. Tente outro nome ou identificador.')).toBeInTheDocument();
     expect(api.getPlatformCompanyEmployees).toHaveBeenLastCalledWith(
       'company-1',
@@ -142,6 +145,17 @@ describe('Platform company employees', () => {
       'company-1',
       { offset: 0, limit: 50, search: 'MAT-002', includeInactive: true },
     ));
+  });
+
+  it('warns, with a way out, when the company has no administrator', async () => {
+    vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
+    renderPage();
+    await openParticipants();
+
+    const warning = await screen.findByText(/Esta empresa ainda não tem administrador/);
+    expect(warning).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Adicionar administrador/ }));
+    expect(await screen.findByRole('dialog')).toBeVisible();
   });
 
   it('moves between server-paginated employee results', async () => {
@@ -172,5 +186,22 @@ describe('Platform company employees', () => {
       'company-1',
       { offset: 50, limit: 50, search: '', includeInactive: false },
     );
+  });
+
+  it('opens with the search sent by the quality page', async () => {
+    vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
+    render(
+      <MemoryRouter initialEntries={['/platform/companies/company-1/participantes?busca=joao.silva']}>
+        <Routes>
+          <Route path="/platform/companies/:companyId/:section?" element={<PlatformCompanyEmployeesPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('searchbox', { name: 'Buscar por nome ou login' })).toHaveValue('joao.silva');
+    await waitFor(() => expect(api.getPlatformCompanyEmployees).toHaveBeenCalledWith(
+      'company-1',
+      expect.objectContaining({ search: 'joao.silva' }),
+    ));
   });
 });

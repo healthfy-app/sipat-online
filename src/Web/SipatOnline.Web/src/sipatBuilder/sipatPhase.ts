@@ -9,7 +9,7 @@ export const phaseLabel: Record<SipatPhase, { text: string; variant: 'default' |
   published: { text: 'Publicada', variant: 'success' },
   running: { text: 'Em andamento', variant: 'default' },
   finished: { text: 'Concluída', variant: 'neutral' },
-  cancelled: { text: 'Cancelada', variant: 'neutral' },
+  cancelled: { text: 'Encerrada', variant: 'neutral' },
 };
 
 /**

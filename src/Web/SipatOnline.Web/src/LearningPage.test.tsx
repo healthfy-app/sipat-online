@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom';
 import LearningPage, { type LearningSummary } from './LearningPage';
@@ -103,6 +103,9 @@ async function playableCourse(lessons: Array<typeof lesson & { sectionTitle?: st
   Object.defineProperty(video, 'paused', { configurable: true, writable: true, value: false });
   return { ...result, video };
 }
+
+// a lesson long enough that saved ranges are not clamped to the 5 s of the default fixture
+const longLesson = [{ ...lesson, durationMilliseconds: 60000 }];
 
 function atTime(video: HTMLVideoElement, seconds: number) {
   Object.defineProperty(video, 'currentTime', { configurable: true, writable: true, value: seconds });
@@ -634,6 +637,31 @@ describe('learning experience', () => {
     expect(startPlayback).toHaveBeenCalledWith('track-1', 'lesson-1');
   });
 
+  it('passes both renditions of the session to the player', async () => {
+    listAssignedTracks.mockResolvedValue([trackCard]);
+    getAssignedTrack.mockResolvedValueOnce({ track: trackCard, lessons: [lesson] });
+    startPlayback.mockResolvedValueOnce({
+      url: 'https://media.example.test/session/720.mp4',
+      sources: [
+        { url: 'https://media.example.test/session/720.mp4', quality: '720p' },
+        { url: 'https://media.example.test/session/480.mp4', quality: '480p' },
+      ],
+      contentType: 'video/mp4',
+      expiresAt: '2099-01-01T00:00:00Z',
+      sessionId: 'session-1',
+      isDevelopmentDemo: false,
+    });
+    localStorage.setItem('sipat-player-quality', '480p');
+    try {
+      const { container } = renderAt('/learning/tracks/track-1');
+      expect(await screen.findByRole('heading', { name: 'Identificação de riscos' })).toBeVisible();
+      await screen.findByRole('button', { name: 'Qualidade: 480p' });
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://media.example.test/session/480.mp4');
+    } finally {
+      localStorage.removeItem('sipat-player-quality');
+    }
+  });
+
   it('clamps the final playback range to the configured duration', async () => {
     listAssignedTracks.mockResolvedValue([trackCard]);
     getAssignedTrack.mockResolvedValueOnce({ track: trackCard, lessons: [lesson] });
@@ -909,5 +937,81 @@ describe('learning experience', () => {
     await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
     await waitFor(() => expect(sendQuality).toHaveBeenCalledWith('track-1',
       expect.objectContaining({ playbackSessionId: 'session-lesson-1' })));
+  });
+
+  it('saves every 10 seconds only once the range reaches 8 seconds', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { video } = await playableCourse(longLesson);
+      atTime(video, 0); fireEvent.playing(video);
+      atTime(video, 5); fireEvent.timeUpdate(video);
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      expect(recordRange).not.toHaveBeenCalled();
+      atTime(video, 9); fireEvent.timeUpdate(video);
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 9000, 9000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('saves on the first 10 second tick when the range is already long enough', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const { video } = await playableCourse(longLesson);
+      atTime(video, 0); fireEvent.playing(video);
+      atTime(video, 4); fireEvent.timeUpdate(video);
+      atTime(video, 9); fireEvent.timeUpdate(video);
+      await act(async () => { await vi.advanceTimersByTimeAsync(10000); });
+      expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 9000, 9000);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('starts a new range after a jump of more than five seconds', async () => {
+    const { video } = await playableCourse(longLesson);
+    atTime(video, 0); fireEvent.playing(video);
+    atTime(video, 3); fireEvent.timeUpdate(video);
+    atTime(video, 9.5); fireEvent.timeUpdate(video);
+    atTime(video, 10); fireEvent.timeUpdate(video);
+    fireEvent.pause(video);
+    await waitFor(() => expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 9500, 10000, expect.any(Number)));
+    const ranges = recordRange.mock.calls.map(call => [call[3], call[4]]);
+    expect(ranges.some(([start, end]) => start === 0 && end >= 9500)).toBe(false);
+  });
+
+  it('starts a new range when time goes backwards', async () => {
+    const { video } = await playableCourse(longLesson);
+    atTime(video, 0); fireEvent.playing(video);
+    atTime(video, 4); fireEvent.timeUpdate(video);
+    atTime(video, 2); fireEvent.timeUpdate(video);
+    atTime(video, 3); fireEvent.timeUpdate(video);
+    fireEvent.pause(video);
+    await waitFor(() => expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 2000, 3000, expect.any(Number)));
+  });
+
+  it('stops a drag on the timeline at what was already watched', async () => {
+    const { video, container } = await playableCourse([{ ...longLesson[0], lastPlaybackPositionMilliseconds: 12000 }]);
+    Object.defineProperty(video, 'duration', { configurable: true, value: 60 });
+    fireEvent.loadedMetadata(video);
+    const track = container.querySelector('.sipat-scrubber-track') as HTMLElement;
+    track.getBoundingClientRect = () => ({ left: 0, width: 100, right: 100, top: 0, bottom: 10, height: 10, x: 0, y: 0, toJSON: () => ({}) });
+    // jsdom has no PointerEvent: without it clientX would be lost
+    Object.defineProperty(window, 'PointerEvent', { configurable: true, writable: true, value: class extends MouseEvent {} });
+    try {
+      fireEvent.pointerDown(screen.getByRole('slider', { name: 'Posição do vídeo' }), { clientX: 90, button: 0 });
+    } finally { Reflect.deleteProperty(window, 'PointerEvent'); }
+    expect(video.currentTime).toBe(12);
+    expect(screen.getByText(/não é possível avançar/)).toBeVisible();
+  });
+
+  it('saves when the video is paused and after a seek', async () => {
+    const { video } = await playableCourse(longLesson);
+    atTime(video, 0); fireEvent.playing(video);
+    atTime(video, 2); fireEvent.pause(video);
+    await waitFor(() => expect(recordRange).toHaveBeenCalledWith('track-1', 'lesson-1', 'session-lesson-1', 0, 2000, expect.any(Number)));
+    atTime(video, 1); fireEvent.seeking(video); fireEvent.seeked(video);
+    await waitFor(() => expect(savePosition).toHaveBeenCalledWith('track-1', 'lesson-1', 1000));
   });
 });

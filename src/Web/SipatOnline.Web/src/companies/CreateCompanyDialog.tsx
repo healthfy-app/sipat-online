@@ -1,5 +1,6 @@
+import { Check, Copy, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
-import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
+import { generatePassword, passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { createPlatformCompany, type PlatformCompany, type PlatformCompanyData } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
@@ -27,6 +28,18 @@ export default function CreateCompanyDialog({
   const [keyEdited, setKeyEdited] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
+  // the operator has to hand this password over, so it can be seen, generated and copied
+  const [showPassword, setShowPassword] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  async function copyPassword() {
+    try {
+      await navigator.clipboard.writeText(form.adminPassword);
+      setCopied(true);
+    } catch {
+      setShowPassword(true); // no clipboard access: at least show it so it can be copied by hand
+    }
+  }
 
   const update = (field: Exclude<keyof PlatformCompanyData, 'plan'>, value: string) => setForm((current) => ({ ...current, [field]: value }));
 
@@ -51,7 +64,7 @@ export default function CreateCompanyDialog({
   }
 
   return (
-    <Dialog busy={isSaving} description="A empresa já nasce com o administrador que vai cuidar do SIPAT dela." onClose={onClose} size="lg" title="Nova empresa">
+    <Dialog busy={isSaving} description="A empresa já nasce com o administrador que vai cuidar da SIPAT dela." onClose={onClose} size="lg" title="Nova empresa">
       <form className="grid gap-5" onSubmit={handleSubmit}>
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
         <fieldset className="m-0 grid gap-4 border-0 p-0 sm:grid-cols-2">
@@ -63,7 +76,8 @@ export default function CreateCompanyDialog({
                 if (!keyEdited) update('key', suggestKey(event.target.value));
               }} />
           </Field>
-          <Field hint="Vira o endereço do portal: identificador.sipatonline.com.br" htmlFor="company-key" label="Identificador do portal">
+          <Field hint={<>Endereço do portal: <strong className="font-semibold text-foreground">{form.key.trim().toLowerCase() || 'identificador'}.sipatonline.com.br</strong></>}
+            htmlFor="company-key" label="Identificador do portal">
             <Input autoCapitalize="none" autoComplete="off" id="company-key" maxLength={63}
               pattern="[A-Za-z0-9]+([A-Za-z0-9-]*[A-Za-z0-9])?" required
               title="Use letras, números e hífen; não comece ou termine com hífen." value={form.key}
@@ -87,8 +101,23 @@ export default function CreateCompanyDialog({
           </Field>
           <Field className="sm:col-span-2" hint={`${passwordRulesHint} Entregue por um canal seguro: a senha não será exibida novamente.`}
             htmlFor="first-admin-password" label="Senha inicial temporária">
-            <Input autoComplete="new-password" id="first-admin-password" minLength={passwordMinLength} required type="password" value={form.adminPassword}
-              onChange={(event) => update('adminPassword', event.target.value)} />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-0 flex-[1_1_14rem]">
+                <Input autoComplete="new-password" className="pr-20 font-mono" id="first-admin-password" minLength={passwordMinLength} required
+                  type={showPassword ? 'text' : 'password'} value={form.adminPassword}
+                  onChange={(event) => { update('adminPassword', event.target.value); setCopied(false); }} />
+                <Button aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'} aria-pressed={showPassword}
+                  className="absolute top-1/2 right-1 -translate-y-1/2" onClick={() => setShowPassword((visible) => !visible)} size="sm" type="button" variant="ghost">
+                  {showPassword ? <EyeOff /> : <Eye />} {showPassword ? 'Ocultar' : 'Mostrar'}
+                </Button>
+              </div>
+              <Button disabled={isSaving} onClick={() => { update('adminPassword', generatePassword()); setShowPassword(true); setCopied(false); }} type="button" variant="outline">
+                <KeyRound /> Gerar senha
+              </Button>
+              <Button disabled={!form.adminPassword} onClick={() => void copyPassword()} type="button" variant="outline">
+                {copied ? <Check /> : <Copy />} {copied ? 'Copiada' : 'Copiar'}
+              </Button>
+            </div>
           </Field>
         </fieldset>
         <DialogActions>

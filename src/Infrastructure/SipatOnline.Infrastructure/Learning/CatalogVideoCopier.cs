@@ -45,7 +45,7 @@ public sealed class CatalogVideoCopier(
             string? error = null;
             try
             {
-                await using var stream = await source.OpenReadAsync(video.Id, cancellationToken);
+                await using var stream = await source.OpenReadAsync(video.Id, VideoRendition.Hd720, cancellationToken);
                 if (stream is not null)
                 {
                     // The file on the volume is the truth: it may have been converted in place
@@ -55,6 +55,11 @@ public sealed class CatalogVideoCopier(
                         video.Id, stream, video.ContentType, actualSize, cancellationToken);
                     if (saved.IsSuccess)
                     {
+                        if (source.FindFile(video.Id, VideoRendition.Sd480) is { } sd480)
+                        {
+                            await target.SaveRenditionAsync(video.Id, VideoRendition.Sd480, sd480, cancellationToken);
+                        }
+
                         status = CatalogVideoCopyStatus.Copied;
                         if (actualSize != video.SizeBytes)
                         {

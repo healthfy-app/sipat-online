@@ -18,6 +18,10 @@ x-api-environment: &api-environment
   SipatOnline__VideoStorage__R2__AccessKeyId: ${R2_ACCESS_KEY_ID:-}
   SipatOnline__VideoStorage__R2__SecretAccessKey: ${R2_SECRET_ACCESS_KEY:-}
   SipatOnline__VideoStorage__R2__Bucket: ${R2_VIDEO_BUCKET:-}
+  # cada envio vira 720p e 480p na propria API (ffmpeg na imagem), um por vez e em prioridade baixa;
+  # a pasta guarda o original so ate a conversao terminar
+  SipatOnline__VideoConversion__Enabled: "true"
+  SipatOnline__VideoConversion__WorkPath: /var/sipat/video-work
   # the owner of the platform, created on the first start (the password is only read then)
   SipatOnline__PlatformOperator__LoginIdentifier: ${PLATFORM_OPERATOR_LOGIN_IDENTIFIER:-}
   SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-}
@@ -69,6 +73,7 @@ services:
     volumes:
       - aspnet-data-protection:/root/.aspnet/DataProtection-Keys
       - platform-videos:/var/sipat/videos
+      - video-work:/var/sipat/video-work
     expose:
       - "8080"
     depends_on:
@@ -115,6 +120,7 @@ volumes:
   postgres-data:
   aspnet-data-protection:
   platform-videos:
+  video-work:
 
 networks:
   data:

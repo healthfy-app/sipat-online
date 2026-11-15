@@ -2,6 +2,7 @@ using System.IO.Compression;
 using System.Text;
 using SipatOnline.Infrastructure.Learning;
 using SipatOnline.Learning.Application;
+using SipatOnline.Learning.Application.Quality;
 using Xunit;
 
 namespace SipatOnline.IntegrationTests;
@@ -13,6 +14,9 @@ namespace SipatOnline.IntegrationTests;
 public sealed class PdfAccentGlyphTests
 {
     [Fact]
+    public void Quality_summary_keeps_the_parts_of_accented_letters() => AssertComplete(RenderQuality());
+
+    [Fact]
     public void Certificate_keeps_the_parts_of_accented_letters() => AssertComplete(RenderCertificate());
 
     [Fact]
@@ -20,9 +24,26 @@ public sealed class PdfAccentGlyphTests
     {
         var folder = Environment.GetEnvironmentVariable("PDF_SAMPLE_DIR");
         if (string.IsNullOrEmpty(folder)) return;
+        File.WriteAllBytes(Path.Combine(folder, "quality-summary-sample.pdf"), RenderQuality());
         File.WriteAllBytes(Path.Combine(folder, "certificate-sample.pdf"), RenderCertificate());
     }
 
+    private static byte[] RenderQuality()
+    {
+        var indicators = new QualityIndicators(
+            1280, 1190,
+            new QualityIndicator(7.0, QualityLevel.Good),
+            new QualityIndicator(18.4, QualityLevel.Attention),
+            new QualityIndicator(2350, QualityLevel.Attention),
+            new QualityIndicator(3.1, QualityLevel.Good));
+        var hours = Enumerable.Range(7, 12).Select(h => new HourBucket(h, 40 + h * 9 % 70, h % 4 == 0 ? 14 : 3)).ToList();
+        return new PlaybackQualityPdfRenderer().Render(new PlaybackQualityPdfContent(
+            "Companhia Brasileira de Distribuição, Mineração e Siderurgia do Vale do Paraíba Ltda - Unidade Industrial Norte",
+            "SIPAT 2026 - Semana Interna de Prevenção de Acidentes de Trabalho",
+            "Dia 3 - 18/11/2026", indicators, hours,
+            "A maioria das pessoas começou o vídeo sem problemas, mas 18,4% das sessões tiveram travamento no começo da tarde.",
+            DateTimeOffset.Now));
+    }
 
     private static byte[] RenderCertificate() => new CertificatePdfRenderer().Render(new ParticipationCertificate(
         Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),

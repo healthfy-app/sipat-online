@@ -1,0 +1,368 @@
+// Measures the quality of one video playback session. Pure TypeScript: no React and no
+// imports from the app; the player knows nothing about lessons or API sessions.
+
+export type QualityLabel = 'single' | '720p' | '480p';
+export type PlaybackDevice = 'phone' | 'tablet' | 'desktop';
+
+export interface PlaybackEnvironment {
+  connectionType: 'slow-2g' | '2g' | '3g' | '4g' | null;
+  downlinkMbps: number | null;
+  device: PlaybackDevice;
+  timezoneOffsetMinutes: number;
+}
+
+/** One playback session's quality, as the player measures it. The app adds the lesson and its API session. */
+export interface PlayerQualitySummary {
+  id: string;
+  startedAt: string;
+  timezoneOffsetMinutes: number;
+  startupMs: number | null;
+  neverStarted: boolean;
+  stallCount: number;
+  stallMs: number;
+  watchedMs: number;
+  errorKind: 'network' | 'decode' | 'source' | 'unknown' | null;
+  quality: QualityLabel;
+  qualitySwitches: number;
+  connectionType: PlaybackEnvironment['connectionType'];
+  downlinkMbps: number | null;
+  device: PlaybackDevice;
+}
+
+export type FlushReason = 'interval' | 'paused' | 'ended' | 'hidden' | 'leave' | 'stop';
+
+export interface QualityTracker {
+  flush(reason: FlushReason): void;
+  stop(): void;
+  /** The source changed: counts a switch and ignores the waiting it causes until the next 'playing'. */
+  setQuality(quality: QualityLabel): void;
+}
+
+const NEVER_STARTED_MS = 30_000;
+const INTERVAL_MS = 60_000;
+const PAUSED_MS = 30_000;
+const MIN_STALL_MS = 500;
+
+// Server-side limits (POST playback-quality).
+const MAX_STARTUP_MS = 600_000;
+const MAX_STALL_COUNT = 10_000;
+const MAX_DURATION_MS = 21_600_000;
+const MAX_DOWNLINK = 10_000;
+const MAX_QUALITY_SWITCHES = 1000;
+const MAX_TZ = 840;
+
+const CONNECTION_TYPES = ['slow-2g', '2g', '3g', '4g'] as const;
+
+function clampInt(value: number, max: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(max, Math.max(0, Math.round(value)));
+}
+
+export function detectDevice(
+  screenWidth: number,
+  screenHeight: number,
+  touch: boolean,
+): PlaybackDevice {
+  const min = Math.min(screenWidth, screenHeight);
+  if (touch && min < 600) return 'phone';
+  if (touch && min < 1100) return 'tablet';
+  return 'desktop';
+}
+
+export function readPlaybackEnvironment(): PlaybackEnvironment {
+  const connection = (
+    typeof navigator !== 'undefined'
+      ? (navigator as unknown as { connection?: { effectiveType?: unknown; downlink?: unknown } })
+          .connection
+      : undefined
+  );
+  const type = connection?.effectiveType;
+  const connectionType = (CONNECTION_TYPES as readonly unknown[]).includes(type)
+    ? (type as PlaybackEnvironment['connectionType'])
+    : null;
+  const rawDownlink = connection?.downlink;
+  const downlinkMbps =
+    typeof rawDownlink === 'number' && Number.isFinite(rawDownlink)
+      ? Math.min(MAX_DOWNLINK, Math.max(0, rawDownlink))
+      : null;
+
+  const touch =
+    (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+    (typeof window !== 'undefined' && 'ontouchstart' in window);
+  const width = typeof window !== 'undefined' ? window.screen?.width ?? 0 : 0;
+  const height = typeof window !== 'undefined' ? window.screen?.height ?? 0 : 0;
+
+  const offset = -new Date().getTimezoneOffset();
+  return {
+    connectionType,
+    downlinkMbps,
+    device: detectDevice(width, height, touch),
+    timezoneOffsetMinutes: Math.min(MAX_TZ, Math.max(-MAX_TZ, Math.round(offset))),
+  };
+}
+
+function safeEnvironment(): PlaybackEnvironment {
+  try {
+    return readPlaybackEnvironment();
+  } catch {
+    return { connectionType: null, downlinkMbps: null, device: 'desktop', timezoneOffsetMinutes: 0 };
+  }
+}
+
+// crypto.randomUUID is missing on non-HTTPS origins; fall back to a v4 UUID.
+function safeUuid(): string {
+  try {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+  } catch {
+    // fall through
+  }
+  const bytes = new Uint8Array(16);
+  try {
+    crypto.getRandomValues(bytes);
+  } catch {
+    for (let i = 0; i < 16; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+}
+
+function errorKindOf(video: HTMLVideoElement): PlayerQualitySummary['errorKind'] {
+  switch (video.error?.code) {
+    case 2:
+      return 'network';
+    case 3:
+      return 'decode';
+    case 4:
+      return 'source';
+    default:
+      return 'unknown';
+  }
+}
+
+export function trackPlaybackQuality(
+  video: HTMLVideoElement,
+  options: {
+    quality: QualityLabel;
+    environment?: PlaybackEnvironment;
+    /** Called when a counted stall (500 ms or more) ends. */
+    onStall?: (durationMs: number) => void;
+    onReport: (summary: PlayerQualitySummary, reason: FlushReason) => void;
+  },
+): QualityTracker {
+  const environment = options.environment ?? safeEnvironment();
+  const id = safeUuid();
+
+  let stopped = false;
+  let startedAt: string | null = null;
+  let playRequestedAt = 0;
+  let startupMs: number | null = null;
+  let hasPlayed = false; // first 'playing' seen
+  let neverStarted = false;
+  let stallCount = 0;
+  let stallMs = 0;
+  let watchedMs = 0;
+  let playingSince: number | null = null;
+  let waitingSince: number | null = null;
+  let errorKind: PlayerQualitySummary['errorKind'] = null;
+  let quality = options.quality;
+  let qualitySwitches = 0;
+  let switching = false; // a source change is loading: its waiting is not a stall
+
+  let neverStartedTimer: ReturnType<typeof setTimeout> | null = null;
+  let intervalTimer: ReturnType<typeof setInterval> | null = null;
+  let pausedTimer: ReturnType<typeof setTimeout> | null = null;
+
+  const now = () => performance.now();
+
+  function clearNeverStarted() {
+    if (neverStartedTimer !== null) clearTimeout(neverStartedTimer);
+    neverStartedTimer = null;
+  }
+  function clearInterval_() {
+    if (intervalTimer !== null) clearInterval(intervalTimer);
+    intervalTimer = null;
+  }
+  function clearPaused() {
+    if (pausedTimer !== null) clearTimeout(pausedTimer);
+    pausedTimer = null;
+  }
+
+  function closeWatched() {
+    if (playingSince !== null) {
+      watchedMs += now() - playingSince;
+      playingSince = null;
+    }
+  }
+
+  function buildSummary(): PlayerQualitySummary {
+    const t = now();
+    const watched = watchedMs + (playingSince !== null ? t - playingSince : 0);
+    // A stall still open at flush is reported without touching the accumulators,
+    // so the real 'playing' that closes it later does not count it twice.
+    const openStall = waitingSince !== null ? t - waitingSince : 0;
+    const reportOpen = openStall >= MIN_STALL_MS;
+    return {
+      id,
+      startedAt: startedAt ?? new Date().toISOString(),
+      timezoneOffsetMinutes: environment.timezoneOffsetMinutes,
+      startupMs: startupMs === null ? null : clampInt(startupMs, MAX_STARTUP_MS),
+      neverStarted,
+      stallCount: clampInt(stallCount + (reportOpen ? 1 : 0), MAX_STALL_COUNT),
+      stallMs: clampInt(stallMs + (reportOpen ? openStall : 0), MAX_DURATION_MS),
+      watchedMs: clampInt(watched, MAX_DURATION_MS),
+      errorKind,
+      quality,
+      qualitySwitches: clampInt(qualitySwitches, MAX_QUALITY_SWITCHES),
+      connectionType: environment.connectionType,
+      downlinkMbps: environment.downlinkMbps,
+      device: environment.device,
+    };
+  }
+
+  function flush(reason: FlushReason) {
+    if (startedAt === null) return; // nothing before the first play
+    try {
+      options.onReport(buildSummary(), reason);
+    } catch {
+      // a failing report must never break playback
+    }
+  }
+
+  function startInterval() {
+    if (intervalTimer !== null) return;
+    intervalTimer = setInterval(() => flush('interval'), INTERVAL_MS);
+  }
+
+  function onPlay() {
+    clearPaused();
+    if (startedAt !== null) return;
+    startedAt = new Date().toISOString();
+    playRequestedAt = now();
+    neverStartedTimer = setTimeout(() => {
+      neverStartedTimer = null;
+      if (!hasPlayed) {
+        neverStarted = true;
+        flush('interval');
+      }
+    }, NEVER_STARTED_MS);
+  }
+
+  function onPlaying() {
+    clearPaused();
+    if (startedAt === null) return;
+    if (!hasPlayed) {
+      hasPlayed = true;
+      startupMs = now() - playRequestedAt;
+      neverStarted = false;
+      clearNeverStarted();
+    }
+    switching = false;
+    if (waitingSince !== null) {
+      const duration = now() - waitingSince;
+      waitingSince = null;
+      if (duration >= MIN_STALL_MS) {
+        stallCount += 1;
+        stallMs += duration;
+        try { options.onStall?.(duration); } catch { /* the page's reaction must not break the meter */ }
+      }
+    }
+    if (playingSince === null) playingSince = now();
+    startInterval();
+  }
+
+  function onWaiting() {
+    if (!hasPlayed) return;
+    closeWatched();
+    if (video.seeking || switching) return;
+    if (waitingSince === null) waitingSince = now();
+  }
+
+  function onPause() {
+    if (!hasPlayed || video.ended) return;
+    closeWatched();
+    waitingSince = null;
+    clearInterval_();
+    clearPaused();
+    pausedTimer = setTimeout(() => {
+      pausedTimer = null;
+      if (video.paused) flush('paused');
+    }, PAUSED_MS);
+  }
+
+  function onEnded() {
+    if (!hasPlayed) return;
+    closeWatched();
+    waitingSince = null;
+    clearInterval_();
+    clearPaused();
+    flush('ended');
+  }
+
+  function onError() {
+    errorKind = errorKindOf(video);
+    if (startedAt === null) onPlay(); // an error before play starts the session
+    if (!hasPlayed) {
+      neverStarted = true;
+      clearNeverStarted();
+    }
+    flush('interval');
+  }
+
+  const handlers: Array<[string, () => void]> = [
+    ['play', onPlay],
+    ['playing', onPlaying],
+    ['waiting', onWaiting],
+    ['pause', onPause],
+    ['emptied', () => { if (switching) waitingSince = null; }],
+    ['ended', onEnded],
+    ['error', onError],
+  ];
+  // Never let an exception escape an event handler.
+  const guarded = handlers.map(([name, fn]) => {
+    const wrapped = () => {
+      try {
+        fn();
+      } catch {
+        // ignore
+      }
+    };
+    video.addEventListener(name, wrapped);
+    return [name, wrapped] as const;
+  });
+
+  // The video may already be failed or playing when the tracker is created.
+  try {
+    if (video.error) onError();
+    else if (!video.paused) onPlay();
+  } catch {
+    // ignore
+  }
+
+  return {
+    flush(reason) {
+      if (stopped) return;
+      flush(reason);
+    },
+    setQuality(next) {
+      if (stopped) return;
+      quality = next;
+      qualitySwitches += 1;
+      switching = true;
+      closeWatched();
+      waitingSince = null;
+    },
+    stop() {
+      if (stopped) return;
+      flush('stop');
+      stopped = true;
+      for (const [name, wrapped] of guarded) video.removeEventListener(name, wrapped);
+      clearNeverStarted();
+      clearInterval_();
+      clearPaused();
+    },
+  };
+}

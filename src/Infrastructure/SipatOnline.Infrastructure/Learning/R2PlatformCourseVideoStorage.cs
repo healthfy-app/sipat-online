@@ -15,7 +15,8 @@ public sealed class R2PlatformCourseVideoStorage(
 
     private bool UsesHttp => options.ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
 
-    public static string KeyFor(Guid videoId) => $"videos/{videoId:N}/720p.mp4";
+    public static string KeyFor(Guid videoId, VideoRendition rendition) =>
+        rendition == VideoRendition.Sd480 ? $"videos/{videoId:N}/480p.mp4" : $"videos/{videoId:N}/720p.mp4";
 
     public async Task<Result<StoredPlatformVideo>> SaveAsync(
         Guid videoId,
@@ -81,7 +82,7 @@ public sealed class R2PlatformCourseVideoStorage(
             await s3.PutObjectAsync(new PutObjectRequest
             {
                 BucketName = options.Bucket,
-                Key = KeyFor(videoId),
+                Key = KeyFor(videoId, VideoRendition.Hd720),
                 FilePath = tempPath,
                 ContentType = contentType,
                 // The SDK only allows unsigned payloads over HTTPS (always true for R2; HTTP is the local test MinIO).
@@ -99,11 +100,11 @@ public sealed class R2PlatformCourseVideoStorage(
         }
     }
 
-    public async Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken)
+    public async Task<Stream?> OpenReadAsync(Guid videoId, VideoRendition rendition, CancellationToken cancellationToken)
     {
         try
         {
-            var response = await s3.GetObjectAsync(options.Bucket, KeyFor(videoId), cancellationToken);
+            var response = await s3.GetObjectAsync(options.Bucket, KeyFor(videoId, rendition), cancellationToken);
             return response.ResponseStream;
         }
         catch (AmazonS3Exception exception) when (exception.StatusCode == HttpStatusCode.NotFound)
@@ -112,12 +113,24 @@ public sealed class R2PlatformCourseVideoStorage(
         }
     }
 
-    public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken)
+    public async Task SaveRenditionAsync(
+        Guid videoId, VideoRendition rendition, string filePath, CancellationToken cancellationToken) =>
+        await s3.PutObjectAsync(new PutObjectRequest
+        {
+            BucketName = options.Bucket,
+            Key = KeyFor(videoId, rendition),
+            FilePath = filePath,
+            ContentType = "video/mp4",
+            DisablePayloadSigning = !UsesHttp
+        }, cancellationToken);
+
+    public Task<Uri?> GetPlaybackUrlAsync(
+        Guid videoId, VideoRendition rendition, TimeSpan validFor, CancellationToken cancellationToken)
     {
         var url = s3.GetPreSignedURL(new GetPreSignedUrlRequest
         {
             BucketName = options.Bucket,
-            Key = KeyFor(videoId),
+            Key = KeyFor(videoId, rendition),
             Verb = HttpVerb.GET,
             Expires = clock.GetUtcNow().UtcDateTime.Add(validFor),
             Protocol = UsesHttp ? Protocol.HTTP : Protocol.HTTPS
@@ -125,8 +138,13 @@ public sealed class R2PlatformCourseVideoStorage(
         return Task.FromResult<Uri?>(new Uri(url));
     }
 
-    public async Task DeleteAsync(Guid videoId, CancellationToken cancellationToken) =>
-        await s3.DeleteObjectAsync(options.Bucket, KeyFor(videoId), cancellationToken);
+    public async Task DeleteAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        foreach (var rendition in Enum.GetValues<VideoRendition>())
+        {
+            await s3.DeleteObjectAsync(options.Bucket, KeyFor(videoId, rendition), cancellationToken);
+        }
+    }
 
     private static bool HasExpectedSignature(byte[] header, int headerLength, string contentType) =>
         contentType switch

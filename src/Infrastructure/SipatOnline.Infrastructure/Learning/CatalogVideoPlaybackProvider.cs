@@ -40,6 +40,11 @@ public sealed class CatalogVideoPlaybackProvider(
             return Unavailable();
         }
 
+        if (video.Status != nameof(PlatformVideoStatus.Ready))
+        {
+            return NotReady();
+        }
+
         var now = clock.GetUtcNow();
         var expiresAt = now.Add(SessionLifetime);
         var grant = new PlaybackGrantEntity
@@ -55,11 +60,19 @@ public sealed class CatalogVideoPlaybackProvider(
         db.PlaybackGrants.Add(grant);
         await db.SaveChangesAsync(cancellationToken);
 
-        var direct = await storage.GetPlaybackUrlAsync(
-            videoId, SessionLifetime + StorageLinkMargin, cancellationToken);
-        var url = direct?.ToString() ?? $"/api/learning/lessons/{lessonId:D}/media";
+        var linkLifetime = SessionLifetime + StorageLinkMargin;
+        var hd = await storage.GetPlaybackUrlAsync(videoId, VideoRendition.Hd720, linkLifetime, cancellationToken);
+        var hdUrl = hd?.ToString() ?? $"/api/learning/lessons/{lessonId:D}/media";
+        PlaybackSource[] sources = [new(hdUrl, video.HasSd480 ? "720p" : null)];
+        if (video.HasSd480)
+        {
+            // R2 signs a link even for a missing object, so the 480p is offered only once it exists.
+            var sd = await storage.GetPlaybackUrlAsync(videoId, VideoRendition.Sd480, linkLifetime, cancellationToken);
+            sources = [sources[0], new(sd?.ToString() ?? $"/api/learning/lessons/{lessonId:D}/media?quality=480p", "480p")];
+        }
+
         return Result<PlaybackSession>.Success(
-            new PlaybackSession(url, video.ContentType, expiresAt, grant.Id, false));
+            new PlaybackSession(hdUrl, video.ContentType, expiresAt, grant.Id, false, sources));
     }
 
     public async Task<Result<bool>> VerifyRangeAsync(
@@ -94,6 +107,11 @@ public sealed class CatalogVideoPlaybackProvider(
         await db.SaveChangesAsync(cancellationToken);
         return Result<bool>.Success(true);
     }
+
+    /// <summary>The refusal for a video that is still converting (or whose conversion failed).</summary>
+    public static Result<PlaybackSession> NotReady() =>
+        Result<PlaybackSession>.Failure(
+            new DomainError("learning.video_asset_unavailable", "Este vídeo ainda está sendo preparado."));
 
     private static Result<PlaybackSession> Unavailable() =>
         Result<PlaybackSession>.Failure(

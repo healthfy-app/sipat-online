@@ -1,0 +1,181 @@
+/* Lesson player: our own control bar over the browser's video engine (Media Chrome). */
+
+.sipat-player {
+  /* Every color of the player lives here; a screen can override any of these. */
+  --sipat-player-accent: var(--learner-action, var(--brand-primary, #0f7a3d));
+  --sipat-player-signal: #ffd166;
+  --sipat-player-surface: #000;
+  --sipat-player-text: #fff;
+  --sipat-player-track: rgb(255 255 255 / 22%);
+  --sipat-player-unlocked: rgb(255 255 255 / 55%);
+  --sipat-player-marker: #111;
+  --sipat-player-buffered: rgb(255 255 255 / 18%);
+  --sipat-player-hover: rgb(255 255 255 / 14%);
+  --sipat-player-range: rgb(255 255 255 / 30%);
+  --sipat-player-highlight: rgb(255 255 255 / 22%);
+  --sipat-player-muted-text: rgb(255 255 255 / 75%);
+  --sipat-player-fade-strong: rgb(0 0 0 / 78%);
+  --sipat-player-fade-soft: rgb(0 0 0 / 38%);
+  --sipat-player-fade-none: rgb(0 0 0 / 0%);
+  --sipat-player-shadow: rgb(0 0 0 / 45%);
+  --sipat-player-thumb-shadow: rgb(0 0 0 / 50%);
+  --sipat-player-tip: rgb(12 20 17 / 92%);
+  --sipat-player-scrim: rgb(0 0 0 / 72%);
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--sipat-player-surface);
+}
+.sipat-player.is-filling { position: fixed; inset: 0; z-index: 900; }
+.sipat-player:fullscreen { width: 100vw; height: 100vh; }
+
+/* visually hidden, still read by screen readers */
+.sipat-player-sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+
+.sipat-player-controller {
+  display: block;
+  width: 100%;
+  height: 100%;
+  --media-primary-color: var(--sipat-player-text);
+  --media-secondary-color: transparent;
+  --media-control-background: transparent;
+  --media-control-hover-background: var(--sipat-player-hover);
+  --media-control-padding: 8px;
+  --media-control-height: 22px;
+  --media-button-icon-height: 22px;
+  --media-font-family: 'Geist', system-ui, sans-serif;
+  --media-font-size: 13px;
+  --media-font-weight: 500;
+  --media-range-track-height: 3px;
+  --media-range-track-background: var(--sipat-player-range);
+  --media-range-bar-color: var(--sipat-player-text);
+  --media-range-thumb-background: var(--sipat-player-text);
+  --media-focus-box-shadow: 0 0 0 2px var(--sipat-player-signal);
+  --media-loading-indicator-icon-height: 56px;
+  --media-tooltip-display: none;
+}
+.sipat-player .learning-video, .sipat-player .sipat-player-video {
+  width: 100%; height: 100%; max-height: none; object-fit: contain; background: var(--sipat-player-surface);
+}
+
+/* ---------- barra ---------- */
+.sipat-player-bar {
+  align-items: center;
+  gap: 2px;
+  padding: 2px 10px 8px;
+  background: linear-gradient(to top, var(--sipat-player-fade-strong), var(--sipat-player-fade-none));
+}
+.sipat-player-bar > * { border-radius: 8px; }
+.sipat-player-bar media-volume-range { width: 72px; }
+.sipat-player-bar media-time-display { font-variant-numeric: tabular-nums; opacity: .92; }
+.sipat-player-spacer { flex: 1; }
+.sipat-player-activities {
+  display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; padding: 3px 9px;
+  border-radius: 999px; background: var(--sipat-player-hover); color: var(--sipat-player-text);
+  font: 600 12px/1.4 'Geist', system-ui, sans-serif; font-variant-numeric: tabular-nums;
+}
+.sipat-player-activities svg { width: 14px; height: 14px; color: var(--sipat-player-signal); }
+.sipat-player-button {
+  display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border: 0; border-radius: 8px;
+  background: transparent; color: var(--sipat-player-text); cursor: pointer; transition: background-color 150ms ease, transform 150ms ease;
+}
+.sipat-player-button:hover { background: var(--sipat-player-hover); }
+.sipat-player-button:active { transform: scale(.92); }
+.sipat-player-button:focus-visible { outline: 2px solid var(--sipat-player-signal); outline-offset: -2px; }
+.sipat-player-button svg { width: 20px; height: 20px; }
+
+/* ---------- qualidade ---------- */
+.sipat-player-quality { position: relative; display: inline-grid; }
+.sipat-player-menu {
+  position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 3; display: grid; min-width: 150px; padding: 4px;
+  border-radius: 10px; background: var(--sipat-player-surface); box-shadow: 0 12px 32px var(--sipat-player-shadow), inset 0 1px 0 var(--sipat-player-highlight);
+}
+.sipat-player-menuitem {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--sipat-player-text); font: 500 14px/1.2 'Geist', system-ui, sans-serif; text-align: left; cursor: pointer;
+}
+.sipat-player-menuitem:hover { background: var(--sipat-player-hover); }
+.sipat-player-menuitem:focus-visible { outline: 2px solid var(--sipat-player-signal); outline-offset: -2px; }
+.sipat-player-menuitem[aria-checked='true'] { color: var(--sipat-player-signal); font-weight: 700; }
+.sipat-player-menuitem[aria-checked='true']::after { content: '\2713'; }
+
+/* ---------- botão central: aparece pausado, some com um leve zoom ao tocar ---------- */
+.sipat-player-bigplay {
+  --media-button-icon-height: 34px;
+  width: 76px; height: 76px; border-radius: 50%;
+  background: color-mix(in srgb, var(--sipat-player-accent) 92%, var(--sipat-player-surface));
+  box-shadow: 0 12px 32px var(--sipat-player-shadow), inset 0 1px 0 var(--sipat-player-highlight);
+  transition: opacity 220ms ease, transform 220ms cubic-bezier(.2, .8, .2, 1), background-color 150ms ease;
+}
+.sipat-player-bigplay:hover { transform: scale(1.06); background: var(--sipat-player-accent); }
+.sipat-player-bigplay:not([mediapaused]) { opacity: 0; transform: scale(1.35); pointer-events: none; }
+
+/* ---------- linha do tempo ---------- */
+.sipat-scrubber {
+  position: relative; display: flex; align-items: center; align-self: stretch; height: 22px; padding: 0 14px; cursor: pointer;
+  touch-action: none; outline: none; background: linear-gradient(to top, var(--sipat-player-fade-soft), transparent);
+}
+.sipat-scrubber-track {
+  position: relative; width: 100%; height: 4px; border-radius: 999px; background: var(--sipat-player-track);
+  transition: height 140ms ease;
+}
+.sipat-scrubber.is-hovered .sipat-scrubber-track, .sipat-scrubber:focus-visible .sipat-scrubber-track { height: 7px; }
+.sipat-scrubber:focus-visible .sipat-scrubber-track { box-shadow: 0 0 0 2px var(--sipat-player-signal); }
+.sipat-scrubber-track > span { position: absolute; top: 0; left: 0; height: 100%; border-radius: inherit; }
+.sipat-scrubber-buffered { background: var(--sipat-player-buffered); }
+.sipat-scrubber-unlocked { background: var(--sipat-player-unlocked); transition: width 300ms linear; }
+.sipat-scrubber-played { background: var(--sipat-player-accent); filter: brightness(1.35) saturate(1.1); }
+.sipat-scrubber-track > .sipat-scrubber-thumb {
+  top: 50%; width: 14px; height: 14px; border-radius: 50%; background: var(--sipat-player-text);
+  box-shadow: 0 1px 4px var(--sipat-player-thumb-shadow); transform: translate(-50%, -50%) scale(0); transition: transform 140ms ease;
+}
+.sipat-scrubber.is-hovered .sipat-scrubber-thumb, .sipat-scrubber:focus-visible .sipat-scrubber-thumb { transform: translate(-50%, -50%) scale(1); }
+.sipat-scrubber-track > .sipat-scrubber-marker {
+  top: 50%; width: 9px; height: 9px; border: 2px solid var(--sipat-player-marker); border-radius: 50%; background: var(--sipat-player-signal);
+  transform: translate(-50%, -50%); transition: transform 140ms ease;
+}
+.sipat-scrubber.is-hovered .sipat-scrubber-marker { transform: translate(-50%, -50%) scale(1.25); }
+.sipat-scrubber-track > .sipat-scrubber-marker.is-done { background: var(--sipat-player-text); }
+
+.sipat-scrubber-tip {
+  position: absolute; bottom: 24px; display: grid; justify-items: center; gap: 2px; padding: 5px 9px;
+  border-radius: 8px; background: var(--sipat-player-tip); color: var(--sipat-player-text); white-space: nowrap; pointer-events: none;
+  font: 600 12px/1.35 'Geist', system-ui, sans-serif; font-variant-numeric: tabular-nums;
+  transform: translateX(-50%); animation: sipat-tip-in 120ms ease-out;
+}
+.sipat-scrubber-tip > * { display: inline-flex; align-items: center; gap: 5px; }
+.sipat-scrubber-tip strong { color: var(--sipat-player-signal); font-weight: 600; }
+.sipat-scrubber-tip.is-locked > span { color: var(--sipat-player-muted-text); font-weight: 500; }
+.sipat-scrubber-tip svg { width: 12px; height: 12px; }
+@keyframes sipat-tip-in { from { opacity: 0; transform: translateX(-50%) translateY(4px); } }
+
+/* ---------- erro de carregamento e atividade ---------- */
+.sipat-player-error {
+  position: absolute; inset: 0; z-index: 2; display: grid; place-content: center; justify-items: center; gap: 12px;
+  padding: 16px; text-align: center; background: var(--sipat-player-scrim); color: var(--sipat-player-text);
+  font: 500 14px/1.45 'Geist', system-ui, sans-serif;
+}
+.sipat-player-error p { margin: 0; max-width: 32ch; }
+.sipat-player-retry {
+  padding: 8px 16px; border: 0; border-radius: 8px; background: var(--sipat-player-accent); color: var(--sipat-player-text);
+  font: 600 14px/1.2 'Geist', system-ui, sans-serif; cursor: pointer;
+}
+.sipat-player-retry:focus-visible { outline: 2px solid var(--sipat-player-signal); outline-offset: 2px; }
+/* the activity brings its own stage; this only keeps its place inside the frame */
+.sipat-player-activity { display: contents; }
+
+
+@media (max-width: 480px) {
+  .sipat-player-bar media-volume-range, .sipat-player-bar media-seek-backward-button { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sipat-player-bigplay, .sipat-scrubber-track, .sipat-scrubber-thumb, .sipat-scrubber-marker, .sipat-scrubber-unlocked { transition: none; }
+  .sipat-player-bigplay:not([mediapaused]) { transform: none; }
+  .sipat-scrubber-tip { animation: none; }
+}
+
+/* standalone use (previews): the player sizes itself to the video's 16:9 frame */
+.video-preview .sipat-player { height: auto; aspect-ratio: 16 / 9; border-radius: 10px; overflow: hidden; }

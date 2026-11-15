@@ -21,6 +21,9 @@ x-api-environment: &api-environment
   SipatOnline__PlatformOperator__LoginIdentifier: ${PLATFORM_OPERATOR_LOGIN_IDENTIFIER:-sipat.online.admin}
   SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-Super Admin SIPAT Online}
   SipatOnline__PlatformOperator__Password: ${PLATFORM_OPERATOR_PASSWORD:-}
+  # every upload is converted to 720p and 480p by the API itself (ffmpeg in the image), one at a time
+  SipatOnline__VideoConversion__Enabled: "true"
+  SipatOnline__VideoConversion__WorkPath: /var/sipat/video-work
 
 services:
   postgres:
@@ -61,6 +64,7 @@ services:
     environment: *api-environment
     volumes:
       - platform-course-videos:/app/platform-course-videos
+      - video-work:/var/sipat/video-work
     ports:
       - "${LOCAL_BIND_ADDRESS:-0.0.0.0}:${API_PORT:-8080}:8080"
     depends_on:
@@ -70,8 +74,8 @@ services:
 
   web:
     build:
-      context: ./src/Web/SipatOnline.Web
-      dockerfile: Dockerfile
+      context: ./src/Web
+      dockerfile: SipatOnline.Web/Dockerfile
     environment:
       SIPAT_API_TARGET: http://api:8080
     ports:
@@ -80,3 +84,4 @@ services:
 volumes:
   postgres-data:
   platform-course-videos:
+  video-work:

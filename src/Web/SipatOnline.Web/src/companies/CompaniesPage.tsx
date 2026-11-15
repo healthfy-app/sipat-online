@@ -87,7 +87,7 @@ export default function CompaniesPage() {
       <button
         aria-label={`Ordenar por ${label.toLocaleLowerCase('pt-BR')}`}
         aria-pressed={sortKey === key}
-        className="m-0 inline-flex min-h-0 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-[inherit] font-[inherit] uppercase tracking-[inherit] text-[inherit] hover:text-foreground"
+        className="m-0 inline-flex min-h-0 cursor-pointer items-center gap-1 border-0 bg-transparent p-0 [color:inherit] [font:inherit] [letter-spacing:inherit] uppercase hover:text-foreground"
         onClick={() => sortBy(key)}
         type="button"
       >
@@ -121,7 +121,7 @@ export default function CompaniesPage() {
         {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
 
-        <div className="ops-card flex flex-wrap items-center gap-2.5 p-4">
+        <div className="flex flex-wrap items-center gap-2.5">
           <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-sm">
             <Search className="pointer-events-none absolute left-3 size-4" />
             <Input aria-label="Buscar empresa" className="pl-9" placeholder="Buscar por nome ou identificador" type="search" value={search}
@@ -145,7 +145,7 @@ export default function CompaniesPage() {
               <TableRow>
                 {sortable('name', 'Empresa')}
                 <TableHead className="max-lg:hidden" scope="col">Plano</TableHead>
-                {sortable('participants', 'Participantes', 'max-md:hidden')}
+                {sortable('participants', 'Participantes', 'max-md:hidden text-right')}
                 {sortable('status', 'Status', 'max-sm:hidden')}
                 <TableHead className="w-12"><span className="sr-only">Ações</span></TableHead>
               </TableRow>
@@ -155,11 +155,11 @@ export default function CompaniesPage() {
                 <TableRow className="cursor-pointer" key={company.id} onClick={() => navigate(`/platform/companies/${company.id}`)}>
                   <TableCell>
                     <div className="flex min-w-0 items-center gap-3">
-                      <CompanyAvatar name={company.name} />
+                      <CompanyAvatar logo={company.logoReference} name={company.name} />
                       <div className="grid min-w-0">
                         <Link
                           aria-label={`Abrir empresa ${company.name}`}
-                          className="truncate font-extrabold tracking-[-0.01em] text-[#12332c] no-underline hover:underline"
+                          className="truncate font-extrabold tracking-[-0.01em] text-foreground no-underline hover:underline"
                           onClick={(event) => event.stopPropagation()}
                           to={`/platform/companies/${company.id}`}
                         >
@@ -170,13 +170,19 @@ export default function CompaniesPage() {
                     </div>
                   </TableCell>
                   <TableCell className="max-lg:hidden"><PlanBadge plan={company.plan ?? 'Diamante'} /></TableCell>
-                  <TableCell className="tabular-nums max-md:hidden">{company.employeeCount.toLocaleString('pt-BR')}</TableCell>
+                  <TableCell className="text-right tabular-nums max-md:hidden">{company.employeeCount.toLocaleString('pt-BR')}</TableCell>
                   <TableCell className="max-sm:hidden">
-                    <Badge variant={company.isActive ? 'success' : 'neutral'}>{company.isActive ? 'Ativa' : 'Inativa'}</Badge>
+                    {/* active is the normal case and stays quiet; only an inactive company stands out */}
+                    {company.isActive
+                      ? <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><span aria-hidden="true" className="size-1.5 rounded-full bg-success" />Ativa</span>
+                      : <Badge variant="warning">Inativa</Badge>}
                   </TableCell>
                   <TableCell className="py-2 pr-2 text-right" onClick={(event) => event.stopPropagation()}>
                     <div className="flex items-center justify-end gap-1">
-                      <Link className="ops-pill" to={`/platform/companies/${company.id}`}>Entrar <ArrowRight aria-hidden="true" /></Link>
+                      <Link className="companies-open inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-sm font-semibold text-primary no-underline hover:bg-accent"
+                        tabIndex={-1} to={`/platform/companies/${company.id}`}>
+                        Abrir <ArrowRight aria-hidden="true" className="size-4" />
+                      </Link>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button aria-label={`Ações da empresa ${company.name}`} size="icon-sm" variant="ghost"><EllipsisVertical /></Button>

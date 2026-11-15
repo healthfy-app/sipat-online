@@ -57,6 +57,16 @@ export default function PlatformCoursesPage() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // While a video is being converted, reload the library quietly until it is ready (or failed).
+  const hasProcessing = library.some((item) => item.video.status === 'Processing');
+  useEffect(() => {
+    if (!hasProcessing) return;
+    const timer = window.setInterval(() => {
+      listPlatformLibraryVideos().then(setLibrary, () => undefined);
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [hasProcessing]);
+
   async function duplicate(course: PlatformCourse) {
     setError('');
     setNotice('');

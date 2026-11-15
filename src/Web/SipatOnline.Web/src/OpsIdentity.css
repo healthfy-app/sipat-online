@@ -34,11 +34,13 @@
   border: 1px solid #cdd7d3 !important; border-radius: 999px !important; background: #fff !important; color: #12332c !important;
 }
 .ops-hero-actions > button:hover:not(:disabled), .ops-hero-actions > a:hover { border-color: #12332c !important; }
+/* The main action of an operations page uses the same primary color as every other main button of the system */
 .ops-hero-actions > .ops-primary {
-  border-color: #ffd166 !important; background: #ffd166 !important; color: #12332c !important; font-weight: 800; padding-inline: 1.25rem;
+  border-color: var(--color-primary) !important; background: var(--color-primary) !important; color: var(--color-primary-foreground) !important;
+  font-weight: 800; padding-inline: 1.25rem;
 }
-.ops-hero-actions > .ops-primary:hover:not(:disabled) { background: #ffdf8f !important; }
-.ops-hero-actions > button:focus-visible, .ops-hero-actions > a:focus-visible { outline: 3px solid #ffd166; outline-offset: 2px; }
+.ops-hero-actions > .ops-primary:hover:not(:disabled) { background: color-mix(in srgb, var(--color-primary) 88%, #000) !important; }
+.ops-hero-actions > button:focus-visible, .ops-hero-actions > a:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-primary) 45%, transparent); outline-offset: 2px; }
 
 .ops-card { border: 1px solid #dfe6e3; border-radius: 1.25rem; background: #fff; }
 .ops-pill {

@@ -33,7 +33,7 @@ function Test-LocalTenant([string]$HostName) {
 const fs = require('fs');
 const https = require('https');
 const host = process.argv[2];
-const paths = ['/app/node_modules/.vite/basic-ssl-demo/_cert.pem', '/app/node_modules/.vite/basic-ssl/_cert.pem'];
+const paths = ['/app/SipatOnline.Web/node_modules/.vite/basic-ssl-demo/_cert.pem', '/app/SipatOnline.Web/node_modules/.vite/basic-ssl/_cert.pem', '/app/node_modules/.vite/basic-ssl-demo/_cert.pem', '/app/node_modules/.vite/basic-ssl/_cert.pem'];
 const pem = fs.readFileSync(paths.find(path => fs.existsSync(path)), 'utf8');
 const certificate = pem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/)[0];
 const request = https.get({ hostname: '127.0.0.1', port: 5173, servername: host, path: '/api/tenant/branding', headers: { host }, ca: certificate }, response => {
@@ -101,6 +101,8 @@ if (-not (Test-Path -LiteralPath $envFile)) {
     $participantPassword = New-LocalPassword
     $adminPassword = New-LocalPassword
     $operatorPassword = New-LocalPassword
+    # the demo display names say "demonstracao" with its accents, built from char codes so this file stays ASCII (Windows PowerShell 5.1)
+    $demo = 'demonstra' + [char]0x00E7 + [char]0x00E3 + 'o'
     $configuration = @(
         'POSTGRES_DB=sipat_online'
         'POSTGRES_USER=sipat_online'
@@ -119,13 +121,13 @@ if (-not (Test-Path -LiteralPath $envFile)) {
         'DEMO_PRESENTATION_ENABLED=false'
         'DEMO_VIDEO_SIZE_BYTES=0'
         'DEVELOPMENT_SAMPLE_PARTICIPANT_LOGIN_IDENTIFIER=participante.demo'
-        'DEVELOPMENT_SAMPLE_PARTICIPANT_DISPLAY_NAME=Participante de demonstracao'
+        "DEVELOPMENT_SAMPLE_PARTICIPANT_DISPLAY_NAME=Participante de $demo"
         "DEVELOPMENT_SAMPLE_PARTICIPANT_PASSWORD=$participantPassword"
         'BOOTSTRAP_ADMIN_LOGIN_IDENTIFIER=admin.demo'
-        'BOOTSTRAP_ADMIN_DISPLAY_NAME=Administrador de demonstracao'
+        "BOOTSTRAP_ADMIN_DISPLAY_NAME=Administrador de $demo"
         "BOOTSTRAP_ADMIN_PASSWORD=$adminPassword"
         'PLATFORM_OPERATOR_LOGIN_IDENTIFIER=operador.demo'
-        'PLATFORM_OPERATOR_DISPLAY_NAME=Operador de demonstracao'
+        "PLATFORM_OPERATOR_DISPLAY_NAME=Operador de $demo"
         "PLATFORM_OPERATOR_PASSWORD=$operatorPassword"
     )
     $credentials = @(
@@ -172,7 +174,7 @@ foreach ($key in $settings.Keys) {
 
 function Set-LocalSetting([string]$Key, [string]$Value) {
     $escapedKey = [regex]::Escape($Key)
-    $lines = @(Get-Content -LiteralPath $envFile)
+    $lines = @(Get-Content -LiteralPath $envFile -Encoding UTF8)
     $found = $false
     for ($index = 0; $index -lt $lines.Count; $index++) {
         if ($lines[$index] -match "^\s*$escapedKey=") {

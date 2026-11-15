@@ -17,6 +17,18 @@
   margin: 0 0 0.75rem; padding: 0.25rem 0.5rem 0.9rem; border-bottom: 1px solid #dfe6e3;
 }
 .portal-layout:not(.portal-layout-learner) .sidebar-brand .tenant-logo { max-width: 9rem; height: 2.25rem; }
+
+/* Logo rule for the compact header: a wide logo (a wordmark) stands alone and centered, its name kept for screen readers;
+   a square logo or the SIPAT gear keeps the name beside it, wrapping to two lines instead of being cut off */
+.tenant-identity-compact.has-wide-logo { display: flex; width: 100%; justify-content: center; }
+.tenant-identity-compact.has-wide-logo .tenant-logo { max-width: 100%; }
+.tenant-identity-compact.has-wide-logo .tenant-name {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+.tenant-identity-compact:not(.has-wide-logo) .tenant-name {
+  display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  line-height: 1.2; white-space: normal; overflow-wrap: anywhere;
+}
 .portal-layout:not(.portal-layout-learner) .sidebar-brand .sipat-default-logo { width: 2.25rem; height: 2.25rem; }
 .portal-layout:not(.portal-layout-learner) .sidebar-brand .tenant-name { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; }
 

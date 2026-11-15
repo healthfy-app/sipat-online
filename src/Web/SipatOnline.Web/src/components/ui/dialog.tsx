@@ -89,7 +89,10 @@ export function Dialog({
   );
 }
 
-/** Rodapé de ações do diálogo (Cancelar / Confirmar). */
+/**
+ * Rodapé de ações do diálogo (Cancelar / Confirmar).
+ * Num diálogo só de confirmação (sem conteúdo antes das ações) a linha do cabeçalho já separa: o rodapé não traz outra.
+ */
 export function DialogActions({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn('mt-2 flex flex-wrap justify-end gap-2 border-t border-border pt-4', className)}>{children}</div>;
+  return <div className={cn('mt-2 flex flex-wrap justify-end gap-2 border-t border-border pt-4 first:mt-0 first:border-t-0 first:pt-0', className)}>{children}</div>;
 }

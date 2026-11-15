@@ -194,17 +194,23 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ISipatEventStore, EfSipatEventStore>();
         services.AddScoped<ILearningStore, EfLearningStore>();
         services.AddScoped<ILearningEngagementStore, EfLearningEngagementStore>();
+        services.AddScoped<ILessonMediaStore, EfLessonMediaStore>();
+        services.AddScoped<LessonMediaAccessService>();
         services.AddScoped<SipatOnline.Learning.Application.Quality.IPlaybackQualityStore, EfPlaybackQualityStore>();
         services.AddScoped<SipatOnline.Learning.Application.Quality.PlaybackQualityService>();
+        services.AddScoped<SipatOnline.Learning.Application.Quality.IPlaybackQualityDashboardStore, EfPlaybackQualityDashboardStore>();
+        services.AddScoped<SipatOnline.Learning.Application.Quality.PlaybackQualityDashboardService>();
         services.AddScoped<LearningEngagementService>();
         services.AddScoped<LearningDistributionService>();
         services.AddScoped<SipatPlanService>();
         services.AddScoped<SipatOnline.Infrastructure.Identity.EmployeeCredentialService>();
         services.AddScoped<SipatOnline.Infrastructure.Tenancy.TenantPlanService>();
         services.AddSingleton<ICertificatePdfRenderer, CertificatePdfRenderer>();
+        services.AddSingleton<SipatOnline.Learning.Application.Quality.IPlaybackQualityPdfRenderer, PlaybackQualityPdfRenderer>();
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<PlatformCourseCatalogService>();
         AddPlatformCourseVideoStorage(services, configuration);
+        AddVideoConversion(services, configuration);
         ValidatePlaybackProviderSetting(configuration);
         services.AddSingleton<IHostedService>(provider =>
             new PlaybackProviderStartupCheck(provider.GetRequiredService<IHostEnvironment>(), configuration));
@@ -298,6 +304,27 @@ public static class InfrastructureServiceCollectionExtensions
             new FilePlatformCourseVideoStorage(
                 configuration["SipatOnline:PlatformCatalog:StoragePath"],
                 serviceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
+    }
+
+    private static void AddVideoConversion(IServiceCollection services, IConfiguration configuration)
+    {
+        var options = configuration.GetSection(VideoConversionOptions.SectionName).Get<VideoConversionOptions>()
+            ?? new VideoConversionOptions();
+        if (options.Enabled && string.IsNullOrWhiteSpace(options.WorkPath))
+        {
+            throw new InvalidOperationException($"Configure {VideoConversionOptions.SectionName}:WorkPath.");
+        }
+
+        services.AddSingleton(options);
+        services.AddSingleton<VideoConversionSignal>();
+        services.AddSingleton<FfmpegVideoTranscoder>();
+        services.AddScoped<IVideoConversionQueue, EfVideoConversionQueue>();
+        services.AddScoped<VideoConversionProcessor>();
+        if (options.Enabled && options.RunInBackground)
+        {
+            // A single worker: conversions run one at a time.
+            services.AddHostedService<VideoConversionWorker>();
+        }
     }
 
     private static string RequireR2Setting(IConfiguration configuration, string field) =>

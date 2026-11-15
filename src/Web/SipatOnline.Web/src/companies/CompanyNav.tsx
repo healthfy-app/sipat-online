@@ -36,5 +36,6 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
     <NavLink className={link(inSipat)} to={`${base}/sipats`}>SIPATs</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/participantes`}>Participantes</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/administradores`}>Administradores</NavLink>
+    <NavLink className={({ isActive }) => link(isActive)} to={`${base}/qualidade`}>Qualidade do vídeo</NavLink>
   </>;
 }

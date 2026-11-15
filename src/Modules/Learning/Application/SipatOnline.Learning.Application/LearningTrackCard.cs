@@ -37,12 +37,16 @@ public sealed record LearningExperience(
     LearningTrackCard Track,
     IReadOnlyList<LearningLessonProgress> Lessons);
 
+/// <summary>One address of the same video; <paramref name="Quality"/> is "720p", "480p" or null for a single version.</summary>
+public sealed record PlaybackSource(string Url, string? Quality);
+
 public sealed record PlaybackSession(
     string Url,
     string? ContentType,
     DateTimeOffset ExpiresAt,
     Guid SessionId,
-    bool IsDevelopmentDemo);
+    bool IsDevelopmentDemo,
+    IReadOnlyList<PlaybackSource>? Sources = null);
 
 public sealed record LearningLessonContext(
     Guid TrackId,
