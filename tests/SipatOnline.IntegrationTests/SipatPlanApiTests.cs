@@ -149,7 +149,12 @@ public sealed class SipatPlanApiTests
         var id = Guid.NewGuid();
         db.PlatformCourseVideos.Add(new PlatformCourseVideoEntity
         {
-            Id = id, Title = title, ContentType = "video/mp4", SizeBytes = 16, DurationMilliseconds = 5000, CreatedAt = DateTimeOffset.UtcNow
+            Id = id,
+            Title = title,
+            ContentType = "video/mp4",
+            SizeBytes = 16,
+            DurationMilliseconds = 5000,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
         return id;

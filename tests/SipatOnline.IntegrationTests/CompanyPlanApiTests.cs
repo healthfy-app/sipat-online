@@ -145,7 +145,12 @@ public sealed class CompanyPlanApiTests
         var id = Guid.NewGuid();
         db.PlatformCourseVideos.Add(new PlatformCourseVideoEntity
         {
-            Id = id, Title = title, ContentType = "video/mp4", SizeBytes = 16, DurationMilliseconds = 5000, CreatedAt = DateTimeOffset.UtcNow
+            Id = id,
+            Title = title,
+            ContentType = "video/mp4",
+            SizeBytes = 16,
+            DurationMilliseconds = 5000,
+            CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();
         return id;
@@ -156,7 +161,11 @@ public sealed class CompanyPlanApiTests
         var id = Guid.NewGuid();
         db.PlatformCourses.Add(new PlatformCourseEntity
         {
-            Id = id, Title = title, Description = description, CreatedAt = DateTimeOffset.UtcNow, Status = (int)PlatformCourseStatus.Published
+            Id = id,
+            Title = title,
+            Description = description,
+            CreatedAt = DateTimeOffset.UtcNow,
+            Status = (int)PlatformCourseStatus.Published
         });
         db.PlatformCourseVideoLinks.Add(new PlatformCourseVideoLinkEntity { CourseId = id, VideoId = videoId, Position = 0 });
         await db.SaveChangesAsync();
