@@ -196,6 +196,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ILearningEngagementStore, EfLearningEngagementStore>();
         services.AddScoped<SipatOnline.Learning.Application.Quality.IPlaybackQualityStore, EfPlaybackQualityStore>();
         services.AddScoped<SipatOnline.Learning.Application.Quality.PlaybackQualityService>();
+        services.AddScoped<SipatOnline.Learning.Application.Quality.IPlaybackQualityDashboardStore, EfPlaybackQualityDashboardStore>();
+        services.AddScoped<SipatOnline.Learning.Application.Quality.PlaybackQualityDashboardService>();
         services.AddScoped<LearningEngagementService>();
         services.AddScoped<LearningDistributionService>();
         services.AddScoped<SipatPlanService>();
