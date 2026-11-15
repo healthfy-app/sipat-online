@@ -95,7 +95,7 @@ public sealed class VideoConversionProcessor(
         return true;
     }
 
-    /// <summary>Queues every ready video that has no 480p yet, starting from its current 720p. It stays online meanwhile.</summary>
+    /// <summary>Queues every ready video that has no 480p yet; it gains only the 480p, made from its current 720p, which is never re-encoded. It stays online meanwhile.</summary>
     public async Task<int> EnqueueMissingSd480Async(CancellationToken cancellationToken)
     {
         var queued = db.VideoConversionJobs
@@ -147,7 +147,11 @@ public sealed class VideoConversionProcessor(
     /// <summary>Null when the video is converted; otherwise the reason it could not be.</summary>
     private async Task<string?> ConvertAsync(Guid jobId, Guid videoId, CancellationToken cancellationToken)
     {
-        if (!await db.PlatformCourseVideos.AnyAsync(video => video.Id == videoId, cancellationToken))
+        var status = await db.PlatformCourseVideos.AsNoTracking()
+            .Where(video => video.Id == videoId)
+            .Select(video => video.Status)
+            .SingleOrDefaultAsync(cancellationToken);
+        if (status is null)
         {
             return "O vídeo foi excluído antes da conversão.";
         }
@@ -158,9 +162,15 @@ public sealed class VideoConversionProcessor(
             return "O arquivo enviado não foi encontrado para a conversão. Envie o vídeo de novo.";
         }
 
+        // A video that is already ready may be playing right now: rewriting its 720p would answer
+        // the viewers' range requests from another encoding. It only gains the 480p, made from that 720p.
+        var addsSd480Only = status == Ready;
         var hd = OutputPath(videoId, VideoRendition.Hd720);
         var sd = OutputPath(videoId, VideoRendition.Sd480);
-        foreach (var (rendition, output) in new[] { (VideoRendition.Hd720, hd), (VideoRendition.Sd480, sd) })
+        var renditions = addsSd480Only
+            ? new[] { (VideoRendition.Sd480, sd) }
+            : new[] { (VideoRendition.Hd720, hd), (VideoRendition.Sd480, sd) };
+        foreach (var (rendition, output) in renditions)
         {
             var result = await transcoder.TranscodeAsync(source, output, rendition, cancellationToken);
             if (result.Canceled)
@@ -174,9 +184,15 @@ public sealed class VideoConversionProcessor(
             }
         }
 
-        var duration = await transcoder.ProbeDurationMillisecondsAsync(hd, cancellationToken);
-        var size = new FileInfo(hd).Length;
-        await storage.SaveRenditionAsync(videoId, VideoRendition.Hd720, hd, cancellationToken);
+        long? duration = null;
+        long size = 0;
+        if (!addsSd480Only)
+        {
+            duration = await transcoder.ProbeDurationMillisecondsAsync(hd, cancellationToken);
+            size = new FileInfo(hd).Length;
+            await storage.SaveRenditionAsync(videoId, VideoRendition.Hd720, hd, cancellationToken);
+        }
+
         await storage.SaveRenditionAsync(videoId, VideoRendition.Sd480, sd, cancellationToken);
 
         await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
@@ -185,10 +201,16 @@ public sealed class VideoConversionProcessor(
                 .Where(video => video.Id == videoId)
                 .ExecuteUpdateAsync(setters =>
                 {
+                    setters.SetProperty(video => video.HasSd480, true);
+                    if (addsSd480Only)
+                    {
+                        // The 720p, its size and its type stay exactly as they were.
+                        return;
+                    }
+
                     setters
                         .SetProperty(video => video.Status, Ready)
                         .SetProperty(video => video.ProcessingError, (string?)null)
-                        .SetProperty(video => video.HasSd480, true)
                         // Both versions are mp4 now (R2 stores them as video/mp4), whatever was uploaded.
                         .SetProperty(video => video.ContentType, "video/mp4")
                         .SetProperty(video => video.SizeBytes, size);
@@ -214,7 +236,14 @@ public sealed class VideoConversionProcessor(
         }
 
         DeleteWorkFolder(videoId);
-        logger.LogInformation("Video {VideoId} converted to 720p and 480p", videoId);
+        if (addsSd480Only)
+        {
+            logger.LogInformation("Video {VideoId} gained its 480p; its 720p was left untouched", videoId);
+        }
+        else
+        {
+            logger.LogInformation("Video {VideoId} converted to 720p and 480p", videoId);
+        }
         return null;
     }
 

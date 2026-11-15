@@ -259,12 +259,35 @@ public sealed class VideoConversionApiTests : IDisposable
         var queued = await LibraryVideo(client, videoId);
         Assert.Equal("Ready", queued.GetProperty("status").GetString());
         Assert.False(queued.GetProperty("hasSd480").GetBoolean());
+        Assert.True(Directory.Exists(SourceFolder(videoId)));
+        Assert.Equal(bytes, await Read720p(factory, videoId));
 
         Assert.True(await ConvertNext(factory));
 
         var converted = await LibraryVideo(client, videoId);
         Assert.Equal("Ready", converted.GetProperty("status").GetString());
         Assert.True(converted.GetProperty("hasSd480").GetBoolean());
+        // People may be watching: the 720p is not re-encoded, byte for byte the same file, same metadata.
+        Assert.Equal(bytes, await Read720p(factory, videoId));
+        Assert.Equal(bytes.Length, converted.GetProperty("sizeBytes").GetInt64());
+        Assert.Equal("video/mp4", converted.GetProperty("contentType").GetString());
+        await using (var sd = await factory.Services.GetRequiredService<IPlatformCourseVideoStorage>()
+                         .OpenReadAsync(videoId, VideoRendition.Sd480, default))
+        {
+            Assert.NotNull(sd);
+        }
+
+        Assert.False(Directory.Exists(SourceFolder(videoId)));
+    }
+
+    private static async Task<byte[]> Read720p(WebApplicationFactory<Program> factory, Guid videoId)
+    {
+        await using var stream = await factory.Services.GetRequiredService<IPlatformCourseVideoStorage>()
+            .OpenReadAsync(videoId, VideoRendition.Hd720, default);
+        Assert.NotNull(stream);
+        using var copy = new MemoryStream();
+        await stream!.CopyToAsync(copy);
+        return copy.ToArray();
     }
 
     [DockerFact]

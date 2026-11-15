@@ -36,6 +36,6 @@
 
 - **A imagem da API fica maior** com o `ffmpeg` (dezenas de MB) e a VM gasta CPU nas conversões; por isso uma por vez e em prioridade baixa. Um envio grande leva alguns minutos para ficar pronto.
 - A API ganha um volume de trabalho (`video-work`) para os originais que esperam conversão; a pasta de cada vídeo é apagada ao terminar, com sucesso ou falha.
-- Os vídeos antigos ganham a 480p com `--convert-catalog-videos`, sem sair do ar e sem trocar de id.
+- Os vídeos antigos ganham a 480p com `--convert-catalog-videos`, sem sair do ar e sem trocar de id. Para um vídeo que já está pronto, **só a 480p é gerada** (a partir da 720p atual); a 720p **não é recodificada**, para não trocar o arquivo debaixo de quem está assistindo (os pedidos por faixa de bytes de uma reprodução em andamento cairiam em outra codificação). Um vídeo antigo pesado continua pesado na 720p até ser convertido à mão, fora do horário de uso (`deploy/CLOUDFLARE-VM.md`, seção 5).
 - **HLS adaptativo fica para depois**, gerado pelo mesmo ffmpeg e guardado no próprio R2, sem mudar o player nem a interface de armazenamento.
 - **Antes de ligar o R2 em produção, confirmar nos termos de uso da Cloudflare** que servir vídeo pelo R2 é permitido no plano contratado. Se não for, o plano B (`File`) continua disponível.
