@@ -38,6 +38,29 @@ describe('quality menu', () => {
     expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument();
   });
 
+  it('loads the file once per switch, by menu or by automatic step-down', () => {
+    vi.useFakeTimers();
+    try {
+      const loads: string[] = [];
+      const descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src')!;
+      const set = vi.spyOn(Element.prototype, 'setAttribute');
+      const { video } = mount();
+      Object.defineProperty(video, 'src', { configurable: true, get: () => descriptor.get!.call(video), set: (value: string) => { loads.push(value); descriptor.set!.call(video, value); } });
+      set.mockClear();
+      const fire = (name: string) => act(() => { video.dispatchEvent(new Event(name)); });
+      const stall = () => { fire('waiting'); act(() => { vi.advanceTimersByTime(600); }); fire('playing'); };
+      fire('play'); fire('playing'); stall(); stall();
+      expect(video.getAttribute('src')).toBe('/480.mp4');
+      expect(loads).toEqual(['/480.mp4']);
+      expect(set.mock.calls.filter(([name]) => name === 'src')).toEqual([]);
+
+      fireEvent.click(screen.getByRole('button', { name: /Qualidade/ }));
+      fireEvent.click(screen.getByRole('menuitemradio', { name: '720p' }));
+      expect(loads).toEqual(['/480.mp4', '/720.mp4']);
+      expect(set.mock.calls.filter(([name]) => name === 'src')).toEqual([]);
+    } finally { vi.useRealTimers(); }
+  });
+
   it('starts in the saved quality', () => {
     localStorage.setItem(QUALITY_PREFERENCE_KEY, '480p');
     const { video } = mount();

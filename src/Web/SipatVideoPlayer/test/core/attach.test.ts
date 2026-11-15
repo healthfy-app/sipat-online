@@ -267,17 +267,22 @@ describe('attachPlayer quality switch', () => {
     h.video.dispatchEvent(new Event('seeking')); h.video.dispatchEvent(new Event('seeked'));
     expect(h.video.play).toHaveBeenCalled();
     h.define('paused', false); h.video.dispatchEvent(new Event('playing'));
-    h.define('currentTime', 21); h.video.dispatchEvent(new Event('timeupdate'));
-    await vi.advanceTimersByTimeAsync(10_000);
+    for (let t = 21; t <= 29; t++) { h.define('currentTime', t); h.video.dispatchEvent(new Event('timeupdate')); }
 
     h.define('currentTime', 45); h.video.dispatchEvent(new Event('seeking'));
     expect(h.video.currentTime).toBe(30);
     expect(events).toContainEqual({ type: 'seekBlocked' });
     expect(player!.unlocked()).toBe(30);
 
-    // nothing sent after the switch starts at 0 or reports a position before where the viewer was
+    // a real save after the switch: the range starts where the viewer was, never at 0
+    events.length = 0;
+    pauseAt(h, 30); await flush();
     const sent = saves(events).flatMap(event => event.type === 'save' ? [event] : []);
-    expect(sent.every(event => event.positionMs >= 20_000 && (event.range?.startMs ?? 20_000) >= 19_000)).toBe(true);
+    expect(sent).toEqual([{ type: 'save', reason: 'pause', positionMs: 30_000, range: { startMs: 20_000, endMs: 30_000 } }]);
+
+    await player!.requestSave('leave');
+    const report = events.find(event => event.type === 'quality');
+    expect(report && report.type === 'quality' && report.summary).toMatchObject({ quality: '480p', qualitySwitches: 1, stallCount: 2 });
   });
 
   it('does not step down automatically when the viewer chose 720p', async () => {
@@ -287,6 +292,18 @@ describe('attachPlayer quality switch', () => {
     await flush();
     expect(h.video.src).toMatch(/\/720\.mp4$/);
     expect(events.some(event => event.type === 'qualityChange')).toBe(false);
+  });
+
+  it('assigns the new file once per switch, automatic or manual', async () => {
+    const assigned: string[] = [];
+    const events: PlayerEvent[] = []; const h = open(events);
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLMediaElement.prototype, 'src')!;
+    Object.defineProperty(h.video, 'src', { configurable: true, get: () => descriptor.get!.call(h.video), set: (value: string) => { assigned.push(value); descriptor.set!.call(h.video, value); } });
+    h.video.dispatchEvent(new Event('play')); playTo(h, 0, 3);
+    stall(h, 600); stall(h, 600);
+    expect(assigned).toEqual(['/480.mp4']);
+    player!.switchQuality('720p');
+    expect(assigned).toEqual(['/480.mp4', '/720.mp4']);
   });
 
   it('steps down only once per session', async () => {

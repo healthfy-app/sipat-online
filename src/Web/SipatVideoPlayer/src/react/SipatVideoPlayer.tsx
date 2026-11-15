@@ -51,8 +51,9 @@ export default function SipatVideoPlayer({
   const [failed, setFailed] = useState(false);
   const [fired, setFired] = useState<ReadonlySet<string>>(new Set());
   const [preference, setPreference] = useState<QualityPreference>(() => readQualityPreference());
-  // The rendition playing. Chosen once from the saved choice and the connection; after that attachPlayer changes it and tells us.
-  const [current, setCurrent] = useState<VideoSource>(() => chooseSource(sources, preference, readConnection()));
+  // The rendition playing (label and meter). Chosen once from the saved choice and the connection; after that attachPlayer changes it and tells us.
+  const [initial] = useState<VideoSource>(() => chooseSource(sources, preference, readConnection()));
+  const [current, setCurrent] = useState<VideoSource>(initial);
 
   // Latest props for the long-lived listeners, so the player is not re-attached on every render.
   // One source is reported as 'single'.
@@ -144,7 +145,7 @@ export default function SipatVideoPlayer({
     overlay={overlay} unlocked={() => attached.current?.unlocked() ?? 0} videoRef={video}>
     <video
       aria-label={title} className="sipat-player-video" disablePictureInPicture playsInline preload={preload} slot="media"
-      ref={setVideo} src={current.src}>
+      ref={setVideo} src={initial.src} /* fixed: attachPlayer swaps the file; a re-render with a new src would load it twice */>
       {texts.unsupported}
     </video>
   </PlayerChrome>;

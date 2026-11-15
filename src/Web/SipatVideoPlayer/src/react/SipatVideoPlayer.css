@@ -100,7 +100,7 @@
 .sipat-player-menuitem:hover { background: var(--sipat-player-hover); }
 .sipat-player-menuitem:focus-visible { outline: 2px solid var(--sipat-player-signal); outline-offset: -2px; }
 .sipat-player-menuitem[aria-checked='true'] { color: var(--sipat-player-signal); font-weight: 700; }
-.sipat-player-menuitem[aria-checked='true']::after { content: '¹3'; }
+.sipat-player-menuitem[aria-checked='true']::after { content: '\2713'; }
 
 /* ---------- botão central: aparece pausado, some com um leve zoom ao tocar ---------- */
 .sipat-player-bigplay {
