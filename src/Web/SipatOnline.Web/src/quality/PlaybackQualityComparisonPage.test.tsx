@@ -150,6 +150,24 @@ describe('playback quality comparison page', () => {
     expect(screen.queryByRole('link', { name: 'Beta' })).not.toBeInTheDocument();
   });
 
+  it('accepts a period of exactly 366 days, counting both ends, and sends the request', async () => {
+    renderPage();
+    await screen.findByRole('link', { name: 'Beta' });
+    vi.mocked(api.getPlaybackQualityComparison).mockClear();
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '2025-11-15' } });
+    await waitFor(() => expect(api.getPlaybackQualityComparison).toHaveBeenCalledWith({ from: '2025-11-15', to: '2026-11-15' }));
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('refuses a period of 367 days', async () => {
+    renderPage();
+    await screen.findByRole('link', { name: 'Beta' });
+    vi.mocked(api.getPlaybackQualityComparison).mockClear();
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '2025-11-14' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Escolha um período de até um ano.');
+    expect(api.getPlaybackQualityComparison).not.toHaveBeenCalled();
+  });
+
   it('does not keep showing the previous period when reloading fails', async () => {
     renderPage();
     await screen.findByRole('link', { name: 'Beta' });

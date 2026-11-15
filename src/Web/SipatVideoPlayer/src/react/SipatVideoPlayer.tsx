@@ -18,11 +18,14 @@ export interface SipatVideoPlayerHandle {
 }
 
 export interface SipatVideoPlayerProps {
+  /** Read once, at mount: to change the sources, remount the player (give it a new `key`). */
   sources: VideoSource[];
   title: string;
   /** Opt-in rules; leave out for free playback (previews). */
   rules?: PlayerRules;
+  /** Seconds to start at. Read once, at mount: remount (new `key`) to change it. */
   resumeAt?: number;
+  /** Furthest second already watched (the watch-in-order limit). Read once, at mount: remount (new `key`) to change it. */
   furthest?: number;
   checkpoints?: Checkpoint[];
   /** Default true: the video pauses at each checkpoint. */
@@ -54,6 +57,8 @@ export default function SipatVideoPlayer({
   // The rendition playing (label and meter). Chosen once from the saved choice and the connection; after that attachPlayer changes it and tells us.
   const [initial] = useState<VideoSource>(() => chooseSource(sources, preference, readConnection()));
   const [current, setCurrent] = useState<VideoSource>(initial);
+  // True after the player stepped down by itself: picking Automática again then keeps that rendition instead of climbing back.
+  const steppedDown = useRef(false);
 
   // Latest props for the long-lived listeners, so the player is not re-attached on every render.
   // One source is reported as 'single'.
@@ -84,6 +89,7 @@ export default function SipatVideoPlayer({
         if (event.type === 'error') setFailed(true);
         if (event.type === 'checkpoint') syncFired();
         if (event.type === 'qualityChange') {
+          steppedDown.current = event.automatic;
           const next = latest.current.sources.find(source => source.quality === event.quality);
           if (next) setCurrent(next);
         }
@@ -121,6 +127,7 @@ export default function SipatVideoPlayer({
   function chooseQuality(value: QualityPreference) {
     setPreference(value);
     saveQualityPreference(value);
+    if (value === 'auto' && steppedDown.current) return;
     const target = chooseSource(sources, value, readConnection());
     if (target.quality && target.quality !== current.quality) attached.current?.switchQuality(target.quality);
   }

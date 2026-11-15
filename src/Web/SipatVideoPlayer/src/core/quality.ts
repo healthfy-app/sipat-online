@@ -48,6 +48,7 @@ const MAX_STARTUP_MS = 600_000;
 const MAX_STALL_COUNT = 10_000;
 const MAX_DURATION_MS = 21_600_000;
 const MAX_DOWNLINK = 10_000;
+const MAX_QUALITY_SWITCHES = 1000;
 const MAX_TZ = 840;
 
 const CONNECTION_TYPES = ['slow-2g', '2g', '3g', '4g'] as const;
@@ -215,7 +216,7 @@ export function trackPlaybackQuality(
       watchedMs: clampInt(watched, MAX_DURATION_MS),
       errorKind,
       quality,
-      qualitySwitches: clampInt(qualitySwitches, MAX_STALL_COUNT),
+      qualitySwitches: clampInt(qualitySwitches, MAX_QUALITY_SWITCHES),
       connectionType: environment.connectionType,
       downlinkMbps: environment.downlinkMbps,
       device: environment.device,

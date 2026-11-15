@@ -84,3 +84,29 @@ describe('quality menu', () => {
     expect(screen.queryByRole('menuitemradio')).not.toBeInTheDocument();
   });
 });
+
+describe('quality menu after an automatic step-down', () => {
+  it('keeps the current rendition when Automática is picked again', () => {
+    vi.useFakeTimers();
+    try {
+      const { video } = mount();
+      const fire = (name: string) => act(() => { video.dispatchEvent(new Event(name)); });
+      const stall = () => { fire('waiting'); act(() => { vi.advanceTimersByTime(600); }); fire('playing'); };
+      fire('play'); fire('playing'); stall(); stall();
+      expect(video.getAttribute('src')).toBe('/480.mp4');
+      fireEvent.click(screen.getByRole('button', { name: /Qualidade/ }));
+      fireEvent.click(screen.getByRole('menuitemradio', { name: 'Automática' }));
+      expect(video.getAttribute('src')).toBe('/480.mp4');
+      expect(localStorage.getItem(QUALITY_PREFERENCE_KEY)).toBe('auto');
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('still lets a manual choice be undone by Automática', () => {
+    const { video } = mount();
+    fireEvent.click(screen.getByRole('button', { name: /Qualidade/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: '480p' }));
+    fireEvent.click(screen.getByRole('button', { name: /Qualidade/ }));
+    fireEvent.click(screen.getByRole('menuitemradio', { name: 'Automática' }));
+    expect(video.getAttribute('src')).toBe('/720.mp4');
+  });
+});

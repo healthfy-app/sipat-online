@@ -26,13 +26,13 @@ const byName = (a: Company, b: Company) => a.name.localeCompare(b.name, 'pt-BR')
 
 const dayInMilliseconds = 86_400_000;
 
-/** Same limits as the API (from <= to, at most 366 days), so a bad period never reaches the server. */
+/** Same limits as the API (from <= to, at most 366 days counting both ends), so a bad period never reaches the server. */
 function periodProblem(from: string, to: string): string {
   const start = Date.parse(from);
   const end = Date.parse(to);
   if (Number.isNaN(start) || Number.isNaN(end)) return '';
   if (start > end) return 'A data inicial deve ser anterior à final.';
-  if ((end - start) / dayInMilliseconds > 366) return 'Escolha um período de até um ano.';
+  if ((end - start) / dayInMilliseconds + 1 > 366) return 'Escolha um período de até um ano.';
   return '';
 }
 

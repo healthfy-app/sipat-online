@@ -105,6 +105,15 @@ describe('trackPlaybackQuality', () => {
     expect(last().s.stallMs).toBe(0);
   });
 
+  it('caps the switch count at the server limit of 1000', () => {
+    const { tracker, fire, last } = setup();
+    fire('play');
+    fire('playing');
+    for (let i = 0; i < 1005; i += 1) tracker.setQuality(i % 2 ? '720p' : '480p');
+    tracker.flush('leave');
+    expect(last().s.qualitySwitches).toBe(1000);
+  });
+
   it('counts a quality switch and ignores the waiting it causes', () => {
     const { video, fire, tracker, last } = setup();
     fire('play');
