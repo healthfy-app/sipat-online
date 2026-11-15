@@ -94,7 +94,7 @@ com a mesma consulta (usuário e banco estão no arquivo `.env` do ambiente).
 |---|---|---|---|
 | E1 | Assistir um vídeo inteiro em **Chrome (desktop)**, **Safari no iPhone** e **Chrome no Android** | Em cada aparelho: o avanço além do ponto liberado é bloqueado, a velocidade fica em 1x, a tela cheia funciona, o jogo abre no momento certo e o progresso fica salvo (recarregar retoma de onde parou) | |
 | E2 | No Chrome: DevTools → Network → **Slow 4G**; tocar o vídeo até travar algumas vezes | Ao terminar ou fechar a sessão, a consulta acima mostra uma linha nova com `StallCount > 0` e `StallMilliseconds > 0` | |
-| E3 | Repetir E2 e **fechar a aba durante um travamento** | Mesmo assim a linha existe na consulta | |
+| E3 | Repetir E2 e **fechar a aba durante um travamento** | Mesmo assim a linha existe na consulta, com `StallCount > 0` | |
 | E4 | Com `VIDEO_STORAGE_PROVIDER=R2`: abrir a aula com DevTools → Network aberto | As requisições do vídeo vão para `*.r2.cloudflarestorage.com` (link assinado) e o vídeo toca até o fim | |
 | E5 | **Reiniciar o contêiner da API no meio do vídeo** (`docker compose restart api`) | O vídeo continua e o progresso continua sendo salvo (a sessão de reprodução, que permite aceitar o avanço depois do reinício, fica em `learning."PlaybackGrants"`; o progresso assistido fica em `learning."LearningProgress"`) | |
 

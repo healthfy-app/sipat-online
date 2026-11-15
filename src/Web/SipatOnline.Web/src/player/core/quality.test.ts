@@ -80,6 +80,33 @@ describe('trackPlaybackQuality', () => {
     expect(last().s.watchedMs).toBe(0);
   });
 
+  it('counts a stall that is still open at flush without double counting it later', () => {
+    const { fire, tracker, last } = setup();
+    fire('play');
+    fire('playing');
+    fire('waiting');
+    vi.advanceTimersByTime(2000);
+    tracker.flush('leave');
+    expect(last().s.stallCount).toBe(1);
+    expect(last().s.stallMs).toBeGreaterThanOrEqual(2000);
+    fire('playing');
+    tracker.flush('leave');
+    expect(last().s.stallCount).toBe(1);
+    expect(last().s.stallMs).toBeGreaterThanOrEqual(2000);
+    expect(last().s.stallMs).toBeLessThan(2100);
+  });
+
+  it('does not report an open stall shorter than 500 ms', () => {
+    const { fire, tracker, last } = setup();
+    fire('play');
+    fire('playing');
+    fire('waiting');
+    vi.advanceTimersByTime(300);
+    tracker.flush('leave');
+    expect(last().s.stallCount).toBe(0);
+    expect(last().s.stallMs).toBe(0);
+  });
+
   it('does not count waiting while seeking', () => {
     const { video, fire, tracker, last } = setup();
     fire('play');

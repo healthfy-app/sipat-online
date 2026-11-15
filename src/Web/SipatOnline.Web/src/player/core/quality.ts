@@ -194,7 +194,12 @@ export function trackPlaybackQuality(
   }
 
   function buildSummary(): PlaybackQualitySummary {
-    const watched = watchedMs + (playingSince !== null ? now() - playingSince : 0);
+    const t = now();
+    const watched = watchedMs + (playingSince !== null ? t - playingSince : 0);
+    // A stall still open at flush is reported without touching the accumulators,
+    // so the real 'playing' that closes it later does not count it twice.
+    const openStall = waitingSince !== null ? t - waitingSince : 0;
+    const reportOpen = openStall >= MIN_STALL_MS;
     return {
       id,
       lessonId: options.lessonId,
@@ -203,8 +208,8 @@ export function trackPlaybackQuality(
       timezoneOffsetMinutes: environment.timezoneOffsetMinutes,
       startupMs: startupMs === null ? null : clampInt(startupMs, MAX_STARTUP_MS),
       neverStarted,
-      stallCount: clampInt(stallCount, MAX_STALL_COUNT),
-      stallMs: clampInt(stallMs, MAX_DURATION_MS),
+      stallCount: clampInt(stallCount + (reportOpen ? 1 : 0), MAX_STALL_COUNT),
+      stallMs: clampInt(stallMs + (reportOpen ? openStall : 0), MAX_DURATION_MS),
       watchedMs: clampInt(watched, MAX_DURATION_MS),
       errorKind,
       quality: options.quality,
