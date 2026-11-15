@@ -659,6 +659,22 @@ describe('Platform course catalog', () => {
     expect(api.updatePlatformCourse).not.toHaveBeenCalled();
   });
 
+  it('offers only ready library videos when adding a video to a course', async () => {
+    const user = userEvent.setup();
+    const processing = { ...makeVideo('v-5', 'Ainda convertendo'), status: 'Processing' as const, hasSd480: false };
+    const failed = { ...makeVideo('v-6', 'Conversão com falha'), status: 'Failed' as const, processingError: 'Arquivo inválido.' };
+    const ready = makeVideo('v-7', 'Pronto para usar');
+    vi.mocked(api.listPlatformLibraryVideos).mockResolvedValue([
+      { video: opening, courseCount: 1 }, { video: processing, courseCount: 0 }, { video: failed, courseCount: 0 }, { video: ready, courseCount: 0 },
+    ]);
+    render(<PlatformCoursesPage />, '/platform/courses/c-2/edit');
+
+    await user.click((await screen.findAllByRole('button', { name: 'Adicionar vídeo' }))[0]);
+    const dialog = await screen.findByRole('dialog', { name: 'Adicionar vídeo' });
+    const options = within(within(dialog).getByLabelText('Vincular da biblioteca')).getAllByRole('option').map(option => option.textContent);
+    expect(options).toEqual(['Selecione um vídeo', 'Abertura', 'Pronto para usar']);
+  });
+
   it('explains where optional activities appear and how to configure a video question', async () => {
     const user = userEvent.setup();
     vi.mocked(api.listGameModules).mockResolvedValue([memoryModule]);

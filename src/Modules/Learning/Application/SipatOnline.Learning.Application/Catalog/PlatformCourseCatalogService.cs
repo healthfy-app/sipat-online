@@ -270,6 +270,12 @@ public sealed class PlatformCourseCatalogService(
                 "Um curso publicado precisa ter ao menos um vídeo.");
         }
 
+        var unready = await RefuseUnreadyNewVideosAsync(course, videoIds, cancellationToken);
+        if (unready is not null)
+        {
+            return unready;
+        }
+
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         if (!await catalogStore.SetCourseVideosAsync(courseId, videoIds, cancellationToken))
         {
@@ -284,6 +290,30 @@ public sealed class PlatformCourseCatalogService(
         return refreshed is null
             ? CourseNotFound<PlatformCourse>()
             : Result<PlatformCourse>.Success(refreshed);
+    }
+
+    /// <summary>
+    /// A video that is not in the course yet must be ready to be added. A video still converting that
+    /// was uploaded straight into this course is already linked, so saving the course keeps it.
+    /// </summary>
+    private async Task<Result<PlatformCourse>?> RefuseUnreadyNewVideosAsync(
+        PlatformCourse course,
+        IReadOnlyCollection<Guid> requestedIds,
+        CancellationToken cancellationToken)
+    {
+        var linked = course.Videos.Select(video => video.Id).ToHashSet();
+        foreach (var videoId in requestedIds.Where(id => !linked.Contains(id)))
+        {
+            var video = await catalogStore.FindVideoAsync(videoId, cancellationToken);
+            if (video is not null && video.Status != PlatformVideoStatus.Ready)
+            {
+                return Failure<PlatformCourse>(
+                    "learning.platform_course.video_not_ready",
+                    $"O vídeo \"{video.Title}\" ainda não está pronto e não pode entrar num curso.");
+            }
+        }
+
+        return null;
     }
 
     public async Task<Result<PlatformCourse>> SetStructureAsync(
@@ -352,6 +382,12 @@ public sealed class PlatformCourseCatalogService(
             return Failure<PlatformCourse>(
                 "learning.platform_course.publish_requires_video",
                 "Um curso publicado precisa ter ao menos um vídeo.");
+        }
+
+        var unready = await RefuseUnreadyNewVideosAsync(course, allVideoIds, cancellationToken);
+        if (unready is not null)
+        {
+            return unready;
         }
 
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
