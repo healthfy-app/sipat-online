@@ -85,6 +85,9 @@ public sealed class PlaybackQualityDashboardApiTests
 
         Assert.Equal(2, body.GetProperty("indicators").GetProperty("sessions").GetInt32());
         Assert.Equal(1, body.GetProperty("day").GetInt32());
+        var byHour = body.GetProperty("byHour");
+        Assert.Equal(2, byHour[10].GetProperty("sessions").GetInt32());
+        Assert.Equal(0, byHour[17].GetProperty("sessions").GetInt32());
     }
 
     [DockerFact]
