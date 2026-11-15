@@ -23,7 +23,7 @@ public sealed class VideoConversionOptions
     public bool RunInBackground { get; set; } = true;
 }
 
-public sealed record TranscodeResult(bool Succeeded, string? Error);
+public sealed record TranscodeResult(bool Succeeded, string? Error, bool Canceled = false);
 
 /// <summary>Converts a video to one of the library formats with ffmpeg, at low CPU priority.</summary>
 public sealed class FfmpegVideoTranscoder(VideoConversionOptions options)
@@ -72,7 +72,7 @@ public sealed class FfmpegVideoTranscoder(VideoConversionOptions options)
 
             if (run.Canceled)
             {
-                return new TranscodeResult(false, "A conversão foi cancelada.");
+                return new TranscodeResult(false, "A conversão foi cancelada.", Canceled: true);
             }
 
             return run.ExitCode == 0
@@ -173,12 +173,13 @@ public sealed class FfmpegVideoTranscoder(VideoConversionOptions options)
             {
                 process.Kill(entireProcessTree: true);
             }
-            catch (Exception killException) when (killException is InvalidOperationException or System.ComponentModel.Win32Exception)
+            catch (Exception killException) when (killException is InvalidOperationException or System.ComponentModel.Win32Exception or AggregateException)
             {
                 // The process already ended.
             }
 
             await process.WaitForExitAsync(CancellationToken.None);
+            await Task.WhenAll(output, error).ContinueWith(_ => { }, TaskScheduler.Default);
             return new ProcessRun(-1, string.Empty, string.Empty, timeoutSource.IsCancellationRequested, !timeoutSource.IsCancellationRequested);
         }
 

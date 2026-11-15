@@ -128,7 +128,7 @@ public sealed class FilePlatformCourseVideoStorage(
                 filePath,
                 FileMode.Open,
                 FileAccess.Read,
-                FileShare.Read,
+                FileShare.Read | FileShare.Delete,
                 CopyBufferSize,
                 FileOptions.Asynchronous | FileOptions.SequentialScan)
             : null;
@@ -146,7 +146,30 @@ public sealed class FilePlatformCourseVideoStorage(
         var storagePath = StoragePath
             ?? throw new InvalidOperationException("O armazenamento de vídeos do catálogo não está configurado.");
         Directory.CreateDirectory(storagePath);
-        File.Copy(filePath, GetFilePath(storagePath, videoId, rendition), overwrite: true);
+        var destination = GetFilePath(storagePath, videoId, rendition);
+        // Never rewrite the live file in place: a player may be reading byte ranges from it.
+        var temporary = Path.Combine(storagePath, $"{Guid.NewGuid():N}.tmp");
+        try
+        {
+            File.Copy(filePath, temporary, overwrite: true);
+            if (File.Exists(destination))
+            {
+                // ReplaceFile swaps atomically and works while readers hold the old file open with FileShare.Delete.
+                File.Replace(temporary, destination, destinationBackupFileName: null);
+            }
+            else
+            {
+                File.Move(temporary, destination);
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporary))
+            {
+                File.Delete(temporary);
+            }
+        }
+
         return Task.CompletedTask;
     }
 
