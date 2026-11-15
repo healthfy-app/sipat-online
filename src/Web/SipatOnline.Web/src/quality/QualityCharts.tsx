@@ -14,6 +14,7 @@ const hourText = (item: Hour) => `${item.hour}h: ${item.stalledSessions} de ${it
 /** Barra = % das sessões da hora que travaram. Hora sem sessões fica sem barra. */
 export function HourChart({ hours }: { hours: Hour[] }) {
   const byHour = new Map(hours.map(item => [item.hour, item]));
+  const withSessions = hours.filter(item => item.sessions > 0);
   const max = Math.max(10, ...hours.filter(item => item.sessions > 0).map(item => item.stalledSessions * 100 / item.sessions));
   return (
     <div>
@@ -36,9 +37,11 @@ export function HourChart({ hours }: { hours: Hour[] }) {
       })}
     </svg>
     {/* the <title> hover is invisible to screen readers and keyboards: the same numbers live here */}
-    <ul aria-label="Sessões com travamento por hora do dia" className="sr-only">
-      {hours.filter(item => item.sessions > 0).map(item => <li key={item.hour}>{hourText(item)}</li>)}
-    </ul>
+    {withSessions.length > 0 && (
+      <ul aria-label="Sessões com travamento por hora do dia" className="sr-only">
+        {withSessions.map(item => <li key={item.hour}>{hourText(item)}</li>)}
+      </ul>
+    )}
     </div>
   );
 }

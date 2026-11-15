@@ -133,13 +133,13 @@ describe('tenant portal', () => {
     expect(coursesActive ? certificates : courses).not.toHaveAttribute('aria-current');
     expect(within(sidebar).getByRole('img', { name: 'SIPAT Online' })).toHaveAttribute('src', '/favicon.svg');
   });
-  it.each(['ClientAdmin', 'Participant', 'Supervisor'])('keeps the company video quality screen away from a %s account', async (role) => {
+  it.each(['ClientAdmin', 'Participant', 'Supervisor'])('keeps the company video quality screen away from a platform %s account', async (role) => {
     window.history.pushState({}, '', '/platform/companies/c1/qualidade');
     const fetch = vi.fn(async (url: string) => {
       if (url === '/api/tenant/branding') return Response.json({
-        tenantKey: 'acme', tenantName: 'Acme', logoReference: null, primaryColor: '#123456', secondaryColor: '#FFFFFF', customDomain: null,
+        tenantKey: 'platform', tenantName: 'SIPAT Online', logoReference: null, primaryColor: '#123456', secondaryColor: '#FFFFFF', customDomain: null,
       });
-      if (url === '/api/identity/session') return Response.json({ id: 'user-1', loginIdentifier: 'user', displayName: 'User', roles: [role] });
+      if (url === '/api/platform/identity/session') return Response.json({ id: 'user-1', loginIdentifier: 'user', displayName: 'User', roles: [role] });
       return Response.json({});
     });
     vi.stubGlobal('fetch', fetch);
