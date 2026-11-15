@@ -7,6 +7,9 @@ namespace SipatOnline.Api.Endpoints;
 /// <summary>The video file of a lesson, for the participant it is assigned to.</summary>
 public static class LessonMediaEndpoints
 {
+    /// <summary>The 480p is always produced as MP4, whatever type the original was stored with.</summary>
+    private const string Mp4ContentType = "video/mp4";
+
     public static IEndpointRouteBuilder MapLessonMediaEndpoints(this IEndpointRouteBuilder endpoints)
     {
         endpoints.MapGroup("/api/learning")
@@ -52,7 +55,7 @@ public static class LessonMediaEndpoints
                 var stream = await storage.OpenReadAsync(media.VideoId, rendition.Value, cancellationToken);
                 return stream is null
                     ? Results.Problem(statusCode: 503, detail: "O arquivo do vídeo não está disponível.")
-                    : Results.File(stream, media.ContentType, enableRangeProcessing: true);
+                    : Results.File(stream, rendition == VideoRendition.Sd480 ? Mp4ContentType : media.ContentType, enableRangeProcessing: true);
             });
         return endpoints;
     }

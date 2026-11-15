@@ -320,6 +320,40 @@ public sealed class VideoConversionApiTests : IDisposable
         Assert.Equal("learning.platform_course.video_processing", (await Read(file)).GetProperty("code").GetString());
     }
 
+    [DockerFact]
+    public async Task Refuses_adding_a_processing_video_to_a_course_but_keeps_one_uploaded_into_it()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = await StartFactory(postgres.GetConnectionString());
+        using var client = await OperatorClient(factory);
+        var other = (await Upload(client, TinyMp4, "Convertendo")).GetProperty("id").GetGuid();
+        using var created = await Send(client, HttpMethod.Post, "/api/platform/catalog/courses", new { title = "Curso", description = (string?)null });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        var courseId = (await Read(created)).GetProperty("id").GetGuid();
+
+        using (var byVideos = await Send(client, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/videos", new { videoIds = new[] { other } }))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, byVideos.StatusCode);
+            var problem = await Read(byVideos);
+            Assert.Equal("learning.platform_course.video_not_ready", problem.GetProperty("code").GetString());
+            Assert.Contains("\"Convertendo\" ainda não está pronto", problem.GetProperty("detail").GetString());
+        }
+
+        var structure = new
+        {
+            lessons = new[] { new { id = (Guid?)null, title = "Aula 1", description = (string?)null, videos = new[] { new { videoId = other, titleOverride = (string?)null } } } }
+        };
+        using (var byStructure = await Send(client, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/structure", structure))
+        {
+            Assert.Equal(HttpStatusCode.BadRequest, byStructure.StatusCode);
+            Assert.Equal("learning.platform_course.video_not_ready", (await Read(byStructure)).GetProperty("code").GetString());
+        }
+
+        var inside = (await UploadInto(client, courseId, TinyMp4, "Dentro do curso")).GetProperty("id").GetGuid();
+        using var kept = await Send(client, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/videos", new { videoIds = new[] { inside } });
+        Assert.Equal(HttpStatusCode.OK, kept.StatusCode);
+    }
+
     private string SourceFolder(Guid videoId) => Path.Combine(WorkPath, videoId.ToString("N"));
 
     private async Task<WebApplicationFactory<Program>> StartFactory(
@@ -376,6 +410,22 @@ public sealed class VideoConversionApiTests : IDisposable
         content.Add(new StringContent(title), "title");
         content.Add(new StringContent("1234"), "durationMilliseconds");
         using var request = new HttpRequestMessage(HttpMethod.Post, $"https://{Host}/api/platform/catalog/videos") { Content = content };
+        request.Headers.Add("X-CSRF-TOKEN", token!.RequestToken);
+        using var response = await client.SendAsync(request);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
+        return await Read(response);
+    }
+
+    private static async Task<JsonElement> UploadInto(HttpClient client, Guid courseId, byte[] bytes, string title)
+    {
+        var token = await client.GetFromJsonAsync<AntiforgeryTokenResponse>($"https://{Host}/api/identity/antiforgery");
+        using var content = new MultipartFormDataContent();
+        var file = new ByteArrayContent(bytes);
+        file.Headers.ContentType = new MediaTypeHeaderValue("video/mp4");
+        content.Add(file, "video", "video.mp4");
+        content.Add(new StringContent(title), "title");
+        content.Add(new StringContent("1234"), "durationMilliseconds");
+        using var request = new HttpRequestMessage(HttpMethod.Post, $"https://{Host}/api/platform/catalog/courses/{courseId}/videos") { Content = content };
         request.Headers.Add("X-CSRF-TOKEN", token!.RequestToken);
         using var response = await client.SendAsync(request);
         Assert.True(response.StatusCode == HttpStatusCode.Created, await response.Content.ReadAsStringAsync());
