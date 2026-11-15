@@ -5,6 +5,7 @@
   "type": "module",
   "exports": { ".": "./src/index.ts" },
   "scripts": {
+    "playground": "vite --config vite.playground.config.ts",
     "lint": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run"
   },
