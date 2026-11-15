@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { SipatVideoPlayer, type Checkpoint, type PlayerEvent, type PlayerQualitySummary } from '../src';
+import { ExternalVideoPlayer, SipatVideoPlayer, type Checkpoint, type PlayerEvent, type PlayerQualitySummary } from '../src';
 import { fileSampleId, fileSampleTitle, samples } from './samples';
 
 interface LogItem { key: number; time: string; event: PlayerEvent }
@@ -20,6 +20,7 @@ export default function PlaygroundApp() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [log, setLog] = useState<LogItem[]>([]);
   const [quality, setQuality] = useState<PlayerQualitySummary | null>(null);
+  const [showExternal, setShowExternal] = useState(false);
   const counter = useRef(0);
 
   useEffect(() => () => { if (fileUrl) URL.revokeObjectURL(fileUrl); }, [fileUrl]);
@@ -110,6 +111,14 @@ export default function PlaygroundApp() {
           activity={activity} checkpoints={checkpoints} furthest={number(furthest)} key={src} onEvent={onEvent}
           resumeAt={number(resumeAt)} rules={{ watchInOrder, fixedSpeed }} sources={[{ src, quality: '720p' }, { src, quality: '480p' }]} title={title} />
       : <p>Escolha um vídeo.</p>}
+
+    <fieldset>
+      <legend>Vídeo externo</legend>
+      <label><input checked={showExternal} onChange={event => setShowExternal(event.target.checked)} type="checkbox" /> Mostrar exemplo do YouTube (mesmo quadro, sem regras nem eventos)</label>
+      {showExternal && <div style={{ aspectRatio: '16 / 9', marginTop: 8 }}>
+        <ExternalVideoPlayer externalId="aqz-KE-bpKQ" provider="YouTube" title="Exemplo do YouTube" />
+      </div>}
+    </fieldset>
 
     {quality && <section aria-label="Último resumo de qualidade" style={{ background: '#fff7d6', border: '1px solid #e0c34a', borderRadius: 8, margin: '16px 0', padding: 12 }}>
       <strong>Último resumo de qualidade</strong>
