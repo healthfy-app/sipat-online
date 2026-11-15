@@ -14,7 +14,7 @@ import { connectionLabel, dayLabel, deviceLabel, formatPercent, formatSeconds, l
 const selectClass = 'h-9 rounded-md border border-input bg-card px-3 text-sm text-foreground';
 
 /** Traffic light: colour is never alone, there is always an icon and a word. */
-function Light({ level }: { level: QualityLevel | null }) {
+export function Light({ level }: { level: QualityLevel | null }) {
   const variant = level === 'Good' ? 'success' : level === 'Attention' ? 'warning' : level === 'Poor' ? 'destructive' : 'neutral';
   const Icon = level === 'Good' ? CircleCheck : level === 'Attention' ? TriangleAlert : level === 'Poor' ? CircleAlert : CircleHelp;
   return <Badge variant={variant}><Icon aria-hidden="true" />{levelLabel(level)}</Badge>;

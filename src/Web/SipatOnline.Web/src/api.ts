@@ -1176,3 +1176,16 @@ export function getCompanyPlaybackQuality(companyId: string, filter: QualityFilt
 export function playbackQualitySummaryUrl(companyId: string, filter: QualityFilter = {}): string {
   return `/api/platform/companies/${encodeURIComponent(companyId)}/playback-quality/summary.pdf${qualityQuery(filter)}`;
 }
+
+export interface PlaybackQualityComparison {
+  from: string; to: string;
+  companies: { companyId: string; name: string; indicators: QualityIndicators }[];
+}
+
+export function getPlaybackQualityComparison(period: { from?: string; to?: string } = {}): Promise<PlaybackQualityComparison> {
+  const query = new URLSearchParams();
+  if (period.from) query.set('from', period.from);
+  if (period.to) query.set('to', period.to);
+  const text = query.toString();
+  return requestJson<PlaybackQualityComparison>(`/api/platform/playback-quality${text ? `?${text}` : ''}`);
+}

@@ -465,6 +465,7 @@ describe('tenant portal', () => {
     expect(screen.queryByRole('link', { name: 'Painel' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Biblioteca' })).toHaveAttribute('href', '/platform/courses');
+    expect(screen.getByRole('link', { name: 'Qualidade do vídeo' })).toHaveAttribute('href', '/platform/qualidade');
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/platform/dashboard',
