@@ -34,7 +34,15 @@ export default function VideoLibraryPanel({
             return (
             <article className="flex min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-card" key={video.id}>
               <div className="aspect-video bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
-                <VideoPreview preload="metadata" src={video.fileUrl} title={`Prévia de ${video.title}`} />
+                {video.status === 'Ready' ? (
+                  <VideoPreview preload="metadata" src={video.fileUrl} title={`Prévia de ${video.title}`} />
+                ) : (
+                  <p className="m-0 grid size-full place-items-center p-4 text-center text-[0.8125rem] leading-snug text-white/80">
+                    {video.status === 'Processing'
+                      ? 'Convertendo para 720p e 480p. O vídeo fica disponível para os Dias quando terminar.'
+                      : video.processingError ?? 'A conversão deste vídeo falhou.'}
+                  </p>
+                )}
               </div>
               <div className="grid gap-1.5 px-4 pb-4 pt-3.5">
                 <h3 className="m-0 line-clamp-2 text-[0.9375rem] font-semibold leading-[1.35]" title={video.title}>{video.title}</h3>
@@ -42,9 +50,13 @@ export default function VideoLibraryPanel({
                   {formatDuration(video.durationMilliseconds)} · {formatBytes(video.sizeBytes)}
                 </p>
                 <div className="mt-1 flex items-center justify-between gap-2">
-                  <Badge variant={courseCount === 0 ? 'warning' : 'default'}>
-                    {courseCount === 0 ? 'Ainda não usado em assuntos' : `Usado em ${pluralize(courseCount, 'assunto', 'assuntos')}`}
-                  </Badge>
+                  {video.status === 'Processing' ? <Badge variant="warning">Processando</Badge>
+                    : video.status === 'Failed' ? <Badge variant="destructive">Falhou</Badge>
+                    : (
+                      <Badge variant={courseCount === 0 ? 'warning' : 'default'}>
+                        {courseCount === 0 ? 'Ainda não usado em assuntos' : `Usado em ${pluralize(courseCount, 'assunto', 'assuntos')}`}
+                      </Badge>
+                    )}
                   <Button aria-label={`Excluir vídeo ${video.title}`} disabled={busy} onClick={() => onDelete(item)} size="icon-sm" title="Excluir vídeo" variant="ghost"><Trash2 /></Button>
                 </div>
               </div>

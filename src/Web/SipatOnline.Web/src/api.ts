@@ -284,6 +284,10 @@ export interface PlatformCourseVideo {
   durationMilliseconds: number;
   createdAt: string;
   fileUrl: string;
+  /** Every upload is converted in the background; only Ready videos can be watched or put in a Day. */
+  status: 'Ready' | 'Processing' | 'Failed';
+  processingError: string | null;
+  hasSd480: boolean;
   checkpoints: VideoCheckpoint[];
   lessonId?: string | null;
   libraryTitle?: string | null;
