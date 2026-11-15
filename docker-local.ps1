@@ -33,7 +33,7 @@ function Test-LocalTenant([string]$HostName) {
 const fs = require('fs');
 const https = require('https');
 const host = process.argv[2];
-const paths = ['/app/node_modules/.vite/basic-ssl-demo/_cert.pem', '/app/node_modules/.vite/basic-ssl/_cert.pem'];
+const paths = ['/app/SipatOnline.Web/node_modules/.vite/basic-ssl-demo/_cert.pem', '/app/SipatOnline.Web/node_modules/.vite/basic-ssl/_cert.pem', '/app/node_modules/.vite/basic-ssl-demo/_cert.pem', '/app/node_modules/.vite/basic-ssl/_cert.pem'];
 const pem = fs.readFileSync(paths.find(path => fs.existsSync(path)), 'utf8');
 const certificate = pem.match(/-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/)[0];
 const request = https.get({ hostname: '127.0.0.1', port: 5173, servername: host, path: '/api/tenant/branding', headers: { host }, ca: certificate }, response => {

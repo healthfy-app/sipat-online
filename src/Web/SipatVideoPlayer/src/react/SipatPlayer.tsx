@@ -1,3 +1,4 @@
+/// <reference path="./mediaChrome.d.ts" />
 import { useEffect, useReducer, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode, type RefObject } from 'react';
 import { Gamepad2, Lock, Maximize, Minimize } from 'lucide-react';
 import { loadMediaChrome } from './loadMediaChrome';

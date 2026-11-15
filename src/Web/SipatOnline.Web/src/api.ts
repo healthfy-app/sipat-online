@@ -1,4 +1,4 @@
-import type { PlaybackQualitySummary } from './player/core/quality';
+import type { PlaybackQualitySummary } from '@sipat/video-player';
 
 export interface TenantBranding {
   tenantKey: string;

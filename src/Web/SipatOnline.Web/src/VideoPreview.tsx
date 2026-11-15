@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import type { PreviewCheckpoint } from '@/courseEditor/courseTrack';
 import GameStage from '@/games/GameStage';
 import GamePlayer from '@/games/LazyGamePlayer';
-import SipatPlayer from '@/player/SipatPlayer';
+import { SipatPlayer } from '@sipat/video-player';
 
 /**
  * Free playback (no lock) of a library video, on the same SIPAT player participants use.

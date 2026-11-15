@@ -70,8 +70,8 @@ services:
 
   web:
     build:
-      context: ./src/Web/SipatOnline.Web
-      dockerfile: Dockerfile
+      context: ./src/Web
+      dockerfile: SipatOnline.Web/Dockerfile
     environment:
       SIPAT_API_TARGET: http://api:8080
     ports:

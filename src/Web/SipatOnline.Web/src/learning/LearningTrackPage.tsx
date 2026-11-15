@@ -29,8 +29,7 @@ import {
   type LearningSummary,
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
-import SipatPlayer from '@/player/SipatPlayer';
-import { trackPlaybackQuality, type QualityTracker } from '@/player/core/quality';
+import { SipatPlayer, trackPlaybackQuality, type QualityTracker } from '@sipat/video-player';
 import { formatDayDate } from './WeekVideos';
 import './LearningMotion.css';
 import './DayPage.css';

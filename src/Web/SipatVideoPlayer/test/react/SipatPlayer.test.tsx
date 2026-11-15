@@ -1,7 +1,7 @@
 import { createRef } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
-import SipatPlayer, { type PlayerLock } from './SipatPlayer';
+import SipatPlayer, { type PlayerLock } from '../../src/react/SipatPlayer';
 
 afterEach(() => {
   cleanup();

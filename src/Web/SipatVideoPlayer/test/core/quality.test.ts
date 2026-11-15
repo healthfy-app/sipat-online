@@ -6,7 +6,7 @@ import {
   type FlushReason,
   type PlaybackEnvironment,
   type PlaybackQualitySummary,
-} from './quality';
+} from '../../src/core/quality';
 
 const env: PlaybackEnvironment = {
   connectionType: '4g',
