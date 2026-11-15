@@ -799,14 +799,28 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<long>("DurationMilliseconds")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<bool>("HasSd480")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<Guid?>("OwnerTenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ProcessingError")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Sipat");
 
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
@@ -826,6 +840,10 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Provider", "ExternalId")
+                        .IsUnique()
+                        .HasFilter("\"ExternalId\" IS NOT NULL");
 
                     b.ToTable("PlatformCourseVideos", "learning");
                 });

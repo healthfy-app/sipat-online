@@ -18,6 +18,7 @@ public sealed class PlatformCourseCatalogService(
     public const long MaximumVideoSizeBytes = 250 * 1024 * 1024;
     public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
+    private const int MaximumExternalIdLength = 32;
 
     public async Task<Result<IReadOnlyList<PlatformCourse>>> ListAsync(
         CancellationToken cancellationToken)
@@ -520,6 +521,85 @@ public sealed class PlatformCourseCatalogService(
         return Result<PlatformCourseVideo>.Success(video);
     }
 
+    /// <summary>Registers a YouTube or Vimeo link as a library item; the same link twice returns the first one.</summary>
+    public async Task<Result<PlatformCourseVideo>> CreateExternalVideoAsync(
+        string? provider,
+        string? url,
+        string? title,
+        long? durationMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<PlatformCourseVideo>.Failure(permission.Error);
+        }
+
+        if (!Enum.TryParse<VideoProvider>(provider?.Trim(), true, out var parsedProvider)
+            || parsedProvider == VideoProvider.Sipat
+            || !Enum.IsDefined(parsedProvider))
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.catalog.external_provider_invalid",
+                "Escolha YouTube ou Vimeo.");
+        }
+
+        if (!ExternalVideoLink.TryParse(parsedProvider, url, out var externalId) || externalId.Length > MaximumExternalIdLength)
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.catalog.external_link_invalid",
+                "Não reconhecemos este link. Cole o endereço do vídeo no YouTube ou no Vimeo.");
+        }
+
+        var normalizedTitle = title?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedTitle) || normalizedTitle.Length > MaximumTitleLength)
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.platform_course.video_title_invalid",
+                "O título do vídeo deve ter entre 1 e 200 caracteres.");
+        }
+
+        if (!Guid.TryParse(currentActor.UserId, out var actorId))
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.platform_course.actor_required",
+                "Não foi possível identificar o operador da plataforma.");
+        }
+
+        var existing = await catalogStore.FindExternalVideoAsync(parsedProvider, externalId, cancellationToken);
+        if (existing is not null)
+        {
+            return Result<PlatformCourseVideo>.Success(existing);
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var video = await catalogStore.AddExternalVideoAsync(
+            parsedProvider,
+            externalId,
+            normalizedTitle,
+            durationMilliseconds is > 0 ? durationMilliseconds.Value : 0,
+            now,
+            cancellationToken);
+
+        // A concurrent request may have registered the same link first; only the creator audits it.
+        if (video.CreatedAt == now)
+        {
+            await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+            await auditTrail.WriteAsync(
+                new AuditRecord(
+                    actorId.ToString("D"),
+                    null,
+                    "learning.catalog.external_video_created",
+                    "platform_course_video",
+                    video.Id.ToString("D"),
+                    now),
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return Result<PlatformCourseVideo>.Success(video);
+    }
+
     /// <summary>The operator preview: asks for a signed link first and opens the file only when there is none.</summary>
     public async Task<Result<PlatformVideoFile>> GetVideoFileAsync(
         Guid videoId,
@@ -533,6 +613,13 @@ public sealed class PlatformCourseCatalogService(
 
         var video = await catalogStore.FindVideoAsync(videoId, cancellationToken);
         if (video is null)
+        {
+            return Failure<PlatformVideoFile>(
+                "learning.platform_course.video_not_found",
+                "O vídeo não foi encontrado.");
+        }
+
+        if (video.Provider != VideoProvider.Sipat)
         {
             return Failure<PlatformVideoFile>(
                 "learning.platform_course.video_not_found",

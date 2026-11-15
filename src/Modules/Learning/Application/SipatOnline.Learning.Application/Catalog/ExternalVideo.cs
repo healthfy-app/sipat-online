@@ -121,6 +121,8 @@ public static class LessonReference
         _ => $"{CatalogPrefix}{id:D}",
     };
 
+    public static string For(PlatformCourseVideo video) => For(video.Id, video.Provider, video.ExternalId);
+
     public static bool IsBonus(string reference) =>
         TryParseExternal(reference, out _, out _);
 
