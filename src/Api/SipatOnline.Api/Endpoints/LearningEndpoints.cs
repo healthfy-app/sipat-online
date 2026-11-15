@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Antiforgery;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application;
+using SipatOnline.Learning.Application.Quality;
 using SipatOnline.Learning.Domain.Assignments;
 using SipatOnline.Learning.Domain.Progress;
 using SipatOnline.Learning.Domain.Tracks;
@@ -272,6 +273,25 @@ public static class LearningEndpoints
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
         })
         .WithName("RecordLearningPlaybackRange");
+
+        participant.MapPost("/tracks/{trackId:guid}/playback-quality", async (
+            Guid trackId,
+            PlaybackQualityRequest request,
+            HttpContext context,
+            IAntiforgery antiforgery,
+            PlaybackQualityService qualityService,
+            CancellationToken cancellationToken) =>
+        {
+            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
+            if (antiforgeryResult is not null)
+            {
+                return antiforgeryResult;
+            }
+
+            var result = await qualityService.RecordAsync(trackId, request, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("RecordPlaybackQuality");
 
         return endpoints;
     }

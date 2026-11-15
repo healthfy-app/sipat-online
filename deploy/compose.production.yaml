@@ -12,6 +12,12 @@ x-api-environment: &api-environment
   SipatOnline__Tenant__PlatformHost: ${PLATFORM_HOST:?Configure PLATFORM_HOST (for example ops.example.com) in deploy/.env.production}
   # where the videos of the library are kept: a volume of the VM, to be backed up with the database
   SipatOnline__PlatformCatalog__StoragePath: /var/sipat/videos
+  # File = volume da VM (plano B, padrao); R2 = Cloudflare R2, com os videos tocando por links assinados
+  SipatOnline__VideoStorage__Provider: ${VIDEO_STORAGE_PROVIDER:-File}
+  SipatOnline__VideoStorage__R2__ServiceUrl: ${R2_SERVICE_URL:-}
+  SipatOnline__VideoStorage__R2__AccessKeyId: ${R2_ACCESS_KEY_ID:-}
+  SipatOnline__VideoStorage__R2__SecretAccessKey: ${R2_SECRET_ACCESS_KEY:-}
+  SipatOnline__VideoStorage__R2__Bucket: ${R2_VIDEO_BUCKET:-}
   # the owner of the platform, created on the first start (the password is only read then)
   SipatOnline__PlatformOperator__LoginIdentifier: ${PLATFORM_OPERATOR_LOGIN_IDENTIFIER:-}
   SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-}

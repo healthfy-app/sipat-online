@@ -22,7 +22,11 @@ public static class SipatPlanEndpoints
             // the plan name is for the operator; the company only sees what it can do
             return Results.Ok(new
             {
-                capabilities.CustomizeGrid, capabilities.CustomBranding, capabilities.CustomCertificate, capabilities.Quizzes, capabilities.InternalVideos,
+                capabilities.CustomizeGrid,
+                capabilities.CustomBranding,
+                capabilities.CustomCertificate,
+                capabilities.Quizzes,
+                capabilities.InternalVideos,
                 plan = context.User.IsInRole(SipatOnline.BuildingBlocks.Application.PlatformRoles.PlatformOperator) ? plan.ToString() : null
             });
         })

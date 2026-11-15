@@ -1,3 +1,6 @@
+using Amazon.Runtime;
+using Amazon.S3;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using FluentValidation;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
@@ -191,6 +194,8 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<ISipatEventStore, EfSipatEventStore>();
         services.AddScoped<ILearningStore, EfLearningStore>();
         services.AddScoped<ILearningEngagementStore, EfLearningEngagementStore>();
+        services.AddScoped<SipatOnline.Learning.Application.Quality.IPlaybackQualityStore, EfPlaybackQualityStore>();
+        services.AddScoped<SipatOnline.Learning.Application.Quality.PlaybackQualityService>();
         services.AddScoped<LearningEngagementService>();
         services.AddScoped<LearningDistributionService>();
         services.AddScoped<SipatPlanService>();
@@ -199,16 +204,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<ICertificatePdfRenderer, CertificatePdfRenderer>();
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<PlatformCourseCatalogService>();
-        services.AddSingleton<IPlatformCourseVideoStorage>(provider =>
-            new FilePlatformCourseVideoStorage(
-                configuration["SipatOnline:PlatformCatalog:StoragePath"],
-                provider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
-        services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
-        services.AddScoped<PlatformCourseCatalogService>();
-        services.AddSingleton<IPlatformCourseVideoStorage>(provider =>
-            new FilePlatformCourseVideoStorage(
-                configuration["SipatOnline:PlatformCatalog:StoragePath"],
-                provider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
+        AddPlatformCourseVideoStorage(services, configuration);
+        ValidatePlaybackProviderSetting(configuration);
+        services.AddSingleton<IHostedService>(provider =>
+            new PlaybackProviderStartupCheck(provider.GetRequiredService<IHostEnvironment>(), configuration));
         services.AddScoped<IGameModuleStore, EfGameModuleStore>();
         services.AddScoped<GameModuleService>();
         services.AddScoped<ISipatProgramStore, EfSipatProgramStore>();
@@ -218,6 +217,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<DevelopmentEngagementInitializer>();
         services.AddSingleton<DevelopmentSampleVideoProvider>();
         services.AddScoped<DevelopmentCatalogVideoProvider>();
+        services.AddScoped<CatalogVideoPlaybackProvider>();
         services.AddScoped<IVideoPlaybackProvider>(provider =>
             GetVideoPlaybackProvider(provider, configuration));
         services.AddScoped<IPlaybackEvidenceVerifier>(provider =>
@@ -259,29 +259,114 @@ public static class InfrastructureServiceCollectionExtensions
         return services;
     }
 
-    private static IVideoPlaybackProvider GetVideoPlaybackProvider(
-        IServiceProvider provider,
-        IConfiguration configuration)
+    private static void AddPlatformCourseVideoStorage(IServiceCollection services, IConfiguration configuration)
     {
-        if (provider.GetRequiredService<IWebHostEnvironment>().IsDevelopment() &&
-            configuration.GetValue<bool>("SipatOnline:Learning:DevelopmentSampleEnabled"))
+        var provider = configuration["SipatOnline:VideoStorage:Provider"];
+        var isR2 = string.Equals(provider, "R2", StringComparison.OrdinalIgnoreCase);
+        if (!isR2 && !string.IsNullOrEmpty(provider) &&
+            !string.Equals(provider, "File", StringComparison.OrdinalIgnoreCase))
         {
-            return provider.GetRequiredService<DevelopmentCatalogVideoProvider>();
+            throw new InvalidOperationException("Configure SipatOnline:VideoStorage:Provider como File ou R2.");
         }
 
-        return new UnconfiguredVideoPlaybackProvider();
+        if (isR2)
+        {
+            var options = new R2StorageOptions
+            {
+                ServiceUrl = RequireR2Setting(configuration, nameof(R2StorageOptions.ServiceUrl)),
+                AccessKeyId = RequireR2Setting(configuration, nameof(R2StorageOptions.AccessKeyId)),
+                SecretAccessKey = RequireR2Setting(configuration, nameof(R2StorageOptions.SecretAccessKey)),
+                Bucket = RequireR2Setting(configuration, nameof(R2StorageOptions.Bucket))
+            };
+            services.AddSingleton(options);
+            services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
+                new BasicAWSCredentials(options.AccessKeyId, options.SecretAccessKey),
+                new AmazonS3Config
+                {
+                    ServiceURL = options.ServiceUrl,
+                    ForcePathStyle = true,
+                    AuthenticationRegion = "auto",
+                    RequestChecksumCalculation = RequestChecksumCalculation.WHEN_REQUIRED,
+                    ResponseChecksumValidation = ResponseChecksumValidation.WHEN_REQUIRED
+                }));
+            services.TryAddSingleton(TimeProvider.System);
+            services.AddSingleton<IPlatformCourseVideoStorage, R2PlatformCourseVideoStorage>();
+            return;
+        }
+
+        services.AddSingleton<IPlatformCourseVideoStorage>(serviceProvider =>
+            new FilePlatformCourseVideoStorage(
+                configuration["SipatOnline:PlatformCatalog:StoragePath"],
+                serviceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
     }
+
+    private static string RequireR2Setting(IConfiguration configuration, string field) =>
+        configuration[$"{R2StorageOptions.SectionName}:{field}"] is { Length: > 0 } value && !string.IsNullOrWhiteSpace(value)
+            ? value
+            : throw new InvalidOperationException($"Configure {R2StorageOptions.SectionName}:{field}.");
+
+    private static void ValidatePlaybackProviderSetting(IConfiguration configuration)
+    {
+        var configured = configuration["SipatOnline:Learning:Playback:Provider"];
+        if (!string.IsNullOrEmpty(configured) &&
+            !string.Equals(configured, "Development", StringComparison.OrdinalIgnoreCase) &&
+            !string.Equals(configured, "Catalog", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                "Configure SipatOnline:Learning:Playback:Provider como Development ou Catalog.");
+        }
+    }
+
+    /// <summary>Stops the API at startup when the development playback provider is set outside development.</summary>
+    private sealed class PlaybackProviderStartupCheck(IHostEnvironment environment, IConfiguration configuration)
+        : IHostedService
+    {
+        public Task StartAsync(CancellationToken cancellationToken)
+        {
+            if (string.Equals(
+                    configuration["SipatOnline:Learning:Playback:Provider"],
+                    "Development",
+                    StringComparison.OrdinalIgnoreCase) &&
+                !environment.IsDevelopment())
+            {
+                throw new InvalidOperationException(
+                    "SipatOnline:Learning:Playback:Provider=Development só pode ser usado em desenvolvimento.");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private static bool UseDevelopmentPlayback(IServiceProvider provider, IConfiguration configuration)
+    {
+        var configured = configuration["SipatOnline:Learning:Playback:Provider"];
+        if (string.Equals(configured, "Development", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        if (string.Equals(configured, "Catalog", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return provider.GetRequiredService<IWebHostEnvironment>().IsDevelopment() &&
+               configuration.GetValue<bool>("SipatOnline:Learning:DevelopmentSampleEnabled");
+    }
+
+    private static IVideoPlaybackProvider GetVideoPlaybackProvider(
+        IServiceProvider provider,
+        IConfiguration configuration) =>
+        UseDevelopmentPlayback(provider, configuration)
+            ? provider.GetRequiredService<DevelopmentCatalogVideoProvider>()
+            : provider.GetRequiredService<CatalogVideoPlaybackProvider>();
 
     private static IPlaybackEvidenceVerifier GetPlaybackEvidenceVerifier(
         IServiceProvider provider,
-        IConfiguration configuration)
-    {
-        if (provider.GetRequiredService<IWebHostEnvironment>().IsDevelopment() &&
-            configuration.GetValue<bool>("SipatOnline:Learning:DevelopmentSampleEnabled"))
-        {
-            return provider.GetRequiredService<DevelopmentSampleVideoProvider>();
-        }
-
-        return new UnconfiguredVideoPlaybackProvider();
-    }
+        IConfiguration configuration) =>
+        UseDevelopmentPlayback(provider, configuration)
+            ? provider.GetRequiredService<DevelopmentSampleVideoProvider>()
+            : provider.GetRequiredService<CatalogVideoPlaybackProvider>();
 }

@@ -89,6 +89,43 @@ if (args.Contains("--initialize-database", StringComparer.Ordinal))
     return;
 }
 
+if (args.Contains("--copy-videos-to-r2", StringComparer.Ordinal))
+{
+    if (!string.Equals(builder.Configuration["SipatOnline:VideoStorage:Provider"], "R2", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.WriteLine("Configure SipatOnline:VideoStorage:Provider=R2 antes de copiar.");
+        Environment.ExitCode = 1;
+        return;
+    }
+
+    await using var scope = app.Services.CreateAsyncScope();
+    var source = new SipatOnline.Infrastructure.Learning.FilePlatformCourseVideoStorage(
+        builder.Configuration["SipatOnline:PlatformCatalog:StoragePath"],
+        app.Environment.IsDevelopment());
+    var copier = new SipatOnline.Infrastructure.Learning.CatalogVideoCopier(
+        scope.ServiceProvider.GetRequiredService<PlatformDbContext>(),
+        source,
+        scope.ServiceProvider.GetRequiredService<SipatOnline.Learning.Application.Catalog.IPlatformCourseVideoStorage>());
+    var lines = await copier.CopyAllAsync(CancellationToken.None);
+    foreach (var line in lines)
+    {
+        var mbps = line.Mbps.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture);
+        var heavy = line.TooHeavy ? "  PESADO" : string.Empty;
+        Console.WriteLine(line.Status switch
+        {
+            SipatOnline.Infrastructure.Learning.CatalogVideoCopyStatus.Copied => $"copiado  {line.Title}  {mbps} Mbps{heavy}",
+            SipatOnline.Infrastructure.Learning.CatalogVideoCopyStatus.SourceMissing => $"sem arquivo na origem  {line.Title}  {mbps} Mbps{heavy}",
+            _ => $"falha ao copiar: {line.Error}  {line.Title}  {mbps} Mbps{heavy}"
+        });
+    }
+
+    var copiedCount = lines.Count(line => line.Copied);
+    var heavyCount = lines.Count(line => line.TooHeavy);
+    Console.WriteLine($"{copiedCount} de {lines.Count} vídeos copiados; {heavyCount} acima de {SipatOnline.Infrastructure.Learning.CatalogVideoCopier.HeavyMbps:0.#} Mbps (PESADO).");
+    Environment.ExitCode = copiedCount == lines.Count ? 0 : 1;
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();

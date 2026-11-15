@@ -74,7 +74,34 @@ Anote: jogo ou tela, navegador e versão, o que esperava, o que aconteceu, e se 
 3. Arrastar um jogo rolando a página no celular.
 4. Vídeo que não retoma depois de fechar um jogo.
 
-## E. Fora do escopo deste roteiro
+## E. Qualidade e entrega do vídeo
+
+Confere a entrega em produção (sessões de reprodução, armazenamento R2) e o resumo de qualidade de cada sessão.
+Estes testes precisam de aparelhos e de uma conta Cloudflare reais; faça-os com uma pessoa, não por script.
+
+**Como ver as linhas de qualidade** (no ambiente local, a partir de qualquer pasta):
+
+```bash
+docker exec sipat-online-dev-postgres-1 psql -U sipat_online -d sipat_online -c \
+  'select "StartedAt", "Device", "ConnectionType", "StallCount", "StallMilliseconds", "NeverStarted"
+     from learning."PlaybackQualitySessions" order by "StartedAt" desc limit 20;'
+```
+
+Em outro ambiente com `compose.yaml`, use `docker compose exec postgres psql -U <usuário> -d <banco> -c '…'`
+com a mesma consulta (usuário e banco estão no arquivo `.env` do ambiente).
+
+| # | O que fazer | O que deve acontecer | Resultado |
+|---|---|---|---|
+| E1 | Assistir um vídeo inteiro em **Chrome (desktop)**, **Safari no iPhone** e **Chrome no Android** | Em cada aparelho: o avanço além do ponto liberado é bloqueado, a velocidade fica em 1x, a tela cheia funciona, o jogo abre no momento certo e o progresso fica salvo (recarregar retoma de onde parou) | |
+| E2 | No Chrome: DevTools → Network → **Slow 4G**; tocar o vídeo até travar algumas vezes | Ao terminar ou fechar a sessão, a consulta acima mostra uma linha nova com `StallCount > 0` e `StallMilliseconds > 0` | |
+| E3 | Repetir E2 e **fechar a aba durante um travamento** | Mesmo assim a linha existe na consulta, com `StallCount > 0` | |
+| E4 | Com `VIDEO_STORAGE_PROVIDER=R2`: abrir a aula com DevTools → Network aberto | As requisições do vídeo vão para `*.r2.cloudflarestorage.com` (link assinado) e o vídeo toca até o fim | |
+| E5 | **Reiniciar o contêiner da API no meio do vídeo** (`docker compose restart api`) | O vídeo continua e o progresso continua sendo salvo (a sessão de reprodução, que permite aceitar o avanço depois do reinício, fica em `learning."PlaybackGrants"`; o progresso assistido fica em `learning."LearningProgress"`) | |
+
+Anote em cada caso o aparelho, o navegador e a versão. Se E2 ou E3 não gerarem linha, anote o horário para
+procurar nos logs da API.
+
+## F. Fora do escopo deste roteiro
 
 - Vídeos longos e conexão lenta (streaming adaptativo não existe hoje).
 - Legendas e leitor de tela completo (o player tem rótulos e teclado, mas não passou por teste com leitor de tela).

@@ -313,12 +313,20 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapGet("/videos/{videoId:guid}/file", async (
             Guid videoId,
             PlatformCourseCatalogService catalogService,
+            IPlatformCourseVideoStorage storage,
             CancellationToken cancellationToken) =>
         {
             var result = await catalogService.OpenVideoAsync(videoId, cancellationToken);
             if (!result.IsSuccess)
             {
                 return ToProblem(result.Error);
+            }
+
+            var signedUrl = await storage.GetPlaybackUrlAsync(videoId, TimeSpan.FromMinutes(10), cancellationToken);
+            if (signedUrl is not null)
+            {
+                await result.Value.Content.DisposeAsync();
+                return Results.Redirect(signedUrl.AbsoluteUri);
             }
 
             return Results.File(

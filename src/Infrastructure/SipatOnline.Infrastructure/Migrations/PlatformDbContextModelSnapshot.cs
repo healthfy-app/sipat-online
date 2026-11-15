@@ -292,69 +292,38 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("Users", "identity");
                 });
 
-            modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity", b =>
-                {
-                    b.Property<int>("Plan")
-                        .HasColumnType("integer");
-
-                    b.Property<Guid>("CourseId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("Plan", "CourseId");
-
-                    b.ToTable("PlanSubjectExclusions", "tenancy");
-                });
-
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatPlanEntity", b =>
-                {
-                    b.Property<Guid>("SipatEventId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("DaysJson")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.HasKey("SipatEventId");
-
-                    b.HasIndex("TenantId");
-
-                    b.ToTable("SipatPlans", "learning");
-                });
-
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatProgramEntity", b =>
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.CourseCategoryEntity", b =>
                 {
                     b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<string>("DaysJson")
+                    b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)");
 
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.ToTable("SipatPrograms", "learning");
+                    b.HasIndex("Position");
+
+                    b.ToTable("CourseCategories", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.GameModuleEntity", b =>
                 {
-                    b.Property<string>("ContentJson").HasColumnType("text");
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
+
+                    b.Property<string>("ContentJson")
+                        .HasColumnType("text");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -374,6 +343,36 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.ToTable("GameModules", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningActivityOutcomeEntity", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActivityId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Outcome")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<DateTimeOffset>("RecordedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("TenantId", "ParticipantId", "RevisionId", "ActivityId");
+
+                    b.HasIndex("RevisionId");
+
+                    b.ToTable("LearningActivityOutcomes", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningAssignmentEntity", b =>
@@ -409,6 +408,32 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("LearningAssignments", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningContentSnapshotEntity", b =>
+                {
+                    b.Property<Guid>("RevisionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("CoverContentType")
+                        .HasColumnType("text");
+
+                    b.Property<byte[]>("CoverData")
+                        .HasColumnType("bytea");
+
+                    b.Property<Guid>("SourceCourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("RevisionId");
+
+                    b.ToTable("LearningContentSnapshots", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningLessonEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -424,10 +449,6 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 
-                    b.Property<string>("SectionTitle")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
                     b.Property<string>("ProviderAssetReference")
                         .IsRequired()
                         .HasMaxLength(256)
@@ -435,6 +456,10 @@ namespace SipatOnline.Infrastructure.Migrations
 
                     b.Property<Guid>("RevisionId")
                         .HasColumnType("uuid");
+
+                    b.Property<string>("SectionTitle")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
@@ -523,13 +548,11 @@ namespace SipatOnline.Infrastructure.Migrations
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningTrackEntity", b =>
                 {
-                    b.Property<Guid?>("SourceCourseId").HasColumnType("uuid");
-                    b.Property<int?>("CoursePosition").HasColumnType("integer");
-                    b.Property<DateOnly?>("DayDate").HasColumnType("date");
-                    b.Property<int?>("DayPosition").HasColumnType("integer");
-                    b.Property<string>("DayTitle").HasMaxLength(120).HasColumnType("character varying(120)");
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("CoursePosition")
+                        .HasColumnType("integer");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -537,11 +560,24 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<Guid?>("CurrentRevisionId")
                         .HasColumnType("uuid");
 
+                    b.Property<DateOnly?>("DayDate")
+                        .HasColumnType("date");
+
+                    b.Property<int?>("DayPosition")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("DayTitle")
+                        .HasMaxLength(120)
+                        .HasColumnType("character varying(120)");
+
                     b.Property<string>("Description")
                         .HasMaxLength(2000)
                         .HasColumnType("character varying(2000)");
 
                     b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("SourceCourseId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
@@ -556,50 +592,14 @@ namespace SipatOnline.Infrastructure.Migrations
 
                     b.HasIndex("SipatEventId");
 
+                    b.HasIndex("TenantId", "SipatEventId", "SourceCourseId")
+                        .IsUnique();
+
                     b.HasIndex("TenantId", "SipatEventId", "Title");
-                    b.HasIndex("TenantId", "SipatEventId", "SourceCourseId").IsUnique();
 
                     b.ToTable("LearningTracks", "learning");
                 });
 
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningContentSnapshotEntity", b =>
-                {
-                    b.Property<Guid>("RevisionId").HasColumnType("uuid");
-                    b.Property<Guid>("TenantId").HasColumnType("uuid");
-                    b.Property<Guid>("SourceCourseId").HasColumnType("uuid");
-                    b.Property<string>("ContentJson").IsRequired().HasColumnType("text");
-                    b.Property<byte[]>("CoverData").HasColumnType("bytea");
-                    b.Property<string>("CoverContentType").HasColumnType("text");
-                    b.HasKey("RevisionId");
-                    b.HasOne("SipatOnline.Infrastructure.Learning.LearningTrackRevisionEntity", null)
-                        .WithMany().HasForeignKey("RevisionId").OnDelete(DeleteBehavior.Restrict).IsRequired();
-                    b.ToTable("LearningContentSnapshots", "learning");
-                });
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningActivityOutcomeEntity", b =>
-                {
-                    b.Property<Guid>("TenantId").HasColumnType("uuid");
-                    b.Property<Guid>("ParticipantId").HasColumnType("uuid");
-                    b.Property<Guid>("RevisionId").HasColumnType("uuid");
-                    b.Property<string>("ActivityId").IsRequired().HasMaxLength(100).HasColumnType("character varying(100)");
-                    b.Property<string>("Outcome").IsRequired().HasMaxLength(20).HasColumnType("character varying(20)");
-                    b.Property<DateTimeOffset>("RecordedAt").HasColumnType("timestamp with time zone");
-                    b.HasKey("TenantId", "ParticipantId", "RevisionId", "ActivityId");
-                    b.HasIndex("RevisionId");
-                    b.HasOne("SipatOnline.Infrastructure.Learning.LearningTrackRevisionEntity", null)
-                        .WithMany().HasForeignKey("RevisionId").OnDelete(DeleteBehavior.Restrict).IsRequired();
-                    b.ToTable("LearningActivityOutcomes", "learning");
-                });
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.ParticipationCertificateEntity", b =>
-                {
-                    b.Property<Guid>("Id").ValueGeneratedOnAdd().HasColumnType("uuid");
-                    b.Property<Guid>("TenantId").HasColumnType("uuid");
-                    b.Property<Guid>("ParticipantId").HasColumnType("uuid");
-                    b.Property<Guid>("SipatEventId").HasColumnType("uuid");
-                    b.Property<string>("SnapshotJson").IsRequired().HasColumnType("text");
-                    b.HasKey("Id");
-                    b.HasIndex("TenantId", "ParticipantId", "SipatEventId").IsUnique();
-                    b.ToTable("ParticipationCertificates", "learning");
-                });
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningTrackRevisionEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -637,6 +637,33 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("LearningTrackRevisions", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.ParticipationCertificateEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("SnapshotJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "ParticipantId", "SipatEventId")
+                        .IsUnique();
+
+                    b.ToTable("ParticipationCertificates", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseCoverEntity", b =>
                 {
                     b.Property<Guid>("CourseId")
@@ -649,30 +676,6 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasKey("CourseId");
 
                     b.ToTable("PlatformCourseCovers", "learning");
-                });
-
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.CourseCategoryEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTimeOffset>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(80)
-                        .HasColumnType("character varying(80)");
-
-                    b.Property<int>("Position")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Position");
-
-                    b.ToTable("CourseCategories", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", b =>
@@ -723,6 +726,33 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasIndex("CreatedAt");
 
                     b.ToTable("PlatformCourses", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseLessonEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("Position")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CourseId", "Position");
+
+                    b.ToTable("PlatformCourseLessons", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseModuleLinkEntity", b =>
@@ -813,33 +843,6 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("PlatformCourseVideoLinks", "learning");
                 });
 
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseLessonEntity", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("CourseId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("Description")
-                        .HasMaxLength(2000)
-                        .HasColumnType("character varying(2000)");
-
-                    b.Property<int>("Position")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("CourseId", "Position");
-
-                    b.ToTable("PlatformCourseLessons", "learning");
-                });
-
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoCheckpointEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -862,6 +865,170 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasIndex("VideoId", "TimeMilliseconds");
 
                     b.ToTable("PlatformVideoCheckpoints", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlaybackGrantEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("DurationMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("LessonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("WatchedRangesJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ExpiresAt");
+
+                    b.ToTable("PlaybackGrants", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlaybackQualitySessionEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ConnectionType")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int?>("DayPosition")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Device")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<double?>("DownlinkMbps")
+                        .HasColumnType("double precision");
+
+                    b.Property<string>("ErrorKind")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<Guid>("LessonId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("NeverStarted")
+                        .HasColumnType("boolean");
+
+                    b.Property<Guid>("ParticipantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("PlaybackSessionId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Quality")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
+                    b.Property<int>("QualitySwitches")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset>("ReceivedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("StallCount")
+                        .HasColumnType("integer");
+
+                    b.Property<long>("StallMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("StartupMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("TimezoneOffsetMinutes")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("TrackId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid?>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("WatchedMilliseconds")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StartedAt");
+
+                    b.HasIndex("TenantId", "SipatEventId");
+
+                    b.ToTable("PlaybackQualitySessions", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatPlanEntity", b =>
+                {
+                    b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DaysJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("SipatEventId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("SipatPlans", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatProgramEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DaysJson")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("SipatPrograms", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventEntity", b =>
@@ -905,16 +1072,29 @@ namespace SipatOnline.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity", b =>
+                {
+                    b.Property<int>("Plan")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Plan", "CourseId");
+
+                    b.ToTable("PlanSubjectExclusions", "tenancy");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.TenantEntity", b =>
                 {
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<byte[]>("CertificateLogoData")
-                        .HasColumnType("bytea");
-
                     b.Property<string>("CertificateLogoContentType")
                         .HasColumnType("text");
+
+                    b.Property<byte[]>("CertificateLogoData")
+                        .HasColumnType("bytea");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -935,23 +1115,23 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasMaxLength(2048)
                         .HasColumnType("character varying(2048)");
 
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)");
+
                     b.Property<int>("Plan")
                         .HasColumnType("integer");
-
-                    b.Property<byte[]>("PortalBannerData")
-                        .HasColumnType("bytea");
 
                     b.Property<string>("PortalBannerContentType")
                         .HasMaxLength(32)
                         .HasColumnType("character varying(32)");
 
-                    b.Property<byte[]>("PortalLogoData")
+                    b.Property<byte[]>("PortalBannerData")
                         .HasColumnType("bytea");
 
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)");
+                    b.Property<byte[]>("PortalLogoData")
+                        .HasColumnType("bytea");
 
                     b.Property<string>("PrimaryColor")
                         .IsRequired()
@@ -1034,11 +1214,29 @@ namespace SipatOnline.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningActivityOutcomeEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.LearningTrackRevisionEntity", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningAssignmentEntity", b =>
                 {
                     b.HasOne("SipatOnline.Infrastructure.Learning.LearningTrackEntity", null)
                         .WithMany()
                         .HasForeignKey("TrackId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.LearningContentSnapshotEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.LearningTrackRevisionEntity", null)
+                        .WithMany()
+                        .HasForeignKey("RevisionId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
@@ -1094,6 +1292,17 @@ namespace SipatOnline.Infrastructure.Migrations
                         .IsRequired();
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseLessonEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", "Course")
+                        .WithMany("Lessons")
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Course");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseModuleLinkEntity", b =>
                 {
                     b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", "Course")
@@ -1135,17 +1344,6 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Navigation("Course");
 
                     b.Navigation("Video");
-                });
-
-            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseLessonEntity", b =>
-                {
-                    b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", "Course")
-                        .WithMany("Lessons")
-                        .HasForeignKey("CourseId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Course");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoCheckpointEntity", b =>

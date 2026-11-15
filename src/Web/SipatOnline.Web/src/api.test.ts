@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureCompanyAdministration, createParticipant, getPlatformCompanyEmployees, getSession, listAllParticipants, signIn, saveTenantAppearance } from './api';
+import { configureCompanyAdministration, createParticipant, getPlatformCompanyEmployees, getSession, listAllParticipants, signIn, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality } from './api';
 
 afterEach(() => {
   configureCompanyAdministration(null);
@@ -127,5 +127,42 @@ describe('API client', () => {
     );
 
     await expect(getSession()).resolves.toBeNull();
+  });
+
+  it('sends the quality summary with keepalive and the cached token', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf-q' }))
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await primeAntiforgeryToken();
+    const summary = { id: 's1' } as never;
+    await sendPlaybackQuality('track-1', summary);
+    await sendPlaybackQuality('track-1', summary);
+    const tokenCalls = fetchMock.mock.calls.filter(c => c[0] === '/api/identity/antiforgery');
+    expect(tokenCalls).toHaveLength(1);
+    const posts = fetchMock.mock.calls.filter(c => c[0] === '/api/learning/tracks/track-1/playback-quality');
+    expect(posts).toHaveLength(2);
+    for (const [, init] of posts) {
+      expect(init.keepalive).toBe(true);
+      expect(init.method).toBe('POST');
+      expect(new Headers(init.headers).get('X-CSRF-TOKEN')).toBe('csrf-q');
+    }
+  });
+
+  it('drops the cached token after a rejected quality send so the next one fetches a fresh token', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'old' }))
+      .mockResolvedValueOnce(new Response(null, { status: 400 }))
+      .mockResolvedValueOnce(Response.json({ requestToken: 'fresh' }))
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+    await primeAntiforgeryToken();
+    const summary = { id: 's1' } as never;
+    await expect(sendPlaybackQuality('track-1', summary)).resolves.toBeUndefined();
+    await sendPlaybackQuality('track-1', summary);
+    const posts = fetchMock.mock.calls.filter(c => c[0] === '/api/learning/tracks/track-1/playback-quality');
+    expect(posts).toHaveLength(2);
+    expect(new Headers(posts[0][1].headers).get('X-CSRF-TOKEN')).toBe('old');
+    expect(new Headers(posts[1][1].headers).get('X-CSRF-TOKEN')).toBe('fresh');
   });
 });

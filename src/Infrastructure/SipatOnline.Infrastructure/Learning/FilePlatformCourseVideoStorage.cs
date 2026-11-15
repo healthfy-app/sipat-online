@@ -135,6 +135,9 @@ public sealed class FilePlatformCourseVideoStorage(
         return Task.FromResult(stream);
     }
 
+    public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
+        Task.FromResult<Uri?>(null);
+
     public Task DeleteAsync(Guid videoId, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();

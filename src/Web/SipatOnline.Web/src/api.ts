@@ -1,3 +1,5 @@
+import type { PlaybackQualitySummary } from './player/core/quality';
+
 export interface TenantBranding {
   tenantKey: string;
   tenantName: string;
@@ -1056,6 +1058,32 @@ export function startLearningPlayback(
     `/api/learning/tracks/${trackId}/lessons/${lessonId}/playback`,
     { method: 'POST', body: JSON.stringify({}) },
   );
+}
+
+let cachedAntiforgeryToken: string | null = null;
+
+export async function primeAntiforgeryToken(): Promise<void> {
+  try {
+    cachedAntiforgeryToken = await getAntiforgeryToken();
+  } catch {
+    // The measurement must never disturb the video.
+  }
+}
+
+export async function sendPlaybackQuality(
+  trackId: string,
+  summary: PlaybackQualitySummary,
+): Promise<void> {
+  const token = cachedAntiforgeryToken ?? (cachedAntiforgeryToken = await getAntiforgeryToken());
+  const response = await fetch(`/api/learning/tracks/${trackId}/playback-quality`, {
+    method: 'POST',
+    keepalive: true,
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': token },
+    body: JSON.stringify(summary),
+  });
+  // A rejected send may mean a stale token: the next send fetches a fresh one. No retry here.
+  if (!response.ok) cachedAntiforgeryToken = null;
 }
 
 export function saveLearningPosition(
