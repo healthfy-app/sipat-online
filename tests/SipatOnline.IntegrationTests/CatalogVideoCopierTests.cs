@@ -21,7 +21,7 @@ public sealed class CatalogVideoCopierTests
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
-        await using var minio = new MinioBuilder("cgr.dev/chainguard/minio:latest").Build();
+        await using var minio = new MinioBuilder(TestImages.Minio).Build();
         await minio.StartAsync();
         using var s3 = new AmazonS3Client(
             new BasicAWSCredentials(minio.GetAccessKey(), minio.GetSecretKey()),
@@ -83,7 +83,7 @@ public sealed class CatalogVideoCopierTests
             Assert.Equal(CatalogVideoCopyStatus.SourceMissing, lines.Single(line => line.VideoId == missingId).Status);
             await AssertExists(target, heavyId, 1_000_000);
             await AssertExists(target, lightId, 100_000);
-            Assert.Null(await target.OpenReadAsync(missingId, default));
+            Assert.Null(await target.OpenReadAsync(missingId, VideoRendition.Hd720, default));
 
             var again = await copier.CopyAllAsync(CancellationToken.None);
             Assert.Equal(2, again.Count(line => line.Copied));
@@ -186,7 +186,7 @@ public sealed class CatalogVideoCopierTests
             Assert.Equal(CatalogVideoCopyStatus.Copied, line.Status);
             Assert.Equal(0.4, line.Mbps, 3);
             Assert.False(line.TooHeavy);
-            await using (var copied = await target.OpenReadAsync(convertedId, default))
+            await using (var copied = await target.OpenReadAsync(convertedId, VideoRendition.Hd720, default))
             {
                 Assert.NotNull(copied);
                 Assert.Equal(500_000, copied!.Length);
@@ -216,11 +216,16 @@ public sealed class CatalogVideoCopierTests
                 ? throw new InvalidOperationException("403 simulado")
                 : inner.SaveAsync(videoId, content, contentType, declaredSize, cancellationToken);
 
-        public Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken) =>
-            inner.OpenReadAsync(videoId, cancellationToken);
+        public Task<Stream?> OpenReadAsync(Guid videoId, VideoRendition rendition, CancellationToken cancellationToken) =>
+            inner.OpenReadAsync(videoId, rendition, cancellationToken);
 
-        public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
-            inner.GetPlaybackUrlAsync(videoId, validFor, cancellationToken);
+        public Task<Uri?> GetPlaybackUrlAsync(
+            Guid videoId, VideoRendition rendition, TimeSpan validFor, CancellationToken cancellationToken) =>
+            inner.GetPlaybackUrlAsync(videoId, rendition, validFor, cancellationToken);
+
+        public Task SaveRenditionAsync(
+            Guid videoId, VideoRendition rendition, string filePath, CancellationToken cancellationToken) =>
+            inner.SaveRenditionAsync(videoId, rendition, filePath, cancellationToken);
 
         public Task DeleteAsync(Guid videoId, CancellationToken cancellationToken) =>
             inner.DeleteAsync(videoId, cancellationToken);
@@ -246,7 +251,7 @@ public sealed class CatalogVideoCopierTests
 
     private static async Task AssertExists(R2PlatformCourseVideoStorage target, Guid id, int size)
     {
-        await using var stream = await target.OpenReadAsync(id, default);
+        await using var stream = await target.OpenReadAsync(id, VideoRendition.Hd720, default);
         Assert.NotNull(stream);
         using var copy = new MemoryStream();
         await stream!.CopyToAsync(copy);

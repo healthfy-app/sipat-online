@@ -322,7 +322,7 @@ public static class PlatformCourseCatalogEndpoints
                 return ToProblem(result.Error);
             }
 
-            var signedUrl = await storage.GetPlaybackUrlAsync(videoId, TimeSpan.FromMinutes(10), cancellationToken);
+            var signedUrl = await storage.GetPlaybackUrlAsync(videoId, VideoRendition.Hd720, TimeSpan.FromMinutes(10), cancellationToken);
             if (signedUrl is not null)
             {
                 await result.Value.Content.DisposeAsync();

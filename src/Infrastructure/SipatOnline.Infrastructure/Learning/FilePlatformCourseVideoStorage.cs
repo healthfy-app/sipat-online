@@ -52,7 +52,7 @@ public sealed class FilePlatformCourseVideoStorage(
         }
 
         Directory.CreateDirectory(storagePath);
-        var filePath = GetFilePath(storagePath, videoId);
+        var filePath = GetFilePath(storagePath, videoId, VideoRendition.Hd720);
         var completed = false;
         try
         {
@@ -113,7 +113,7 @@ public sealed class FilePlatformCourseVideoStorage(
         }
     }
 
-    public Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken)
+    public Task<Stream?> OpenReadAsync(Guid videoId, VideoRendition rendition, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var storagePath = StoragePath;
@@ -122,7 +122,7 @@ public sealed class FilePlatformCourseVideoStorage(
             return Task.FromResult<Stream?>(null);
         }
 
-        var filePath = GetFilePath(storagePath, videoId);
+        var filePath = GetFilePath(storagePath, videoId, rendition);
         Stream? stream = File.Exists(filePath)
             ? new FileStream(
                 filePath,
@@ -135,8 +135,20 @@ public sealed class FilePlatformCourseVideoStorage(
         return Task.FromResult(stream);
     }
 
-    public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
+    public Task<Uri?> GetPlaybackUrlAsync(
+        Guid videoId, VideoRendition rendition, TimeSpan validFor, CancellationToken cancellationToken) =>
         Task.FromResult<Uri?>(null);
+
+    public Task SaveRenditionAsync(
+        Guid videoId, VideoRendition rendition, string filePath, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var storagePath = StoragePath
+            ?? throw new InvalidOperationException("O armazenamento de vídeos do catálogo não está configurado.");
+        Directory.CreateDirectory(storagePath);
+        File.Copy(filePath, GetFilePath(storagePath, videoId, rendition), overwrite: true);
+        return Task.CompletedTask;
+    }
 
     public Task DeleteAsync(Guid videoId, CancellationToken cancellationToken)
     {
@@ -144,18 +156,23 @@ public sealed class FilePlatformCourseVideoStorage(
         var storagePath = StoragePath;
         if (storagePath is not null)
         {
-            var filePath = GetFilePath(storagePath, videoId);
-            if (File.Exists(filePath))
+            foreach (var rendition in Enum.GetValues<VideoRendition>())
             {
-                File.Delete(filePath);
+                var filePath = GetFilePath(storagePath, videoId, rendition);
+                if (File.Exists(filePath))
+                {
+                    File.Delete(filePath);
+                }
             }
         }
 
         return Task.CompletedTask;
     }
 
-    private static string GetFilePath(string storagePath, Guid videoId) =>
-        Path.Combine(storagePath, $"{videoId:N}.video");
+    private static string GetFilePath(string storagePath, Guid videoId, VideoRendition rendition) =>
+        Path.Combine(
+            storagePath,
+            rendition == VideoRendition.Sd480 ? $"{videoId:N}.480p.video" : $"{videoId:N}.video");
 
     private static bool HasExpectedSignature(byte[] header, int headerLength, string contentType) =>
         contentType switch

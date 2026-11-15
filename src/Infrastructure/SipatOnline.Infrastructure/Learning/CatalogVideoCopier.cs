@@ -45,7 +45,7 @@ public sealed class CatalogVideoCopier(
             string? error = null;
             try
             {
-                await using var stream = await source.OpenReadAsync(video.Id, cancellationToken);
+                await using var stream = await source.OpenReadAsync(video.Id, VideoRendition.Hd720, cancellationToken);
                 if (stream is not null)
                 {
                     // The file on the volume is the truth: it may have been converted in place

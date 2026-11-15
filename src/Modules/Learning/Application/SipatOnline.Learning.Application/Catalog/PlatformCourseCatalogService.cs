@@ -487,7 +487,7 @@ public sealed class PlatformCourseCatalogService(
                 "O vídeo não foi encontrado.");
         }
 
-        var content = await videoStorage.OpenReadAsync(videoId, cancellationToken);
+        var content = await videoStorage.OpenReadAsync(videoId, VideoRendition.Hd720, cancellationToken);
         return content is null
             ? Failure<(Stream Content, string ContentType)>(
                 "learning.platform_course.video_file_missing",

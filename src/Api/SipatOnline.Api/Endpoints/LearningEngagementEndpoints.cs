@@ -96,9 +96,9 @@ public static class LearningEngagementEndpoints
                 !Guid.TryParse(lesson.ProviderAssetReference["catalog:".Length..], out var videoId)) return Results.NotFound();
             var video = await db.PlatformCourseVideos.AsNoTracking().SingleOrDefaultAsync(item => item.Id == videoId, token);
             if (video is null) return Results.NotFound();
-            var signedUrl = await storage.GetPlaybackUrlAsync(videoId, TimeSpan.FromMinutes(10), token);
+            var signedUrl = await storage.GetPlaybackUrlAsync(videoId, VideoRendition.Hd720, TimeSpan.FromMinutes(10), token);
             if (signedUrl is not null) return Results.Redirect(signedUrl.AbsoluteUri);
-            var stream = await storage.OpenReadAsync(videoId, token);
+            var stream = await storage.OpenReadAsync(videoId, VideoRendition.Hd720, token);
             return stream is null ? Results.Problem(statusCode: 503, detail: "O arquivo do vídeo não está disponível.") :
                 Results.File(stream, video.ContentType, enableRangeProcessing: true);
         });

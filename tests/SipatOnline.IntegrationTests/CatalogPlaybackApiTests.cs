@@ -251,10 +251,15 @@ public sealed class CatalogPlaybackApiTests
             Task.FromResult(SipatOnline.BuildingBlocks.Domain.Result<StoredPlatformVideo>.Success(
                 new StoredPlatformVideo(contentType, declaredSize)));
 
-        public Task<Stream?> OpenReadAsync(Guid videoId, CancellationToken cancellationToken) =>
+        public Task<Stream?> OpenReadAsync(Guid videoId, VideoRendition rendition, CancellationToken cancellationToken) =>
             Task.FromResult<Stream?>(new MemoryStream());
 
-        public Task<Uri?> GetPlaybackUrlAsync(Guid videoId, TimeSpan validFor, CancellationToken cancellationToken) =>
+        public Task SaveRenditionAsync(
+            Guid videoId, VideoRendition rendition, string filePath, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+
+        public Task<Uri?> GetPlaybackUrlAsync(
+            Guid videoId, VideoRendition rendition, TimeSpan validFor, CancellationToken cancellationToken) =>
             Task.FromResult<Uri?>(RememberLink(validFor));
 
         private static Uri RememberLink(TimeSpan validFor)

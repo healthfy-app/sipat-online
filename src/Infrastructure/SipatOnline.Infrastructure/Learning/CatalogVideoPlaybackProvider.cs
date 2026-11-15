@@ -56,7 +56,7 @@ public sealed class CatalogVideoPlaybackProvider(
         await db.SaveChangesAsync(cancellationToken);
 
         var direct = await storage.GetPlaybackUrlAsync(
-            videoId, SessionLifetime + StorageLinkMargin, cancellationToken);
+            videoId, VideoRendition.Hd720, SessionLifetime + StorageLinkMargin, cancellationToken);
         var url = direct?.ToString() ?? $"/api/learning/lessons/{lessonId:D}/media";
         return Result<PlaybackSession>.Success(
             new PlaybackSession(url, video.ContentType, expiresAt, grant.Id, false));
