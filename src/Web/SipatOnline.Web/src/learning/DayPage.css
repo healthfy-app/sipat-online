@@ -183,3 +183,11 @@
 @keyframes day-trophy { from { transform: scale(0.4) rotate(-18deg); } }
 @keyframes day-check { from { transform: scale(0.3); } }
 @keyframes day-bars { 0%, 100% { transform: scaleY(0.35); } 50% { transform: scaleY(1); } }
+
+/* The player in fullscreen "fills the page" mode: ancestors with transforms or container queries would trap it. */
+.sipat-player-filling .learning-page { animation: none !important; transform: none !important; }
+.sipat-player-filling .portal-content { container-type: normal !important; }
+.sipat-player-filling .learning-player-frame { animation: none !important; overflow: visible; }
+
+/* the demo notice moves up so it does not cover the player bar */
+.learning-player-frame .sipat-player ~ .learning-demo-notice { top: .75rem; bottom: auto; pointer-events: none; opacity: .92; }

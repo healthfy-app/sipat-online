@@ -58,4 +58,12 @@ describe('player package boundary', () => {
       }
     }
   });
+
+  it('keeps colors in the player stylesheet as --sipat-player variables', () => {
+    const css = readFileSync(join(packageRoot, 'src', 'react', 'SipatVideoPlayer.css'), 'utf8');
+    const outside = css.split('\n').filter((line) => !/^\s*--sipat-player-[\w-]+\s*:/.test(line)).join('\n');
+    expect(outside).not.toMatch(/#[0-9a-f]{3,8}\b/i);
+    expect(outside).not.toMatch(/rgba?\(/i);
+    expect(css).not.toMatch(/--player-/);
+  });
 });

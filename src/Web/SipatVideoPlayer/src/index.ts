@@ -1,7 +1,12 @@
+export { default as SipatVideoPlayer } from './react/SipatVideoPlayer';
+export type { SipatVideoPlayerHandle, SipatVideoPlayerProps, VideoSource } from './react/SipatVideoPlayer';
 export { default as SipatPlayer } from './react/SipatPlayer';
 export type { PlayerMarker, PlayerLock, SipatPlayerProps } from './react/SipatPlayer';
+export { texts as playerTexts } from './react/texts';
 export * from './core/quality';
 export * from './core/events';
 export * from './core/coverage';
 export * from './core/rules';
 export * from './core/saveSchedule';
+export * from './core/checkpoints';
+export * from './core/attach';

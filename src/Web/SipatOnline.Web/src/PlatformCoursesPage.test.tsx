@@ -687,8 +687,7 @@ describe('Platform course catalog', () => {
     const video = await screen.findByLabelText('Prévia de Abertura');
     fireEvent.error(video);
     expect(screen.getByRole('alert')).toHaveTextContent('Não foi possível carregar o vídeo.');
-    expect(screen.queryByLabelText('Prévia de Abertura')).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Tentar reproduzir novamente' }));
+    await user.click(screen.getByRole('button', { name: 'Tentar de novo' }));
     expect(screen.getByLabelText('Prévia de Abertura')).toHaveAttribute('src', '/videos/v-1');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(api.updatePlatformCourse).not.toHaveBeenCalled();
