@@ -44,6 +44,8 @@ export default defineConfig({
   },
   test: {
     environment: 'jsdom',
+    // games and the player load on demand; under a full parallel run the first import can pass 5 s
+    testTimeout: 15000,
     setupFiles: './src/test/setup.ts',
     css: true,
   },
