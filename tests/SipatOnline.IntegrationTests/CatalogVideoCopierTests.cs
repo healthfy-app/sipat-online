@@ -135,13 +135,66 @@ public sealed class CatalogVideoCopierTests
 
             Assert.Equal(4, lines.Count);
             Assert.Equal(CatalogVideoCopyStatus.Copied, lines.Single(line => line.VideoId == okId).Status);
-            var mismatch = lines.Single(line => line.VideoId == mismatchId);
-            Assert.Equal(CatalogVideoCopyStatus.SaveFailed, mismatch.Status);
-            Assert.False(string.IsNullOrWhiteSpace(mismatch.Error));
+            // A stored size that differs from the real file is no longer a failure: the real length wins.
+            Assert.Equal(CatalogVideoCopyStatus.Copied, lines.Single(line => line.VideoId == mismatchId).Status);
             var threw = lines.Single(line => line.VideoId == throwsId);
             Assert.Equal(CatalogVideoCopyStatus.SaveFailed, threw.Status);
             Assert.Equal("403 simulado", threw.Error);
+            Assert.False(string.IsNullOrWhiteSpace(threw.Error));
             Assert.Equal(CatalogVideoCopyStatus.SourceMissing, lines.Single(line => line.VideoId == missingId).Status);
+        }
+        finally
+        {
+            foreach (var directory in new[] { sourceDir, targetDir })
+            {
+                if (Directory.Exists(directory))
+                {
+                    Directory.Delete(directory, recursive: true);
+                }
+            }
+        }
+    }
+
+    [DockerFact]
+    public async Task Sends_the_real_file_length_and_corrects_the_stored_size()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        var sourceDir = Path.Combine(Path.GetTempPath(), $"sipat-copier-{Guid.NewGuid():N}");
+        var targetDir = Path.Combine(Path.GetTempPath(), $"sipat-copier-{Guid.NewGuid():N}");
+        try
+        {
+            var source = new FilePlatformCourseVideoStorage(sourceDir, isDevelopment: false);
+            var convertedId = Guid.NewGuid();
+            // The file was converted in place: 500,000 bytes on disk, 2,000,000 still stored.
+            await SaveSource(source, convertedId, 500_000);
+
+            var options = new DbContextOptionsBuilder<PlatformDbContext>()
+                .UseNpgsql(
+                    postgres.GetConnectionString(),
+                    npgsql => npgsql.MigrationsAssembly(typeof(PlatformDbContext).Assembly.FullName))
+                .Options;
+            await using var db = new PlatformDbContext(options);
+            await db.Database.MigrateAsync();
+            db.PlatformCourseVideos.Add(Video(convertedId, "Convertido no lugar", 2_000_000, 10_000));
+            await db.SaveChangesAsync();
+
+            var target = new FilePlatformCourseVideoStorage(targetDir, isDevelopment: false);
+            var lines = await new CatalogVideoCopier(db, source, target).CopyAllAsync(CancellationToken.None);
+
+            var line = Assert.Single(lines);
+            Assert.Equal(CatalogVideoCopyStatus.Copied, line.Status);
+            Assert.Equal(0.4, line.Mbps, 3);
+            Assert.False(line.TooHeavy);
+            await using (var copied = await target.OpenReadAsync(convertedId, default))
+            {
+                Assert.NotNull(copied);
+                Assert.Equal(500_000, copied!.Length);
+            }
+
+            await using var fresh = new PlatformDbContext(options);
+            var stored = await fresh.PlatformCourseVideos.AsNoTracking().SingleAsync(video => video.Id == convertedId);
+            Assert.Equal(500_000, stored.SizeBytes);
         }
         finally
         {

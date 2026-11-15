@@ -40,9 +40,7 @@ public sealed class CatalogVideoCopier(
         var lines = new List<CatalogVideoCopyLine>(videos.Count);
         foreach (var video in videos)
         {
-            var mbps = video.DurationMilliseconds > 0
-                ? video.SizeBytes * 8 / (video.DurationMilliseconds / 1000.0) / 1_000_000
-                : 0;
+            var actualSize = video.SizeBytes;
             var status = CatalogVideoCopyStatus.SourceMissing;
             string? error = null;
             try
@@ -50,11 +48,22 @@ public sealed class CatalogVideoCopier(
                 await using var stream = await source.OpenReadAsync(video.Id, cancellationToken);
                 if (stream is not null)
                 {
+                    // The file on the volume is the truth: it may have been converted in place
+                    // after the upload, so its length can differ from the stored SizeBytes.
+                    actualSize = stream.CanSeek ? stream.Length : video.SizeBytes;
                     var saved = await target.SaveAsync(
-                        video.Id, stream, video.ContentType, video.SizeBytes, cancellationToken);
+                        video.Id, stream, video.ContentType, actualSize, cancellationToken);
                     if (saved.IsSuccess)
                     {
                         status = CatalogVideoCopyStatus.Copied;
+                        if (actualSize != video.SizeBytes)
+                        {
+                            await db.PlatformCourseVideos
+                                .Where(item => item.Id == video.Id)
+                                .ExecuteUpdateAsync(
+                                    setters => setters.SetProperty(item => item.SizeBytes, actualSize),
+                                    cancellationToken);
+                        }
                     }
                     else
                     {
@@ -69,6 +78,9 @@ public sealed class CatalogVideoCopier(
                 error = exception.Message;
             }
 
+            var mbps = video.DurationMilliseconds > 0
+                ? actualSize * 8 / (video.DurationMilliseconds / 1000.0) / 1_000_000
+                : 0;
             lines.Add(new CatalogVideoCopyLine(video.Id, video.Title, status, mbps, mbps > HeavyMbps, error));
         }
 

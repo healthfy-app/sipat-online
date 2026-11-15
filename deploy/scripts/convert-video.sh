@@ -22,7 +22,7 @@ if [ ! -f "$input" ]; then
 fi
 
 ffmpeg -hide_banner -y -i "$input" \
-  -vf "scale=-2:'min(720,ih)'" \
+  -vf "scale=-2:'min(720,trunc(ih/2)*2)'" \
   -c:v libx264 -profile:v high -pix_fmt yuv420p \
   -b:v 2M -maxrate 2500k -bufsize 4M \
   -c:a aac -b:a 128k \
