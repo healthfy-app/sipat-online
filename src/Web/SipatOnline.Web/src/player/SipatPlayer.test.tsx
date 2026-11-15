@@ -54,4 +54,24 @@ describe('SipatPlayer', () => {
     expect(container.querySelector('.sipat-player')).not.toHaveClass('is-filling');
     expect(document.documentElement).not.toHaveClass('sipat-player-filling');
   });
+
+  it('uses the real fullscreen on the player frame and keeps our controls', () => {
+    Object.defineProperty(document, 'fullscreenEnabled', { configurable: true, value: true });
+    const { container } = mount();
+    const frame = container.querySelector('.sipat-player') as HTMLElement;
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    frame.requestFullscreen = requestFullscreen;
+    try {
+      fireEvent.click(screen.getByRole('button', { name: 'Tela cheia' }));
+      expect(requestFullscreen).toHaveBeenCalledTimes(1);
+      expect(frame).not.toHaveClass('is-filling');
+
+      Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: frame });
+      act(() => { document.dispatchEvent(new Event('fullscreenchange')); });
+      expect(screen.getByRole('button', { name: 'Sair da tela cheia' })).toBeInTheDocument();
+      expect(screen.getByRole('slider')).toBeInTheDocument();
+    } finally {
+      Reflect.deleteProperty(document, 'fullscreenElement');
+    }
+  });
 });
