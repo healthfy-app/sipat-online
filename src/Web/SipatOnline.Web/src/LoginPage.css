@@ -83,9 +83,12 @@
   object-fit: contain;
 }
 
-.login-brand-panel .sipat-default-logo {
+/* Qualquer logo fica num quadrado branco: funciona sobre qualquer fundo ou banner */
+.login-brand-panel .sipat-default-logo,
+.login-brand-panel .tenant-logo {
   padding: 0.45rem;
   background: #fff;
+  box-shadow: 0 0.5rem 1.25rem rgb(0 0 0 / 18%);
 }
 
 .login-intro {
@@ -107,7 +110,7 @@
   color: #fff;
   font-size: clamp(2.75rem, 5.1vw, 4.65rem);
   font-weight: 700;
-  letter-spacing: -0.065em;
+  letter-spacing: -0.04em;
   line-height: 1.04;
   text-wrap: balance;
 }
@@ -118,108 +121,6 @@
   color: #fff;
   font-size: 1.02rem;
   line-height: 1.7;
-}
-
-.login-brand-art {
-  position: relative;
-  display: flex;
-  width: min(100%, 29rem);
-  min-height: 9.5rem;
-  align-items: flex-end;
-  margin-top: auto;
-  padding-top: 2rem;
-}
-
-.login-brand-orbit {
-  position: absolute;
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 50%;
-  pointer-events: none;
-}
-
-.login-brand-orbit-large {
-  right: 3.5rem;
-  bottom: -5rem;
-  width: 14rem;
-  height: 14rem;
-}
-
-.login-brand-orbit-small {
-  right: 7rem;
-  bottom: -1rem;
-  width: 6rem;
-  height: 6rem;
-  background: rgb(127 224 166 / 13%);
-  box-shadow: 0 0 0 1.3rem rgb(127 224 166 / 5%);
-}
-
-.login-brand-card {
-  position: relative;
-  display: flex;
-  width: min(100%, 29rem);
-  min-height: 6rem;
-  align-items: center;
-  gap: 1rem;
-  padding: 1.15rem 1.25rem;
-  border: 1px solid rgb(255 255 255 / 18%);
-  border-radius: 1.125rem;
-  background: rgb(0 0 0 / 12%);
-  box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 14%);
-  backdrop-filter: blur(12px);
-}
-
-.login-brand-symbol,
-.login-brand-card-check {
-  display: grid;
-  flex: 0 0 2.75rem;
-  width: 2.75rem;
-  height: 2.75rem;
-  place-items: center;
-  border-radius: 0.875rem;
-  color: #0b241f;
-  background: #a9edc3;
-}
-
-.login-brand-symbol svg,
-.login-form-symbol svg {
-  width: 1.5rem;
-  height: 1.5rem;
-  fill: none;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.login-brand-card-copy {
-  display: grid;
-  min-width: 0;
-  gap: 0.35rem;
-}
-
-.login-brand-card-copy > span {
-  color: #fff;
-  font-size: 0.62rem;
-  font-weight: 700;
-  letter-spacing: 0.13em;
-}
-
-.login-brand-card-copy strong {
-  color: #fff;
-  font-size: 0.95rem;
-  line-height: 1.4;
-}
-
-.login-brand-card-check {
-  width: 1.75rem;
-  height: 1.75rem;
-  flex-basis: 1.75rem;
-  margin-left: auto;
-  border-radius: 50%;
-  color: #fff;
-  background: rgb(127 224 166 / 17%);
-  font-size: 0.9rem;
-  font-weight: 800;
 }
 
 .login-caption {
@@ -265,10 +166,20 @@
   width: 3rem;
   height: 3rem;
   place-items: center;
-  border: 1px solid #cdd7d3;
+  border: 1px solid var(--green-line, #cdd7d3);
   border-radius: 1rem;
-  color: #0b5a2c;
-  background: #e7f3ec;
+  color: var(--green);
+  background: var(--green-soft, #e7f3ec);
+}
+
+.login-form-symbol svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .login-form-heading .eyebrow {
@@ -444,7 +355,6 @@
     font-size: 0.9rem;
   }
 
-  .login-brand-art,
   .login-caption {
     display: none;
   }
@@ -511,7 +421,20 @@
   filter: blur(18px) saturate(1.05);
 }
 
-.login-brand-panel.has-banner::after,
-.login-brand-panel.has-banner .login-brand-art {
+.login-brand-panel.has-banner::after {
   display: none;
+}
+
+/* Sombra suave só atrás do texto: sem borda, escurece onde ficam as letras e deixa o resto da foto claro */
+.login-brand-panel.has-banner .login-intro {
+  text-shadow: 0 0.15rem 1rem rgb(0 0 0 / 35%);
+}
+
+.login-brand-panel.has-banner .login-intro::before {
+  position: absolute;
+  z-index: -1;
+  inset: -6rem -8rem;
+  background: radial-gradient(closest-side, rgb(0 0 0 / 55%), rgb(0 0 0 / 25%) 60%, transparent);
+  content: "";
+  pointer-events: none;
 }

@@ -33,6 +33,8 @@ export interface PlatformCompanyOverview extends PlatformCompany {
   employeeCount: number;
   administratorCount: number;
   totalUserCount: number;
+  /** The company's portal logo; absent when it has none. */
+  logoReference?: string | null;
 }
 
 export interface PlatformCompanyEmployee {

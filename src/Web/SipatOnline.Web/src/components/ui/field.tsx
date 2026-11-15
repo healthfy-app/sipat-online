@@ -28,7 +28,7 @@ export function Field({
   children: ReactNode;
 }) {
   return (
-    <div className={cn('grid min-w-0 gap-1.5', className)} data-slot="field">
+    <div className={cn('grid min-w-0 content-start gap-1.5', className)} data-slot="field">
       <Label htmlFor={htmlFor}>{label}</Label>
       {children}
       {hint && <p className="m-0 text-xs leading-relaxed text-muted-foreground">{hint}</p>}

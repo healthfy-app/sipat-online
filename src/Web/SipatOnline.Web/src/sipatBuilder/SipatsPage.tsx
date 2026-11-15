@@ -78,7 +78,7 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
 </>;
           return <li key={event.id}>
             {cancelled
-              ? <div aria-disabled="true" aria-label={`${event.title} (cancelada)`} className="grid h-full gap-3 rounded-2xl border border-dashed border-border bg-muted/40 p-4 text-muted-foreground" role="group">
+              ? <div aria-disabled="true" aria-label={`${event.title} (encerrada)`} className="grid h-full gap-3 rounded-2xl border border-dashed border-border bg-muted/40 p-4 text-muted-foreground" role="group">
                 <div className="grid gap-3 opacity-60">{details}</div>
                 <Button className="justify-self-start" disabled={reactivating === event.id} onClick={() => void reactivate(event)} size="sm" variant="outline">
                   <RotateCcw /> {reactivating === event.id ? 'Reativando...' : 'Reativar'}

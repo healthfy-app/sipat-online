@@ -255,9 +255,9 @@ describe('tenant portal', () => {
 
     expect(await screen.findByRole('heading', { name: 'Entre na sua área de aprendizagem' })).toBeVisible();
     expect(screen.getByRole('region', { name: 'Acesso ao portal da empresa' })).toBeVisible();
-    expect(screen.getByText('Pequenos passos. Rotinas mais seguras.')).toBeInTheDocument();
+    expect(screen.queryByText('Pequenos passos. Rotinas mais seguras.')).not.toBeInTheDocument();
     expect(screen.getByText('Acme Segurança')).toBeVisible();
-    expect(screen.getByLabelText('Login')).toBeVisible();
+    expect(screen.getByLabelText('Login')).toHaveAttribute('placeholder', 'Digite seu login');
     expect(screen.getByLabelText('Senha')).toHaveAttribute('placeholder', 'Digite sua senha');
   });
 

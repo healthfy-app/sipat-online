@@ -206,7 +206,7 @@ export default function PlatformUsersPage() {
         description={isLoading
           ? 'Carregando usuários...'
           : `${(page?.totalCount ?? 0).toLocaleString('pt-BR')} ${(page?.totalCount ?? 0) === 1 ? 'usuário' : 'usuários'} · Dados de autenticação nunca são exibidos.`}
-        eyebrow="SIPAT.ONLINE.ADMIN"
+        eyebrow="Operação da plataforma"
         title="Usuários"
       />
 

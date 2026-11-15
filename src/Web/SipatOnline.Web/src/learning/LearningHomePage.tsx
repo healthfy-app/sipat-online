@@ -38,6 +38,16 @@ import ProgressBar from './ProgressBar';
 import './CourseCards.css';
 import './LearningHero.css';
 
+const firstArrivalKey = 'sipat:learning-arrived';
+
+function readSessionFlag(key: string): string | null {
+  try { return sessionStorage.getItem(key); } catch { return null; }
+}
+
+function writeSessionFlag(key: string, value: string) {
+  try { sessionStorage.setItem(key, value); } catch { /* private mode: the cascade simply plays again */ }
+}
+
 export default function LearningHomePage({ participantName, setSummary }: {
   participantName?: string;
   setSummary?: (summary: LearningSummary | null) => void;
@@ -56,6 +66,12 @@ export default function LearningHomePage({ participantName, setSummary }: {
   const [sortMode, setSortMode] = useState<CourseSort>('recommended');
   const [shownMilestone, setShownMilestone] = useState<number | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  // the first arrival of the session opens in a short cascade; later visits show the page at once
+  const [isFirstArrival] = useState(() => readSessionFlag(firstArrivalKey) !== '1');
+  const isArriving = isFirstArrival && !isLoading && !error;
+  useEffect(() => {
+    if (isArriving) writeSessionFlag(firstArrivalKey, '1');
+  }, [isArriving]);
 
   // a participant can have several SIPATs (one a year): the published one is shown, earlier ones are one tap away
   const sipats = Array.from(new Map(allTracks.map(track => [track.sipatEventId, track])).values())
@@ -298,7 +314,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
   const heroGreets = startedAnyCourse && !isLoading && !error && tracks.length > 0;
 
   return (
-    <main className={`learning-page learning-catalog${startedAnyCourse ? ' is-returning' : ''}`}>
+    <main className={`learning-page learning-catalog${startedAnyCourse ? ' is-returning' : ''}${isArriving ? ' is-arriving' : ''}`}>
       {!heroGreets && <header className="learning-page-heading">
         {firstName && <p className="learning-catalog-greeting">Olá, {firstName}.</p>}
         <h1>{startedAnyCourse ? 'Bom te ver de volta.' : dayMode ? 'Sua SIPAT. Seu próximo passo.' : 'Seus cursos. Seu próximo passo.'}</h1>

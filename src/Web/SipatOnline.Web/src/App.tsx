@@ -404,41 +404,20 @@ function LoginPage({
         <div className="login-intro">
           {tenant.tenantKey === 'platform' ? (
             <>
-              <p className="eyebrow">SIPAT.ONLINE.ADMIN</p>
+              <p className="eyebrow">OPERAÇÃO DA PLATAFORMA</p>
               <h1>Gestão segura dos clientes.</h1>
               <p>Acesse a área de operação do SIPAT Online.</p>
             </>
           ) : (
             <>
-              <p className="eyebrow">CONTEÚDOS PARA A SEMANA DA SIPAT</p>
+              <p className="eyebrow">CONTEÚDOS DA SUA SIPAT</p>
               <h1>Aprender também faz parte de cuidar.</h1>
               <p>
                 Acesse os vídeos e demais conteúdos que sua empresa preparou para
-                a semana da SIPAT.
+                a SIPAT.
               </p>
             </>
           )}
-        </div>
-        <div aria-hidden="true" className="login-brand-art">
-          <span className="login-brand-orbit login-brand-orbit-large" />
-          <span className="login-brand-orbit login-brand-orbit-small" />
-          <div className="login-brand-card">
-            <span className="login-brand-symbol">
-              <svg viewBox="0 0 24 24">
-                <path d="M12 3 19 6v5c0 4.7-2.9 8.3-7 10-4.1-1.7-7-5.3-7-10V6l7-3Z" />
-                <path d="m9 12 2 2 4-4" />
-              </svg>
-            </span>
-            <span className="login-brand-card-copy">
-              <span>{tenant.tenantKey === 'platform' ? 'OPERAÇÃO DA PLATAFORMA' : 'FORMAÇÃO DA EQUIPE'}</span>
-              <strong>
-                {tenant.tenantKey === 'platform'
-                  ? 'Empresas, cursos e usuários em um só lugar.'
-                  : 'Pequenos passos. Rotinas mais seguras.'}
-              </strong>
-            </span>
-            <span className="login-brand-card-check">✓</span>
-          </div>
         </div>
         <span className="login-caption">
           {tenant.tenantKey === 'platform' ? 'Acesso exclusivo para operadores' : 'Ambiente de aprendizagem da empresa'}
@@ -472,6 +451,7 @@ function LoginPage({
             id="login-identifier"
             name="loginIdentifier"
             onChange={(event) => setLoginIdentifier(event.target.value)}
+            placeholder="Digite seu login"
             required
             value={loginIdentifier}
           />
@@ -684,7 +664,7 @@ function ProtectedPortal({
           {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}
           {isPlatformOperator && !isPlatformCompanyContext && !companyWorkspaceId && (
             <>
-              <p className="sidebar-label sidebar-label-spaced">SIPAT.ONLINE.ADMIN</p>
+              <p className="sidebar-label sidebar-label-spaced">OPERAÇÃO</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Biblioteca</NavLink>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Qualidade do vídeo</NavLink>
@@ -727,10 +707,22 @@ function TenantIdentity({
   tenant: TenantBranding;
   compact: boolean;
 }) {
+  // a wide logo is already the company name written out, so the compact header shows it alone, centered
+  const [isWideLogo, setIsWideLogo] = useState(false);
   return (
-    <div className={`tenant-identity${compact ? ' tenant-identity-compact' : ''}`}>
+    <div
+      className={`tenant-identity${compact ? ' tenant-identity-compact' : ''}${compact && isWideLogo ? ' has-wide-logo' : ''}`}
+    >
       {tenant.logoReference ? (
-        <img alt="" className="tenant-logo" src={tenant.logoReference} />
+        <img
+          alt=""
+          className="tenant-logo"
+          onLoad={(event) => {
+            const image = event.currentTarget;
+            setIsWideLogo(image.naturalHeight > 0 && image.naturalWidth / image.naturalHeight >= 2);
+          }}
+          src={tenant.logoReference}
+        />
       ) : (
         <img alt="SIPAT Online" className="sipat-default-logo" height={48} src="/favicon.svg" width={48} />
       )}

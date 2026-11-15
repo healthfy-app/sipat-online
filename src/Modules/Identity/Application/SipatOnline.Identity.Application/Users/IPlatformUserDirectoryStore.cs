@@ -41,7 +41,9 @@ public sealed record PlatformCompanyOverview(
     int EmployeeCount,
     int AdministratorCount,
     int TotalUserCount,
-    string Plan = "Diamante");
+    string Plan = "Diamante",
+    // the company's portal logo, so the operator recognizes it in the list; null when it has none
+    string? LogoReference = null);
 
 public sealed record PlatformCompanyEmployeePage(
     Guid CompanyId,

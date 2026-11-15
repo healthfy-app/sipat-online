@@ -1,6 +1,6 @@
-import { ChevronRight, LogIn, Search, UserPlus } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
-import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Award, LogIn, MoreHorizontal, Search, TriangleAlert, UserPlus } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 import {
   changePlatformCompanyEmployeesStatus,
   getPlatformCompanyEmployees,
@@ -13,9 +13,9 @@ import {
 import CompanyCertificateLogoPanel from '@/CompanyCertificateLogoPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { EmptyState, Page, PageHeader, Stat } from '@/components/ui/page';
-import { TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingState from '@/LoadingState';
 import ParticipantOutcomesPanel from '@/ParticipantOutcomesPanel';
@@ -23,12 +23,24 @@ import AddAdministratorDialog from './AddAdministratorDialog';
 import CompanyAvatar from './CompanyAvatar';
 
 const pageSize = 50;
+const searchDelay = 300;
 
+/** Active is the normal case and stays quiet; only an inactive person stands out. */
+function ActiveStatus({ isActive }: { isActive: boolean }) {
+  return isActive
+    ? <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><span aria-hidden="true" className="size-1.5 rounded-full bg-success" />Ativo</span>
+    : <Badge variant="warning">Inativo</Badge>;
+}
+
+/**
+ * One company, seen by the operator. The sidebar (CompanyNav) is the navigation of every company page and already
+ * names the company and its plan; this page shows the company once, its main actions, and the section the sidebar
+ * chose: participants (default) or administrators.
+ */
 export default function CompanyPage() {
   const { companyId = '', section } = useParams<{ companyId: string; section?: string }>();
-  const navigate = useNavigate();
   const initialSearch = useSearchParams()[0].get('busca')?.trim() ?? '';
-  const tab = section === 'administradores' ? 'administrators' : 'participants';
+  const showingAdministrators = section === 'administradores';
   const [page, setPage] = useState<PlatformCompanyEmployeePage | null>(null);
   const [overview, setOverview] = useState<PlatformCompanyOverview | null>(null);
   const [administrators, setAdministrators] = useState<PlatformUserSummary[] | null>(null);
@@ -45,6 +57,7 @@ export default function CompanyPage() {
   const [reload, setReload] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isChangingStatus, setIsChangingStatus] = useState(false);
+  const [certificateLogoRequest, setCertificateLogoRequest] = useState(0);
 
   useEffect(() => {
     let current = true;
@@ -54,7 +67,7 @@ export default function CompanyPage() {
       .catch((loadError) => {
         if (!current) return;
         setOverview(null);
-        setSummaryError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar os indicadores da empresa.');
+        setSummaryError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar os dados da empresa.');
       });
     // administração da empresa = administrador principal (SuperAdmin) + administradores (ClientAdmin)
     Promise.all([
@@ -69,6 +82,14 @@ export default function CompanyPage() {
       .catch(() => { if (current) setAdministrators([]); });
     return () => { current = false; };
   }, [companyId, refreshKey]);
+
+  // the list filters as the operator types, like the list of companies
+  useEffect(() => {
+    const term = searchInput.trim();
+    if (term === search) return;
+    const timer = window.setTimeout(() => { setOffset(0); setSearch(term); }, searchDelay);
+    return () => window.clearTimeout(timer);
+  }, [searchInput, search]);
 
   useEffect(() => {
     let current = true;
@@ -119,80 +140,72 @@ export default function CompanyPage() {
     }
   }
 
-  function handleSearch(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setOffset(0);
-    setSearch(searchInput.trim());
-  }
-
   const companyName = page?.companyName ?? overview?.name ?? '';
   const currentPage = Math.floor(offset / pageSize) + 1;
   const pageCount = Math.max(1, Math.ceil((page?.totalCount ?? 0) / pageSize));
+  const canSetCertificateLogo = overview?.plan === undefined || overview.plan === 'Ouro' || overview.plan === 'Diamante';
+  const missingAdministrator = administrators !== null && administrators.length === 0;
+  const participantCount = page?.totalCount ?? overview?.employeeCount ?? 0;
 
   return (
     <div className="page-content">
       <Page>
-        <nav aria-label="Breadcrumb">
-          <ol className="m-0 flex list-none items-center gap-1.5 p-0 text-sm text-muted-foreground">
-            <li><Link className="text-muted-foreground no-underline hover:text-foreground" to="/platform">Empresas</Link></li>
-            <li aria-hidden="true"><ChevronRight className="size-3.5" /></li>
-            <li aria-current="page" className="font-medium text-foreground">{companyName || 'Empresa'}</li>
-          </ol>
-        </nav>
-
         <div className="flex flex-wrap items-center gap-4">
-          {companyName && <CompanyAvatar className="size-12 text-base" name={companyName} />}
+          {companyName && <CompanyAvatar className="size-12 text-base" logo={overview?.logoReference} name={companyName} />}
           <PageHeader
             actions={(
               <>
                 <a className={buttonVariants({ variant: 'default' })} href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}><LogIn /> Entrar como administrador</a>
-                {(overview?.plan === undefined || overview.plan === 'Ouro' || overview.plan === 'Diamante') && <CompanyCertificateLogoPanel companyId={companyId} />}
+                {canSetCertificateLogo && <DropdownMenu modal={false}>
+                  <DropdownMenuTrigger asChild><Button variant="outline"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem onSelect={() => setCertificateLogoRequest((value) => value + 1)}><Award /> Logo do certificado</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>}
               </>
             )}
-            badge={overview && <Badge variant={overview.isActive ? 'success' : 'neutral'}>{overview.isActive ? 'Ativa' : 'Inativa'}</Badge>}
-            className="flex-1"
+            badge={overview && (overview.isActive
+              ? <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><span aria-hidden="true" className="size-1.5 rounded-full bg-success" />Ativa</span>
+              : <Badge variant="warning">Inativa</Badge>)}
+            className="flex-1 items-center"
             description={page ? `Identificador · ${page.companyKey}` : 'Carregando dados da empresa...'}
-            title={companyName || (isLoading ? 'Carregando empresa...' : 'Participantes')}
+            title={companyName || (isLoading ? 'Carregando empresa...' : 'Empresa')}
           />
         </div>
+        {canSetCertificateLogo && <CompanyCertificateLogoPanel companyId={companyId} openRequest={certificateLogoRequest} />}
 
         {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
         {summaryError && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{summaryError}</p>}
 
-        {(page || overview) && (
-          <section aria-label="Resumo da empresa" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13rem),1fr))] gap-4">
-            <Stat hint={overview ? 'Ativos' : 'Na listagem atual'} label="Participantes"
-              value={(overview?.employeeCount ?? page?.totalCount ?? 0).toLocaleString('pt-BR')} />
-            {overview && (
-              <Stat hint={overview.administratorCount === 0 ? 'Adicione quem vai cuidar do SIPAT' : 'Com acesso de administração'}
-                label="Administradores" value={overview.administratorCount.toLocaleString('pt-BR')} />
-            )}
-          </section>
+        {/* without an administrator nobody in the company can run its SIPAT: the most urgent thing on the page */}
+        {missingAdministrator && !showingAdministrators && (
+          <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-warning" role="status">
+            <TriangleAlert aria-hidden="true" className="size-5 shrink-0" />
+            <p className="m-0 min-w-0 flex-1 text-sm font-medium">Esta empresa ainda não tem administrador. Sem ele, ninguém da empresa consegue cuidar da SIPAT.</p>
+            <Button onClick={() => setAddingAdmin(true)} size="sm"><UserPlus /> Adicionar administrador</Button>
+          </div>
         )}
 
-        <Tabs onValueChange={value => navigate(`/platform/companies/${companyId}${value === 'administrators' ? '/administradores' : '/participantes'}`)} value={tab}>
-          <TabsList aria-label="Seções da empresa">
-            <TabsTrigger value="participants">Participantes <TabCount>{page?.totalCount ?? 0}</TabCount></TabsTrigger>
-            <TabsTrigger value="administrators">Administradores <TabCount>{administrators?.length ?? overview?.administratorCount ?? 0}</TabCount></TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="participants">
+        {!showingAdministrators ? (
+          <section aria-labelledby="company-participants-title" className="grid gap-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <h2 className="m-0 text-lg font-semibold tracking-tight" id="company-participants-title">
+                Participantes <span className="font-normal text-muted-foreground tabular-nums">· {participantCount.toLocaleString('pt-BR')}</span>
+              </h2>
+            </div>
             {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
-            <section aria-label="Filtros de participantes" className="flex flex-wrap items-center justify-between gap-3">
-              <form className="flex min-w-0 flex-[1_1_20rem] gap-2" onSubmit={handleSearch}>
-                <label className="relative flex min-w-0 flex-1 items-center text-muted-foreground sm:max-w-sm">
-                  <Search className="pointer-events-none absolute left-3 size-4" />
-                  <Input aria-label="Buscar por nome ou login" className="pl-9" placeholder="Buscar por nome ou login" type="search"
-                    value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
-                </label>
-                <Button type="submit" variant="outline">Buscar</Button>
-              </form>
+            <div aria-label="Filtros de participantes" className="flex flex-wrap items-center justify-between gap-3" role="group">
+              <label className="relative flex min-w-0 flex-[1_1_20rem] items-center text-muted-foreground sm:max-w-sm">
+                <Search className="pointer-events-none absolute left-3 size-4" />
+                <Input aria-label="Buscar por nome ou login" className="pl-9" placeholder="Buscar por nome ou login" type="search"
+                  value={searchInput} onChange={(event) => setSearchInput(event.target.value)} />
+              </label>
               <label className="m-0 flex cursor-pointer items-center gap-2 text-sm text-muted-foreground">
                 <input checked={includeInactive} className="size-4 accent-[var(--brand-primary)]" type="checkbox"
                   onChange={(event) => { setOffset(0); setIncludeInactive(event.target.checked); }} />
                 Incluir participantes inativos
               </label>
-            </section>
+            </div>
 
             {selected.size > 0 && <div aria-label="Ações para os selecionados" className="flex flex-wrap items-center gap-2 rounded-lg bg-accent px-3 py-2" role="group">
               <strong className="text-sm">{selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}</strong>
@@ -216,12 +229,22 @@ export default function CompanyPage() {
                       <TableHead className="max-sm:hidden" scope="col">Login</TableHead>
                       <TableHead scope="col">Conclusão</TableHead>
                       <TableHead className="max-md:hidden" scope="col">Status</TableHead>
-                      <TableHead scope="col">Atividades e certificados</TableHead>
+                      <TableHead className="w-28" scope="col"><span className="sr-only">Histórico</span></TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {page.items.map((employee) => (
-                      <TableRow data-state={selected.has(employee.id) ? 'selected' : undefined} key={employee.id}>
+                      <TableRow
+                        className="cursor-pointer"
+                        data-state={selected.has(employee.id) ? 'selected' : undefined}
+                        key={employee.id}
+                        // the whole row opens the history; checkboxes, buttons and the history dialog itself keep their own clicks
+                        onClick={(event) => {
+                          const target = event.target as HTMLElement;
+                          if (!event.currentTarget.contains(target) || target.closest('input, button, a, label')) return;
+                          event.currentTarget.querySelector<HTMLButtonElement>('.participant-outcomes-trigger')?.click();
+                        }}
+                      >
                         <TableCell>
                           <input aria-label={`Selecionar ${employee.displayName}`} checked={selected.has(employee.id)} className="size-4 accent-[var(--brand-primary)]" type="checkbox"
                             onChange={() => toggleOne(employee.id)} />
@@ -234,47 +257,50 @@ export default function CompanyPage() {
                             aria-valuemax={100}
                             aria-valuemin={0}
                             aria-valuenow={employee.progressPercentage}
-                            className="flex min-w-32 items-center gap-2.5"
+                            className="flex items-center gap-2"
                             role="progressbar"
                           >
-                            <span aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                            <span aria-hidden="true" className="h-1.5 w-24 shrink-0 overflow-hidden rounded-full bg-muted">
                               <span className="block h-full rounded-full bg-primary" style={{ width: `${employee.progressPercentage}%` }} />
                             </span>
-                            <strong className="w-10 text-right text-sm tabular-nums">{employee.progressPercentage}%</strong>
+                            <strong className="text-sm tabular-nums">{employee.progressPercentage}%</strong>
                           </div>
                         </TableCell>
-                        <TableCell className="max-md:hidden">
-                          <Badge variant={employee.isActive ? 'success' : 'neutral'}>{employee.isActive ? 'Ativo' : 'Inativo'}</Badge>
-                        </TableCell>
-                        <TableCell><ParticipantOutcomesPanel companyId={companyId} participantId={employee.id} /></TableCell>
+                        <TableCell className="max-md:hidden"><ActiveStatus isActive={employee.isActive} /></TableCell>
+                        <TableCell className="py-2 pr-2 text-right"><ParticipantOutcomesPanel companyId={companyId} participantId={employee.id} quiet /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
-                <div aria-label="Paginação de participantes" className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground" role="group">
+                {pageCount > 1 && <div aria-label="Paginação de participantes" className="flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground" role="group">
                   <span>Página {currentPage} de {pageCount} · {page.totalCount.toLocaleString('pt-BR')} resultados</span>
                   <div className="flex gap-2">
                     <Button disabled={offset === 0 || isLoading} onClick={() => setOffset(Math.max(0, offset - pageSize))} size="sm" variant="outline">Anterior</Button>
                     <Button disabled={offset + pageSize >= page.totalCount || isLoading} onClick={() => setOffset(offset + pageSize)} size="sm" variant="outline">Próxima</Button>
                   </div>
-                </div>
+                </div>}
               </>
             ) : (
               <EmptyState title={search ? 'Nenhum participante encontrado. Tente outro nome ou identificador.' : 'Nenhum participante para exibir.'} />
             )}
-          </TabsContent>
-
-          <TabsContent value="administrators">
+          </section>
+        ) : (
+          <section aria-labelledby="company-administrators-title" className="grid gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="m-0 text-sm text-muted-foreground">Quem administra o SIPAT desta empresa: participantes, cursos e certificados.</p>
-              <Button onClick={() => setAddingAdmin(true)} variant="outline"><UserPlus /> Adicionar administrador</Button>
+              <div className="grid gap-1">
+                <h2 className="m-0 text-lg font-semibold tracking-tight" id="company-administrators-title">
+                  Administradores <span className="font-normal text-muted-foreground tabular-nums">· {administrators?.length ?? overview?.administratorCount ?? 0}</span>
+                </h2>
+                <p className="m-0 text-sm text-muted-foreground">Quem administra a SIPAT desta empresa: participantes, cursos e certificados.</p>
+              </div>
+              {!missingAdministrator && <Button onClick={() => setAddingAdmin(true)} variant="outline"><UserPlus /> Adicionar administrador</Button>}
             </div>
             {administrators === null ? (
               <LoadingState className="list-state">Carregando administradores...</LoadingState>
             ) : administrators.length === 0 ? (
               <EmptyState
                 action={<Button onClick={() => setAddingAdmin(true)}><UserPlus /> Adicionar administrador</Button>}
-                description="Sem um administrador, ninguém da empresa consegue gerenciar o SIPAT dela."
+                description="Sem um administrador, ninguém da empresa consegue gerenciar a SIPAT dela."
                 title="Esta empresa ainda não tem administrador."
               />
             ) : (
@@ -295,14 +321,14 @@ export default function CompanyPage() {
                       <TableCell className="text-sm max-sm:hidden">
                         {administrator.roles.includes('SuperAdmin') ? 'Administrador principal' : 'Administrador'}
                       </TableCell>
-                      <TableCell><Badge variant={administrator.isActive ? 'success' : 'neutral'}>{administrator.isActive ? 'Ativo' : 'Inativo'}</Badge></TableCell>
+                      <TableCell><ActiveStatus isActive={administrator.isActive} /></TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
             )}
-          </TabsContent>
-        </Tabs>
+          </section>
+        )}
       </Page>
 
       {addingAdmin && (

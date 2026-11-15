@@ -48,7 +48,7 @@ describe('SIPATs of a company', () => {
     vi.mocked(api.reactivateSipatEvent).mockResolvedValue(event('a', 'SIPAT 2026', '2026-11-09T00:00:00Z', 'Draft'));
     render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
 
-    expect(await screen.findByRole('group', { name: 'SIPAT 2026 (cancelada)' })).toHaveAttribute('aria-disabled', 'true');
+    expect(await screen.findByRole('group', { name: 'SIPAT 2026 (encerrada)' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.queryByRole('link', { name: 'Abrir SIPAT 2026' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Reativar' }));

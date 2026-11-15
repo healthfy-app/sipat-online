@@ -1,11 +1,11 @@
 import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { Clock, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import {
-  addDays, dayDuration, formatClock, formatSpan, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay,
+  addDays, dayDuration, formatClock, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay,
   type Catalog, type DaySlots,
 } from './model';
 import { DayBox, dropId, ThemeTray } from './ThemeCards';
@@ -20,11 +20,16 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange, canEditThemes = true }: {
+export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, canEditThemes = true }: {
   days: DaySlots[]; catalog: Catalog; onChange: (days: DaySlots[]) => void; canEditThemes?: boolean;
+  /** Removes a day; the page offers to undo it. Without it the day is simply dropped. */
+  onRemoveDay?: (index: number) => void;
+  /** What is missing on each day, by position; shown on the day itself. */
+  issues?: Record<number, string[]>;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
-  const previousCount = useRef(days.length);
+  // set by "+ Dia" only: a day put back with undo returns to its own place and must not pull the grid to the end
+  const addedAtEnd = useRef(false);
   const themes = catalog.subjects.filter(subject => subject.id !== 'none');
   const canAddDay = days.length < maxDays;
   // up to 7 days always fit the width of the page, however many there are; beyond that the days keep a minimum width and scroll
@@ -33,16 +38,18 @@ export default function BuilderGrid({ days, catalog, onChange, canEditThemes = t
 
   // a day just added scrolls into view
   useEffect(() => {
-    if (days.length > previousCount.current) scroller.current?.scrollTo({ left: scroller.current.scrollWidth, behavior: 'smooth' });
-    previousCount.current = days.length;
+    if (!addedAtEnd.current) return;
+    addedAtEnd.current = false;
+    scroller.current?.scrollTo?.({ left: scroller.current.scrollWidth, behavior: 'smooth' });
   }, [days.length]);
 
   const patchDay = (index: number, patch: Partial<DaySlots>) => onChange(days.map((day, position) => (position === index ? { ...day, ...patch } : day)));
   const addDay = () => {
     const last = days[days.length - 1];
+    addedAtEnd.current = true;
     onChange([...days, newDay(days.length, last?.date ? addDays(last.date, 1) : '')]);
   };
-  const removeDay = (index: number) => onChange(days.filter((_, position) => position !== index));
+  const removeDay = (index: number) => (onRemoveDay ? onRemoveDay(index) : onChange(days.filter((_, position) => position !== index)));
 
   /** A theme brings its videos (in its order), its games and, when the day still has the default title, its name. */
   const applyTheme = (index: number, themeId: string) => {
@@ -71,19 +78,23 @@ export default function BuilderGrid({ days, catalog, onChange, canEditThemes = t
           <div className="grid min-w-full [grid-template-columns:var(--columns)]" role="table" style={layout}>
             {days.map((day, index) => {
               const color = subjectColor(day.subject);
-              const time = dayDuration(day, catalog);
-              return <div className="builder-col grid content-start gap-2 border-r border-b border-border p-3" key={`head-${day.key}`} role="columnheader" style={{ ...column(index), borderTop: `4px solid ${color}`, gridColumn: index + 1, gridRow: 1 }}>
+              const dayIssues = issues?.[index];
+              return <div className={cn('builder-col grid content-start gap-2 border-r border-b border-border p-3', dayIssues && 'bg-destructive-soft')}
+                data-day-issue={dayIssues ? true : undefined} key={`head-${day.key}`} role="columnheader"
+                style={{ ...column(index), borderTop: `4px solid ${dayIssues ? 'var(--color-destructive)' : color}`, gridColumn: index + 1, gridRow: 1 }}>
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
                   <span className="rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wide text-white" style={{ backgroundColor: color }}>DIA {index + 1}</span>
-                  <span className="flex items-center gap-1 text-xs font-medium text-muted-foreground tabular-nums"><Clock aria-hidden="true" className="size-3.5" />{time > 0 ? formatSpan(time) : 'sem vídeos'}</span>
+                  {/* the date field shows day/month; only the weekday is added here. The time of the day lives in the column footer. */}
+                  <span className="mr-auto text-xs font-semibold text-muted-foreground capitalize">{shortDate(day.date).split(' ')[0]}</span>
                   <Button aria-label={`Remover o dia ${index + 1}`} disabled={days.length === 1} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </div>
-                <div className="grid items-center gap-1">
-                  <Input aria-label={`Data do dia ${index + 1}`} className="h-9 min-w-0 px-2 text-sm" onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
-                  <span className="text-xs font-medium text-muted-foreground capitalize">{shortDate(day.date)}</span>
-                </div>
-                <Input aria-label={`Título do dia ${index + 1}`} className="font-medium" maxLength={160}
+                <Input aria-label={`Data do dia ${index + 1}`} className="h-9 min-w-0 px-2 text-sm" onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
+                <Input aria-describedby={dayIssues ? `day-issues-${day.key}` : undefined} aria-invalid={!!dayIssues && !day.title.trim()}
+                  aria-label={`Título do dia ${index + 1}`} className="font-medium" maxLength={160}
                   onChange={event => patchDay(index, { title: event.target.value })} placeholder="Slogan do dia" value={day.title} />
+                {dayIssues && <ul className="m-0 grid list-none gap-0.5 p-0 text-xs font-semibold text-destructive" id={`day-issues-${day.key}`}>
+                  {dayIssues.map(text => <li key={text}>{text}</li>)}
+                </ul>}
               </div>;
             })}
 
@@ -97,8 +108,8 @@ export default function BuilderGrid({ days, catalog, onChange, canEditThemes = t
 
             {days.map((day, index) => {
               const count = filled(day.videos).length;
-              return <div className="builder-col flex items-baseline justify-between gap-2 border-r border-border bg-[#eef2f0] px-4 py-3" key={`time-${day.key}`} style={{ ...column(index), gridColumn: index + 1, gridRow: 3 }}>
-                <span className="text-xl font-extrabold tabular-nums text-[#12332c]">{formatClock(dayDuration(day, catalog))}</span>
+              return <div className="builder-col flex items-baseline justify-between gap-2 border-r border-border bg-muted px-4 py-3" key={`time-${day.key}`} style={{ ...column(index), gridColumn: index + 1, gridRow: 3 }}>
+                <span className="text-xl font-extrabold tabular-nums text-foreground">{formatClock(dayDuration(day, catalog))}</span>
                 <span className="text-xs text-muted-foreground">{count} {count === 1 ? 'vídeo' : 'vídeos'}</span>
               </div>;
             })}

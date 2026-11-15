@@ -1,8 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getCompanyCertificateLogo, saveCompanyCertificateLogo } from './api';
 import CourseDialog from './CourseDialog';
 
-export default function CompanyCertificateLogoPanel({ companyId }: { companyId: string }) {
+/**
+ * The company's logo for its certificates. By default it brings its own button; when `openRequest` is given the
+ * page opens it from elsewhere (a menu) by increasing that number, and no button is drawn.
+ */
+export default function CompanyCertificateLogoPanel({ companyId, openRequest }: { companyId: string; openRequest?: number }) {
   const [open, setOpen] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [file, setFile] = useState<File | null>(null);
@@ -27,8 +31,17 @@ export default function CompanyCertificateLogoPanel({ companyId }: { companyId: 
     } catch (failure) { setError(failure instanceof Error ? failure.message : 'Não foi possível salvar a logo.'); }
     finally { setBusy(false); }
   }
+  const handledRequest = useRef(openRequest ?? 0);
+  useEffect(() => {
+    if (openRequest === undefined || openRequest === handledRequest.current) return;
+    handledRequest.current = openRequest;
+    void load();
+    // load only reacts to a new request; it reads the current company when it runs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRequest]);
+
   return <>
-    <button className="button button-secondary" onClick={() => void load()} type="button">Logo do certificado</button>
+    {openRequest === undefined && <button className="button button-secondary" onClick={() => void load()} type="button">Logo do certificado</button>}
     {open && <CourseDialog busy={busy} onClose={() => setOpen(false)} title="Logo da empresa no certificado">
       <p>Envie a logo oficial da empresa contratante. Ela será incorporada ao PDF, sem depender de links externos.</p>
       {configured && <figure className="certificate-company-logo"><img

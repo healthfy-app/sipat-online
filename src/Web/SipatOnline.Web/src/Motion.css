@@ -23,6 +23,16 @@
   .loading-brand-gear { animation: loading-orbit 2400ms linear infinite; }
   .button[aria-busy="true"]::before { animation: loading-orbit 900ms linear infinite; }
   .loading-state[data-motion-paused="true"] .loading-brand-gear { animation-play-state: paused; }
+  /* the portal and the learner page only show the spinning gear when the wait is real: a fast load never flashes it */
+  :is(.app-loading, .learning-page) .loading-state { animation: loading-appear 200ms 300ms var(--motion-arrive) backwards; }
+  /* first arrival of the session: the content that came with the data rises in a short cascade */
+  .learning-page.is-arriving > :not(.learning-page-heading, .loading-state) {
+    animation: arrival-rise 250ms var(--motion-arrive) backwards;
+  }
+  .learning-page.is-arriving > :nth-child(2) { animation-delay: 50ms; }
+  .learning-page.is-arriving > :nth-child(3) { animation-delay: 100ms; }
+  .learning-page.is-arriving > :nth-child(4) { animation-delay: 150ms; }
+  .learning-page.is-arriving > :nth-child(n + 5) { animation-delay: 200ms; }
   .page-content:not(.learning-page), .learning-page { animation: surface-arrive 180ms var(--motion-arrive); }
   .course-dialog-backdrop { animation: surface-arrive 150ms ease-out; }
   .course-dialog { animation: dialog-arrive 260ms var(--motion-arrive); transform-origin: 50% 70%; }
@@ -44,6 +54,9 @@
   .button:active:not(:disabled) { transform: translateY(1px); }
 }
 @keyframes loading-orbit { to { transform: rotate(360deg); } }
+@keyframes loading-appear { from { opacity: 0; } }
+@keyframes arrival-rise { from { opacity: 0; transform: translateY(8px); } }
+@keyframes arrival-fade { from { opacity: 0; } }
 @keyframes surface-arrive { from { opacity: 0.65; } }
 @keyframes dialog-arrive { from { opacity: 0.7; transform: translateY(14px) scale(0.985); } }
 @keyframes feedback-arrive { from { opacity: 0.7; transform: translateY(4px); } }
@@ -56,4 +69,8 @@
   .achievement-mark *, .course-dialog, .course-dialog-backdrop, .page-content {
     animation: none !important;
   }
+  /* reduced motion: no rise and no cascade, the content only fades in */
+  .learning-page.is-arriving > :not(.learning-page-heading, .loading-state) { animation: arrival-fade 200ms ease-out backwards; }
+  .loading-brand-gear { animation: loading-pulse 1600ms ease-in-out infinite alternate !important; }
 }
+@keyframes loading-pulse { to { opacity: 0.45; } }
