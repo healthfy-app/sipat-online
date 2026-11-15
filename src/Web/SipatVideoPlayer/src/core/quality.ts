@@ -34,6 +34,8 @@ export type FlushReason = 'interval' | 'paused' | 'ended' | 'hidden' | 'leave' |
 export interface QualityTracker {
   flush(reason: FlushReason): void;
   stop(): void;
+  /** The source changed: counts a switch and ignores the waiting it causes until the next 'playing'. */
+  setQuality(quality: QualityLabel): void;
 }
 
 const NEVER_STARTED_MS = 30_000;
@@ -145,6 +147,8 @@ export function trackPlaybackQuality(
   options: {
     quality: QualityLabel;
     environment?: PlaybackEnvironment;
+    /** Called when a counted stall (500 ms or more) ends. */
+    onStall?: (durationMs: number) => void;
     onReport: (summary: PlayerQualitySummary, reason: FlushReason) => void;
   },
 ): QualityTracker {
@@ -163,6 +167,9 @@ export function trackPlaybackQuality(
   let playingSince: number | null = null;
   let waitingSince: number | null = null;
   let errorKind: PlayerQualitySummary['errorKind'] = null;
+  let quality = options.quality;
+  let qualitySwitches = 0;
+  let switching = false; // a source change is loading: its waiting is not a stall
 
   let neverStartedTimer: ReturnType<typeof setTimeout> | null = null;
   let intervalTimer: ReturnType<typeof setInterval> | null = null;
@@ -207,8 +214,8 @@ export function trackPlaybackQuality(
       stallMs: clampInt(stallMs + (reportOpen ? openStall : 0), MAX_DURATION_MS),
       watchedMs: clampInt(watched, MAX_DURATION_MS),
       errorKind,
-      quality: options.quality,
-      qualitySwitches: 0,
+      quality,
+      qualitySwitches: clampInt(qualitySwitches, MAX_STALL_COUNT),
       connectionType: environment.connectionType,
       downlinkMbps: environment.downlinkMbps,
       device: environment.device,
@@ -252,12 +259,14 @@ export function trackPlaybackQuality(
       neverStarted = false;
       clearNeverStarted();
     }
+    switching = false;
     if (waitingSince !== null) {
       const duration = now() - waitingSince;
       waitingSince = null;
       if (duration >= MIN_STALL_MS) {
         stallCount += 1;
         stallMs += duration;
+        try { options.onStall?.(duration); } catch { /* the page's reaction must not break the meter */ }
       }
     }
     if (playingSince === null) playingSince = now();
@@ -267,7 +276,7 @@ export function trackPlaybackQuality(
   function onWaiting() {
     if (!hasPlayed) return;
     closeWatched();
-    if (video.seeking) return;
+    if (video.seeking || switching) return;
     if (waitingSince === null) waitingSince = now();
   }
 
@@ -307,6 +316,7 @@ export function trackPlaybackQuality(
     ['playing', onPlaying],
     ['waiting', onWaiting],
     ['pause', onPause],
+    ['emptied', () => { if (switching) waitingSince = null; }],
     ['ended', onEnded],
     ['error', onError],
   ];
@@ -335,6 +345,14 @@ export function trackPlaybackQuality(
     flush(reason) {
       if (stopped) return;
       flush(reason);
+    },
+    setQuality(next) {
+      if (stopped) return;
+      quality = next;
+      qualitySwitches += 1;
+      switching = true;
+      closeWatched();
+      waitingSince = null;
     },
     stop() {
       if (stopped) return;

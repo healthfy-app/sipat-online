@@ -558,7 +558,7 @@ export default function LearningTrackPage({
                   ref={playerRef}
                   resumeAt={selectedLesson.lastPlaybackPositionMilliseconds / 1000}
                   rules={{ watchInOrder: true, fixedSpeed: true }}
-                  sources={[{ src: activeSession.url }]}
+                  sources={(activeSession.sources ?? [{ url: activeSession.url, quality: null }]).map(source => ({ src: source.url, quality: source.quality ?? undefined }))}
                   title={selectedLesson.title}
                   videoRef={videoRef}
                 />

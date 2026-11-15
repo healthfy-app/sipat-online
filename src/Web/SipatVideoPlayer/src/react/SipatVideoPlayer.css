@@ -87,6 +87,21 @@
 .sipat-player-button:focus-visible { outline: 2px solid var(--sipat-player-signal); outline-offset: -2px; }
 .sipat-player-button svg { width: 20px; height: 20px; }
 
+/* ---------- qualidade ---------- */
+.sipat-player-quality { position: relative; display: inline-grid; }
+.sipat-player-menu {
+  position: absolute; right: 0; bottom: calc(100% + 6px); z-index: 3; display: grid; min-width: 150px; padding: 4px;
+  border-radius: 10px; background: var(--sipat-player-surface); box-shadow: 0 12px 32px var(--sipat-player-shadow), inset 0 1px 0 var(--sipat-player-highlight);
+}
+.sipat-player-menuitem {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; padding: 0 12px; border: 0; border-radius: 8px;
+  background: transparent; color: var(--sipat-player-text); font: 500 14px/1.2 'Geist', system-ui, sans-serif; text-align: left; cursor: pointer;
+}
+.sipat-player-menuitem:hover { background: var(--sipat-player-hover); }
+.sipat-player-menuitem:focus-visible { outline: 2px solid var(--sipat-player-signal); outline-offset: -2px; }
+.sipat-player-menuitem[aria-checked='true'] { color: var(--sipat-player-signal); font-weight: 700; }
+.sipat-player-menuitem[aria-checked='true']::after { content: '¹3'; }
+
 /* ---------- botão central: aparece pausado, some com um leve zoom ao tocar ---------- */
 .sipat-player-bigplay {
   --media-button-icon-height: 34px;

@@ -237,3 +237,76 @@ describe('attachPlayer', () => {
     expect(onEvent).not.toHaveBeenCalled();
   });
 });
+
+describe('attachPlayer quality switch', () => {
+  const sources = [{ src: '/720.mp4', quality: '720p' as const }, { src: '/480.mp4', quality: '480p' as const }];
+  const stall = (h: Harness, ms: number) => {
+    h.video.dispatchEvent(new Event('waiting')); vi.advanceTimersByTime(ms); h.video.dispatchEvent(new Event('playing'));
+  };
+  const open = (events: PlayerEvent[], extra: Partial<Parameters<typeof attachPlayer>[1]> = {}) => {
+    const h = makeVideo();
+    h.video.src = '/720.mp4';
+    player = attachPlayer(h.video, { rules: { watchInOrder: true }, furthest: 30, sources, quality: '720p', preference: () => 'auto', onEvent: saving(events, true), ...extra });
+    return h;
+  };
+
+  it('switches to 480p keeping position, lock and coverage', async () => {
+    const events: PlayerEvent[] = []; const h = open(events);
+    h.video.dispatchEvent(new Event('play')); playTo(h, 19, 20);
+    stall(h, 600); vi.advanceTimersByTime(10_000); // first stall
+    stall(h, 600); // second stall, within the minute
+    await flush();
+    expect(h.video.src).toMatch(/\/480\.mp4$/);
+    expect(events).toContainEqual({ type: 'qualityChange', quality: '480p', automatic: true });
+
+    // the browser starts the new file at 0 and loads it
+    events.length = 0;
+    h.define('currentTime', 0); h.video.dispatchEvent(new Event('emptied')); h.video.dispatchEvent(new Event('pause')); h.video.dispatchEvent(new Event('timeupdate'));
+    h.define('duration', 60); h.video.dispatchEvent(new Event('loadedmetadata'));
+    expect(h.video.currentTime).toBe(20);
+    h.video.dispatchEvent(new Event('seeking')); h.video.dispatchEvent(new Event('seeked'));
+    expect(h.video.play).toHaveBeenCalled();
+    h.define('paused', false); h.video.dispatchEvent(new Event('playing'));
+    h.define('currentTime', 21); h.video.dispatchEvent(new Event('timeupdate'));
+    await vi.advanceTimersByTimeAsync(10_000);
+
+    h.define('currentTime', 45); h.video.dispatchEvent(new Event('seeking'));
+    expect(h.video.currentTime).toBe(30);
+    expect(events).toContainEqual({ type: 'seekBlocked' });
+    expect(player!.unlocked()).toBe(30);
+
+    // nothing sent after the switch starts at 0 or reports a position before where the viewer was
+    const sent = saves(events).flatMap(event => event.type === 'save' ? [event] : []);
+    expect(sent.every(event => event.positionMs >= 20_000 && (event.range?.startMs ?? 20_000) >= 19_000)).toBe(true);
+  });
+
+  it('does not step down automatically when the viewer chose 720p', async () => {
+    const events: PlayerEvent[] = []; const h = open(events, { preference: () => '720p' });
+    h.video.dispatchEvent(new Event('play')); playTo(h, 0, 3);
+    stall(h, 600); stall(h, 600); stall(h, 600);
+    await flush();
+    expect(h.video.src).toMatch(/\/720\.mp4$/);
+    expect(events.some(event => event.type === 'qualityChange')).toBe(false);
+  });
+
+  it('steps down only once per session', async () => {
+    const events: PlayerEvent[] = []; const h = open(events);
+    h.video.dispatchEvent(new Event('play')); playTo(h, 0, 3);
+    stall(h, 600); stall(h, 600);
+    h.define('duration', 60); h.video.dispatchEvent(new Event('loadedmetadata')); h.video.dispatchEvent(new Event('seeked'));
+    stall(h, 600); stall(h, 600);
+    expect(events.filter(event => event.type === 'qualityChange')).toHaveLength(1);
+  });
+
+  it('switchQuality changes the file on request, once, and the report carries 480p with one switch', async () => {
+    const events: PlayerEvent[] = []; const h = open(events);
+    h.video.dispatchEvent(new Event('play')); playTo(h, 0, 3);
+    player!.switchQuality('480p');
+    player!.switchQuality('480p');
+    expect(h.video.src).toMatch(/\/480\.mp4$/);
+    expect(events.filter(event => event.type === 'qualityChange')).toEqual([{ type: 'qualityChange', quality: '480p', automatic: false }]);
+    await player!.requestSave('leave');
+    const report = events.find(event => event.type === 'quality');
+    expect(report && report.type === 'quality' && report.summary).toMatchObject({ quality: '480p', qualitySwitches: 1 });
+  });
+});

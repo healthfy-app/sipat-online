@@ -63,6 +63,7 @@ export default function PlaygroundApp() {
   return <main style={{ fontFamily: 'system-ui, sans-serif', margin: '0 auto', maxWidth: 960, padding: 16 }}>
     <h1>Player SIPAT - playground</h1>
     <p>Para provocar travamentos, use DevTools → Network → Slow 4G.</p>
+    <p>O mesmo vídeo é oferecido como 720p e 480p, para experimentar o botão de qualidade (engrenagem). A escolha fica salva no navegador.</p>
 
     <fieldset>
       <legend>Vídeo</legend>
@@ -107,7 +108,7 @@ export default function PlaygroundApp() {
     {src
       ? <SipatVideoPlayer
           activity={activity} checkpoints={checkpoints} furthest={number(furthest)} key={src} onEvent={onEvent}
-          resumeAt={number(resumeAt)} rules={{ watchInOrder, fixedSpeed }} sources={[{ src }]} title={title} />
+          resumeAt={number(resumeAt)} rules={{ watchInOrder, fixedSpeed }} sources={[{ src, quality: '720p' }, { src, quality: '480p' }]} title={title} />
       : <p>Escolha um vídeo.</p>}
 
     {quality && <section aria-label="Último resumo de qualidade" style={{ background: '#fff7d6', border: '1px solid #e0c34a', borderRadius: 8, margin: '16px 0', padding: 12 }}>

@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
 import { attachPlayer, type AttachedPlayer } from '../core/attach';
+import { chooseSource, readConnection, readQualityPreference, saveQualityPreference, type QualityPreference, type VideoSource } from '../core/sources';
 import type { Checkpoint } from '../core/checkpoints';
 import type { PlayerEvent, PlayerEventHandler, SaveReason } from '../core/events';
 import type { QualityLabel } from '../core/quality';
 import type { PlayerRules } from '../core/rules';
 import PlayerChrome from './PlayerChrome';
+import QualityMenu from './QualityMenu';
 import { texts } from './texts';
 
-export interface VideoSource { src: string; quality?: '720p' | '480p'; type?: string }
+export type { VideoSource };
 
 export interface SipatVideoPlayerHandle {
   requestSave(reason: SaveReason): Promise<boolean>;
@@ -48,12 +50,15 @@ export default function SipatVideoPlayer({
   const attached = useRef<AttachedPlayer | null>(null);
   const [failed, setFailed] = useState(false);
   const [fired, setFired] = useState<ReadonlySet<string>>(new Set());
+  const [preference, setPreference] = useState<QualityPreference>(() => readQualityPreference());
+  // The rendition playing. Chosen once from the saved choice and the connection; after that attachPlayer changes it and tells us.
+  const [current, setCurrent] = useState<VideoSource>(() => chooseSource(sources, preference, readConnection()));
 
   // Latest props for the long-lived listeners, so the player is not re-attached on every render.
   // One source is reported as 'single'.
-  const quality: QualityLabel = sources.length === 1 ? 'single' : sources[0]?.quality ?? 'single';
-  const latest = useRef({ onEvent, checkpoints, resumeAt, furthest, quality });
-  latest.current = { onEvent, checkpoints, resumeAt, furthest, quality };
+  const quality: QualityLabel = sources.length === 1 ? 'single' : current.quality ?? 'single';
+  const latest = useRef({ onEvent, checkpoints, resumeAt, furthest, quality, preference, sources });
+  latest.current = { onEvent, checkpoints, resumeAt, furthest, quality, preference, sources };
 
   const watchInOrder = rules?.watchInOrder;
   const fixedSpeed = rules?.fixedSpeed;
@@ -70,11 +75,17 @@ export default function SipatVideoPlayer({
       resumeAt: latest.current.resumeAt,
       furthest: latest.current.furthest,
       quality: latest.current.quality,
+      sources: latest.current.sources,
+      preference: () => latest.current.preference,
       checkpoints: () => latest.current.checkpoints,
       pauseAtCheckpoints,
       onEvent: (event: PlayerEvent) => {
         if (event.type === 'error') setFailed(true);
         if (event.type === 'checkpoint') syncFired();
+        if (event.type === 'qualityChange') {
+          const next = latest.current.sources.find(source => source.quality === event.quality);
+          if (next) setCurrent(next);
+        }
         return latest.current.onEvent?.(event);
       },
     });
@@ -106,6 +117,13 @@ export default function SipatVideoPlayer({
     if (videoRef) videoRef.current = node;
   }, [videoRef]);
 
+  function chooseQuality(value: QualityPreference) {
+    setPreference(value);
+    saveQualityPreference(value);
+    const target = chooseSource(sources, value, readConnection());
+    if (target.quality && target.quality !== current.quality) attached.current?.switchQuality(target.quality);
+  }
+
   function retry() {
     setFailed(false);
     video.current?.load();
@@ -122,11 +140,11 @@ export default function SipatVideoPlayer({
 
   return <PlayerChrome
     locked={!!watchInOrder} markers={markers} onSeek={seconds => attached.current?.seekTo(seconds)}
+    controls={sources.length > 1 ? <QualityMenu current={current.quality} onChoose={chooseQuality} preference={preference} /> : undefined}
     overlay={overlay} unlocked={() => attached.current?.unlocked() ?? 0} videoRef={video}>
     <video
       aria-label={title} className="sipat-player-video" disablePictureInPicture playsInline preload={preload} slot="media"
-      ref={setVideo} src={sources.length === 1 ? sources[0].src : undefined}>
-      {sources.length > 1 && sources.map(source => <source data-quality={source.quality} key={source.src} src={source.src} type={source.type} />)}
+      ref={setVideo} src={current.src}>
       {texts.unsupported}
     </video>
   </PlayerChrome>;

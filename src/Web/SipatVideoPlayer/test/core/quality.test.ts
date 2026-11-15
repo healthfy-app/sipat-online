@@ -105,6 +105,42 @@ describe('trackPlaybackQuality', () => {
     expect(last().s.stallMs).toBe(0);
   });
 
+  it('counts a quality switch and ignores the waiting it causes', () => {
+    const { video, fire, tracker, last } = setup();
+    fire('play');
+    fire('playing');
+    vi.advanceTimersByTime(3000);
+    tracker.setQuality('480p');
+    Object.defineProperty(video, 'seeking', { value: true, configurable: true });
+    fire('emptied');
+    fire('waiting');
+    vi.advanceTimersByTime(2000);
+    Object.defineProperty(video, 'seeking', { value: false, configurable: true });
+    fire('playing');
+    tracker.flush('leave');
+    expect(last().s.stallCount).toBe(0);
+    expect(last().s.stallMs).toBe(0);
+    expect(last().s.qualitySwitches).toBe(1);
+    expect(last().s.quality).toBe('480p');
+    expect(last().s.watchedMs).toBe(3000);
+  });
+
+  it('counts a stall after the switch again and tells the page when one ends', () => {
+    const stalls: number[] = [];
+    const video = document.createElement('video');
+    const reports: PlayerQualitySummary[] = [];
+    const tracker = trackPlaybackQuality(video, { quality: '720p', environment: env, onReport: s => reports.push(s), onStall: ms => stalls.push(ms) });
+    const fire = (name: string) => video.dispatchEvent(new Event(name));
+    fire('play'); fire('playing');
+    fire('waiting'); vi.advanceTimersByTime(300); fire('playing'); // too short: not counted
+    fire('waiting'); vi.advanceTimersByTime(900); fire('playing');
+    tracker.setQuality('480p'); fire('waiting'); vi.advanceTimersByTime(5000); fire('playing');
+    fire('waiting'); vi.advanceTimersByTime(700); fire('playing');
+    tracker.flush('leave');
+    expect(stalls).toEqual([900, 700]);
+    expect(reports[0]).toMatchObject({ stallCount: 2, qualitySwitches: 1, quality: '480p' });
+  });
+
   it('does not count waiting while seeking', () => {
     const { video, fire, tracker, last } = setup();
     fire('play');

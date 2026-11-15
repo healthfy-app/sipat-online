@@ -11,7 +11,7 @@ import './SipatVideoPlayer.css';
  * Used by `SipatVideoPlayer`.
  * Shared by `SipatVideoPlayer` and by the lesson page's `SipatPlayer` while that one still exists.
  */
-export default function PlayerChrome({ videoRef, locked, unlocked, markers, onSeek, overlay, children }: {
+export default function PlayerChrome({ videoRef, locked, unlocked, markers, onSeek, overlay, controls, children }: {
   videoRef: RefObject<HTMLVideoElement | null>;
   locked: boolean;
   unlocked: () => number;
@@ -19,6 +19,8 @@ export default function PlayerChrome({ videoRef, locked, unlocked, markers, onSe
   onSeek: (seconds: number) => void;
   /** Drawn over the video, inside the frame (error panel, activity). */
   overlay?: ReactNode;
+  /** Extra buttons of the control bar, before the fullscreen one (the quality menu). */
+  controls?: ReactNode;
   /** The `<video slot="media">`. */
   children: ReactNode;
 }) {
@@ -73,6 +75,7 @@ export default function PlayerChrome({ videoRef, locked, unlocked, markers, onSe
           <Gamepad2 aria-hidden="true" />{markers.filter(marker => marker.done).length}/{markers.length}
           <span className="sipat-player-sr-only"> {texts.activitiesDone}</span>
         </span>}
+        {controls}
         <button aria-label={expanded ? texts.exitFullscreen : texts.fullscreen} className="sipat-player-button" onClick={toggleFullscreen} type="button">
           {expanded ? <Minimize aria-hidden="true" /> : <Maximize aria-hidden="true" />}
         </button>

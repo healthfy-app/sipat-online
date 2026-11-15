@@ -8,4 +8,6 @@ export const texts = {
   unsupported: 'Seu navegador não oferece suporte à reprodução deste vídeo.',
   loadFailed: 'Não foi possível carregar o vídeo. Verifique sua conexão e tente novamente.',
   retry: 'Tentar de novo',
+  quality: 'Qualidade',
+  qualityAuto: 'Automática',
 } as const;

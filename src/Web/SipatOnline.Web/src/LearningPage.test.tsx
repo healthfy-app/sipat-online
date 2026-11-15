@@ -637,6 +637,31 @@ describe('learning experience', () => {
     expect(startPlayback).toHaveBeenCalledWith('track-1', 'lesson-1');
   });
 
+  it('passes both renditions of the session to the player', async () => {
+    listAssignedTracks.mockResolvedValue([trackCard]);
+    getAssignedTrack.mockResolvedValueOnce({ track: trackCard, lessons: [lesson] });
+    startPlayback.mockResolvedValueOnce({
+      url: 'https://media.example.test/session/720.mp4',
+      sources: [
+        { url: 'https://media.example.test/session/720.mp4', quality: '720p' },
+        { url: 'https://media.example.test/session/480.mp4', quality: '480p' },
+      ],
+      contentType: 'video/mp4',
+      expiresAt: '2099-01-01T00:00:00Z',
+      sessionId: 'session-1',
+      isDevelopmentDemo: false,
+    });
+    localStorage.setItem('sipat-player-quality', '480p');
+    try {
+      const { container } = renderAt('/learning/tracks/track-1');
+      expect(await screen.findByRole('heading', { name: 'Identificação de riscos' })).toBeVisible();
+      await screen.findByRole('button', { name: 'Qualidade: 480p' });
+      expect(container.querySelector('video')).toHaveAttribute('src', 'https://media.example.test/session/480.mp4');
+    } finally {
+      localStorage.removeItem('sipat-player-quality');
+    }
+  });
+
   it('clamps the final playback range to the configured duration', async () => {
     listAssignedTracks.mockResolvedValue([trackCard]);
     getAssignedTrack.mockResolvedValueOnce({ track: trackCard, lessons: [lesson] });
