@@ -173,4 +173,21 @@ describe('Platform company employees', () => {
       { offset: 50, limit: 50, search: '', includeInactive: false },
     );
   });
+
+  it('opens with the search sent by the quality page', async () => {
+    vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
+    render(
+      <MemoryRouter initialEntries={['/platform/companies/company-1/participantes?busca=joao.silva']}>
+        <Routes>
+          <Route path="/platform/companies/:companyId/:section?" element={<PlatformCompanyEmployeesPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('searchbox', { name: 'Buscar por nome ou login' })).toHaveValue('joao.silva');
+    await waitFor(() => expect(api.getPlatformCompanyEmployees).toHaveBeenCalledWith(
+      'company-1',
+      expect.objectContaining({ search: 'joao.silva' }),
+    ));
+  });
 });

@@ -37,6 +37,7 @@ import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
 import CompanyNav from './companies/CompanyNav';
+import PlaybackQualityPage from './quality/PlaybackQualityPage';
 import PlatformSettingsPage from './PlatformSettingsPage';
 import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
@@ -292,6 +293,10 @@ export default function App() {
             <Route
               path="/platform/companies/:companyId"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <CompanyHome /> : <AccessDenied />}
+            />
+            <Route
+              path="/platform/companies/:companyId/qualidade"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <PlaybackQualityPage /> : <AccessDenied />}
             />
             <Route
               path="/platform/companies/:companyId/:section"

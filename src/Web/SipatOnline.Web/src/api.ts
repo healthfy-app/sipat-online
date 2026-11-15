@@ -1143,3 +1143,36 @@ export async function deleteCourseCategory(id: string): Promise<void> {
 export async function setCourseCategory(courseId: string, categoryId: string | null): Promise<void> {
   await request(`/api/platform/catalog/courses/${courseId}/category`, { method: 'PUT', body: JSON.stringify({ categoryId }) });
 }
+
+export type QualityLevel = 'Good' | 'Attention' | 'Poor';
+export interface QualityIndicator { value: number | null; level: QualityLevel | null }
+export interface QualityIndicators {
+  sessions: number; startedSessions: number; neverStartedPercent: QualityIndicator;
+  stalledSessionsPercent: QualityIndicator; averageStartupMilliseconds: QualityIndicator; stalledTimePercent: QualityIndicator;
+}
+export interface QualityBreakdownItem { key: string | null; indicators: QualityIndicators }
+export interface CompanyPlaybackQuality {
+  companyId: string; companyName: string; companyKey: string;
+  sipats: { id: string; title: string; startsAt: string }[]; sipatId: string | null; day: number | null; days: number[];
+  indicators: QualityIndicators; byHour: { hour: number; sessions: number; stalledSessions: number }[];
+  byConnection: QualityBreakdownItem[]; byDevice: QualityBreakdownItem[]; byQuality: QualityBreakdownItem[]; byDay: QualityBreakdownItem[];
+  videos: { videoId: string | null; title: string; indicators: QualityIndicators }[];
+  people: { participantId: string; displayName: string; loginIdentifier: string; sessions: number; neverStarted: number; stalledTimePercent: number }[];
+}
+export interface QualityFilter { sipatId?: string | null; day?: number | null }
+
+function qualityQuery(filter: QualityFilter = {}): string {
+  const query = new URLSearchParams();
+  if (filter.sipatId) query.set('sipatId', filter.sipatId);
+  if (filter.day !== null && filter.day !== undefined) query.set('day', String(filter.day));
+  const text = query.toString();
+  return text ? `?${text}` : '';
+}
+
+export function getCompanyPlaybackQuality(companyId: string, filter: QualityFilter = {}): Promise<CompanyPlaybackQuality> {
+  return requestJson<CompanyPlaybackQuality>(`/api/platform/companies/${encodeURIComponent(companyId)}/playback-quality${qualityQuery(filter)}`);
+}
+
+export function playbackQualitySummaryUrl(companyId: string, filter: QualityFilter = {}): string {
+  return `/api/platform/companies/${encodeURIComponent(companyId)}/playback-quality/summary.pdf${qualityQuery(filter)}`;
+}
