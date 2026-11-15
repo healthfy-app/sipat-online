@@ -204,6 +204,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<SipatOnline.Infrastructure.Identity.EmployeeCredentialService>();
         services.AddScoped<SipatOnline.Infrastructure.Tenancy.TenantPlanService>();
         services.AddSingleton<ICertificatePdfRenderer, CertificatePdfRenderer>();
+        services.AddSingleton<SipatOnline.Learning.Application.Quality.IPlaybackQualityPdfRenderer, PlaybackQualityPdfRenderer>();
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<PlatformCourseCatalogService>();
         AddPlatformCourseVideoStorage(services, configuration);

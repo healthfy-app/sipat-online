@@ -93,19 +93,7 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         return output.ToArray();
     }
 
-    private static Stream Asset(string name) =>
+    internal static Stream Asset(string name) =>
         typeof(CertificatePdfRenderer).Assembly.GetManifestResourceStream($"SipatOnline.Infrastructure.Learning.Assets.{name}")
         ?? throw new InvalidOperationException($"Certificate asset is missing: {name}");
-
-    private sealed class CertificateFontResolver : IFontResolver
-    {
-        public FontResolverInfo ResolveTypeface(string familyName, bool bold, bool italic) => new("NotoSans");
-        public byte[] GetFont(string faceName)
-        {
-            using var stream = Asset("NotoSans-Regular.ttf");
-            using var output = new MemoryStream();
-            stream.CopyTo(output);
-            return output.ToArray();
-        }
-    }
 }

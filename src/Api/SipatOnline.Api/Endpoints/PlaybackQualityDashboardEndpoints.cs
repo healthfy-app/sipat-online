@@ -24,6 +24,20 @@ public static class PlaybackQualityDashboardEndpoints
         })
         .WithName("GetCompanyPlaybackQuality");
 
+        group.MapGet("/companies/{companyId:guid}/playback-quality/summary.pdf", async (
+            Guid companyId,
+            Guid? sipatId,
+            int? day,
+            PlaybackQualityDashboardService service,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await service.RenderSummaryAsync(companyId, sipatId, day, cancellationToken);
+            return result.IsSuccess
+                ? Results.File(result.Value.Pdf, "application/pdf", result.Value.FileName)
+                : ToProblem(result.Error);
+        })
+        .WithName("GetCompanyPlaybackQualitySummary");
+
         group.MapGet("/playback-quality", async (
             DateOnly? from,
             DateOnly? to,

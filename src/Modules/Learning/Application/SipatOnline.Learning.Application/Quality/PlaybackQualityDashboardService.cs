@@ -8,6 +8,7 @@ public sealed class PlaybackQualityDashboardService(
     ITenantContext tenantContext,
     ICurrentActor currentActor,
     IPlaybackQualityDashboardStore store,
+    IPlaybackQualityPdfRenderer pdfRenderer,
     TimeProvider timeProvider)
 {
     private const int DefaultPeriodDays = 90;
@@ -57,6 +58,28 @@ public sealed class PlaybackQualityDashboardService(
                 .Select(item => new VideoQualityItem(item.VideoId, item.Title, PlaybackQualityThresholds.Evaluate(item.Totals)))
                 .ToArray(),
             aggregate.People));
+    }
+
+    public async Task<Result<(byte[] Pdf, string FileName)>> RenderSummaryAsync(
+        Guid companyId, Guid? sipatId, int? day, CancellationToken cancellationToken)
+    {
+        var result = await GetCompanyAsync(companyId, sipatId, day, cancellationToken);
+        if (!result.IsSuccess)
+        {
+            return Result<(byte[] Pdf, string FileName)>.Failure(result.Error);
+        }
+
+        var quality = result.Value;
+        var sipatTitle = quality.Sipats.FirstOrDefault(item => item.Id == quality.SipatId)?.Title ?? "Nenhuma SIPAT";
+        var pdf = pdfRenderer.Render(new PlaybackQualityPdfContent(
+            quality.CompanyName,
+            sipatTitle,
+            quality.Day is { } chosenDay ? $"Dia {chosenDay}" : "Todos os dias",
+            quality.Indicators,
+            quality.ByHour,
+            PlaybackQualityConclusion.For(quality.Indicators, quality.ByHour),
+            timeProvider.GetUtcNow()));
+        return Result<(byte[] Pdf, string FileName)>.Success((pdf, $"qualidade-video-{quality.CompanyKey}.pdf"));
     }
 
     public async Task<Result<CompanyQualityComparison>> CompareAsync(

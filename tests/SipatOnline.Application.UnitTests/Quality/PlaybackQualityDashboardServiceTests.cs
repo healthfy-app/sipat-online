@@ -29,7 +29,7 @@ public sealed class PlaybackQualityDashboardServiceTests
     }
 
     private static PlaybackQualityDashboardService Service(bool isOperator, Guid? tenantId) =>
-        new(new FakeTenant(tenantId), new FakeActor(isOperator), new NoStore(), TimeProvider.System);
+        new(new FakeTenant(tenantId), new FakeActor(isOperator), new NoStore(), new NoRenderer(), TimeProvider.System);
 
     private sealed class FakeTenant(Guid? id) : ITenantContext
     {
@@ -41,6 +41,11 @@ public sealed class PlaybackQualityDashboardServiceTests
         public string? UserId => null;
 
         public bool IsInRole(string role) => isOperator && role == PlatformRoles.PlatformOperator;
+    }
+
+    private sealed class NoRenderer : IPlaybackQualityPdfRenderer
+    {
+        public byte[] Render(PlaybackQualityPdfContent content) => throw new InvalidOperationException();
     }
 
     private sealed class NoStore : IPlaybackQualityDashboardStore

@@ -3,6 +3,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
+using PdfSharp.Pdf.IO;
 using SipatOnline.Api.Endpoints;
 using SipatOnline.Infrastructure;
 using SipatOnline.Infrastructure.Identity;
@@ -164,6 +165,45 @@ public sealed class PlaybackQualityDashboardApiTests
         Assert.Equal("learning.playback_quality.period_invalid", invalid.GetProperty("code").GetString());
         var tooLong = await Get(operatorClient, "/api/platform/playback-quality?from=2025-01-01&to=2026-11-30", HttpStatusCode.BadRequest);
         Assert.Equal("learning.playback_quality.period_invalid", tooLong.GetProperty("code").GetString());
+    }
+
+    [DockerFact]
+    public async Task Downloads_a_one_page_summary()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        var data = await Seed(factory);
+        using var operatorClient = await OperatorClient(factory);
+
+        using var response = await operatorClient.GetAsync(
+            $"/api/platform/companies/{CompanyId:D}/playback-quality/summary.pdf?sipatId={data.SipatA}&day=1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("application/pdf", response.Content.Headers.ContentType?.MediaType);
+        Assert.Equal("qualidade-video-integration-test.pdf", response.Content.Headers.ContentDisposition?.FileName?.Trim('"'));
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal("%PDF", System.Text.Encoding.ASCII.GetString(bytes, 0, 4));
+        using var stream = new MemoryStream(bytes);
+        using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.Equal(1, pdf.PageCount);
+        Assert.Equal("Qualidade do vídeo - Integration Test", pdf.Info.Title);
+    }
+
+    [DockerFact]
+    public async Task Downloads_the_summary_even_without_sessions()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        var data = await Seed(factory);
+        using var operatorClient = await OperatorClient(factory);
+
+        using var response = await operatorClient.GetAsync(
+            $"/api/platform/companies/{CompanyId:D}/playback-quality/summary.pdf?sipatId={data.SipatB}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var stream = new MemoryStream(await response.Content.ReadAsByteArrayAsync());
+        using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
+        Assert.Equal(1, pdf.PageCount);
     }
 
     private sealed record Seeded(
