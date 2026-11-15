@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { useRef } from 'react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -35,7 +36,10 @@ function comparison(overrides: Partial<api.PlaybackQualityComparison> = {}): api
 }
 
 function Where() {
-  return <p data-testid="where">{useLocation().pathname}</p>;
+  const location = useLocation();
+  const visits = useRef(new Set<string>());
+  visits.current.add(location.key);
+  return <><p data-testid="where">{location.pathname}</p><p data-testid="visits">{visits.current.size}</p></>;
 }
 
 function renderPage() {
@@ -91,24 +95,82 @@ describe('playback quality comparison page', () => {
     expect(companyNames()).toEqual(['Acme', 'Delta', 'Beta', 'Gama']);
   });
 
-  it('opens the company when its row is clicked', async () => {
+  it('opens the company when a non-link cell of its row is clicked', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click((await screen.findByText('Beta')).closest('tr')!);
+    const row = (await screen.findByRole('link', { name: 'Beta' })).closest('tr')!;
+    await user.click(within(row).getAllByRole('cell')[1]);
     expect(screen.getByTestId('where')).toHaveTextContent('/platform/companies/c2/qualidade');
+    expect(screen.getByTestId('visits')).toHaveTextContent('1');
+  });
+
+  it('navigates exactly once when the company link is clicked', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(await screen.findByRole('link', { name: 'Beta' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/platform/companies/c2/qualidade');
+    expect(screen.getByTestId('visits')).toHaveTextContent('1');
   });
 
   it('reloads for another period', async () => {
+    vi.mocked(api.getPlaybackQualityComparison).mockResolvedValue(comparison({ to: '2026-12-31' }));
     renderPage();
     await screen.findByRole('link', { name: 'Beta' });
     expect(api.getPlaybackQualityComparison).toHaveBeenLastCalledWith(undefined);
     fireEvent.change(screen.getByLabelText('De'), { target: { value: '2026-12-01' } });
-    await waitFor(() => expect(api.getPlaybackQualityComparison).toHaveBeenLastCalledWith({ from: '2026-12-01', to: '2026-11-15' }));
+    await waitFor(() => expect(api.getPlaybackQualityComparison).toHaveBeenLastCalledWith({ from: '2026-12-01', to: '2026-12-31' }));
   });
 
   it('says when no company had a SIPAT in the period', async () => {
     vi.mocked(api.getPlaybackQualityComparison).mockResolvedValue(comparison({ companies: [] }));
     renderPage();
     expect(await screen.findByText('Nenhuma empresa teve SIPAT neste período')).toBeVisible();
+  });
+
+  it('refuses a start date after the end date without calling the API', async () => {
+    renderPage();
+    await screen.findByRole('link', { name: 'Beta' });
+    vi.mocked(api.getPlaybackQualityComparison).mockClear();
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '2026-11-20' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('A data inicial deve ser anterior à final.');
+    expect(api.getPlaybackQualityComparison).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: 'Beta' })).not.toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '2026-11-10' } });
+    expect(await screen.findByRole('link', { name: 'Beta' })).toBeVisible();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  });
+
+  it('refuses a period longer than one year without calling the API', async () => {
+    renderPage();
+    await screen.findByRole('link', { name: 'Beta' });
+    vi.mocked(api.getPlaybackQualityComparison).mockClear();
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '2025-01-01' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Escolha um período de até um ano.');
+    expect(api.getPlaybackQualityComparison).not.toHaveBeenCalled();
+    expect(screen.queryByRole('link', { name: 'Beta' })).not.toBeInTheDocument();
+  });
+
+  it('does not keep showing the previous period when reloading fails', async () => {
+    renderPage();
+    await screen.findByRole('link', { name: 'Beta' });
+    vi.mocked(api.getPlaybackQualityComparison).mockImplementationOnce(() => Promise.reject(new Error('Falha ao carregar.')));
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '2026-10-01' } });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falha ao carregar.');
+    expect(screen.queryByRole('link', { name: 'Beta' })).not.toBeInTheDocument();
+  });
+
+  it('marks the table as busy while another period loads', async () => {
+    renderPage();
+    await screen.findByRole('link', { name: 'Beta' });
+    vi.mocked(api.getPlaybackQualityComparison).mockReturnValueOnce(new Promise(() => {}));
+    fireEvent.change(screen.getByLabelText('De'), { target: { value: '2026-10-01' } });
+    await waitFor(() => expect(screen.getByRole('table').closest('[aria-busy]')).toHaveAttribute('aria-busy', 'true'));
+  });
+
+  it('shows the error when the first load fails', async () => {
+    vi.mocked(api.getPlaybackQualityComparison).mockImplementationOnce(() => Promise.reject(new Error('Sem conexão.')));
+    renderPage();
+    expect(await screen.findByRole('alert')).toHaveTextContent('Sem conexão.');
+    expect(screen.queryByRole('table')).not.toBeInTheDocument();
   });
 });

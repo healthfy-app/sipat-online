@@ -24,6 +24,22 @@ const metric: Record<Exclude<SortKey, 'name'>, (indicators: QualityIndicators) =
 
 const byName = (a: Company, b: Company) => a.name.localeCompare(b.name, 'pt-BR');
 
+const dayInMilliseconds = 86_400_000;
+
+/** Same limits as the API (from <= to, at most 366 days), so a bad period never reaches the server. */
+function periodProblem(from: string, to: string): string {
+  const start = Date.parse(from);
+  const end = Date.parse(to);
+  if (Number.isNaN(start) || Number.isNaN(end)) return '';
+  if (start > end) return 'A data inicial deve ser anterior à final.';
+  if ((end - start) / dayInMilliseconds > 366) return 'Escolha um período de até um ano.';
+  return '';
+}
+
+function ErrorMessage({ children }: { children: string }) {
+  return <p className="m-0 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-foreground" role="alert">{children}</p>;
+}
+
 /** Companies without data always go last, whatever the direction. */
 function sortCompanies(companies: Company[], key: SortKey, direction: Direction): Company[] {
   const sign = direction === 'ascending' ? 1 : -1;
@@ -49,25 +65,36 @@ export default function PlaybackQualityComparisonPage() {
   const [period, setPeriod] = useState<{ from?: string; to?: string } | null>(null);
   const [data, setData] = useState<PlaybackQualityComparison | null>(null);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>('stalledTime');
   const [direction, setDirection] = useState<Direction>('descending');
   const navigate = useNavigate();
 
+  const problem = period?.from && period.to ? periodProblem(period.from, period.to) : '';
+
   useEffect(() => {
+    if (problem) return;
     let current = true;
     setError('');
+    setLoading(true);
     getPlaybackQualityComparison(period ?? undefined)
-      .then(result => { if (current) setData(result); })
-      .catch(failure => { if (current) setError(failure instanceof Error ? failure.message : 'Não foi possível carregar a comparação.'); });
+      .then(result => { if (current) { setData(result); setLoading(false); } })
+      .catch(failure => {
+        if (!current) return;
+        setData(null);
+        setLoading(false);
+        setError(failure instanceof Error ? failure.message : 'Não foi possível carregar a comparação.');
+      });
     return () => { current = false; };
-  }, [period]);
+  }, [period, problem]);
 
   const sorted = useMemo(() => (data ? sortCompanies(data.companies, sortKey, direction) : []), [data, sortKey, direction]);
 
-  if (!data) return <div className="page-content">{error ? <p role="alert">{error}</p> : <LoadingState>Carregando a comparação...</LoadingState>}</div>;
+  if (!data && !period) return <div className="page-content">{error ? <ErrorMessage>{error}</ErrorMessage> : <LoadingState>Carregando a comparação...</LoadingState>}</div>;
 
-  const from = period?.from ?? data.from;
-  const to = period?.to ?? data.to;
+  const from = period?.from ?? data?.from ?? '';
+  const to = period?.to ?? data?.to ?? '';
+  const message = problem || error;
 
   function sortBy(key: SortKey) {
     setDirection(sortKey === key ? (direction === 'ascending' ? 'descending' : 'ascending') : key === 'name' ? 'ascending' : 'descending');
@@ -101,11 +128,11 @@ export default function PlaybackQualityComparisonPage() {
           </>}
           title="Qualidade do vídeo"
         />
-        {error && <p role="alert">{error}</p>}
-        {sorted.length === 0
+        {message && <ErrorMessage>{message}</ErrorMessage>}
+        {message || !data ? null : sorted.length === 0
           ? <EmptyState description="Escolha outro período para comparar as empresas." title="Nenhuma empresa teve SIPAT neste período" />
           : (
-            <div className="ops-table">
+            <div aria-busy={loading} className={loading ? 'ops-table opacity-50' : 'ops-table'}>
               <Table aria-label="Qualidade do vídeo por empresa">
                 <TableHeader>
                   <TableRow>
