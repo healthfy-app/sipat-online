@@ -20,6 +20,8 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
     public const string YouTubeId = "dQw4w9WgXcQ";
 
     private readonly PostgreSqlContainer postgres;
+    private Guid programId;
+    private Guid dayId;
 
     private BonusLessonScenario(PostgreSqlContainer postgres, SipatOnlineApiFactory factory)
     {
@@ -73,14 +75,9 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
         var courseId = await scenario.CreateCourseAsync();
         await scenario.Call(scenario.Platform, $"/api/platform/catalog/courses/{courseId}/videos", HttpMethod.Put,
             new { videoIds = new[] { a, x } });
-        var module = await scenario.Call(scenario.Platform, "/api/platform/catalog/modules", HttpMethod.Post, new
-        {
-            title = "Jogo final",
-            gameType = "Quiz",
-            questions = new[] { new { text = "Qual a resposta?", options = new[] { "Segura", "Insegura" }, correctIndex = 0 } }
-        }, HttpStatusCode.Created);
+        var module = await scenario.CreateQuizAsync("Jogo final");
         await scenario.Call(scenario.Platform, $"/api/platform/catalog/courses/{courseId}/modules", HttpMethod.Put,
-            new { items = new[] { new { moduleId = module.GetProperty("id").GetGuid(), afterVideoCount = 2 } } });
+            new { items = new[] { new { moduleId = module, afterVideoCount = 2 } } });
         await scenario.DeliverAsync(courseId);
         return scenario;
     }
@@ -124,6 +121,67 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
             new { title = "Curso com extra", description = "Curso do teste", gamificationEnabled = true }, HttpStatusCode.Created);
         return course.GetProperty("id").GetGuid();
     }
+
+    public async Task<Guid> CreateQuizAsync(string title)
+    {
+        var module = await Call(Platform, "/api/platform/catalog/modules", HttpMethod.Post, new
+        {
+            title,
+            gameType = "Quiz",
+            questions = new[] { new { text = "Qual a resposta?", options = new[] { "Segura", "Insegura" }, correctIndex = 0 } }
+        }, HttpStatusCode.Created);
+        return module.GetProperty("id").GetGuid();
+    }
+
+    /// <summary>Puts a quiz in the middle of a house video (a checkpoint game).</summary>
+    public async Task PlaceCheckpointAsync(Guid videoId)
+    {
+        var module = await CreateQuizAsync("Jogo no meio do vídeo");
+        await Call(Platform, $"/api/platform/catalog/videos/{videoId}/checkpoints", HttpMethod.Put,
+            new { items = new[] { new { moduleId = module, timeMilliseconds = HouseDuration / 2 } } });
+    }
+
+    /// <summary>
+    /// Saves the one Day of the scenario's program with these videos (creating the program the first time) and applies
+    /// it to the sample SIPAT; the scenario's track becomes that Day's track.
+    /// </summary>
+    public async Task<JsonElement> ApplyDayAsync(params Guid[] videoIds)
+    {
+        var day = new
+        {
+            id = dayId == Guid.Empty ? (Guid?)null : dayId,
+            title = "Dia 1",
+            date = (string?)null,
+            subject = (string?)null,
+            videoIds,
+            gameIds = Array.Empty<Guid>()
+        };
+        if (programId == Guid.Empty)
+        {
+            var program = await Call(Platform, "/api/platform/catalog/programs", HttpMethod.Post,
+                new { title = "SIPAT com extra", days = new[] { day } }, HttpStatusCode.Created);
+            programId = program.GetProperty("id").GetGuid();
+            dayId = program.GetProperty("days")[0].GetProperty("id").GetGuid();
+        }
+        else
+        {
+            await Call(Platform, $"/api/platform/catalog/programs/{programId}", HttpMethod.Put,
+                new { title = "SIPAT com extra", days = new[] { day } });
+        }
+
+        var applied = await Call(Platform, $"{CompanyPath}/sipats/{SipatId}/programs/{programId}", HttpMethod.Post, new { });
+        await using var scope = Factory.Services.CreateAsyncScope();
+        TrackId = await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().LearningTracks
+            .Where(item => item.SourceCourseId == dayId).Select(item => item.Id).SingleAsync();
+        return applied;
+    }
+
+    public Task<JsonElement> Activities() =>
+        Participant.GetFromJsonAsync<JsonElement>($"/api/learning/tracks/{TrackId}/activities");
+
+    public Task AnswerAsync(string activityId) =>
+        Call(Participant, $"/api/learning/tracks/{TrackId}/activities/{activityId}/outcome", HttpMethod.Put,
+            new { outcome = "completed" });
 
     public Task PublishCourseAsync(Guid courseId) =>
         Call(Platform, $"/api/platform/catalog/courses/{courseId}", HttpMethod.Put,
@@ -195,7 +253,7 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
         return scenario;
     }
 
-    private async Task DeliverAsync(Guid courseId)
+    public async Task DeliverAsync(Guid courseId)
     {
         await PublishCourseAsync(courseId);
         var association = await Call(Platform, $"{CompanyPath}/sipats/{SipatId}/courses/{courseId}", HttpMethod.Post, new { });

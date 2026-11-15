@@ -342,6 +342,46 @@ public sealed class LearningEngagementApiTests
     }
 
     [DockerFact]
+    public async Task Certificate_already_issued_is_unchanged_after_an_extra()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        await using (var scope = scenario.Factory.Services.CreateAsyncScope())
+        {
+            await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Tenants
+                .Where(item => item.Id == SipatOnlineApiFactory.DefaultTenantId)
+                .ExecuteUpdateAsync(update => update.SetProperty(item => item.CertificateLogoData, Logo)
+                    .SetProperty(item => item.CertificateLogoContentType, "image/png"));
+        }
+        var a = await scenario.SeedHouseVideoAsync("Vídeo A");
+        var b = await scenario.SeedHouseVideoAsync("Vídeo B");
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        await scenario.ApplyDayAsync(a, b);
+        var lessonIds = await scenario.LessonIdsAsync();
+        await scenario.CompleteAsync(lessonIds[0]);
+        await scenario.CompleteAsync(lessonIds[1]);
+        var issued = await scenario.Call(scenario.Participant, $"/api/learning/sipats/{scenario.SipatId}/certificate",
+            HttpMethod.Post, new { });
+
+        var applied = await scenario.ApplyDayAsync(a, x, b);
+
+        Assert.Equal(1, applied.GetProperty("updated").GetInt32());
+        var candidate = Assert.Single(
+            (await scenario.Participant.GetFromJsonAsync<JsonElement>("/api/learning/certificates")).EnumerateArray(),
+            item => item.GetProperty("sipatEventId").GetGuid() == scenario.SipatId);
+        Assert.True(candidate.GetProperty("isEligible").GetBoolean());
+        var certificate = candidate.GetProperty("certificate");
+        Assert.Equal(issued.GetProperty("id").GetGuid(), certificate.GetProperty("id").GetGuid());
+        Assert.Equal(issued.GetProperty("issuedAt").GetDateTimeOffset(), certificate.GetProperty("issuedAt").GetDateTimeOffset());
+        Assert.Equal(2 * BonusLessonScenario.HouseDuration, certificate.GetProperty("durationMilliseconds").GetInt64());
+        var reissued = await scenario.Call(scenario.Participant, $"/api/learning/sipats/{scenario.SipatId}/certificate",
+            HttpMethod.Post, new { });
+        Assert.Equal(issued.GetProperty("id").GetGuid(), reissued.GetProperty("id").GetGuid());
+        var track = (await scenario.Experience()).GetProperty("track");
+        Assert.Equal(100, track.GetProperty("progressPercentage").GetInt32());
+        Assert.Equal(3, (await scenario.LessonIdsAsync()).Length);
+    }
+
+    [DockerFact]
     public async Task End_game_after_a_trailing_extra_is_due_after_the_last_house_video()
     {
         await using var scenario = await BonusLessonScenario.StartWithTrailingExtraAsync();

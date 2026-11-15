@@ -366,6 +366,147 @@ public sealed class LearningApiTests
         Assert.Equal(["Aula 1", "Aula 1", "Aula 2"], lessons.Select(item => item.GetProperty("sectionTitle").GetString()));
     }
 
+    [DockerFact]
+    public async Task Extra_added_to_a_day_in_progress_keeps_progress()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        var a = await scenario.SeedHouseVideoAsync("Vídeo A");
+        var b = await scenario.SeedHouseVideoAsync("Vídeo B");
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        await scenario.PlaceCheckpointAsync(b);
+        await scenario.ApplyDayAsync(a, b);
+        var before = await scenario.LessonIdsAsync();
+        await scenario.CompleteAsync(before[0]);
+        await scenario.AnswerAsync("checkpoint-1-0");
+        var completedAt = (await scenario.Experience()).GetProperty("lessons")[0].GetProperty("completedAt").GetDateTimeOffset();
+
+        var applied = await scenario.ApplyDayAsync(a, x, b);
+
+        Assert.Equal(1, applied.GetProperty("updated").GetInt32());
+        Assert.Equal(0, applied.GetProperty("kept").GetInt32());
+        var lessons = (await scenario.Experience()).GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Equal(["Vídeo A", "Extra do YouTube", "Vídeo B"], lessons.Select(item => item.GetProperty("title").GetString()));
+        Assert.Equal([1, 2, 3], lessons.Select(item => item.GetProperty("position").GetInt32()));
+        Assert.Equal([false, true, false], lessons.Select(item => item.GetProperty("isBonus").GetBoolean()));
+        Assert.Equal(before[0], lessons[0].GetProperty("id").GetGuid());
+        Assert.Equal(before[1], lessons[2].GetProperty("id").GetGuid());
+        Assert.True(lessons[0].GetProperty("isCompleted").GetBoolean());
+        Assert.Equal(completedAt, lessons[0].GetProperty("completedAt").GetDateTimeOffset());
+        Assert.Equal(50, (await scenario.Experience()).GetProperty("track").GetProperty("progressPercentage").GetInt32());
+        // the answer given on B's game stays on B, now the third lesson
+        var game = Assert.Single((await scenario.Activities()).GetProperty("items").EnumerateArray(),
+            item => item.GetProperty("lessonId").ValueKind == JsonValueKind.String);
+        Assert.Equal(before[1], game.GetProperty("lessonId").GetGuid());
+        Assert.Equal("checkpoint-2-0", game.GetProperty("id").GetString());
+        Assert.Equal("completed", game.GetProperty("outcome").GetString());
+
+        var again = await scenario.ApplyDayAsync(a, x, b);
+
+        Assert.Equal(1, again.GetProperty("kept").GetInt32());
+        Assert.Equal(lessons.Select(item => item.GetProperty("id").GetGuid()), await scenario.LessonIdsAsync());
+        Assert.Equal("completed", Assert.Single((await scenario.Activities()).GetProperty("items").EnumerateArray()).GetProperty("outcome").GetString());
+    }
+
+    [DockerFact]
+    public async Task Extra_removed_from_a_day_in_progress_keeps_progress()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        var a = await scenario.SeedHouseVideoAsync("Vídeo A");
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var b = await scenario.SeedHouseVideoAsync("Vídeo B");
+        await scenario.PlaceCheckpointAsync(b);
+        await scenario.ApplyDayAsync(a, x, b);
+        var before = await scenario.LessonIdsAsync();
+        await scenario.CompleteAsync(before[0]);
+        await scenario.AnswerAsync("checkpoint-2-0");
+        var completedAt = (await scenario.Experience()).GetProperty("lessons")[0].GetProperty("completedAt").GetDateTimeOffset();
+
+        var applied = await scenario.ApplyDayAsync(a, b);
+
+        Assert.Equal(1, applied.GetProperty("updated").GetInt32());
+        var lessons = (await scenario.Experience()).GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Equal([before[0], before[2]], lessons.Select(item => item.GetProperty("id").GetGuid()));
+        Assert.Equal([1, 2], lessons.Select(item => item.GetProperty("position").GetInt32()));
+        Assert.Equal([false, false], lessons.Select(item => item.GetProperty("isBonus").GetBoolean()));
+        Assert.Equal(completedAt, lessons[0].GetProperty("completedAt").GetDateTimeOffset());
+        var game = Assert.Single((await scenario.Activities()).GetProperty("items").EnumerateArray());
+        Assert.Equal(before[2], game.GetProperty("lessonId").GetGuid());
+        Assert.Equal("checkpoint-1-0", game.GetProperty("id").GetString());
+        Assert.Equal("completed", game.GetProperty("outcome").GetString());
+    }
+
+    [DockerFact]
+    public async Task House_change_in_a_day_in_progress_is_still_kept()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        var a = await scenario.SeedHouseVideoAsync("Vídeo A");
+        var b = await scenario.SeedHouseVideoAsync("Vídeo B");
+        var c = await scenario.SeedHouseVideoAsync("Vídeo C");
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        await scenario.ApplyDayAsync(a, b);
+        var before = await scenario.LessonIdsAsync();
+        await scenario.CompleteAsync(before[0]);
+
+        var changed = await scenario.ApplyDayAsync(a, c);
+        var changedWithExtra = await scenario.ApplyDayAsync(a, x, c);
+        // answers are kept by the place of the game, so an extra never comes in together with other games
+        await scenario.PlaceCheckpointAsync(a);
+        var gamesChangedWithExtra = await scenario.ApplyDayAsync(a, x, b);
+
+        foreach (var applied in new[] { changed, changedWithExtra, gamesChangedWithExtra })
+        {
+            Assert.Equal(1, applied.GetProperty("kept").GetInt32());
+            Assert.Equal(0, applied.GetProperty("updated").GetInt32());
+        }
+        var lessons = (await scenario.Experience()).GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Equal(before, lessons.Select(item => item.GetProperty("id").GetGuid()));
+        Assert.Equal(["Vídeo A", "Vídeo B"], lessons.Select(item => item.GetProperty("title").GetString()));
+        Assert.True(lessons[0].GetProperty("isCompleted").GetBoolean());
+    }
+
+    [DockerFact]
+    public async Task Distribute_again_adds_the_extra_to_a_live_assunto()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        var a = await scenario.SeedHouseVideoAsync("Vídeo A");
+        var b = await scenario.SeedHouseVideoAsync("Vídeo B");
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        await scenario.PlaceCheckpointAsync(b);
+        var courseId = await scenario.CreateCourseAsync();
+        await SetStructureAsync([a], [b]);
+        await scenario.DeliverAsync(courseId);
+        var trackId = scenario.TrackId;
+        var before = await scenario.LessonIdsAsync();
+        await scenario.CompleteAsync(before[0]);
+        await scenario.AnswerAsync("checkpoint-1-0");
+
+        await SetStructureAsync([a, x], [b]);
+        var again = await scenario.Call(scenario.Platform,
+            $"{BonusLessonScenario.CompanyPath}/sipats/{scenario.SipatId}/courses/{courseId}", HttpMethod.Post, new { });
+
+        Assert.Equal(trackId, again.GetProperty("trackId").GetGuid());
+        var lessons = (await scenario.Experience()).GetProperty("lessons").EnumerateArray().ToArray();
+        Assert.Equal(["Vídeo A", "Extra do YouTube", "Vídeo B"], lessons.Select(item => item.GetProperty("title").GetString()));
+        Assert.Equal(["Aula 1", "Aula 1", "Aula 2"], lessons.Select(item => item.GetProperty("sectionTitle").GetString()));
+        Assert.Equal(before[0], lessons[0].GetProperty("id").GetGuid());
+        Assert.Equal(before[1], lessons[2].GetProperty("id").GetGuid());
+        Assert.True(lessons[0].GetProperty("isCompleted").GetBoolean());
+        var game = Assert.Single((await scenario.Activities()).GetProperty("items").EnumerateArray());
+        Assert.Equal(before[1], game.GetProperty("lessonId").GetGuid());
+        Assert.Equal("checkpoint-2-0", game.GetProperty("id").GetString());
+        Assert.Equal("completed", game.GetProperty("outcome").GetString());
+
+        Task SetStructureAsync(Guid[] first, Guid[] second) =>
+            scenario.Call(scenario.Platform, $"/api/platform/catalog/courses/{courseId}/structure", HttpMethod.Put, new
+            {
+                lessons = new[]
+                {
+                    new { id = (Guid?)null, title = "Aula 1", description = (string?)null, videos = first.Select(id => new { videoId = id, title = (string?)null }).ToArray() },
+                    new { id = (Guid?)null, title = "Aula 2", description = (string?)null, videos = second.Select(id => new { videoId = id, title = (string?)null }).ToArray() }
+                }
+            });
+    }
+
     private sealed class TestClock(DateTimeOffset now) : TimeProvider
     {
         public DateTimeOffset Now { get; set; } = now;
