@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ChangeEvent } from 'react';
-import { ExternalVideoPlayer, SipatVideoPlayer, type Checkpoint, type PlayerEvent, type PlayerQualitySummary } from '../src';
+import { ExternalVideoLink, ExternalVideoPlayer, SipatVideoPlayer, type Checkpoint, type PlayerEvent, type PlayerQualitySummary } from '../src';
 import { fileSampleId, fileSampleTitle, samples } from './samples';
 
 interface LogItem { key: number; time: string; event: PlayerEvent }
@@ -115,9 +115,10 @@ export default function PlaygroundApp() {
     <fieldset>
       <legend>Vídeo externo</legend>
       <label><input checked={showExternal} onChange={event => setShowExternal(event.target.checked)} type="checkbox" /> Mostrar exemplo do YouTube (mesmo quadro, sem regras nem eventos)</label>
-      {showExternal && <div style={{ marginTop: 8 }}>
+      {showExternal && <div style={{ aspectRatio: '16 / 9', marginTop: 8, overflow: 'hidden' }}>
         <ExternalVideoPlayer externalId="aqz-KE-bpKQ" provider="YouTube" title="Exemplo do YouTube" />
       </div>}
+      {showExternal && <ExternalVideoLink externalId="aqz-KE-bpKQ" provider="YouTube" />}
     </fieldset>
 
     {quality && <section aria-label="Último resumo de qualidade" style={{ background: '#fff7d6', border: '1px solid #e0c34a', borderRadius: 8, margin: '16px 0', padding: 12 }}>

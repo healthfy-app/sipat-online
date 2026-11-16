@@ -21,7 +21,7 @@ function urlsOf(provider: ExternalProvider, externalId: string) {
 
 /**
  * Provider video in the same frame as the house player. No rules, progress or events.
- * Root is a plain wrapper; `div.sipat-player` inside it is the frame, and the "outside" line sits under the frame.
+ * Root is only the frame (`div.sipat-player`), filling its parent like the house player; the host places `ExternalVideoLink` under it.
  */
 export default function ExternalVideoPlayer({ provider, externalId, title, blockedAfterMs = 8000 }: ExternalVideoPlayerProps) {
   const [blocked, setBlocked] = useState(false);
@@ -45,18 +45,13 @@ export default function ExternalVideoPlayer({ provider, externalId, title, block
   }
 
   const openText = texts.externalOpenOutside.replace('{provider}', provider);
-  return <div className="sipat-player-external">
-    <div className="sipat-player">
-      <iframe
-        allow="fullscreen; picture-in-picture" allowFullScreen className="sipat-player-embed"
-        onLoad={loaded} referrerPolicy="strict-origin-when-cross-origin" src={urls.embed} title={title} />
-      {blocked && <div className="sipat-player-error" role="alert">
-        <p>{texts.externalBlocked}</p>
-        <a className="sipat-player-retry sipat-player-link" href={urls.watch} rel="noopener noreferrer" target="_blank">{openText}</a>
-      </div>}
-    </div>
-    <p className="sipat-player-outside">{texts.externalNotOpening}{' '}
-      <a href={urls.watch} rel="noopener noreferrer" target="_blank">{openText}</a>
-    </p>
+  return <div className="sipat-player">
+    <iframe
+      allow="fullscreen; picture-in-picture" allowFullScreen className="sipat-player-embed"
+      onLoad={loaded} referrerPolicy="strict-origin-when-cross-origin" src={urls.embed} title={title} />
+    {blocked && <div className="sipat-player-error" role="alert">
+      <p>{texts.externalBlocked}</p>
+      <a className="sipat-player-retry sipat-player-link" href={urls.watch} rel="noopener noreferrer" target="_blank">{openText}</a>
+    </div>}
   </div>;
 }
