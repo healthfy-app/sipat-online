@@ -23,6 +23,7 @@ import {
   getTrackProgress,
   getNextLesson,
   getOverallProgress,
+  houseLessons,
   resolveAssignedTrackId,
   formatDuration,
   getLearningErrorMessage,
@@ -30,6 +31,8 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import {
+  ExternalVideoLink,
+  ExternalVideoPlayer,
   SipatVideoPlayer,
   type PlayerEvent,
   type PlayerQualitySummary,
@@ -40,6 +43,11 @@ import {
 import { formatDayDate } from './WeekVideos';
 import './LearningMotion.css';
 import './DayPage.css';
+
+/** "Extra · YouTube": the quiet mark of a video that is an appendix of the day. */
+function extraLabel(lesson: LearningLessonProgress): string {
+  return lesson.provider ? `Extra · ${lesson.provider}` : 'Extra';
+}
 
 export default function LearningTrackPage({
   resumeLessonId,
@@ -189,9 +197,13 @@ export default function LearningTrackPage({
   useEffect(() => () => setSummary?.(null), [setSummary]);
 
   useEffect(() => {
-    if (!selectedLesson || !apiTrackId) {
+    // an extra plays in the provider's player: no session, no resume, nothing to save
+    if (!selectedLesson || !apiTrackId || selectedLesson.isBonus) {
       setPlaybackSession(null);
       setPlaybackError('');
+      setIsStartingPlayback(false);
+      setSaveMessage('');
+      setSeekNotice(false);
       return;
     }
 
@@ -247,9 +259,11 @@ export default function LearningTrackPage({
             }
           : lesson,
       );
-      const completedLessonCount = lessons.filter((lesson) => lesson.isCompleted).length;
-      const totalDuration = lessons.reduce((total, lesson) => total + lesson.durationMilliseconds, 0);
-      const watchedDuration = lessons.reduce(
+      // an extra never counts: only the house videos make the numbers of the day
+      const counted = houseLessons(lessons);
+      const completedLessonCount = counted.filter((lesson) => lesson.isCompleted).length;
+      const totalDuration = counted.reduce((total, lesson) => total + lesson.durationMilliseconds, 0);
+      const watchedDuration = counted.reduce(
         (total, lesson) => total + lesson.durationMilliseconds * lesson.watchedPercentage / 100,
         0,
       );
@@ -260,7 +274,7 @@ export default function LearningTrackPage({
         track: {
           ...current.track,
           completedLessonCount,
-          progressPercentage: lessons.length > 0 && completedLessonCount === lessons.length
+          progressPercentage: counted.length > 0 && completedLessonCount === counted.length
             ? 100
             : totalDuration === 0 ? 0 : Math.min(99, Math.floor(watchedDuration * 100 / totalDuration)),
         },
@@ -486,9 +500,19 @@ export default function LearningTrackPage({
   const currentIndex = experience.lessons.findIndex((lesson) => lesson.id === selectedLesson?.id);
   const previousLesson = currentIndex > 0 ? experience.lessons[currentIndex - 1] : null;
   const nextLesson = currentIndex >= 0 ? experience.lessons[currentIndex + 1] ?? null : null;
-  const completedLessons = experience.lessons.filter(lesson => lesson.isCompleted).length;
+  const countedLessons = houseLessons(experience.lessons);
+  const hasExtras = countedLessons.length !== experience.lessons.length;
+  const completedLessons = countedLessons.filter(lesson => lesson.isCompleted).length;
+  // the number a house video has among the house videos (an extra has none)
+  const houseNumber = (lesson: LearningLessonProgress) => hasExtras
+    ? countedLessons.findIndex(item => item.id === lesson.id) + 1
+    : lesson.position;
+  // the house video before the one on stage: a game placed there opens when this one starts
+  const boundaryBefore = hasExtras && selectedLesson && !selectedLesson.isBonus
+    ? countedLessons.filter(item => item.position < selectedLesson.position).at(-1)?.position ?? 0
+    : undefined;
   const hasSections = new Set(experience.lessons.map((lesson) => lesson.sectionTitle).filter(Boolean)).size > 1;
-  const isTrackComplete = completedLessons === experience.lessons.length && experience.lessons.length > 0;
+  const isTrackComplete = completedLessons === countedLessons.length && countedLessons.length > 0;
   const trackTitle = getTrackDisplayTitle(experience.track.title);
   const dayTitle = experience.track.dayTitle ?? null;
   const dayPosition = experience.track.dayPosition ?? null;
@@ -514,9 +538,9 @@ export default function LearningTrackPage({
           {dayTitle && dayTitle !== trackTitle && <p className="day-subject">{trackTitle}</p>}
         </div>
         <div className="day-progress">
-          <span className="day-progress-text">{completedLessons} de {experience.lessons.length} vídeos · {percentage}%</span>
+          <span className="day-progress-text">{completedLessons} de {countedLessons.length} vídeos · {percentage}%</span>
           <div aria-label="Progresso do dia" aria-valuemax={100} aria-valuemin={0} aria-valuenow={percentage} className="day-progress-steps" role="progressbar">
-            {experience.lessons.map(lesson => <span className={lesson.isCompleted ? 'is-done' : lesson.id === selectedLesson?.id ? 'is-current' : ''} key={lesson.id}>
+            {countedLessons.map(lesson => <span className={lesson.isCompleted ? 'is-done' : lesson.id === selectedLesson?.id ? 'is-current' : ''} key={lesson.id}>
               {!lesson.isCompleted && <i style={{ width: `${Math.min(100, Math.max(0, lesson.watchedPercentage))}%` }} />}
             </span>)}
           </div>
@@ -540,13 +564,22 @@ export default function LearningTrackPage({
         <section aria-label="Vídeo" className="day-stage">
           {selectedLesson && (
             <header className="day-stage-head" key={selectedLesson.id}>
-              <p>Vídeo {selectedLesson.position} de {experience.lessons.length}</p>
+              <p>{selectedLesson.isBonus ? extraLabel(selectedLesson) : `Vídeo ${houseNumber(selectedLesson)} de ${countedLessons.length}`}</p>
               <h2>{selectedLesson.title}</h2>
             </header>
           )}
 
           <div className="learning-player-frame day-player">
-            {activeSession && selectedLesson ? (
+            {selectedLesson?.isBonus ? (
+              selectedLesson.provider && selectedLesson.externalId
+                ? <ExternalVideoPlayer externalId={selectedLesson.externalId} key={selectedLesson.id}
+                  provider={selectedLesson.provider} title={selectedLesson.title} />
+                : <div className="learning-player-state" role="alert">
+                  <span aria-hidden="true" className="learning-player-icon">!</span>
+                  <h2>Vídeo indisponível</h2>
+                  <p>Este vídeo extra não pôde ser aberto. Siga para o próximo.</p>
+                </div>
+            ) : activeSession && selectedLesson ? (
               <>
                 <SipatVideoPlayer
                   checkpoints={markers}
@@ -602,14 +635,16 @@ export default function LearningTrackPage({
               >
                 <ArrowLeft aria-hidden="true" /> <span>Vídeo anterior</span>
               </button>
-              <span className={`day-status${selectedLesson.isCompleted ? ' is-complete' : ''}`}>
-                {selectedLesson.isCompleted ? <Check aria-hidden="true" /> : <Play aria-hidden="true" />}
-                {selectedLesson.isCompleted
-                  ? 'Concluído'
-                  : selectedLesson.watchedPercentage > 0
-                    ? `${selectedLesson.watchedPercentage}% assistido`
-                    : 'Assista até o fim para concluir'}
-              </span>
+              {selectedLesson.isBonus
+                ? <span className="day-status">{extraLabel(selectedLesson)}</span>
+                : <span className={`day-status${selectedLesson.isCompleted ? ' is-complete' : ''}`}>
+                  {selectedLesson.isCompleted ? <Check aria-hidden="true" /> : <Play aria-hidden="true" />}
+                  {selectedLesson.isCompleted
+                    ? 'Concluído'
+                    : selectedLesson.watchedPercentage > 0
+                      ? `${selectedLesson.watchedPercentage}% assistido`
+                      : 'Assista até o fim para concluir'}
+                </span>}
               <button
                 className="day-control is-next"
                 disabled={!nextLesson || switchingLesson}
@@ -618,6 +653,12 @@ export default function LearningTrackPage({
               >
                 <span>Próximo vídeo</span> <ArrowRight aria-hidden="true" />
               </button>
+            </div>
+          )}
+
+          {selectedLesson?.isBonus && selectedLesson.provider && selectedLesson.externalId && (
+            <div className="day-outside">
+              <ExternalVideoLink externalId={selectedLesson.externalId} provider={selectedLesson.provider} />
             </div>
           )}
 
@@ -646,7 +687,7 @@ export default function LearningTrackPage({
           <section aria-labelledby="learning-curriculum-title" className="day-playlist">
             <div className="day-playlist-head">
               <h2 id="learning-curriculum-title">Vídeos do dia</h2>
-              <span>{completedLessons}/{experience.lessons.length}</span>
+              <span>{completedLessons}/{countedLessons.length}</span>
             </div>
             <ol>
               {experience.lessons.map((lesson, lessonIndex) => {
@@ -658,24 +699,26 @@ export default function LearningTrackPage({
                     {showSection && <p className="day-section">{lesson.sectionTitle}</p>}
                     <button
                       aria-current={isCurrent ? 'step' : undefined}
-                      className={`day-item${isCurrent ? ' is-current' : ''}${lesson.isCompleted ? ' is-complete' : ''}`}
+                      className={`day-item${isCurrent ? ' is-current' : ''}${lesson.isCompleted ? ' is-complete' : ''}${lesson.isBonus ? ' is-extra' : ''}`}
                       disabled={switchingLesson}
                       onClick={() => selectLesson(lesson)}
                       type="button"
                     >
                       <span aria-hidden="true" className="day-item-mark">
-                        {lesson.isCompleted ? <Check /> : isCurrent && isPlaying
+                        {lesson.isBonus ? <Play /> : lesson.isCompleted ? <Check /> : isCurrent && isPlaying
                           ? <span className="learning-playing-bars"><i /><i /><i /></span>
-                          : lesson.position}
+                          : houseNumber(lesson)}
                       </span>
                       <span className="day-item-copy">
                         <span className="day-item-title">{lesson.title}</span>
-                        <span className="day-item-meta">
-                          {formatDuration(lesson.durationMilliseconds)}
-                          <span aria-hidden="true">·</span>
-                          {lesson.isCompleted ? 'Concluído' : lesson.watchedPercentage > 0 ? `${lesson.watchedPercentage}% assistido` : 'Não iniciado'}
-                        </span>
-                        {!lesson.isCompleted && lesson.watchedPercentage > 0 && <span aria-hidden="true" className="day-item-progress">
+                        {lesson.isBonus
+                          ? <span className="day-item-meta">{extraLabel(lesson)}</span>
+                          : <span className="day-item-meta">
+                            {formatDuration(lesson.durationMilliseconds)}
+                            <span aria-hidden="true">·</span>
+                            {lesson.isCompleted ? 'Concluído' : lesson.watchedPercentage > 0 ? `${lesson.watchedPercentage}% assistido` : 'Não iniciado'}
+                          </span>}
+                        {!lesson.isBonus && !lesson.isCompleted && lesson.watchedPercentage > 0 && <span aria-hidden="true" className="day-item-progress">
                           <span style={{ width: `${Math.min(100, Math.max(0, lesson.watchedPercentage))}%` }} />
                         </span>}
                       </span>
@@ -689,6 +732,7 @@ export default function LearningTrackPage({
             trackId={apiTrackId ?? experience.track.id}
             lessonId={selectedLesson?.id ?? null}
             lessonPosition={selectedLesson?.position ?? 1}
+            boundaryBefore={boundaryBefore}
             onActivities={setActivities}
             playbackKey={activeSession?.sessionId}
             videoRef={videoRef}

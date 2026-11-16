@@ -94,7 +94,7 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
             const path = getTrackPath(track, allTracks);
             const cover = track.coverUrl ?? getCourseCover(track.title);
             const subject = getTrackDisplayTitle(track.title);
-            const nextId = Array.isArray(items) ? items.find(lesson => !lesson.isCompleted)?.id : undefined;
+            const nextId = Array.isArray(items) ? items.find(lesson => !lesson.isBonus && !lesson.isCompleted)?.id : undefined;
             return <div className="week-day-track" key={track.id}>
               {(day.tracks.length > 1 || subject !== day.title) && <p className="week-day-subject">{subject}</p>}
               {items === undefined && <p className="week-videos-note" role="status">Carregando os vídeos...</p>}
@@ -103,20 +103,22 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
               </p>}
               {Array.isArray(items) && <ol className="week-video-grid">
                 {items.map((lesson, index) => {
-                  const state = lesson.isCompleted ? 'done' : lesson.watchedPercentage > 0 ? 'progress' : lesson.id === nextId ? 'next' : 'todo';
+                  // an extra is an appendix: no progress, no number
+                  const houseNumber = items.slice(0, index + 1).filter(item => !item.isBonus).length;
+                  const state = lesson.isBonus ? 'todo' : lesson.isCompleted ? 'done' : lesson.watchedPercentage > 0 ? 'progress' : lesson.id === nextId ? 'next' : 'todo';
                   return <li key={lesson.id}>
-                    <Link className={`week-video is-${state}`} to={`${path}?video=${encodeURIComponent(lesson.id)}`}>
+                    <Link className={`week-video is-${state}${lesson.isBonus ? ' is-extra' : ''}`} to={`${path}?video=${encodeURIComponent(lesson.id)}`}>
                       <span className="week-video-cover">
                         <img alt="" decoding="async" loading="lazy" src={cover} />
                         <span aria-hidden="true" className="week-video-play">{lesson.isCompleted ? <Check /> : <Play />}</span>
-                        <span className="week-video-time">{formatDuration(lesson.durationMilliseconds)}</span>
+                        {!lesson.isBonus && <span className="week-video-time">{formatDuration(lesson.durationMilliseconds)}</span>}
                         {state === 'progress' && <span aria-hidden="true" className="week-video-bar"><span style={{ width: `${lesson.watchedPercentage}%` }} /></span>}
                       </span>
                       <span className="week-video-body">
-                        <span className="week-video-kicker">Vídeo {index + 1}</span>
+                        <span className="week-video-kicker">{lesson.isBonus ? 'Extra' : `Vídeo ${houseNumber}`}</span>
                         <strong>{lesson.title}</strong>
                         <span className="week-video-state">
-                          {state === 'done' ? 'Assistido' : state === 'progress' ? `Continuar · ${Math.round(lesson.watchedPercentage)}%` : state === 'next' ? 'Próximo' : 'Para assistir'}
+                          {lesson.isBonus ? `Extra · ${lesson.provider ?? 'externo'}` : state === 'done' ? 'Assistido' : state === 'progress' ? `Continuar · ${Math.round(lesson.watchedPercentage)}%` : state === 'next' ? 'Próximo' : 'Para assistir'}
                         </span>
                       </span>
                     </Link>

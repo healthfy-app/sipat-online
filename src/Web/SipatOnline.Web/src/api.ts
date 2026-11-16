@@ -169,9 +169,10 @@ export function getLearningActivities(trackId: string): Promise<{ revisionId: st
   return requestJson(`/api/learning/tracks/${trackId}/activities`);
 }
 
-export function saveLearningActivityOutcome(trackId: string, activityId: string, outcome: string): Promise<{ saved: boolean }> {
+/** A checkpoint outcome names its lesson: the server refuses it (409 `learning.activity.stale`) when the list changed. */
+export function saveLearningActivityOutcome(trackId: string, activityId: string, outcome: string, lessonId?: string): Promise<{ saved: boolean }> {
   return requestJson(`/api/learning/tracks/${trackId}/activities/${activityId}/outcome`, {
-    method: 'PUT', body: JSON.stringify({ outcome }),
+    method: 'PUT', body: JSON.stringify(lessonId ? { outcome, lessonId } : { outcome }),
   });
 }
 
@@ -521,6 +522,10 @@ export interface LearningLessonProgress {
   completedAt: string | null;
   sectionTitle?: string | null;
   watchedMilliseconds?: number;
+  /** An extra (YouTube or Vimeo): never counts for progress. Missing in payloads from before external videos. */
+  isBonus?: boolean;
+  provider?: 'YouTube' | 'Vimeo' | null;
+  externalId?: string | null;
 }
 
 export interface LearningExperience {
@@ -552,6 +557,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -571,16 +577,18 @@ export function getCompanyAdministrationId(): string | null {
 async function readError(response: Response): Promise<ApiError> {
   let message = `Não foi possível concluir a solicitação (HTTP ${response.status}).`;
 
+  let code: string | undefined;
   try {
-    const problem = (await response.json()) as { detail?: string; title?: string };
+    const problem = (await response.json()) as { detail?: string; title?: string; code?: string };
     message = problem.detail ?? problem.title ?? message;
+    code = problem.code;
   } catch (error) {
     if (!(error instanceof SyntaxError)) {
       throw error;
     }
   }
 
-  return new ApiError(message, response.status);
+  return new ApiError(message, response.status, code);
 }
 
 async function getAntiforgeryToken(): Promise<string> {

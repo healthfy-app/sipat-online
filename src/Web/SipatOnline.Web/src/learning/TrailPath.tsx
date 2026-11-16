@@ -33,15 +33,15 @@ function DayVideos({ track, allTracks }: { track: LearningTrackCard; allTracks: 
   }, [track.id]);
   if (lessons === null) return <p className="learning-trail-dialog-summary">Carregando os vídeos...</p>;
   if (lessons.length === 0) return null;
-  const nextId = lessons.find(lesson => !lesson.isCompleted)?.id;
+  const nextId = lessons.find(lesson => !lesson.isBonus && !lesson.isCompleted)?.id;
   return <ol aria-label="Vídeos do dia" className="learning-trail-courses">
     {lessons.map(lesson => {
-      const Icon = lesson.isCompleted ? CircleCheck : lesson.watchedPercentage > 0 ? Play : Circle;
+      const Icon = lesson.isBonus ? Play : lesson.isCompleted ? CircleCheck : lesson.watchedPercentage > 0 ? Play : Circle;
       return <li key={lesson.id}>
-        <Link className={`learning-trail-course${lesson.isCompleted ? ' is-done' : lesson.id === nextId ? ' is-next' : ''}`} to={getTrackPath(track, allTracks)}>
+        <Link className={`learning-trail-course${lesson.isBonus ? '' : lesson.isCompleted ? ' is-done' : lesson.id === nextId ? ' is-next' : ''}`} to={getTrackPath(track, allTracks)}>
           <Icon aria-hidden="true" />
           <span className="learning-trail-course-title">{lesson.title}</span>
-          <span className="learning-trail-course-state">{lesson.isCompleted ? 'Concluído' : lesson.id === nextId ? 'Próximo' : formatDuration(lesson.durationMilliseconds)}</span>
+          <span className="learning-trail-course-state">{lesson.isBonus ? `Extra · ${lesson.provider ?? 'externo'}` : lesson.isCompleted ? 'Concluído' : lesson.id === nextId ? 'Próximo' : formatDuration(lesson.durationMilliseconds)}</span>
         </Link>
       </li>;
     })}

@@ -1015,3 +1015,162 @@ describe('learning experience', () => {
     await waitFor(() => expect(savePosition).toHaveBeenCalledWith('track-1', 'lesson-1', 1000));
   });
 });
+
+describe('extras in the day', () => {
+  const houseA = { ...lesson, id: 'house-a', title: 'Vídeo da casa A', position: 1 };
+  const extra = { ...lesson, id: 'extra-x', title: 'Vídeo externo X', position: 2, durationMilliseconds: 0,
+    isBonus: true, provider: 'YouTube', externalId: 'dQw4w9WgXcQ' };
+  const houseB = { ...lesson, id: 'house-b', title: 'Vídeo da casa B', position: 3 };
+  const done = (item: typeof lesson) => ({ ...item, isCompleted: true, watchedPercentage: 100 });
+
+  async function extraCourse(lessons: Array<Record<string, unknown>>, houseCount: number, completed = 0) {
+    listAssignedTracks.mockResolvedValue([trackCard]);
+    getAssignedTrack.mockResolvedValue({
+      track: { ...trackCard, lessonCount: houseCount, completedLessonCount: completed,
+        progressPercentage: houseCount === 0 ? 0 : Math.floor(completed * 100 / houseCount) },
+      lessons,
+    });
+    startPlayback.mockReset().mockImplementation((_track: string, id: string) => Promise.resolve({
+      url: `https://media.example.test/${id}.mp4`, sessionId: `session-${id}`,
+      expiresAt: '2099-01-01T00:00:00Z', isDevelopmentDemo: false,
+    }));
+    recordRange.mockReset().mockResolvedValue(progress(2000));
+    savePosition.mockReset().mockImplementation((_t: string, _l: string, position: number) => Promise.resolve(progress(position)));
+    return renderAt('/learning/tracks/track-1');
+  }
+
+  async function houseVideo(container: HTMLElement, id: string) {
+    return waitFor(() => {
+      const found = container.querySelector('video');
+      expect(found).toHaveAttribute('src', `https://media.example.test/${id}.mp4`);
+      return found!;
+    });
+  }
+
+  it('lists the extra with its provider, without a check, and counts only the house videos', async () => {
+    const { container } = await extraCourse([houseA, extra, houseB], 2);
+    await screen.findByRole('heading', { name: 'Vídeo da casa A' });
+
+    const item = screen.getByRole('button', { name: /Vídeo externo X/ });
+    expect(item).toHaveTextContent('Extra · YouTube');
+    expect(item.querySelector('svg.lucide-check')).toBeNull();
+    expect(item).not.toHaveTextContent('Não iniciado');
+    expect(screen.getByText('0 de 2 vídeos · 0%')).toBeVisible();
+    expect(container.querySelector('.day-playlist-head span')).toHaveTextContent('0/2');
+    expect(screen.getByText('Vídeo 1 de 2')).toBeVisible();
+  });
+
+  it('plays the extra in the same frame without touching playback, position, ranges or quality', async () => {
+    const user = userEvent.setup();
+    const { container } = await extraCourse([houseA, extra, houseB], 2);
+    await houseVideo(container, 'house-a');
+    startPlayback.mockClear();
+
+    await user.click(screen.getByRole('button', { name: /Vídeo externo X/ }));
+
+    const frame = container.querySelector('.learning-player-frame')!;
+    await waitFor(() => expect(frame.querySelector('iframe')).toHaveAttribute('src', 'https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ'));
+    expect(frame.querySelector('iframe')).toHaveAttribute('title', 'Vídeo externo X');
+    expect(container.querySelector('video')).toBeNull();
+    expect(screen.getByRole('link', { name: 'Abrir no YouTube' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Vídeo externo X' })).toBeVisible();
+    expect(container.querySelector('.day-controls .day-status')).toHaveTextContent('Extra · YouTube');
+    expect(container.querySelector('.learning-player-frame + .day-controls')).toBeInTheDocument();
+    expect(startPlayback).not.toHaveBeenCalled();
+    expect(recordRange).not.toHaveBeenCalled();
+    expect(savePosition).not.toHaveBeenCalled();
+    expect(sendQuality).not.toHaveBeenCalled();
+  });
+
+  it('shows 2 de 2 and 100 percent with both house videos done, extra untouched', async () => {
+    await extraCourse([done(houseA), extra, done(houseB)], 2, 2);
+    await screen.findByText('2 de 2 vídeos · 100%');
+
+    expect(screen.getByText('2 de 2 vídeos · 100%')).toBeVisible();
+    expect(screen.getByRole('progressbar', { name: 'Progresso do dia' })).toHaveAttribute('aria-valuenow', '100');
+    expect(screen.getByRole('status', { name: 'Dia concluído' })).toBeVisible();
+  });
+
+  it('goes from the house video to the extra and from the extra to the next video', async () => {
+    const user = userEvent.setup();
+    const { container } = await extraCourse([houseA, extra, houseB], 2);
+    await houseVideo(container, 'house-a');
+
+    await user.click(screen.getByRole('button', { name: 'Próximo vídeo' }));
+    await waitFor(() => expect(container.querySelector('iframe')).toBeInTheDocument());
+    expect(screen.getByRole('heading', { name: 'Vídeo externo X' })).toBeVisible();
+
+    await user.click(screen.getByRole('button', { name: 'Próximo vídeo' }));
+    await houseVideo(container, 'house-b');
+    expect(screen.getByText('Vídeo 2 de 2')).toBeVisible();
+  });
+
+  it('opens a track that starts with an extra on the first house video', async () => {
+    const { container } = await extraCourse([{ ...extra, position: 1 }, { ...houseA, position: 2 }], 1);
+    await houseVideo(container, 'house-a');
+    expect(container.querySelector('iframe')).toBeNull();
+  });
+
+  it('recomputes progress over the house videos only, and reaches 100 when the last item is an extra', async () => {
+    const { container } = await extraCourse([houseA, { ...extra, position: 2 }], 1);
+    const video = await houseVideo(container, 'house-a');
+    Object.defineProperty(video, 'paused', { configurable: true, writable: true, value: false });
+    recordRange.mockResolvedValue({ ...progress(5000, 100), lessonId: 'house-a' });
+    atTime(video, 0); fireEvent.playing(video);
+    atTime(video, 5); fireEvent.ended(video);
+
+    await waitFor(() => expect(screen.getByText('1 de 1 vídeos · 100%')).toBeVisible());
+    expect(screen.getByRole('status', { name: 'Dia concluído' })).toBeVisible();
+    // after a house video ends the way forward can be the extra
+    await waitFor(() => expect(container.querySelector('iframe')).toBeInTheDocument());
+  });
+
+  it('keeps the list and the next button working when the provider is blocked', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      const { container } = await extraCourse([houseA, extra, houseB], 2);
+      await houseVideo(container, 'house-a');
+      await user.click(screen.getByRole('button', { name: /Vídeo externo X/ }));
+      await waitFor(() => expect(container.querySelector('iframe')).toBeInTheDocument());
+      await act(async () => { vi.advanceTimersByTime(9000); });
+      expect(await screen.findByRole('alert')).toBeVisible();
+      await user.click(screen.getByRole('button', { name: 'Próximo vídeo' }));
+      await houseVideo(container, 'house-b');
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('opens the end game after the last house video even when an extra follows', async () => {
+    const api = await import('./api');
+    vi.mocked(api.getLearningActivities).mockResolvedValue({ revisionId: 'r', items: [{
+      id: 'placement-end', afterVideoCount: 1, lessonId: null, timeMilliseconds: null, outcome: null,
+      module: { id: 'quiz', title: 'Jogo final', gameType: 'Quiz', createdAt: '', usageCount: 0,
+        questions: [{ text: 'Qual a opção segura?', options: ['Usar EPI', 'Ignorar'], correctIndex: 0 }] },
+    }] });
+    const { container } = await extraCourse([houseA, { ...extra, position: 2 }], 1);
+    const video = await houseVideo(container, 'house-a');
+    await screen.findByRole('region', { name: 'Atividades para praticar' });
+    Object.defineProperty(video, 'paused', { configurable: true, writable: true, value: false });
+    recordRange.mockResolvedValue({ ...progress(5000, 100), lessonId: 'house-a' });
+    atTime(video, 0); fireEvent.playing(video);
+    atTime(video, 5); fireEvent.ended(video);
+
+    expect(await screen.findByRole('dialog')).toHaveAccessibleName('Jogo final');
+  });
+});
+
+describe('extras in the week list', () => {
+  it('marks an extra as Extra, numbers only the house videos and never makes it the next video', async () => {
+    const day = { ...trackCard, id: 'a', title: 'Opção 1 · Ergonomia', lessonCount: 2, dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-09' };
+    listAssignedTracks.mockResolvedValue([day]);
+    const first = { ...lesson, id: 'v-1', title: 'Ginástica laboral', isCompleted: true, watchedPercentage: 100 };
+    const extra = { ...lesson, id: 'v-x', title: 'Dica externa', position: 2, durationMilliseconds: 0, isBonus: true, provider: 'Vimeo', externalId: '76979871' };
+    const second = { ...lesson, id: 'v-2', title: 'Trabalho sentado', position: 3 };
+    getAssignedTrack.mockResolvedValue({ track: day, lessons: [first, extra, second] });
+    renderAt('/learning');
+
+    const region = await screen.findByRole('region', { name: 'Dia 1 · Boa postura' });
+    expect(await within(region).findByRole('link', { name: /Extra.*Dica externa.*Extra · Vimeo/ })).toBeVisible();
+    expect(within(region).getByRole('link', { name: /Vídeo 2.*Trabalho sentado.*Próximo/ })).toBeVisible();
+  });
+});
