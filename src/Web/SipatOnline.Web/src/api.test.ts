@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureCompanyAdministration, createParticipant, getPlatformCompanyEmployees, getSession, listAllParticipants, signIn, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality } from './api';
+import { configureCompanyAdministration, createParticipant, getPlatformCompanyEmployees, getSession, listAllParticipants, signIn, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality, createExternalPlatformVideo, isExtra, videoProvider } from './api';
 
 afterEach(() => {
   configureCompanyAdministration(null);
@@ -164,5 +164,26 @@ describe('API client', () => {
     expect(posts).toHaveLength(2);
     expect(new Headers(posts[0][1].headers).get('X-CSRF-TOKEN')).toBe('old');
     expect(new Headers(posts[1][1].headers).get('X-CSRF-TOKEN')).toBe('fresh');
+  });
+});
+
+describe('external videos', () => {
+  it('posts the provider link and reads an old payload without provider as a house video', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(Response.json({ id: 'v1', title: 'Dicas', provider: 'YouTube', externalId: 'dQw4w9WgXcQ' }, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const data = { provider: 'YouTube' as const, url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Dicas', durationMilliseconds: null };
+
+    const video = await createExternalPlatformVideo(data);
+
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/platform/catalog/videos/external');
+    expect(fetchMock.mock.calls[1][1].method).toBe('POST');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(data);
+    expect(video.externalId).toBe('dQw4w9WgXcQ');
+    expect(isExtra(video)).toBe(true);
+    const old: { provider?: 'Sipat' } = {};
+    expect(videoProvider(old)).toBe('Sipat');
+    expect(isExtra(old)).toBe(false);
   });
 });

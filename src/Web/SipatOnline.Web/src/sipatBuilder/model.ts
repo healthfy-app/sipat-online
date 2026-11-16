@@ -1,4 +1,4 @@
-import type { GameModule, PlatformCourse, PlatformLibraryVideo, ProgramDay } from '@/api';
+import { isExtra, videoProvider, type GameModule, type PlatformCourse, type PlatformLibraryVideo, type ProgramDay, type VideoProvider } from '@/api';
 
 /** Rows shown for videos and games in the planner, as in the sheet (VÍDEO 1 to 5, and the games slots). */
 export const defaultVideoRows = 5;
@@ -7,8 +7,9 @@ export const defaultGameRows = 3;
 export const maxGameRows = 5;
 export const maxDays = 14;
 
-export interface CatalogVideo { id: string; title: string; durationMs: number; code: string | null }
-export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; coverUrl: string | null; gameIds: string[]; option: string | null }
+/** `durationMs` of an extra is only what the operator typed: it never enters a sum. */
+export interface CatalogVideo { id: string; title: string; durationMs: number; code: string | null; provider?: VideoProvider }
+export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; extraCount?: number; coverUrl: string | null; gameIds: string[]; option: string | null }
 export interface Catalog {
   videos: Map<string, CatalogVideo>;
   subjects: Subject[];
@@ -20,6 +21,7 @@ export function videoCode(title: string): string | null {
   return /^\s*([A-Za-z]\d+V\d+)\s*[-–—:]/.exec(title)?.[1].toUpperCase() ?? null;
 }
 
+/** Time counts only house videos; extras are counted apart. */function houseTotals(ids: string[], videos: Map<string, CatalogVideo>) {  const held = ids.map(id => videos.get(id)!);  return { totalMs: held.filter(video => !isExtra(video)).reduce((sum, video) => sum + video.durationMs, 0), extraCount: held.filter(isExtra).length };}
 /** Subjects are the courses of the catalog; videos that belong to no course go to "Sem assunto". */
 export function buildCatalog(courses: PlatformCourse[], library: PlatformLibraryVideo[], games: GameModule[], categories: { id: string; name: string }[] = []): Catalog {
   const categoryNames = new Map(categories.map(item => [item.id, item.name]));
@@ -28,7 +30,7 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
   for (const item of library) {
     if (item.video.status !== 'Ready') continue;
     const title = item.video.libraryTitle ?? item.video.title;
-    videos.set(item.video.id, { id: item.video.id, title, durationMs: item.video.durationMilliseconds, code: videoCode(title) });
+    videos.set(item.video.id, { id: item.video.id, title, durationMs: item.video.durationMilliseconds, code: videoCode(title), provider: videoProvider(item.video) });
   }
   const used = new Set<string>();
   const subjects: Subject[] = [];
@@ -37,11 +39,11 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
     if (ids.length === 0) continue;
     ids.forEach(id => used.add(id));
     const gameIds = [...new Set([...(course.modules ?? [])].sort((a, b) => a.afterVideoCount - b.afterVideoCount).map(placement => placement.moduleId))].filter(id => gameMap.has(id));
-    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, gameIds, option: (course.categoryId && categoryNames.get(course.categoryId)) || null, videoIds: ids, totalMs: ids.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    subjects.push({ id: course.id, title: course.title, coverUrl: course.coverUrl ?? null, gameIds, option: (course.categoryId && categoryNames.get(course.categoryId)) || null, videoIds: ids, ...houseTotals(ids, videos) });
   }
   const loose = [...videos.keys()].filter(id => !used.has(id));
   if (loose.length > 0) {
-    subjects.push({ id: 'none', title: 'Sem assunto', coverUrl: null, gameIds: [], option: null, videoIds: loose, totalMs: loose.reduce((sum, id) => sum + videos.get(id)!.durationMs, 0) });
+    subjects.push({ id: 'none', title: 'Sem assunto', coverUrl: null, gameIds: [], option: null, videoIds: loose, ...houseTotals(loose, videos) });
   }
   subjects.sort((a, b) => (a.id === 'none' ? 1 : b.id === 'none' ? -1 : a.title.localeCompare(b.title, 'pt-BR')));
   return { videos, subjects, games: gameMap };
@@ -90,7 +92,7 @@ export function toProgramDay(day: DaySlots): ProgramDay {
 }
 
 export function dayDuration(day: DaySlots, catalog: Catalog): number {
-  return day.videos.reduce((sum, id) => sum + (id ? catalog.videos.get(id)?.durationMs ?? 0 : 0), 0);
+  return day.videos.reduce((sum, id) => { const video = id ? catalog.videos.get(id) : undefined; return sum + (video && !isExtra(video) ? video.durationMs : 0); }, 0);
 }
 
 /** h:mm:ss, the way the sheet shows times. */
@@ -162,4 +164,10 @@ export function themeOfDay(themes: Subject[], day: Pick<DaySlots, 'subject' | 'v
   const held = new Set(day.videos.filter(Boolean));
   const overlap = (item: Subject) => item.videoIds.filter(id => held.has(id)).length;
   return candidates.reduce((best, item) => (overlap(item) > overlap(best) ? item : best));
+}
+
+/** The videos of a day that count (house) and the extras, for "5 vídeos + 1 extra". */
+export function dayVideoCounts(videoIds: string[], catalog: Catalog): { house: number; extras: number } {
+  const extras = videoIds.filter(id => { const video = catalog.videos.get(id); return video && isExtra(video); }).length;
+  return { house: videoIds.length - extras, extras };
 }

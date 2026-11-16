@@ -4,7 +4,9 @@ import { Field } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { editorPanel } from './CourseOutlinePanel';
-import { formatDuration, pluralize } from './courseFormat';
+import { isExtra } from '@/api';
+import { durationLabel, pluralize } from './courseFormat';
+import ExtraBadge from './ExtraBadge';
 import { gameTypeLabel, type LessonGroup, type TrackItem } from './courseTrack';
 
 export interface PropertiesActions {
@@ -39,7 +41,7 @@ export default function CoursePropertiesPanel({
   return (
     <aside aria-label="Propriedades do conteúdo" className={cn(editorPanel, 'max-[1180px]:col-span-full max-[1180px]:border-t max-[1180px]:border-border max-[1180px]:shadow-none')}>
       <header className="flex items-center justify-between gap-2 border-b border-border p-4 text-xs">
-        <span className="text-[0.6875rem] font-bold tracking-[0.08em] text-primary">{kind}</span>
+        <span className="flex items-center gap-2"><span className="text-[0.6875rem] font-bold tracking-[0.08em] text-primary">{kind}</span>{!lesson && item?.kind === 'video' && isExtra(item.video) && <ExtraBadge />}</span>
         {lesson ? (
           <span className="font-medium tabular-nums text-muted-foreground">{lessonIndex + 1}ª aula</span>
         ) : item && <span className="font-medium tabular-nums text-muted-foreground">{position + 1} de {total}</span>}
@@ -86,10 +88,12 @@ export default function CoursePropertiesPanel({
             <Button disabled={busy} onClick={() => actions.onRenameVideo(item.video.id, null)} size="sm" variant="outline">Restaurar título original</Button>
           )}
           <div className="grid grid-cols-2 gap-3">
-            <PropField label="Duração">{formatDuration(item.video.durationMilliseconds)}</PropField>
-            <PropField label="Perguntas">{item.video.checkpoints.length}</PropField>
+            <PropField label="Duração">{durationLabel(item.video)}</PropField>
+            {!isExtra(item.video) && <PropField label="Perguntas">{item.video.checkpoints.length}</PropField>}
           </div>
-          <Button disabled={busy} onClick={actions.onManageActivities} variant="outline">Editar perguntas do vídeo</Button>
+          {isExtra(item.video)
+            ? <p className="m-0 text-xs leading-relaxed text-muted-foreground">Vídeo extra: não conta no progresso nem no certificado.</p>
+            : <Button disabled={busy} onClick={actions.onManageActivities} variant="outline">Editar perguntas do vídeo</Button>}
           <Button disabled={busy} onClick={() => actions.onRemoveVideo(item.video.id)} variant="ghost">Remover do curso</Button>
         </>}
 

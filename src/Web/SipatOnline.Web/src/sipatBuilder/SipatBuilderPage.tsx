@@ -11,7 +11,7 @@ import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Page } from '@/components/ui/page';
-import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
+import { extrasSuffix, getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import '@/OpsIdentity.css';
 import BuilderGrid from './BuilderGrid';
@@ -20,7 +20,7 @@ import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
 import { phaseLabel, sipatPhase } from './sipatPhase';
 import {
-  addDays, buildCatalog, dayDuration, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay,
+  addDays, buildCatalog, dayDuration, dayVideoCounts, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay,
   type Catalog, type DaySlots,
 } from './model';
 
@@ -139,8 +139,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     return () => window.clearTimeout(timer);
   }, [removed]);
 
-  const totals = useMemo(() => !catalog ? { videos: 0, games: 0, time: 0 } : {
-    videos: days.reduce((sum, day) => sum + day.videos.filter(Boolean).length, 0),
+  const totals = useMemo(() => !catalog ? { videos: 0, extras: 0, games: 0, time: 0 } : {
+    videos: days.reduce((sum, day) => sum + dayVideoCounts(day.videos.filter((id): id is string => !!id), catalog).house, 0),
+    extras: days.reduce((sum, day) => sum + dayVideoCounts(day.videos.filter((id): id is string => !!id), catalog).extras, 0),
     games: days.reduce((sum, day) => sum + day.games.filter(Boolean).length, 0),
     time: days.reduce((sum, day) => sum + dayDuration(day, catalog), 0),
   }, [days, catalog]);
@@ -295,7 +296,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         <p className="ops-hero-lead is-keep">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</p>
         {stage === 'grid' && <ul aria-label="Resumo da SIPAT" className="ops-hero-stats">
           <li><strong>{days.length}</strong> {days.length === 1 ? 'dia' : 'dias'}</li>
-          <li><Film aria-hidden="true" /><strong>{totals.videos}</strong> {totals.videos === 1 ? 'vídeo' : 'vídeos'}</li>
+          <li><Film aria-hidden="true" /><strong>{totals.videos}</strong> {totals.videos === 1 ? 'vídeo' : 'vídeos'}{extrasSuffix(totals.extras)}</li>
           <li><Gamepad2 aria-hidden="true" /><strong>{totals.games}</strong> {totals.games === 1 ? 'jogo' : 'jogos'}</li>
           <li><Clock aria-hidden="true" />{totals.time > 0 ? formatSpan(totals.time) : 'sem vídeos'}</li>
         </ul>}

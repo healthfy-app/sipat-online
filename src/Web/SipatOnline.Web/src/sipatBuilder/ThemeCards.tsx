@@ -1,7 +1,10 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { ExternalLink, Gamepad2, GripVertical, Layers, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { isExtra, videoProvider } from '@/api';
 import { Input } from '@/components/ui/input';
+import { extrasSuffix } from '@/courseEditor/courseFormat';
+import ExtraBadge from '@/courseEditor/ExtraBadge';
 import { cn } from '@/lib/utils';
 import { formatClock, formatSpan, normalize, subjectColor, themeLabel, type Catalog, type Subject } from './model';
 
@@ -13,7 +16,11 @@ function Cover({ subject, className }: { subject: Subject; className?: string })
   return <span aria-hidden="true" className={cn('grid shrink-0 place-items-center rounded-md text-xs font-bold text-white', className)} style={{ backgroundColor: subjectColor(subject.title) }}>{initials || 'T'}</span>;
 }
 
-const summary = (subject: Subject) => `${subject.videoIds.length} ${subject.videoIds.length === 1 ? 'vídeo' : 'vídeos'} · ${formatSpan(subject.totalMs) || '0:00'}`;
+const summary = (subject: Subject) => {
+  const extras = subject.extraCount ?? 0;
+  const house = subject.videoIds.length - extras;
+  return `${house} ${house === 1 ? 'vídeo' : 'vídeos'} · ${formatSpan(subject.totalMs) || '0:00'}${extrasSuffix(extras)}`;
+};
 
 /** The themes of the library, ready to be dragged onto a day. */
 export function ThemeTray({ subjects }: { subjects: Subject[] }) {
@@ -86,8 +93,8 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
           const video = catalog.videos.get(id);
           return <li className="flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5" key={id}>
             <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[0.6875rem] font-bold text-primary-foreground">{index + 1}</span>
-            <span className="min-w-0 flex-1 text-xs leading-snug font-medium [overflow-wrap:anywhere]">{video?.title ?? 'Vídeo removido do catálogo'}</span>
-            {video && <span className="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">{formatClock(video.durationMs)}</span>}
+            <span className="min-w-0 flex-1 text-xs leading-snug font-medium [overflow-wrap:anywhere]">{video?.title ?? 'Vídeo removido do catálogo'}{video && isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</span>
+            {video && <span className="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">{isExtra(video) && video.durationMs <= 0 ? videoProvider(video) : formatClock(video.durationMs)}</span>}
           </li>;
         })}
       </ol>

@@ -293,6 +293,20 @@ export interface PlatformCourseVideo {
   checkpoints: VideoCheckpoint[];
   lessonId?: string | null;
   libraryTitle?: string | null;
+  /** Missing in payloads from before external videos: read it with `videoProvider`. */
+  provider?: VideoProvider;
+  externalId?: string | null;
+}
+
+export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo';
+
+export function videoProvider(video: { provider?: VideoProvider }): VideoProvider {
+  return video.provider ?? 'Sipat';
+}
+
+/** A YouTube or Vimeo video: an appendix of the Assunto that never counts for progress or the certificate. */
+export function isExtra(video: { provider?: string }): boolean {
+  return (video.provider ?? 'Sipat') !== 'Sipat';
 }
 
 export interface PlatformLibraryVideo {
@@ -778,6 +792,18 @@ export function uploadPlatformVideo(
       : '/api/platform/catalog/videos',
     { method: 'POST', body: formData },
   );
+}
+
+export function createExternalPlatformVideo(data: {
+  provider: 'YouTube' | 'Vimeo';
+  url: string;
+  title: string;
+  durationMilliseconds: number | null;
+}): Promise<PlatformCourseVideo> {
+  return requestJson<PlatformCourseVideo>('/api/platform/catalog/videos/external', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function setPlatformCourseCover(courseId: string, file: File): Promise<PlatformCourse> {

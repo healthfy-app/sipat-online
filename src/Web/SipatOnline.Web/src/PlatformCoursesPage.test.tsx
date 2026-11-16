@@ -41,6 +41,7 @@ vi.mock('./api', async (importOriginal) => {
     setPlatformCourseVideos: vi.fn(),
     updatePlatformCourse: vi.fn(),
     uploadPlatformVideo: vi.fn(),
+    createExternalPlatformVideo: vi.fn(),
   };
 });
 
@@ -124,6 +125,7 @@ beforeEach(() => {
     { video: closing, courseCount: 1 },
   ]);
   vi.mocked(api.uploadPlatformVideo).mockReset();
+  vi.mocked(api.createExternalPlatformVideo).mockReset();
   vi.mocked(api.duplicatePlatformCourse).mockReset();
   vi.mocked(api.setPlatformCourseVideos).mockReset();
   vi.mocked(api.setPlatformCourseStructure).mockReset();
@@ -657,6 +659,143 @@ describe('Platform course catalog', () => {
     expect(within(review).getByText('Ativada após os vídeos')).toBeVisible();
     expect(within(review).getByText('No catálogo')).toBeVisible();
     expect(api.updatePlatformCourse).not.toHaveBeenCalled();
+  });
+
+  describe('extras (YouTube and Vimeo)', () => {
+    const extra: api.PlatformCourseVideo = {
+      ...makeVideo('v-9', 'Dicas de postura'), provider: 'YouTube', externalId: 'dQw4w9WgXcQ',
+      fileUrl: '', durationMilliseconds: 0, contentType: 'video/external',
+    };
+
+    async function openAddVideo(user: ReturnType<typeof userEvent.setup>) {
+      render(<PlatformCoursesPage />, '/platform/courses/c-1/edit');
+      await user.click((await screen.findAllByRole('button', { name: 'Adicionar vídeo' }))[0]);
+      return screen.findByRole('dialog', { name: 'Adicionar vídeo' });
+    }
+
+    it('swaps the library for the link form when YouTube is chosen', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.listPlatformLibraryVideos).mockResolvedValue([{ video: opening, courseCount: 1 }, { video: closing, courseCount: 1 }, { video: makeVideo('v-7', 'Pronto'), courseCount: 0 }]);
+      const dialog = await openAddVideo(user);
+      expect(within(dialog).getByRole('button', { name: 'Nosso vídeo' })).toHaveAttribute('aria-pressed', 'true');
+      expect(within(dialog).getByLabelText('Vincular da biblioteca')).toBeVisible();
+
+      await user.click(within(dialog).getByRole('button', { name: 'YouTube' }));
+
+      expect(within(dialog).getByLabelText('Link do vídeo')).toBeVisible();
+      expect(within(dialog).getByLabelText('Título')).toBeVisible();
+      expect(within(dialog).getByLabelText('Duração (min)')).toBeVisible();
+      expect(within(dialog).queryByLabelText('Vincular da biblioteca')).not.toBeInTheDocument();
+      expect(within(dialog).getByText('Vídeo extra: não conta no progresso nem no certificado.')).toBeVisible();
+    });
+
+    it('keeps Adicionar disabled while the link does not parse and previews it once it does', async () => {
+      const user = userEvent.setup();
+      const dialog = await openAddVideo(user);
+      await user.click(within(dialog).getByRole('button', { name: 'YouTube' }));
+      await user.type(within(dialog).getByLabelText('Título'), 'Dicas de postura');
+      await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://example.com/abc');
+      expect(within(dialog).getByRole('button', { name: 'Adicionar' })).toBeDisabled();
+      expect(dialog.querySelector('iframe')).toBeNull();
+
+      await user.clear(within(dialog).getByLabelText('Link do vídeo'));
+      await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://youtu.be/dQw4w9WgXcQ');
+      expect(within(dialog).getByRole('button', { name: 'Adicionar' })).toBeEnabled();
+      expect(dialog.querySelector('iframe')).toHaveAttribute('src', expect.stringContaining('/embed/dQw4w9WgXcQ'));
+      expect(within(dialog).getByText(/Não abriu\?/)).toBeVisible();
+    });
+
+    it('creates the external video and links it to the Assunto', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.createExternalPlatformVideo).mockResolvedValue(extra);
+      vi.mocked(api.setPlatformCourseStructure).mockResolvedValue({ ...ergonomics, videos: [opening, closing, extra] });
+      const dialog = await openAddVideo(user);
+      await user.click(within(dialog).getByRole('button', { name: 'YouTube' }));
+      await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://youtu.be/dQw4w9WgXcQ');
+      await user.type(within(dialog).getByLabelText('Título'), 'Dicas de postura');
+      await user.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
+
+      await waitFor(() => expect(api.createExternalPlatformVideo).toHaveBeenCalledWith({
+        provider: 'YouTube', url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Dicas de postura', durationMilliseconds: null,
+      }));
+      await waitFor(() => expect(api.setPlatformCourseStructure).toHaveBeenCalledWith('c-1', [
+        expect.objectContaining({ videos: [{ videoId: 'v-1', title: null }, { videoId: 'v-2', title: null }, { videoId: 'v-9', title: null }] }),
+      ]));
+    });
+
+    it('sends whole minutes as milliseconds', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.createExternalPlatformVideo).mockResolvedValue({ ...extra, provider: 'Vimeo', externalId: '123456789' });
+      vi.mocked(api.setPlatformCourseStructure).mockResolvedValue(ergonomics);
+      const dialog = await openAddVideo(user);
+      await user.click(within(dialog).getByRole('button', { name: 'Vimeo' }));
+      await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://vimeo.com/123456789');
+      await user.type(within(dialog).getByLabelText('Título'), 'Ergonomia no escritório');
+      await user.type(within(dialog).getByLabelText('Duração (min)'), '12');
+      await user.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
+
+      await waitFor(() => expect(api.createExternalPlatformVideo).toHaveBeenCalledWith({
+        provider: 'Vimeo', url: 'https://vimeo.com/123456789', title: 'Ergonomia no escritório', durationMilliseconds: 720000,
+      }));
+    });
+
+    it('shows the server refusal under the link field and does not link anything', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.createExternalPlatformVideo).mockRejectedValue(new Error('Esse vídeo não permite incorporação.'));
+      const dialog = await openAddVideo(user);
+      await user.click(within(dialog).getByRole('button', { name: 'YouTube' }));
+      await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://youtu.be/dQw4w9WgXcQ');
+      await user.type(within(dialog).getByLabelText('Título'), 'Dicas');
+      await user.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
+
+      expect(await within(dialog).findByText('Esse vídeo não permite incorporação.')).toBeVisible();
+      expect(api.setPlatformCourseStructure).not.toHaveBeenCalled();
+    });
+
+    it('marks an extra in the outline, previews it in the provider frame and hides the question controls', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.listPlatformCourses).mockResolvedValue([{ ...ergonomics, videos: [opening, extra] }, fire]);
+      render(<PlatformCoursesPage />, '/platform/courses/c-1/edit');
+
+      const outline = await screen.findByRole('list', { name: 'Vídeos do assunto' });
+      expect(within(outline).getAllByText('Extra')).toHaveLength(1);
+      expect(within(outline).getByText('YouTube')).toBeVisible();
+
+      await user.click(screen.getByLabelText('Título do vídeo 2'));
+      expect(document.querySelector('iframe')).toHaveAttribute('src', expect.stringContaining('/embed/dQw4w9WgXcQ'));
+      const properties = screen.getByRole('complementary', { name: 'Propriedades do conteúdo' });
+      expect(within(properties).queryByRole('button', { name: 'Editar perguntas do vídeo' })).not.toBeInTheDocument();
+      expect(within(properties).getByText('Vídeo extra: não conta no progresso nem no certificado.')).toBeVisible();
+    });
+
+    it('offers question moments only for house videos', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.listGameModules).mockResolvedValue([memoryModule]);
+      vi.mocked(api.listPlatformCourses).mockResolvedValue([{ ...ergonomics, videos: [opening, extra] }, fire]);
+      render(<PlatformCoursesPage />, '/platform/courses/c-1/edit');
+
+      await user.click((await screen.findAllByRole('button', { name: 'Configurar atividades' }))[0]);
+      const dialog = await screen.findByRole('dialog', { name: 'Atividades e perguntas' });
+      expect(within(dialog).getByText('Vídeo 1 · Abertura')).toBeVisible();
+      expect(within(dialog).queryByText(/Dicas de postura/, { selector: 'strong' })).not.toBeInTheDocument();
+    });
+
+    it('counts only house videos in the summary and appends the extras', async () => {
+      vi.mocked(api.listPlatformCourses).mockResolvedValue([{ ...ergonomics, videos: [opening, closing, extra] }, fire]);
+      render(<PlatformCoursesPage />);
+      expect(await screen.findByText('2 vídeos · 3:00 + 1 extra')).toBeVisible();
+    });
+
+    it('marks an extra in the video library without the file size', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.listPlatformLibraryVideos).mockResolvedValue([{ video: opening, courseCount: 1 }, { video: extra, courseCount: 0 }]);
+      render(<PlatformCoursesPage />);
+      await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
+      const card = (await screen.findByRole('heading', { name: /Dicas de postura/ })).closest('article') as HTMLElement;
+      expect(within(card).getByText('Extra')).toBeVisible();
+      expect(within(card).getByText('YouTube')).toBeVisible();
+      expect(card.querySelector('iframe')).not.toBeNull();
+    });
   });
 
   it('offers only ready library videos when adding a video to a course', async () => {
