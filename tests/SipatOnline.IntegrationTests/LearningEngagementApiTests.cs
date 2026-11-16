@@ -382,6 +382,83 @@ public sealed class LearningEngagementApiTests
     }
 
     [DockerFact]
+    public async Task Answer_from_a_page_opened_before_an_extra_moved_the_videos_is_refused()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        var a = await scenario.SeedHouseVideoAsync("Vídeo A");
+        var b = await scenario.SeedHouseVideoAsync("Vídeo B");
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        await scenario.PlaceCheckpointAsync(a);
+        await scenario.PlaceCheckpointAsync(b);
+        await scenario.ApplyDayAsync(a, b);
+        var before = await scenario.LessonIdsAsync();
+        await scenario.CompleteAsync(before[0]);
+        Assert.Equal(1, (await scenario.ApplyDayAsync(x, a, b)).GetProperty("updated").GetInt32());
+
+        // B's game was checkpoint-1-0 on the old page; that id now names A's game
+        var stale = await scenario.AnswerAsync("checkpoint-1-0", before[1], HttpStatusCode.Conflict);
+
+        Assert.Equal("learning.activity.stale", stale.GetProperty("code").GetString());
+        Assert.Equal("A lista de atividades mudou. Atualize a página.", stale.GetProperty("detail").GetString());
+        Assert.Equal(new string?[] { null, null }, await OutcomesAsync());
+
+        await scenario.AnswerAsync("checkpoint-2-0", before[1]);
+        Assert.Equal(new string?[] { null, "completed" }, await OutcomesAsync());
+
+        // a page that does not say which video it shows is answered as before
+        await scenario.AnswerAsync("checkpoint-1-0");
+        Assert.Equal(new string?[] { "completed", "completed" }, await OutcomesAsync());
+
+        async Task<string?[]> OutcomesAsync()
+        {
+            var items = (await scenario.Activities()).GetProperty("items").EnumerateArray().ToArray();
+            Assert.Equal([before[0], before[1]], items.Select(item => item.GetProperty("lessonId").GetGuid()));
+            return items.Select(item => item.GetProperty("outcome").GetString()).ToArray();
+        }
+    }
+
+    [DockerFact]
+    public async Task Failing_day_takes_back_the_whole_application()
+    {
+        await using var scenario = await BonusLessonScenario.StartEmptyAsync();
+        var a = await scenario.SeedHouseVideoAsync("Vídeo A");
+        var b = await scenario.SeedHouseVideoAsync("Vídeo B");
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        // a house video without a duration cannot become a lesson, so its day fails after the day before it was saved
+        var broken = await scenario.SeedHouseVideoAsync("Vídeo sem duração", 0);
+
+        var sampleTracks = 0;
+        sampleTracks = (await CountAsync()).Tracks;
+        var refusedFirst = await scenario.ApplyDaysAsync("Dia 1", [a, b], [broken], HttpStatusCode.BadRequest);
+
+        Assert.Equal("learning.lesson.duration_invalid", refusedFirst.GetProperty("code").GetString());
+        Assert.Equal((0, 0), await CountAsync());
+
+        await scenario.ApplyDayAsync(a, b);
+        var before = await scenario.LessonIdsAsync();
+        await scenario.CompleteAsync(before[0]);
+        Assert.Equal((1, 1), await CountAsync());
+
+        var refusedMerge = await scenario.ApplyDaysAsync("Dia 1 renomeado", [a, x, b], [broken], HttpStatusCode.BadRequest);
+
+        Assert.Equal("learning.lesson.duration_invalid", refusedMerge.GetProperty("code").GetString());
+        Assert.Equal((1, 1), await CountAsync());
+        Assert.Equal(before, await scenario.LessonIdsAsync());
+        var experience = await scenario.Experience();
+        Assert.Equal("Dia 1", experience.GetProperty("track").GetProperty("dayTitle").GetString());
+        Assert.True(experience.GetProperty("lessons")[0].GetProperty("isCompleted").GetBoolean());
+
+        async Task<(int Tracks, int Audits)> CountAsync()
+        {
+            await using var scope = scenario.Factory.Services.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            // the sample company already has tracks of its own: only the ones this test delivers count
+            return (await db.LearningTracks.CountAsync(item => item.SipatEventId == scenario.SipatId) - sampleTracks,
+                await db.AuditEntries.CountAsync(item => item.Action == "learning.program.applied"));
+        }
+    }
+
+    [DockerFact]
     public async Task End_game_after_a_trailing_extra_is_due_after_the_last_house_video()
     {
         await using var scenario = await BonusLessonScenario.StartWithTrailingExtraAsync();

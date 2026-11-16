@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using SipatOnline.Api.Endpoints;
 using SipatOnline.Infrastructure;
@@ -495,6 +496,14 @@ public sealed class LearningApiTests
         Assert.Equal(before[1], game.GetProperty("lessonId").GetGuid());
         Assert.Equal("checkpoint-2-0", game.GetProperty("id").GetString());
         Assert.Equal("completed", game.GetProperty("outcome").GetString());
+        await scenario.Call(scenario.Platform,
+            $"{BonusLessonScenario.CompanyPath}/sipats/{scenario.SipatId}/courses/{courseId}", HttpMethod.Post, new { });
+        await using (var scope = scenario.Factory.Services.CreateAsyncScope())
+        {
+            // recorded once: delivering the same course again changes nothing
+            Assert.Equal(1, await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().AuditEntries
+                .CountAsync(item => item.Action == "learning.course.extras_updated" && item.SubjectId == trackId.ToString("D")));
+        }
 
         Task SetStructureAsync(Guid[] first, Guid[] second) =>
             scenario.Call(scenario.Platform, $"/api/platform/catalog/courses/{courseId}/structure", HttpMethod.Put, new

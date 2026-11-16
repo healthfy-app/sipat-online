@@ -85,7 +85,7 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
     /// <summary>Only the operator signed in, nothing delivered yet.</summary>
     public static Task<BonusLessonScenario> StartEmptyAsync() => CreateAsync();
 
-    public async Task<Guid> SeedHouseVideoAsync(string title)
+    public async Task<Guid> SeedHouseVideoAsync(string title, long durationMilliseconds = HouseDuration)
     {
         await using var scope = Factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
@@ -95,7 +95,7 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
             Title = title,
             ContentType = "video/mp4",
             SizeBytes = 1024,
-            DurationMilliseconds = HouseDuration,
+            DurationMilliseconds = durationMilliseconds,
             CreatedAt = DateTimeOffset.UtcNow
         };
         db.PlatformCourseVideos.Add(video);
@@ -145,31 +145,53 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
     /// Saves the one Day of the scenario's program with these videos (creating the program the first time) and applies
     /// it to the sample SIPAT; the scenario's track becomes that Day's track.
     /// </summary>
-    public async Task<JsonElement> ApplyDayAsync(params Guid[] videoIds)
+    public Task<JsonElement> ApplyDayAsync(params Guid[] videoIds) => ApplyDaysAsync("Dia 1", videoIds, null, HttpStatusCode.OK);
+
+    /// <summary>
+    /// Like <see cref="ApplyDayAsync"/>, with the first Day's title and, optionally, a second (new) Day after it;
+    /// the response is checked against <paramref name="expected"/>.
+    /// </summary>
+    public async Task<JsonElement> ApplyDaysAsync(string title, Guid[] videoIds, Guid[]? secondDay, HttpStatusCode expected)
     {
-        var day = new
+        var days = new List<object>
         {
-            id = dayId == Guid.Empty ? (Guid?)null : dayId,
-            title = "Dia 1",
-            date = (string?)null,
-            subject = (string?)null,
-            videoIds,
-            gameIds = Array.Empty<Guid>()
+            new
+            {
+                id = dayId == Guid.Empty ? (Guid?)null : dayId,
+                title,
+                date = (string?)null,
+                subject = (string?)null,
+                videoIds,
+                gameIds = Array.Empty<Guid>()
+            }
         };
+        if (secondDay is not null)
+        {
+            days.Add(new
+            {
+                id = (Guid?)null,
+                title = "Dia 2",
+                date = (string?)null,
+                subject = (string?)null,
+                videoIds = secondDay,
+                gameIds = Array.Empty<Guid>()
+            });
+        }
         if (programId == Guid.Empty)
         {
             var program = await Call(Platform, "/api/platform/catalog/programs", HttpMethod.Post,
-                new { title = "SIPAT com extra", days = new[] { day } }, HttpStatusCode.Created);
+                new { title = "SIPAT com extra", days }, HttpStatusCode.Created);
             programId = program.GetProperty("id").GetGuid();
             dayId = program.GetProperty("days")[0].GetProperty("id").GetGuid();
         }
         else
         {
             await Call(Platform, $"/api/platform/catalog/programs/{programId}", HttpMethod.Put,
-                new { title = "SIPAT com extra", days = new[] { day } });
+                new { title = "SIPAT com extra", days });
         }
 
-        var applied = await Call(Platform, $"{CompanyPath}/sipats/{SipatId}/programs/{programId}", HttpMethod.Post, new { });
+        var applied = await Call(Platform, $"{CompanyPath}/sipats/{SipatId}/programs/{programId}", HttpMethod.Post, new { }, expected);
+        if (expected != HttpStatusCode.OK) return applied;
         await using var scope = Factory.Services.CreateAsyncScope();
         TrackId = await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().LearningTracks
             .Where(item => item.SourceCourseId == dayId).Select(item => item.Id).SingleAsync();
@@ -182,6 +204,11 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
     public Task AnswerAsync(string activityId) =>
         Call(Participant, $"/api/learning/tracks/{TrackId}/activities/{activityId}/outcome", HttpMethod.Put,
             new { outcome = "completed" });
+
+    /// <summary>Answers a game as a page that shows it in the middle of <paramref name="lessonId"/>.</summary>
+    public Task<JsonElement> AnswerAsync(string activityId, Guid lessonId, HttpStatusCode expected = HttpStatusCode.OK) =>
+        Call(Participant, $"/api/learning/tracks/{TrackId}/activities/{activityId}/outcome", HttpMethod.Put,
+            new { outcome = "completed", lessonId }, expected);
 
     public Task PublishCourseAsync(Guid courseId) =>
         Call(Platform, $"/api/platform/catalog/courses/{courseId}", HttpMethod.Put,

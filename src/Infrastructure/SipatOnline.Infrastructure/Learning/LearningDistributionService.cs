@@ -48,7 +48,17 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             if (course is not null && course.Status == PlatformCourseStatus.Published && HasHouseVideo(course.Videos))
             {
                 var track = await db.LearningTracks.SingleAsync(item => item.Id == existing.TrackId && item.TenantId == tenantId, token);
-                if (track.CurrentRevisionId is Guid revisionId) await MergeBonusLessonsAsync(track, revisionId, course, token);
+                if (track.CurrentRevisionId is Guid revisionId)
+                {
+                    await using var transaction = await db.Database.BeginTransactionAsync(token);
+                    if (await MergeBonusLessonsAsync(track, revisionId, course, token))
+                    {
+                        await audit.WriteAsync(new AuditRecord(actor.UserId!, new TenantId(tenantId), "learning.course.extras_updated",
+                            "learning_track", track.Id.ToString("D"), clock.GetUtcNow()), token);
+                        await db.SaveChangesAsync(token);
+                        await transaction.CommitAsync(token);
+                    }
+                }
             }
             return Result<Guid>.Success(existing.TrackId);
         }
@@ -78,7 +88,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         if (!published.IsSuccess) return Result<Guid>.Failure(published.Error);
         var trackPublished = track.Value.PublishRevision(revision);
         if (!trackPublished.IsSuccess) return Result<Guid>.Failure(trackPublished.Error);
-        await using var transaction = await db.Database.BeginTransactionAsync(token);
+        // a SIPAT delivered day by day holds one transaction for all its days: this track joins it
+        await using var transaction = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(token) : null;
         await learning.CreateTrackAsync(track.Value, revision, token);
         db.LearningTracks.Local.Single(item => item.Id == track.Value.Id).SourceCourseId = course.Id;
         db.LearningLessons.AddRange(revision.Lessons.Select(item => new LearningLessonEntity
@@ -113,10 +124,10 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             if (await learning.IsActiveParticipantAsync(tenant, participantId, token))
                 await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, track.Value.Id, participantId, now).Value, token);
         }
-        await db.SaveChangesAsync(token);
         await audit.WriteAsync(new AuditRecord(actor.UserId!, tenant, "learning.course.distributed",
             "learning_track", track.Value.Id.ToString("D"), now), token);
-        await transaction.CommitAsync(token);
+        await db.SaveChangesAsync(token);
+        if (transaction is not null) await transaction.CommitAsync(token);
         return Result<Guid>.Success(track.Value.Id);
     }
 
@@ -168,6 +179,24 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             courses.Add(course);
         }
 
+        // and deliver every day in one transaction: a day that fails takes back the ones before it
+        await using var transaction = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(token) : null;
+        var delivered = await DeliverDaysAsync(tenantId, sipatId, days, courses, auditSubjectId, auditAction, auditSubjectType, token);
+        if (transaction is null) return delivered;
+        if (delivered.IsSuccess)
+        {
+            await transaction.CommitAsync(token);
+            return delivered;
+        }
+        await transaction.RollbackAsync(token);
+        // what was saved is gone, so nothing tracked may claim it was
+        db.ChangeTracker.Clear();
+        return delivered;
+    }
+
+    private async Task<Result<ProgramApplication>> DeliverDaysAsync(Guid tenantId, Guid sipatId, IReadOnlyList<ProgramDay> days,
+        List<PlatformCourse> courses, Guid auditSubjectId, string auditAction, string auditSubjectType, CancellationToken token)
+    {
         int created = 0, updated = 0, kept = 0;
         for (var index = 0; index < courses.Count; index++)
         {
@@ -196,6 +225,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         await EnsureAssignmentsAsync(tenantId, null, token);
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(tenantId), auditAction,
             auditSubjectType, auditSubjectId.ToString("D"), clock.GetUtcNow()), token);
+        await db.SaveChangesAsync(token);
         return Result<ProgramApplication>.Success(new ProgramApplication(courses.Count, created, updated, kept));
     }
 
