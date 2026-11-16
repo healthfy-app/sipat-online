@@ -115,7 +115,7 @@ export default function PlaygroundApp() {
     <fieldset>
       <legend>Vídeo externo</legend>
       <label><input checked={showExternal} onChange={event => setShowExternal(event.target.checked)} type="checkbox" /> Mostrar exemplo do YouTube (mesmo quadro, sem regras nem eventos)</label>
-      {showExternal && <div style={{ aspectRatio: '16 / 9', marginTop: 8 }}>
+      {showExternal && <div style={{ marginTop: 8 }}>
         <ExternalVideoPlayer externalId="aqz-KE-bpKQ" provider="YouTube" title="Exemplo do YouTube" />
       </div>}
     </fieldset>

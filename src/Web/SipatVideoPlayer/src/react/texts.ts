@@ -12,4 +12,6 @@ export const texts = {
   qualityAuto: 'Automática',
   externalBlocked: 'Este vídeo não abriu na sua rede.',
   externalOpenOutside: 'Abrir no {provider}',
+  externalNotOpening: 'Não abriu?',
+  externalUnavailable: 'Este vídeo não está disponível.',
 } as const;

@@ -26,7 +26,7 @@ describe('ExternalVideoPlayer', () => {
     expect(screen.queryByText(blocked)).toBeNull();
     act(() => { vi.advanceTimersByTime(1); });
     expect(screen.getByText(blocked)).toBeInTheDocument();
-    const link = screen.getByRole('link', { name: 'Abrir no Vimeo' });
+    const link = screen.getAllByRole('link', { name: 'Abrir no Vimeo' }).at(-1)!;
     expect(link).toHaveAttribute('href', 'https://vimeo.com/76979871');
     expect(link).toHaveAttribute('target', '_blank');
     expect(link).toHaveAttribute('rel', 'noopener noreferrer');
@@ -36,7 +36,7 @@ describe('ExternalVideoPlayer', () => {
   it('names YouTube in the link', () => {
     render(<ExternalVideoPlayer blockedAfterMs={10} externalId="dQw4w9WgXcQ" provider="YouTube" title="Aula" />);
     act(() => { vi.advanceTimersByTime(10); });
-    expect(screen.getByRole('link', { name: 'Abrir no YouTube' })).toHaveAttribute('href', 'https://youtu.be/dQw4w9WgXcQ');
+    expect(screen.getAllByRole('link', { name: 'Abrir no YouTube' }).at(-1)!).toHaveAttribute('href', 'https://youtu.be/dQw4w9WgXcQ');
   });
 
   it('never shows the message when the iframe loads in time', () => {
@@ -67,6 +67,33 @@ describe('ExternalVideoPlayer', () => {
   it('clears the timer on unmount', () => {
     const { unmount } = render(<ExternalVideoPlayer externalId="dQw4w9WgXcQ" provider="YouTube" title="Aula" />);
     unmount();
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it.each([['YouTube', 'dQw4w9WgXcQ', 'https://youtu.be/dQw4w9WgXcQ'], ['Vimeo', '76979871', 'https://vimeo.com/76979871']] as const)(
+    'always offers the outside link under the frame (%s)', (provider, id, href) => {
+      const { container } = render(<ExternalVideoPlayer externalId={id} provider={provider} title="Aula" />);
+      const link = screen.getByRole('link', { name: `Abrir no ${provider}` });
+      expect(link).toHaveAttribute('href', href);
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(screen.getByText('Não abriu?')).toBeInTheDocument();
+      expect(link.closest('.sipat-player')).toBeNull();
+      fireEvent.load(iframeOf(container));
+      expect(screen.getByRole('link', { name: `Abrir no ${provider}` })).toBeInTheDocument();
+    });
+
+  it('does not make the iframe lazy', () => {
+    const { container } = render(<ExternalVideoPlayer externalId="dQw4w9WgXcQ" provider="YouTube" title="Aula" />);
+    expect(iframeOf(container)).not.toHaveAttribute('loading');
+  });
+
+  it('shows an unavailable message for an invalid id instead of throwing', () => {
+    const { container } = render(<ExternalVideoPlayer externalId="a/b" provider="YouTube" title="Aula" />);
+    expect(screen.getByRole('alert')).toHaveTextContent('Este vídeo não está disponível.');
+    expect(container.querySelector('iframe')).toBeNull();
+    expect(screen.queryByRole('link')).toBeNull();
+    expect(container.querySelector('.sipat-player')).not.toBeNull();
     expect(vi.getTimerCount()).toBe(0);
   });
 });
