@@ -21,7 +21,15 @@ export function videoCode(title: string): string | null {
   return /^\s*([A-Za-z]\d+V\d+)\s*[-–—:]/.exec(title)?.[1].toUpperCase() ?? null;
 }
 
-/** Time counts only house videos; extras are counted apart. */function houseTotals(ids: string[], videos: Map<string, CatalogVideo>) {  const held = ids.map(id => videos.get(id)!);  return { totalMs: held.filter(video => !isExtra(video)).reduce((sum, video) => sum + video.durationMs, 0), extraCount: held.filter(isExtra).length };}
+/** Time counts only house videos; extras are counted apart. */
+function houseTotals(ids: string[], videos: Map<string, CatalogVideo>) {
+  const held = ids.map(id => videos.get(id)!);
+  return {
+    totalMs: held.filter(video => !isExtra(video)).reduce((sum, video) => sum + video.durationMs, 0),
+    extraCount: held.filter(isExtra).length,
+  };
+}
+
 /** Subjects are the courses of the catalog; videos that belong to no course go to "Sem assunto". */
 export function buildCatalog(courses: PlatformCourse[], library: PlatformLibraryVideo[], games: GameModule[], categories: { id: string; name: string }[] = []): Catalog {
   const categoryNames = new Map(categories.map(item => [item.id, item.name]));

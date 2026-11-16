@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { createExternalPlatformVideo, type PlatformCourseVideo, type PlatformLibraryVideo } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -45,7 +45,7 @@ export default function AddVideoDialog({
   return (
     <Dialog busy={busy} onClose={onClose} title="Adicionar vídeo">
       <div className="grid gap-5">
-        <SegmentedControl label="Origem do vídeo" onChange={setSource} options={sources} value={source} />
+        <SegmentedControl disabled={busy} label="Origem do vídeo" onChange={setSource} options={sources} value={source} />
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
         {source === 'house' ? <>
           {availableVideos.length > 0 && (
@@ -87,13 +87,15 @@ function ExternalVideoForm({ provider, busy, onBusyChange, onError, onLink }: {
   const [title, setTitle] = useState('');
   const [minutes, setMinutes] = useState('');
   const [linkError, setLinkError] = useState('');
+  const submitting = useRef(false);
   const externalId = externalIdFromLink(provider, url);
   const minutesValid = minutes === '' || /^[1-9]\d*$/.test(minutes);
   const canAdd = !!externalId && title.trim() !== '' && minutesValid && !busy;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canAdd) return;
+    if (!canAdd || submitting.current) return;
+    submitting.current = true;
     setLinkError('');
     onError('');
     onBusyChange(true);
@@ -106,6 +108,7 @@ function ExternalVideoForm({ provider, busy, onBusyChange, onError, onLink }: {
         durationMilliseconds: minutes === '' ? null : Number(minutes) * 60000,
       });
     } catch (failure) {
+      submitting.current = false;
       setLinkError(getErrorMessage(failure));
       return;
     } finally {

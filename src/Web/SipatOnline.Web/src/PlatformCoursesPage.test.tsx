@@ -723,6 +723,39 @@ describe('Platform course catalog', () => {
       ]));
     });
 
+    it('creates the external video once when submitted twice in the same tick', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.createExternalPlatformVideo).mockReturnValue(new Promise(() => {}));
+      const dialog = await openAddVideo(user);
+      await user.click(within(dialog).getByRole('button', { name: 'YouTube' }));
+      await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://youtu.be/dQw4w9WgXcQ');
+      await user.type(within(dialog).getByLabelText('Título'), 'Dicas');
+      const form = within(dialog).getByLabelText('Título').closest('form') as HTMLFormElement;
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+      expect(api.createExternalPlatformVideo).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(within(dialog).getByRole('button', { name: 'YouTube' })).toBeDisabled());
+    });
+
+    it('does not let an Assunto with only an extra pass the video checklist or publish', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.listPlatformCourses).mockResolvedValue([{ ...ergonomics, status: 'Draft', videos: [extra] }, fire]);
+      render(<PlatformCoursesPage />, '/platform/courses/c-1/edit');
+      await user.click(await screen.findByRole('button', { name: 'Publicar' }));
+      expect(screen.getByText('Adicione ao menos um vídeo antes de publicar.')).toBeVisible();
+      expect(screen.getByRole('button', { name: 'Publicar agora' })).toBeDisabled();
+      expect(api.updatePlatformCourse).not.toHaveBeenCalled();
+    });
+
+    it('lets an Assunto with a house video and an extra pass the checklist as before', async () => {
+      const user = userEvent.setup();
+      vi.mocked(api.listPlatformCourses).mockResolvedValue([{ ...ergonomics, status: 'Draft', videos: [opening, extra] }, fire]);
+      render(<PlatformCoursesPage />, '/platform/courses/c-1/edit');
+      await user.click(await screen.findByRole('button', { name: 'Publicar' }));
+      expect(screen.queryByText('Adicione ao menos um vídeo antes de publicar.')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Publicar agora' })).toBeEnabled();
+    });
+
     it('sends whole minutes as milliseconds', async () => {
       const user = userEvent.setup();
       vi.mocked(api.createExternalPlatformVideo).mockResolvedValue({ ...extra, provider: 'Vimeo', externalId: '123456789' });

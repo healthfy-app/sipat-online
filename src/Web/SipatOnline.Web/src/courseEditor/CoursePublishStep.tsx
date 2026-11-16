@@ -43,8 +43,8 @@ export default function CoursePublishStep({
   onPublish: () => void;
   onUnpublish: () => void;
 }) {
-  const hasVideos = course.videos.length > 0;
   const house = houseVideos(course.videos);
+  const hasVideos = house.length > 0;
   const isPublished = status === 'Published';
   const checklist: ChecklistItem[] = [
     { label: 'Nome do curso', state: title.trim() ? 'ready' : 'required', text: title.trim() ? 'Pronto' : 'Obrigatório' },
