@@ -1,6 +1,6 @@
 # Vídeo externo (YouTube, Vimeo) como vídeo bônus — design
 
-Data: 2026-11-15 · Status: aguardando aprovação
+Data: 2026-11-15 · Status: implementado em feat/video-externo (2026-11-16)
 
 ## Intenção
 
