@@ -823,7 +823,35 @@ export function listPlatformLibraryVideos(): Promise<PlatformLibraryVideo[]> {
   return requestJson<PlatformLibraryVideo[]>('/api/platform/catalog/videos');
 }
 
-export function uploadPlatformVideo(
+export type VideoUploadStart =
+  | {
+      mode: 'direct';
+      videoId: string;
+      uploadUrl: string;
+      method: 'PUT';
+      headers: Record<string, string>;
+      expiresAt: string;
+      maxSizeBytes: number;
+    }
+  | { mode: 'multipart'; maxSizeBytes: number };
+
+async function startVideoUpload(file: File): Promise<VideoUploadStart> {
+  try {
+    return await requestJson<VideoUploadStart>('/api/platform/catalog/videos/uploads', {
+      method: 'POST',
+      body: JSON.stringify({ contentType: file.type, sizeBytes: file.size }),
+    });
+  } catch (error) {
+    // An API older than this web build has no /uploads route: keep using the multipart upload.
+    if (error instanceof ApiError && error.status === 404) {
+      return { mode: 'multipart', maxSizeBytes: 0 };
+    }
+
+    throw error;
+  }
+}
+
+function uploadVideoMultipart(
   title: string,
   durationMilliseconds: number,
   file: File,
@@ -838,6 +866,37 @@ export function uploadPlatformVideo(
       ? `/api/platform/catalog/courses/${courseId}/videos`
       : '/api/platform/catalog/videos',
     { method: 'POST', body: formData },
+  );
+}
+
+export async function uploadPlatformVideo(
+  title: string,
+  durationMilliseconds: number,
+  file: File,
+  courseId?: string,
+): Promise<PlatformCourseVideo> {
+  const start = await startVideoUpload(file);
+  if (start.mode !== 'direct') {
+    return uploadVideoMultipart(title, durationMilliseconds, file, courseId);
+  }
+
+  // The bucket is another origin: no cookies and no CSRF header, only what the signed URL asks for.
+  const put = await fetch(start.uploadUrl, {
+    method: 'PUT',
+    body: file,
+    headers: start.headers,
+    credentials: 'omit',
+  });
+  if (!put.ok) {
+    throw new ApiError('Não foi possível enviar o vídeo. Verifique a conexão e tente de novo.', put.status);
+  }
+
+  return requestJson<PlatformCourseVideo>(
+    `/api/platform/catalog/videos/uploads/${start.videoId}/complete`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title, durationMilliseconds, courseId: courseId ?? null }),
+    },
   );
 }
 
