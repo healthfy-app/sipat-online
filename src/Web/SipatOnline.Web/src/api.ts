@@ -1,4 +1,5 @@
 import type { PlayerQualitySummary } from '@sipat/video-player';
+import { reportFailedRequest } from './telemetry';
 
 export interface TenantBranding {
   tenantKey: string;
@@ -658,12 +659,19 @@ async function request(
     headers.set('Content-Type', 'application/json');
   }
 
-  const send = () => fetch(path, {
-    ...init,
-    method,
-    credentials: 'include',
-    headers: new Headers(headers),
-  });
+  const send = async (): Promise<Response> => {
+    try {
+      return await fetch(path, {
+        ...init,
+        method,
+        credentials: 'include',
+        headers: new Headers(headers),
+      });
+    } catch (error) {
+      reportFailedRequest(method, path, error);
+      throw error;
+    }
+  };
   let response = await send();
 
   // The token is tied to the signed-in person: after a login, logout or expired session it is stale.
@@ -674,6 +682,7 @@ async function request(
     response = await send();
   }
 
+  if (response.status >= 500) reportFailedRequest(method, path, response.status);
   if (!response.ok) {
     throw await readError(response);
   }
@@ -727,6 +736,7 @@ export async function signIn(
     method: 'POST',
     body: JSON.stringify({ loginIdentifier, password }),
   });
+  // the token is tied to who is signed in
   cachedAntiforgeryToken = null;
 }
 

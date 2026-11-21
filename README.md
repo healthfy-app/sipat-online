@@ -41,6 +41,16 @@ Para reconstruir após alterações:
 .\docker-local.ps1 up -Build
 ```
 
+### Painel de logs, requisições e métricas
+
+Junto com a aplicação sobe o **Aspire Dashboard**. Abra `http://localhost:18888` (sem login):
+
+- **Traces**: cada requisição, do middleware ao endpoint e às consultas SQL (e às chamadas ao R2). Filtre por `sipat.tenant.id` (empresa) ou `enduser.id` (usuário).
+- **Structured logs**: os logs da API, pesquisáveis; os erros do navegador aparecem como `Erro no navegador`.
+- **Metrics**: tempo e quantidade de requisições (`http.server.request.duration`), memória, CPU e banco.
+
+O painel guarda tudo só na memória (some ao reiniciar) e roda sem autenticação, por isso escuta apenas em `127.0.0.1`: é só para desenvolvimento. Para desligar, coloque `OTEL_EXPORTER_OTLP_ENDPOINT=` (vazio) no `.env`. Uma API rodando com `dotnet run` também aparece nele se você definir `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:18889`. Em produção vem desligado; veja a seção 7 de [deploy/CLOUDFLARE-VM.md](deploy/CLOUDFLARE-VM.md).
+
 Outros comandos úteis: `.\docker-local.ps1 status`, `logs` e `stop`. Para conhecer a apresentação ponta a ponta e os dados de demonstração, consulte [docs/MVP-DEMO.md](docs/MVP-DEMO.md).
 
 ## Desenvolver e validar

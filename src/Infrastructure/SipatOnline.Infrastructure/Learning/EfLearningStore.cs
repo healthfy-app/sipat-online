@@ -211,43 +211,43 @@ public sealed class EfLearningStore(
     public async Task<IReadOnlyList<LearningTrackCard>> ListAssignedTracksAsync(
         TenantId tenantId,
         Guid participantId,
+        CancellationToken cancellationToken) =>
+        (await LoadAssignedExperiencesAsync(tenantId, participantId, null, cancellationToken))
+            .Select(experience => experience.Track)
+            .ToArray();
+
+    public Task<IReadOnlyList<LearningExperience>> ListAssignedExperiencesAsync(
+        TenantId tenantId,
+        Guid participantId,
+        CancellationToken cancellationToken) =>
+        LoadAssignedExperiencesAsync(tenantId, participantId, null, cancellationToken);
+
+    public Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
+        TenantId tenantId,
+        CancellationToken cancellationToken) =>
+        ListParticipantProgressAsync(tenantId, null, cancellationToken);
+
+    public Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
+        TenantId tenantId,
+        Guid participantId,
+        CancellationToken cancellationToken) =>
+        ListParticipantProgressAsync(tenantId, (Guid?)participantId, cancellationToken);
+
+    private async Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
+        TenantId tenantId,
+        Guid? onlyParticipantId,
         CancellationToken cancellationToken)
     {
-        var trackIds = await dbContext.LearningAssignments.AsNoTracking()
+        var assignmentQuery = dbContext.LearningAssignments.AsNoTracking()
             .Where(assignment =>
                 assignment.TenantId == tenantId.Value &&
-                assignment.ParticipantId == participantId &&
-                assignment.RevokedAt == null)
-            .OrderByDescending(assignment => assignment.AssignedAt)
-            .Select(assignment => assignment.TrackId)
-            .ToListAsync(cancellationToken);
-
-        var cards = new List<LearningTrackCard>(trackIds.Count);
-        foreach (var trackId in trackIds)
+                assignment.RevokedAt == null);
+        if (onlyParticipantId is Guid only)
         {
-            var experience = await GetAssignedExperienceAsync(
-                tenantId,
-                participantId,
-                trackId,
-                cancellationToken);
-            if (experience is not null)
-            {
-                cards.Add(experience.Track);
-            }
+            assignmentQuery = assignmentQuery.Where(assignment => assignment.ParticipantId == only);
         }
 
-        return cards;
-    }
-
-    public async Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
-        TenantId tenantId,
-        CancellationToken cancellationToken)
-    {
-        var assignments = await dbContext.LearningAssignments.AsNoTracking()
-            .Where(assignment =>
-                assignment.TenantId == tenantId.Value &&
-                assignment.RevokedAt == null)
-            .ToListAsync(cancellationToken);
+        var assignments = await assignmentQuery.ToListAsync(cancellationToken);
         if (assignments.Count == 0)
         {
             return [];
@@ -255,8 +255,10 @@ public sealed class EfLearningStore(
 
         var participantIds = assignments.Select(assignment => assignment.ParticipantId).Distinct().ToArray();
         var trackIds = assignments.Select(assignment => assignment.TrackId).Distinct().ToArray();
+        // only the two columns the rows show, not the whole account (hash, stamps)
         var users = await dbContext.Users.AsNoTracking()
             .Where(user => user.TenantId == tenantId.Value && participantIds.Contains(user.Id))
+            .Select(user => new { user.Id, user.EmployeeIdentifier, user.DisplayName })
             .ToDictionaryAsync(user => user.Id, cancellationToken);
         var tracks = await dbContext.LearningTracks.AsNoTracking()
             .Where(track => track.TenantId == tenantId.Value && trackIds.Contains(track.Id))
@@ -294,9 +296,14 @@ public sealed class EfLearningStore(
 
         var lessonsByRevision = lessons.GroupBy(lesson => lesson.RevisionId)
             .ToDictionary(group => group.Key, group => group.ToArray());
-        var progressByParticipantAndRevision = progress
+        var progressGroups = progress
             .GroupBy(item => (item.ParticipantId, item.RevisionId))
+            .ToArray();
+        var progressByParticipantAndRevision = progressGroups
             .ToDictionary(group => group.Key, group => group.Select(ToDomain).ToArray());
+        // once per participant and revision, instead of scanning every progress row for each assignment
+        var lastAccessByParticipantAndRevision = progressGroups
+            .ToDictionary(group => group.Key, group => group.Max(item => item.LastAccessedAt));
         var rows = new List<LearningParticipantProgress>(assignments.Count);
 
         foreach (var assignment in assignments)
@@ -333,7 +340,9 @@ public sealed class EfLearningStore(
                 completedLessonCount == revisionLessons.Length,
                 watchedDuration,
                 completedLessonCount == revisionLessons.Length ? participantProgress.Max(item => item.CompletedAt) : null,
-                participantProgress.Length == 0 ? null : LastAccess(progress, assignment.ParticipantId, revisionId)));
+                participantProgress.Length == 0
+                    ? null
+                    : lastAccessByParticipantAndRevision[(assignment.ParticipantId, revisionId)]));
         }
 
         return rows
@@ -342,110 +351,162 @@ public sealed class EfLearningStore(
             .ToArray();
     }
 
-    private static DateTimeOffset? LastAccess(
-        IEnumerable<LearningProgressEntity> progress, Guid participantId, Guid revisionId) =>
-        progress.Where(item => item.ParticipantId == participantId && item.RevisionId == revisionId)
-            .Select(item => (DateTimeOffset?)item.LastAccessedAt).Max();
-
     public async Task<LearningExperience?> GetAssignedExperienceAsync(
         TenantId tenantId,
         Guid participantId,
         Guid trackId,
+        CancellationToken cancellationToken) =>
+        (await LoadAssignedExperiencesAsync(tenantId, participantId, trackId, cancellationToken))
+            .FirstOrDefault();
+
+    /// <summary>
+    /// The tracks assigned to the participant (all of them, or only <paramref name="onlyTrackId"/>),
+    /// newest assignment first. A fixed number of queries however many Days the SIPAT has.
+    /// </summary>
+    private async Task<IReadOnlyList<LearningExperience>> LoadAssignedExperiencesAsync(
+        TenantId tenantId,
+        Guid participantId,
+        Guid? onlyTrackId,
         CancellationToken cancellationToken)
     {
-        var isAssigned = await IsAssignedAsync(tenantId, participantId, trackId, cancellationToken);
-        if (!isAssigned)
+        var tenant = tenantId.Value;
+        var assignments = dbContext.LearningAssignments.AsNoTracking()
+            .Where(assignment =>
+                assignment.TenantId == tenant &&
+                assignment.ParticipantId == participantId &&
+                assignment.RevokedAt == null);
+        if (onlyTrackId is Guid only)
         {
-            return null;
+            assignments = assignments.Where(assignment => assignment.TrackId == only);
         }
 
-        var trackEntity = await dbContext.LearningTracks.AsNoTracking().SingleOrDefaultAsync(
-            track => track.TenantId == tenantId.Value && track.Id == trackId,
-            cancellationToken);
-        if (trackEntity?.CurrentRevisionId is null)
-        {
-            return null;
-        }
-
-        var revision = await dbContext.LearningTrackRevisions.AsNoTracking().SingleOrDefaultAsync(
-            item =>
-                item.TenantId == tenantId.Value &&
-                item.TrackId == trackId &&
-                item.Id == trackEntity.CurrentRevisionId &&
-                item.Status == nameof(LearningTrackRevisionStatus.Published),
-            cancellationToken);
-        if (revision is null)
-        {
-            return null;
-        }
-
-        var lessonEntities = await dbContext.LearningLessons.AsNoTracking()
-            .Where(lesson => lesson.TenantId == tenantId.Value && lesson.RevisionId == revision.Id)
-            .OrderBy(lesson => lesson.Position)
+        var trackIds = await assignments
+            .OrderByDescending(assignment => assignment.AssignedAt)
+            .Select(assignment => assignment.TrackId)
             .ToListAsync(cancellationToken);
-        var progressEntities = await dbContext.LearningProgress.AsNoTracking()
-            .Where(progress =>
-                progress.TenantId == tenantId.Value &&
-                progress.ParticipantId == participantId &&
-                progress.RevisionId == revision.Id)
-            .ToDictionaryAsync(progress => progress.LessonId, cancellationToken);
-
-        var lessons = lessonEntities.Select(entity =>
+        if (trackIds.Count == 0)
         {
-            progressEntities.TryGetValue(entity.Id, out var progress);
-            var domainProgress = progress is null ? null : ToDomain(progress);
-            var external = LessonReference.TryParseExternal(entity.ProviderAssetReference, out var provider, out var externalId);
-            return new LearningLessonProgress(
-                entity.Id,
-                entity.Title,
-                entity.Description,
-                entity.Position,
-                entity.DurationMilliseconds,
-                domainProgress?.LastPlaybackPositionMilliseconds ?? 0,
-                domainProgress?.WatchedPercentage ?? 0,
-                domainProgress?.IsCompleted ?? false,
-                domainProgress?.CompletedAt,
-                entity.SectionTitle,
-                domainProgress?.WatchedMilliseconds ?? 0,
-                entity.IsBonus,
-                external ? provider.ToString() : null,
-                external ? externalId : null);
-        }).ToArray();
+            return [];
+        }
 
-        // extras are listed in their place but never counted
-        var counted = lessons.Where(lesson => !lesson.IsBonus).ToArray();
-        var totalDuration = counted.Sum(lesson => lesson.DurationMilliseconds);
-        var watchedDuration = counted.Sum(lesson => lesson.WatchedMilliseconds);
-        var completed = counted.Count(lesson => lesson.IsCompleted);
-        var hasCover = await dbContext.LearningContentSnapshots.AsNoTracking().AnyAsync(
-            item => item.TenantId == tenantId.Value && item.RevisionId == revision.Id && item.CoverData != null, cancellationToken);
-        var sipat = await dbContext.SipatEvents.AsNoTracking()
-            .Where(item => item.Id == trackEntity.SipatEventId && item.TenantId == tenantId.Value)
-            .Select(item => new { item.Title, item.StartsAt, item.EndsAt, item.Status })
-            .SingleOrDefaultAsync(cancellationToken);
-        var card = new LearningTrackCard(
-            trackEntity.Id,
-            trackEntity.SipatEventId,
-            trackEntity.Title,
-            trackEntity.Description,
-            revision.RevisionNumber,
-            counted.Length,
-            completed,
-            counted.Length > 0 && completed == counted.Length
-                ? 100
-                : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
-            hasCover ? $"/api/learning/tracks/{trackId:D}/cover" : null,
-            trackEntity.DayTitle,
-            trackEntity.DayPosition,
-            trackEntity.CoursePosition,
-            trackEntity.DayDate,
-            totalDuration,
-            sipat?.Title,
-            sipat?.StartsAt,
-            sipat?.Status.ToString(),
-            sipat?.EndsAt);
+        var distinctTrackIds = trackIds.Distinct().ToArray();
+        var tracks = await dbContext.LearningTracks.AsNoTracking()
+            .Where(track => track.TenantId == tenant && distinctTrackIds.Contains(track.Id))
+            .ToDictionaryAsync(track => track.Id, cancellationToken);
+        var currentRevisionIds = tracks.Values
+            .Where(track => track.CurrentRevisionId is not null)
+            .Select(track => track.CurrentRevisionId!.Value)
+            .Distinct()
+            .ToArray();
+        if (currentRevisionIds.Length == 0)
+        {
+            return [];
+        }
 
-        return new LearningExperience(card, lessons);
+        var revisions = await dbContext.LearningTrackRevisions.AsNoTracking()
+            .Where(revision =>
+                revision.TenantId == tenant &&
+                currentRevisionIds.Contains(revision.Id) &&
+                revision.Status == nameof(LearningTrackRevisionStatus.Published))
+            .ToDictionaryAsync(revision => revision.Id, cancellationToken);
+        if (revisions.Count == 0)
+        {
+            return [];
+        }
+
+        var revisionIds = revisions.Keys.ToArray();
+        var lessonsByRevision = (await dbContext.LearningLessons.AsNoTracking()
+                .Where(lesson => lesson.TenantId == tenant && revisionIds.Contains(lesson.RevisionId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(lesson => lesson.RevisionId)
+            .ToDictionary(group => group.Key, group => group.OrderBy(lesson => lesson.Position).ToArray());
+        var progressByRevision = (await dbContext.LearningProgress.AsNoTracking()
+                .Where(progress =>
+                    progress.TenantId == tenant &&
+                    progress.ParticipantId == participantId &&
+                    revisionIds.Contains(progress.RevisionId))
+                .ToListAsync(cancellationToken))
+            .GroupBy(progress => progress.RevisionId)
+            .ToDictionary(group => group.Key, group => group.ToDictionary(progress => progress.LessonId));
+        var revisionsWithCover = (await dbContext.LearningContentSnapshots.AsNoTracking()
+                .Where(item => item.TenantId == tenant && revisionIds.Contains(item.RevisionId) && item.CoverData != null)
+                .Select(item => item.RevisionId)
+                .Distinct()
+                .ToListAsync(cancellationToken))
+            .ToHashSet();
+        var sipatIds = tracks.Values.Select(track => track.SipatEventId).Distinct().ToArray();
+        var sipats = await dbContext.SipatEvents.AsNoTracking()
+            .Where(item => item.TenantId == tenant && sipatIds.Contains(item.Id))
+            .Select(item => new { item.Id, item.Title, item.StartsAt, item.EndsAt, item.Status })
+            .ToDictionaryAsync(item => item.Id, cancellationToken);
+
+        var experiences = new List<LearningExperience>(trackIds.Count);
+        foreach (var trackId in trackIds)
+        {
+            if (!tracks.TryGetValue(trackId, out var trackEntity) ||
+                trackEntity.CurrentRevisionId is not Guid revisionId ||
+                !revisions.TryGetValue(revisionId, out var revision) ||
+                revision.TrackId != trackId)
+            {
+                continue;
+            }
+
+            var lessonEntities = lessonsByRevision.GetValueOrDefault(revisionId) ?? [];
+            var progressEntities = progressByRevision.GetValueOrDefault(revisionId) ??
+                new Dictionary<Guid, LearningProgressEntity>();
+            var lessons = lessonEntities.Select(entity =>
+            {
+                progressEntities.TryGetValue(entity.Id, out var progress);
+                var domainProgress = progress is null ? null : ToDomain(progress);
+                var external = LessonReference.TryParseExternal(entity.ProviderAssetReference, out var provider, out var externalId);
+                return new LearningLessonProgress(
+                    entity.Id,
+                    entity.Title,
+                    entity.Description,
+                    entity.Position,
+                    entity.DurationMilliseconds,
+                    domainProgress?.LastPlaybackPositionMilliseconds ?? 0,
+                    domainProgress?.WatchedPercentage ?? 0,
+                    domainProgress?.IsCompleted ?? false,
+                    domainProgress?.CompletedAt,
+                    entity.SectionTitle,
+                    domainProgress?.WatchedMilliseconds ?? 0,
+                    entity.IsBonus,
+                    external ? provider.ToString() : null,
+                    external ? externalId : null);
+            }).ToArray();
+
+            // extras are listed in their place but never counted
+            var counted = lessons.Where(lesson => !lesson.IsBonus).ToArray();
+            var totalDuration = counted.Sum(lesson => lesson.DurationMilliseconds);
+            var watchedDuration = counted.Sum(lesson => lesson.WatchedMilliseconds);
+            var completed = counted.Count(lesson => lesson.IsCompleted);
+            var hasSipat = sipats.TryGetValue(trackEntity.SipatEventId, out var sipat);
+            var card = new LearningTrackCard(
+                trackEntity.Id,
+                trackEntity.SipatEventId,
+                trackEntity.Title,
+                trackEntity.Description,
+                revision.RevisionNumber,
+                counted.Length,
+                completed,
+                counted.Length > 0 && completed == counted.Length
+                    ? 100
+                    : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
+                revisionsWithCover.Contains(revisionId) ? $"/api/learning/tracks/{trackId:D}/cover" : null,
+                trackEntity.DayTitle,
+                trackEntity.DayPosition,
+                trackEntity.CoursePosition,
+                trackEntity.DayDate,
+                totalDuration,
+                hasSipat ? sipat!.Title : null,
+                hasSipat ? sipat!.StartsAt : null,
+                hasSipat ? sipat!.Status.ToString() : null,
+                hasSipat ? sipat!.EndsAt : null);
+            experiences.Add(new LearningExperience(card, lessons));
+        }
+
+        return experiences;
     }
 
     public async Task<LearningLessonContext?> FindAssignedLessonAsync(
@@ -455,26 +516,22 @@ public sealed class EfLearningStore(
         Guid lessonId,
         CancellationToken cancellationToken)
     {
-        if (!await IsAssignedAsync(tenantId, participantId, trackId, cancellationToken))
-        {
-            return null;
-        }
-
-        var track = await dbContext.LearningTracks.AsNoTracking().SingleOrDefaultAsync(
-            item => item.TenantId == tenantId.Value && item.Id == trackId,
-            cancellationToken);
-        if (track?.CurrentRevisionId is null)
-        {
-            return null;
-        }
-
-        var lesson = await dbContext.LearningLessons.AsNoTracking().SingleOrDefaultAsync(
-            item =>
-                item.TenantId == tenantId.Value &&
-                item.TrackId == trackId &&
-                item.RevisionId == track.CurrentRevisionId &&
-                item.Id == lessonId,
-            cancellationToken);
+        // assignment, Day and lesson in one query: this runs on every save while a video plays
+        var tenant = tenantId.Value;
+        var lesson = await (
+                from assignment in dbContext.LearningAssignments.AsNoTracking()
+                join track in dbContext.LearningTracks.AsNoTracking() on assignment.TrackId equals track.Id
+                join item in dbContext.LearningLessons.AsNoTracking() on track.CurrentRevisionId equals (Guid?)item.RevisionId
+                where assignment.TenantId == tenant &&
+                      assignment.ParticipantId == participantId &&
+                      assignment.TrackId == trackId &&
+                      assignment.RevokedAt == null &&
+                      track.TenantId == tenant &&
+                      item.TenantId == tenant &&
+                      item.TrackId == trackId &&
+                      item.Id == lessonId
+                select new { item.RevisionId, item.Id, item.ProviderAssetReference, item.DurationMilliseconds, item.IsBonus })
+            .FirstOrDefaultAsync(cancellationToken);
         return lesson is null
             ? null
             : new LearningLessonContext(
@@ -501,26 +558,40 @@ public sealed class EfLearningStore(
         return entity is null ? null : ToDomain(entity);
     }
 
-    public Task AddProgressAsync(LearningProgress progress, CancellationToken cancellationToken)
+    public async Task<bool> TryAddProgressAsync(LearningProgress progress, CancellationToken cancellationToken)
     {
-        dbContext.LearningProgress.Add(ToEntity(progress));
-        return Task.CompletedTask;
+        var entity = ToEntity(progress);
+        // ON CONFLICT waits for a concurrent insert of the same lesson to finish, then skips
+        var inserted = await dbContext.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO learning."LearningProgress" ("Id", "TenantId", "ParticipantId", "TrackId", "RevisionId", "LessonId",
+                "DurationMilliseconds", "CompletionThresholdPercent", "LastPlaybackPositionMilliseconds", "WatchedRangesJson",
+                "FirstStartedAt", "LastAccessedAt", "CompletedAt")
+            VALUES ({entity.Id}, {entity.TenantId}, {entity.ParticipantId}, {entity.TrackId}, {entity.RevisionId}, {entity.LessonId},
+                {entity.DurationMilliseconds}, {entity.CompletionThresholdPercent}, {entity.LastPlaybackPositionMilliseconds},
+                {entity.WatchedRangesJson}, {entity.FirstStartedAt}, {entity.LastAccessedAt}, {entity.CompletedAt})
+            ON CONFLICT ("TenantId", "ParticipantId", "LessonId") DO NOTHING
+            """, cancellationToken);
+        return inserted == 1;
     }
 
-    public async Task SaveProgressAsync(LearningProgress progress, CancellationToken cancellationToken)
+    public Task SaveProgressAsync(LearningProgress progress, CancellationToken cancellationToken)
     {
-        var entity = await dbContext.LearningProgress.SingleOrDefaultAsync(
-            item =>
-                item.TenantId == progress.TenantId.Value &&
-                item.ParticipantId == progress.ParticipantId &&
-                item.LessonId == progress.LessonId,
-            cancellationToken);
+        // The caller has just read this row (FindProgressAsync): update it by its key without
+        // reading it again. Zero rows updated fails the save, as the old "not found" did.
+        var entity = dbContext.LearningProgress.Local.FirstOrDefault(item => item.Id == progress.Id);
         if (entity is null)
         {
-            throw new InvalidOperationException($"Learning progress {progress.Id:D} was not found.");
+            entity = new LearningProgressEntity { Id = progress.Id };
+            dbContext.LearningProgress.Attach(entity);
         }
 
         CopyProgress(progress, entity);
+        var entry = dbContext.Entry(entity);
+        entry.Property(item => item.LastPlaybackPositionMilliseconds).IsModified = true;
+        entry.Property(item => item.WatchedRangesJson).IsModified = true;
+        entry.Property(item => item.LastAccessedAt).IsModified = true;
+        entry.Property(item => item.CompletedAt).IsModified = true;
+        return Task.CompletedTask;
     }
 
     private async Task<LearningTrackRevision> ToDomainAsync(

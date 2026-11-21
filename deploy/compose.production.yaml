@@ -34,6 +34,12 @@ x-api-environment: &api-environment
   SipatOnline__BootstrapAdmin__LoginIdentifier: ${BOOTSTRAP_ADMIN_LOGIN_IDENTIFIER:-}
   SipatOnline__BootstrapAdmin__DisplayName: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-}
   SipatOnline__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+  # observabilidade (traces, metricas e logs por OTLP): desligada enquanto o endpoint estiver vazio.
+  # Para o Grafana Cloud (camada gratis), veja deploy/CLOUDFLARE-VM.md, secao 7.
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
+  OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+  OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-sipat-online-api}
 
 services:
   postgres:

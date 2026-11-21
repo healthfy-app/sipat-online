@@ -34,8 +34,12 @@ public sealed class ApiAntiforgeryMiddleware(RequestDelegate next)
         await next(context);
     }
 
+    /// <summary>The browser's error reports: anonymous, log-only and rate-limited, sent even when there is no session.</summary>
+    private static readonly PathString ClientErrorsPath = "/api/client-errors";
+
     private static bool RequiresToken(HttpRequest request) =>
         request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase) &&
+        !request.Path.Equals(ClientErrorsPath, StringComparison.OrdinalIgnoreCase) &&
         !(HttpMethods.IsGet(request.Method) || HttpMethods.IsHead(request.Method) ||
           HttpMethods.IsOptions(request.Method) || HttpMethods.IsTrace(request.Method));
 }

@@ -17,7 +17,8 @@ public static class TenantAppearanceEndpoints
         endpoints.MapGet("/api/tenant/logo/{key}", async (
             string key, ITenantContext tenant, PlatformDbContext db, HttpContext context, CancellationToken token) =>
         {
-            var company = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Key == key && item.IsActive, token);
+            var company = await db.Tenants.AsNoTracking().Where(item => item.Key == key && item.IsActive)
+                .Select(item => new { item.Id, item.PortalLogoData }).SingleOrDefaultAsync(token);
             if (company?.PortalLogoData is null ||
                 (tenant.CurrentTenantId is { } current && current.Value != company.Id)) return Results.NotFound();
             context.Response.Headers.CacheControl = "no-cache";
@@ -28,7 +29,8 @@ public static class TenantAppearanceEndpoints
         endpoints.MapGet("/api/tenant/banner/{key}", async (
             string key, ITenantContext tenant, PlatformDbContext db, HttpContext context, CancellationToken token) =>
         {
-            var company = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Key == key && item.IsActive, token);
+            var company = await db.Tenants.AsNoTracking().Where(item => item.Key == key && item.IsActive)
+                .Select(item => new { item.Id, item.PortalBannerData, item.PortalBannerContentType }).SingleOrDefaultAsync(token);
             if (company?.PortalBannerData is null ||
                 (tenant.CurrentTenantId is { } current && current.Value != company.Id)) return Results.NotFound();
             context.Response.Headers.CacheControl = "public, max-age=3600";

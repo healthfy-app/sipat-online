@@ -101,7 +101,8 @@ public static class LearningEngagementEndpoints
         {
             var access = await service.GetAsync(companyId, token);
             if (!access.IsSuccess) return Problem(access.Error);
-            var company = await db.Tenants.AsNoTracking().SingleAsync(item => item.Id == companyId, token);
+            var company = await db.Tenants.AsNoTracking().Where(item => item.Id == companyId)
+                .Select(item => new { item.CertificateLogoData }).SingleAsync(token);
             return company.CertificateLogoData is null ? Results.NotFound() :
                 Results.File(company.CertificateLogoData, "image/png");
         });

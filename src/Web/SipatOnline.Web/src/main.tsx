@@ -7,6 +7,9 @@ import './LoginPage.css';
 import './AdminDesign.css';
 import './ui/tailwind.css';
 import './Shell.css';
+import { installErrorReporting } from './telemetry';
+
+installErrorReporting();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
