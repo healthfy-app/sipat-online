@@ -1,0 +1,75 @@
+name: Deploy Cloudflare
+
+# main -> ambiente dev; tag v* -> ambiente prod. A VM continua em deploy-production.yml (nao muda).
+# Runbook: deploy/CLOUDFLARE-CONTAINERS.md
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Verify
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy (${{ startsWith(github.ref, 'refs/tags/') && 'prod' || 'dev' }})
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    environment: ${{ startsWith(github.ref, 'refs/tags/') && 'prod' || 'dev' }}
+    concurrency:
+      group: cloudflare-${{ startsWith(github.ref, 'refs/tags/') && 'prod' || 'dev' }}
+      cancel-in-progress: false
+    env:
+      DEPLOY_ENV: ${{ startsWith(github.ref, 'refs/tags/') && 'prod' || 'dev' }}
+      # Secrets of the GitHub environment (dev or prod) and repository
+      DATABASE_CONNECTION_STRING: ${{ secrets.DATABASE_CONNECTION_STRING }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      # Variables of the GitHub environment; must match "vars" of the same env in deploy/cloudflare/wrangler.jsonc
+      TENANT_BASE_DOMAIN: ${{ vars.TENANT_BASE_DOMAIN }}
+      PLATFORM_HOST: ${{ vars.PLATFORM_HOST }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build web
+        working-directory: src/Web
+        run: |
+          npm ci
+          npm run build
+
+      - name: Add edge security headers to the web build
+        run: cp deploy/cloudflare/_headers src/Web/SipatOnline.Web/dist/_headers
+
+      - name: Build API image
+        run: docker build -t sipat-online-api:ci .
+
+      # Migrations run here, before the new Worker goes live; the containers never migrate at startup.
+      - name: Migrate the database
+        run: |
+          docker run --rm \
+            -e ConnectionStrings__SipatOnline="$DATABASE_CONNECTION_STRING" \
+            -e SipatOnline__Tenant__BaseDomain="$TENANT_BASE_DOMAIN" \
+            -e SipatOnline__Tenant__PlatformHost="$PLATFORM_HOST" \
+            -e SipatOnline__ForwardedHeaders__KnownNetworks__0=0.0.0.0/0 \
+            -e ASPNETCORE_ENVIRONMENT=Production \
+            sipat-online-api:ci --initialize-database
+
+      - name: Install Worker dependencies
+        working-directory: deploy/cloudflare
+        run: npm ci
+
+      - name: Deploy Worker and containers
+        working-directory: deploy/cloudflare
+        run: npx wrangler deploy --env "$DEPLOY_ENV"

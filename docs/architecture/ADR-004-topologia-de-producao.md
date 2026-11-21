@@ -81,9 +81,9 @@ Antes do go-live (na VM):
 3. [ ] Teste de carga curto: 200 sessões salvando a cada 10 s contra a VM real, medindo p95.
 
 Para o Containers (dezembro):
-4. [ ] Data Protection no banco (`PersistKeysToDbContext`).
-5. [ ] Envio do vídeo direto do navegador ao R2 (PUT pré-assinado), com a conversão lendo do R2.
-6. [ ] Fila de conversão segura para várias instâncias (`SELECT … FOR UPDATE SKIP LOCKED` com lease), ou um container separado só para a conversão.
-7. [ ] Rate limit fora da memória (regra de Rate Limiting/WAF da Cloudflare no login) ou por login no banco.
+4. [x] Data Protection no banco (`PersistKeysToDbContext`). Código pronto, falta ensaio em dev.
+5. [x] Envio do vídeo direto do navegador ao R2 (PUT pré-assinado), com a conversão lendo do R2. Código pronto, falta ensaio em dev.
+6. [x] Fila de conversão segura para várias instâncias (`SELECT … FOR UPDATE SKIP LOCKED` com lease), ou um container separado só para a conversão. Código pronto, falta ensaio em dev.
+7. [x] Rate limit fora da memória (regra de Rate Limiting/WAF da Cloudflare no login) ou por login no banco. Código pronto, falta ensaio em dev.
 8. [ ] Escolher o Postgres gerenciado (região São Paulo, se houver) e medir a latência a partir do container.
-9. [ ] Worker + `wrangler.toml` + CI de deploy; ensaio completo em `dev` com o bucket `sipat-videos-dev`.
+9. [x] Worker + `wrangler.jsonc` + CI de deploy; ensaio completo em `dev` com o bucket `sipat-videos-dev`. Código pronto, falta ensaio em dev.
