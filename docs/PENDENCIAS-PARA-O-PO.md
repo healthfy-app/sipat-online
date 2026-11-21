@@ -14,7 +14,7 @@ Documento de apoio para a conversa de produto. Resume o que está pronto, como m
 - **Planos Bronze, Prata, Ouro e Diamante** escolhidos pelo operador, com matriz de assuntos liberados por plano. A empresa não vê o nome do plano.
 - **Biblioteca** (operador): assuntos, vídeos, jogos e perguntas, planos; **categorias** cadastráveis (Alimentação, Segurança no trabalho, Postura, Saúde mental) no lugar de "Opção 1/2/3"; busca e filtros que se mantêm ao trocar de aba.
 - **Colaboradores:** administrador edita nome, matrícula, senha e acesso numa tela só.
-- **Participante:** palco da semana (trilha dos dias, vídeos por dia, recolher/abrir dia), página do dia com player, cartão de dia concluído com o próximo dia, mensagens de incentivo por faixa de progresso.
+- **Participante:** resumo do progresso, vídeos agrupados por dia, página do dia com player, cartão de dia concluído com o próximo dia, mensagens de incentivo por faixa de progresso.
 - **Certificado por SIPAT**, ordenado do mais recente, com o período.
 - **Quem entra depois da publicação recebe os dias** (ao ser criado e ao atualizar a SIPAT).
 
@@ -22,7 +22,7 @@ Documento de apoio para a conversa de produto. Resume o que está pronto, como m
 
 1. **Operador:** abre a Biblioteca, mostra as categorias e um assunto; entra numa empresa; monta a SIPAT arrastando assuntos para os dias.
 2. **Administrador da empresa:** abre a mesma tela de SIPATs, confere os dias, publica; mostra cancelar e reativar.
-3. **Participante:** entra, vê a trilha, assiste a um vídeo, conclui o dia, vê o próximo dia e o certificado.
+3. **Participante:** entra, escolhe um vídeo, conclui o dia e consulta o próximo dia e o certificado.
 
 ## 3. Decisões que dependem do P.O.
 

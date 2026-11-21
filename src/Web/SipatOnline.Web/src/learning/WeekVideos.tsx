@@ -18,12 +18,9 @@ export function formatDayDate(date: string | null | undefined): string | null {
 
 type LessonsByTrack = Record<string, LearningLessonProgress[] | 'error'>;
 
-/**
- * The videos of the SIPAT week, day by day, three to a row. With a day chosen on the trail only that day shows;
- * with none, the whole week does. Each video opens the day at that video.
- */
-export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: {
-  days: DayGroup[]; allTracks: LearningTrackCard[]; selectedKey: string | null; onShowAll: () => void;
+/** The videos of the SIPAT week, grouped by day. Each video opens the day at that video. */
+export default function WeekVideos({ days, allTracks }: {
+  days: DayGroup[]; allTracks: LearningTrackCard[];
 }) {
   const [lessons, setLessons] = useState<LessonsByTrack>({});
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
@@ -40,19 +37,14 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
     return () => { current = false; };
   }, [trackIds]);
 
-  const shown = selectedKey ? days.filter(day => day.key === selectedKey) : days;
-  const selected = selectedKey ? shown[0] : undefined;
-
   return <section aria-labelledby="week-videos-title" className="week-videos">
     <div className="week-videos-heading">
-      <h2 id="week-videos-title">{selected ? selected.title : 'Vídeos da semana'}</h2>
-      {selected
-        ? <button className="week-videos-all" onClick={onShowAll} type="button">Ver a semana toda</button>
-        : <p>Toque em um dia no caminho para ver só os vídeos dele.</p>}
+      <h2 id="week-videos-title">Vídeos da semana</h2>
+      <p>Vídeos e progresso organizados por dia.</p>
     </div>
 
     <div className="week-videos-days">
-      {shown.map((day, dayIndex) => {
+      {days.map((day, dayIndex) => {
         const total = day.tracks.reduce((sum, track) => sum + track.lessonCount, 0);
         const done = day.tracks.reduce((sum, track) => sum + track.completedLessonCount, 0);
         const date = formatDayDate(day.tracks[0]?.dayDate);

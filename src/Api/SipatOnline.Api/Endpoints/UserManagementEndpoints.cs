@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Antiforgery;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Identity.Application.Users;
 using SipatOnline.Identity.Domain.Users;
@@ -63,18 +62,11 @@ public static class UserManagementEndpoints
         group.MapPost("/", async (
             ProvisionUserRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             UserApplicationService userService,
             SipatOnline.Infrastructure.Learning.LearningDistributionService distribution,
             SipatOnline.BuildingBlocks.Application.ITenantContext tenantContext,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await userService.ProvisionAsync(request, cancellationToken);
             if (!result.IsSuccess)
             {
@@ -97,16 +89,9 @@ public static class UserManagementEndpoints
             Guid userId,
             ChangeDisplayNameRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             UserApplicationService userService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await userService.RenameAsync(
                 new UserId(userId),
                 request.DisplayName,
@@ -121,16 +106,9 @@ public static class UserManagementEndpoints
             Guid userId,
             ChangeUserStatusRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             UserApplicationService userService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await userService.ChangeActiveStatusAsync(
                 new UserId(userId),
                 request.IsActive,
@@ -145,16 +123,9 @@ public static class UserManagementEndpoints
             Guid userId,
             ChangeLoginRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatOnline.Infrastructure.Identity.EmployeeCredentialService credentials,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await credentials.ChangeLoginAsync(userId, request.LoginIdentifier, cancellationToken);
             return result.IsSuccess ? Results.Ok(new { loginIdentifier = result.Value }) : ToProblem(result.Error);
         })
@@ -164,16 +135,9 @@ public static class UserManagementEndpoints
             Guid userId,
             ResetPasswordRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatOnline.Infrastructure.Identity.EmployeeCredentialService credentials,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await credentials.ResetPasswordAsync(userId, request.NewPassword, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
         })
@@ -206,22 +170,6 @@ public static class UserManagementEndpoints
             extensions: new Dictionary<string, object?> { ["code"] = error.Code });
     }
 
-    private static async Task<IResult?> ValidateAntiforgeryAsync(
-        IAntiforgery antiforgery,
-        HttpContext context)
-    {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(context);
-            return null;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Token antifalsificação inválido.");
-        }
-    }
 }
 
 public sealed record ChangeDisplayNameRequest(string? DisplayName);

@@ -66,17 +66,21 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // per address only as a flood guard: a whole factory signs in through one NAT address (see LoginAttemptLimiter)
+    var perAddress = builder.Configuration.GetValue(
+        $"{LoginAttemptLimiter.SectionName}:PerAddressPerMinute", LoginAttemptLimiter.DefaultPerAddressPerMinute);
     options.AddPolicy("identity-auth", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                PermitLimit = perAddress,
                 Window = TimeSpan.FromMinutes(1),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0
             }));
 });
+builder.Services.AddSingleton<LoginAttemptLimiter>();
 builder.Services.AddSipatInfrastructure(builder.Configuration);
 
 var app = builder.Build();
@@ -161,7 +165,7 @@ app.UseAuthentication();
 app.UseMiddleware<PlatformCompanyContextMiddleware>();
 app.UseMiddleware<TenantAuthorizationMiddleware>();
 app.UseAuthorization();
-app.UseAntiforgery();
+app.UseMiddleware<ApiAntiforgeryMiddleware>();
 
 app.MapHealthChecks("/health");
 app.MapIdentityEndpoints();

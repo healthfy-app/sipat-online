@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Antiforgery;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Sipats.Application.Sipats;
 using SipatOnline.Sipats.Domain.Sipats;
@@ -51,16 +50,9 @@ public static class SipatEventEndpoints
         group.MapPost("/", async (
             SipatEventDataRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatEventApplicationService sipatEventService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await sipatEventService.CreateAsync(request, cancellationToken);
             return result.IsSuccess
                 ? Results.Created($"/api/admin/sipats/{result.Value.Id:D}", ToResponse(result.Value))
@@ -72,16 +64,9 @@ public static class SipatEventEndpoints
             Guid sipatEventId,
             SipatEventDataRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatEventApplicationService sipatEventService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await sipatEventService.UpdateAsync(sipatEventId, request, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(ToResponse(result.Value))
@@ -92,16 +77,9 @@ public static class SipatEventEndpoints
         group.MapPost("/{sipatEventId:guid}/publish", async (
             Guid sipatEventId,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatEventApplicationService sipatEventService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await sipatEventService.PublishAsync(sipatEventId, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(ToResponse(result.Value))
@@ -112,16 +90,9 @@ public static class SipatEventEndpoints
         group.MapPost("/{sipatEventId:guid}/cancel", async (
             Guid sipatEventId,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatEventApplicationService sipatEventService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await sipatEventService.CancelAsync(sipatEventId, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(ToResponse(result.Value))
@@ -132,16 +103,9 @@ public static class SipatEventEndpoints
         group.MapPost("/{sipatEventId:guid}/reactivate", async (
             Guid sipatEventId,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatEventApplicationService sipatEventService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await sipatEventService.ReactivateAsync(sipatEventId, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(ToResponse(result.Value))
@@ -180,22 +144,6 @@ public static class SipatEventEndpoints
             extensions: new Dictionary<string, object?> { ["code"] = error.Code });
     }
 
-    private static async Task<IResult?> ValidateAntiforgeryAsync(
-        IAntiforgery antiforgery,
-        HttpContext context)
-    {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(context);
-            return null;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Token antifalsificação inválido.");
-        }
-    }
 }
 
 public sealed record SipatEventResponse(

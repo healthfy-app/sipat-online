@@ -7,7 +7,7 @@ using SipatOnline.Tenancy.Domain.Tenants;
 
 namespace SipatOnline.Infrastructure.Tenancy;
 
-public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
+public sealed class EfTenantStore(PlatformDbContext dbContext, TenantHostCache hostCache) : ITenantStore
 {
     public async Task<Tenant?> FindAsync(TenantId tenantId, CancellationToken cancellationToken)
     {
@@ -49,6 +49,7 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            hostCache.Forget(entity.Key);
             return Result<Tenant>.Success(tenant);
         }
         catch (DbUpdateException exception) when (
@@ -123,5 +124,6 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
         entity.CustomDomain = tenant.Branding.CustomDomain;
         entity.IsActive = tenant.IsActive;
         await dbContext.SaveChangesAsync(cancellationToken);
+        hostCache.Forget(entity.Key);
     }
 }

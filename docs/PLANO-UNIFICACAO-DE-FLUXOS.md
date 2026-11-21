@@ -23,7 +23,7 @@ Este plano parte do que foi definido na conversa e do que o código tem hoje.
 |---|---|
 | **Operador** | Acervo (vídeos, temas, jogos). Empresas. Dentro de uma empresa: SIPATs, participantes, administradores, identidade. |
 | **Administrador da empresa** | As SIPATs da empresa (monta, duplica, publica), participantes e acompanhamento, identidade visual, certificados. |
-| **Participante** | A SIPAT vigente (caminho dos dias e vídeos da semana), histórico por ano e certificados por ano. |
+| **Participante** | A SIPAT vigente (vídeos organizados por dia), histórico por ano e certificados por ano. |
 
 ## 3. Mapa dos fluxos: o que fica, o que une, o que sai
 
@@ -37,7 +37,7 @@ Este plano parte do que foi definido na conversa e do que o código tem hoje.
 | Painel do cliente › Trilhas e vídeos (`/admin/content`) | **Sai.** O cliente não cria trilha; escolhe temas. |
 | Painel do cliente › Participantes e trilhas | **Fica**, falando em dias/vídeos. |
 | Painel do cliente › Identidade visual | **Fica.** |
-| Participante › Meus cursos (lista com busca e categorias) | **Muda** para a semana: caminho dos dias + vídeos por dia. |
+| Participante › Meus cursos (lista com busca e categorias) | **Muda** para a semana: vídeos agrupados por dia. |
 | Participante › Certificados | **Fica**, agrupados por ano. |
 
 ## 4. Modelo de dados e API (alvo)

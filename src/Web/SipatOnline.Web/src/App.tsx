@@ -397,8 +397,12 @@ function LoginPage({
       className="login-layout"
     >
       <div
-        className={`login-brand-panel${tenant.bannerReference ? ' has-banner' : ''}`}
-        style={tenant.bannerReference ? ({ '--login-banner': `url("${tenant.bannerReference}")` } as React.CSSProperties) : undefined}
+        className={`login-brand-panel${tenant.bannerReference || tenant.tenantKey === 'platform' ? ' has-banner' : ''}`}
+        style={
+          tenant.bannerReference || tenant.tenantKey === 'platform'
+            ? ({ '--login-banner': `url("${tenant.bannerReference || '/platform-login-banner.jpg'}")` } as React.CSSProperties)
+            : undefined
+        }
       >
         <TenantIdentity tenant={tenant} compact={false} />
         <div className="login-intro">
