@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.EntityFrameworkCore;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -11,8 +12,12 @@ namespace SipatOnline.Infrastructure;
 
 public sealed class PlatformDbContext(
     DbContextOptions<PlatformDbContext> options)
-    : IdentityDbContext<PlatformIdentityUser, IdentityRole<Guid>, Guid>(options)
+    : IdentityDbContext<PlatformIdentityUser, IdentityRole<Guid>, Guid>(options), IDataProtectionKeyContext
 {
+    public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
+
+    public DbSet<LoginAttemptWindowEntity> LoginAttemptWindows => Set<LoginAttemptWindowEntity>();
+
     public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
 
     public DbSet<AuditEntryEntity> AuditEntries => Set<AuditEntryEntity>();

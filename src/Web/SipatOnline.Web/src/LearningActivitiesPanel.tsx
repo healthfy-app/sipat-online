@@ -7,9 +7,11 @@ import type { GameOutcome } from '@/games/gameKit';
 import GameStage from '@/games/GameStage';
 import { createCheckpointWatcher, watchCheckpoints, type Checkpoint } from '@sipat/video-player';
 
-export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosition, playbackKey, videoRef, onActivities }: {
+export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosition, boundaryBefore, playbackKey, videoRef, onActivities }: {
   trackId: string; lessonId: string | null; playbackKey: string | undefined;
   lessonPosition: number;
+  /** Position of the house video before this one (0 if none): extras in between are skipped. Defaults to `lessonPosition - 1`. */
+  boundaryBefore?: number;
   videoRef: RefObject<HTMLVideoElement | null>;
   /** Lets the page draw the activities on the video timeline. */
   onActivities?: (activities: LearningActivity[]) => void;
@@ -77,7 +79,7 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
         item.timeMilliseconds === null && item.afterVideoCount === count);
       if (due) { boundary.current = count; open(due, shouldResume); }
     };
-    const onPlaying = () => atBoundary(lessonPosition - 1, true);
+    const onPlaying = () => atBoundary(boundaryBefore ?? lessonPosition - 1, true);
     const onEnded = () => atBoundary(lessonPosition, false);
     // activities at a moment of this video; none is due while another one is open
     const checkpoints = (): Checkpoint[] => activeRef.current ? [] : activities
@@ -102,13 +104,15 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
       video.removeEventListener('playing', onPlaying);
       video.removeEventListener('ended', onEnded);
     };
-  }, [activities, lessonId, lessonPosition, active, playbackKey, videoRef]);
+  }, [activities, lessonId, lessonPosition, boundaryBefore, active, playbackKey, videoRef]);
 
   async function close(outcome: GameOutcome = 'skipped') {
     if (!active || busy) return;
     setBusy(true); setSaveError('');
     try {
-      await saveLearningActivityOutcome(trackId, active.id, outcome);
+      // only a checkpoint (a moment of one video) names its lesson, so the server can refuse a list that went stale
+      if (active.lessonId && active.timeMilliseconds !== null) await saveLearningActivityOutcome(trackId, active.id, outcome, active.lessonId);
+      else await saveLearningActivityOutcome(trackId, active.id, outcome);
       setActivities(items => items.map(item => item.id === active.id
         ? { ...item, outcome: item.outcome === 'completed' ? 'completed' : outcome } : item));
       const next = boundary.current === null ? undefined : activities.find(item => !item.outcome &&
@@ -123,6 +127,13 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
         catch { setNotice('Atividade registrada. Use Reproduzir para continuar o vídeo.'); }
       }
     } catch (failure) {
+      if ((failure as { code?: string } | null)?.code === 'learning.activity.stale') {
+        // the list changed under this page: drop the game, show what the server said and read the list again
+        boundary.current = null; activeRef.current = null; setActive(null);
+        setNotice(failure instanceof Error ? failure.message : 'A lista de atividades mudou. Atualize a página.');
+        setRetry(value => value + 1);
+        return;
+      }
       setSaveError(failure instanceof Error ? failure.message : 'Não foi possível registrar a atividade. Tente novamente.');
     } finally { setBusy(false); }
   }

@@ -1,0 +1,99 @@
+// Worker + Containers do SIPAT Online. Runbook: deploy/CLOUDFLARE-CONTAINERS.md
+// O nivel de cima e o que as duas envs compartilham; env.dev e env.prod repetem as chaves que o
+// wrangler nao herda (vars, routes, containers, durable_objects, assets, triggers).
+// Troque os dominios de exemplo (ops.dev.exemplo.com.br, exemplo.com.br) pelos reais antes do primeiro deploy.
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sipat-online",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-11-01",
+  "observability": { "enabled": true },
+
+  "assets": {
+    "directory": "../../src/Web/SipatOnline.Web/dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/health"]
+  },
+  "containers": [
+    { "class_name": "SipatApi", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 5 },
+    { "class_name": "SipatConverter", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-3", "max_instances": 1 }
+  ],
+  "durable_objects": {
+    "bindings": [
+      { "name": "SIPAT_API", "class_name": "SipatApi" },
+      { "name": "SIPAT_CONVERTER", "class_name": "SipatConverter" }
+    ]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SipatApi", "SipatConverter"] }],
+  "triggers": { "crons": ["0 * * * *"] },
+
+  "env": {
+    "dev": {
+      "name": "sipat-online-dev",
+      "observability": { "enabled": true },
+      "assets": {
+        "directory": "../../src/Web/SipatOnline.Web/dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*", "/health"]
+      },
+      "containers": [
+        { "class_name": "SipatApi", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 5 },
+        { "class_name": "SipatConverter", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-3", "max_instances": 1 }
+      ],
+      "durable_objects": {
+        "bindings": [
+          { "name": "SIPAT_API", "class_name": "SipatApi" },
+          { "name": "SIPAT_CONVERTER", "class_name": "SipatConverter" }
+        ]
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SipatApi", "SipatConverter"] }],
+      "triggers": { "crons": ["0 * * * *"] },
+      "routes": [
+        { "pattern": "ops.dev.exemplo.com.br/*", "zone_name": "exemplo.com.br" },
+        { "pattern": "*.dev.exemplo.com.br/*", "zone_name": "exemplo.com.br" }
+      ],
+      "vars": {
+        "TENANT_BASE_DOMAIN": "dev.exemplo.com.br",
+        "PLATFORM_HOST": "ops.dev.exemplo.com.br",
+        "R2_SERVICE_URL": "https://REPLACE_WITH_ACCOUNT_ID.r2.cloudflarestorage.com",
+        "R2_VIDEO_BUCKET": "sipat-videos-dev",
+        "API_INSTANCES": "2"
+      }
+    },
+    "prod": {
+      "name": "sipat-online-prod",
+      "observability": { "enabled": true },
+      "assets": {
+        "directory": "../../src/Web/SipatOnline.Web/dist",
+        "binding": "ASSETS",
+        "not_found_handling": "single-page-application",
+        "run_worker_first": ["/api/*", "/health"]
+      },
+      "containers": [
+        { "class_name": "SipatApi", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 5 },
+        { "class_name": "SipatConverter", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-3", "max_instances": 1 }
+      ],
+      "durable_objects": {
+        "bindings": [
+          { "name": "SIPAT_API", "class_name": "SipatApi" },
+          { "name": "SIPAT_CONVERTER", "class_name": "SipatConverter" }
+        ]
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["SipatApi", "SipatConverter"] }],
+      "triggers": { "crons": ["0 * * * *"] },
+      "routes": [
+        { "pattern": "ops.exemplo.com.br/*", "zone_name": "exemplo.com.br" },
+        { "pattern": "*.exemplo.com.br/*", "zone_name": "exemplo.com.br" }
+      ],
+      "vars": {
+        "TENANT_BASE_DOMAIN": "exemplo.com.br",
+        "PLATFORM_HOST": "ops.exemplo.com.br",
+        "R2_SERVICE_URL": "https://REPLACE_WITH_ACCOUNT_ID.r2.cloudflarestorage.com",
+        "R2_VIDEO_BUCKET": "sipat-videos",
+        "API_INSTANCES": "3"
+      }
+    }
+  }
+}

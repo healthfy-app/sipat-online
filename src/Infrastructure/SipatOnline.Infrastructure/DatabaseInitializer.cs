@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
@@ -22,11 +23,13 @@ public sealed class DatabaseInitializer(
     DevelopmentLearningSampleInitializer developmentLearningSampleInitializer,
     DevelopmentDemoPresentationInitializer developmentDemoPresentationInitializer,
     DevelopmentEngagementInitializer developmentEngagementInitializer,
+    IKeyManager dataProtectionKeys,
     TimeProvider timeProvider)
 {
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         await dbContext.Database.MigrateAsync(cancellationToken);
+        await DataProtectionSetup.EnsureKeyAsync(dbContext, dataProtectionKeys, timeProvider, cancellationToken);
         await SeedTenantAsync(cancellationToken);
         await SeedRolesAsync();
         await SeedBootstrapAdminAsync(cancellationToken);

@@ -1,10 +1,11 @@
 import { CirclePlus, Gamepad2, Puzzle } from 'lucide-react';
 import { Fragment, type Ref } from 'react';
-import type { PlatformCourse, PlatformCourseStatus } from '@/api';
+import { isExtra, type PlatformCourse, type PlatformCourseStatus } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { formatDuration, pluralize, statusLabels } from './courseFormat';
+import { durationLabel, extrasSuffix, formatDuration, houseVideos, pluralize, statusLabels } from './courseFormat';
+import ExtraBadge from './ExtraBadge';
 import { gameTypeLabel, type LessonGroup } from './courseTrack';
 import InlineText from './InlineText';
 
@@ -45,7 +46,8 @@ export default function CourseOutlinePanel({
   busy: boolean;
   actions: OutlineActions;
 }) {
-  const totalMilliseconds = course.videos.reduce((total, video) => total + video.durationMilliseconds, 0);
+  const house = houseVideos(course.videos);
+  const totalMilliseconds = house.reduce((total, video) => total + video.durationMilliseconds, 0);
   const activityCount = groups.reduce((total, group) => total + group.items.filter((item) => item.kind === 'activity').length, 0);
   const flatItems = groups.flatMap((group) => group.items);
   const flatVideoIds = groups.flatMap((group) => group.items.flatMap((item) => (item.kind === 'video' ? [item.video.id] : [])));
@@ -60,7 +62,7 @@ export default function CourseOutlinePanel({
           </h1>
           <div className="flex flex-wrap items-center gap-2 px-1.5 text-xs text-muted-foreground">
             <Badge variant={status === 'Published' ? 'default' : 'warning'}>{statusLabels[status]}</Badge>
-            <span>{pluralize(course.videos.length, 'vídeo', 'vídeos')}</span>
+            <span>{pluralize(house.length, 'vídeo', 'vídeos')}{extrasSuffix(course.videos.length - house.length)}</span>
           </div>
         </div>
       </header>
@@ -104,7 +106,7 @@ export default function CourseOutlinePanel({
                             {item.kind === 'video' ? item.videoIndex + 1 : <Puzzle className="size-3.5" />}
                           </span>
                           {item.kind === 'video' ? (
-                            <div className="min-w-0" onClick={() => actions.onSelect(item.key)} onFocus={() => actions.onSelect(item.key)} role="presentation">
+                            <div className={cn("min-w-0", isExtra(item.video) && "flex items-center gap-1.5")} onClick={() => actions.onSelect(item.key)} onFocus={() => actions.onSelect(item.key)} role="presentation">
                               <InlineText
                                 className={selected ? 'font-medium' : undefined}
                                 disabled={busy}
@@ -112,6 +114,7 @@ export default function CourseOutlinePanel({
                                 onCommit={(value) => actions.onRenameVideo(item.video.id, value)}
                                 value={item.title}
                               />
+                              {isExtra(item.video) && <ExtraBadge />}
                             </div>
                           ) : (
                             <button
@@ -132,7 +135,7 @@ export default function CourseOutlinePanel({
                                 selected && 'invisible',
                               )}
                             >
-                              {formatDuration(item.video.durationMilliseconds)}
+                              {durationLabel(item.video)}
                             </span>
                             <span
                               className={cn(

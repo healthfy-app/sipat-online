@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import GamePlayer from '@/games/LazyGamePlayer';
 import { cn } from '@/lib/utils';
+import { isExtra } from '@/api';
+import ExternalVideoPreview from '@/ExternalVideoPreview';
 import VideoPreview from '@/VideoPreview';
 import type { TrackItem } from './courseTrack';
 
@@ -64,7 +66,9 @@ export default function CoursePreviewCanvas({
           {item?.kind === 'video' && <>
             <h2 className="m-0 text-[1.375rem] font-medium leading-snug text-white [text-wrap:balance]">{item.video.title}</h2>
             <div className="[&_video]:max-h-[min(40rem,70dvh)] [&_video]:w-full [&_video]:rounded-md [&_video]:bg-black [&_.video-preview-error]:text-white">
-              <VideoPreview checkpoints={item.checkpoints} key={item.video.id} src={item.video.fileUrl} title={`Prévia de ${item.video.title}`} />
+              {isExtra(item.video)
+                ? <ExternalVideoPreview key={item.video.id} title={`Prévia de ${item.video.title}`} video={item.video} />
+                : <VideoPreview checkpoints={item.checkpoints} key={item.video.id} src={item.video.fileUrl} title={`Prévia de ${item.video.title}`} />}
             </div>
           </>}
           {item?.kind === 'activity' && (

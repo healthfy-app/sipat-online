@@ -62,7 +62,7 @@ public sealed class LearningTrackRevision
     {
         if (trackId == Guid.Empty || tenantId.IsEmpty)
         {
-            return Failure("learning.revision.owner_required", "A trilha e a empresa da revisão são obrigatórias.");
+            return Failure("learning.revision.owner_required", "A formação e a empresa da revisão são obrigatórias.");
         }
 
         if (revisionNumber < 1)
@@ -128,7 +128,8 @@ public sealed class LearningTrackRevision
         string? title,
         string? description,
         string? providerAssetReference,
-        long durationMilliseconds)
+        long durationMilliseconds,
+        bool isBonus = false)
     {
         if (Status != LearningTrackRevisionStatus.Draft)
         {
@@ -145,7 +146,8 @@ public sealed class LearningTrackRevision
             description,
             providerAssetReference,
             durationMilliseconds,
-            lessons.Count + 1);
+            lessons.Count + 1,
+            isBonus);
         if (!lesson.IsSuccess)
         {
             return lesson;
@@ -164,7 +166,7 @@ public sealed class LearningTrackRevision
 
         if (lessons.Count == 0)
         {
-            return Failure("learning.revision.empty", "Adicione ao menos um vídeo antes de publicar a trilha.");
+            return Failure("learning.revision.empty", "Adicione ao menos um vídeo antes de publicar a formação.");
         }
 
         if (publishedAt == default)

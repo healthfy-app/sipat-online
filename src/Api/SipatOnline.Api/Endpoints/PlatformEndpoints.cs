@@ -23,7 +23,7 @@ public static class PlatformEndpoints
             LoginAttemptLimiter limiter,
             CancellationToken cancellationToken) =>
         {
-            if (!limiter.TryAcquire(context, request.LoginIdentifier))
+            if (!await limiter.TryAcquireAsync(context, request.LoginIdentifier, cancellationToken))
             {
                 return LoginAttemptLimiter.TooManyAttempts();
             }

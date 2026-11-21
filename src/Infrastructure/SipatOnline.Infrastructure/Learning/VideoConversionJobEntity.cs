@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace SipatOnline.Infrastructure.Learning;
 
-/// <summary>One conversion of a library video to 720p and 480p, run by the single background worker.</summary>
+/// <summary>One conversion of a library video to 720p and 480p, run by whichever worker claims it.</summary>
 public sealed class VideoConversionJobEntity
 {
     public const string Pending = "Pending";
@@ -26,6 +26,12 @@ public sealed class VideoConversionJobEntity
     public DateTimeOffset? StartedAt { get; set; }
 
     public DateTimeOffset? FinishedAt { get; set; }
+
+    /// <summary>While "Running": the owner keeps pushing it forward; once it has passed, the job goes back to the queue.</summary>
+    public DateTimeOffset? LeaseUntil { get; set; }
+
+    /// <summary>The worker instance that owns the "Running" job (see <see cref="VideoConversionInstance"/>).</summary>
+    public string? LeasedBy { get; set; }
 }
 
 public sealed class VideoConversionJobEntityConfiguration : IEntityTypeConfiguration<VideoConversionJobEntity>
@@ -37,6 +43,8 @@ public sealed class VideoConversionJobEntityConfiguration : IEntityTypeConfigura
         builder.Property(job => job.Id).ValueGeneratedNever();
         builder.Property(job => job.Status).HasMaxLength(16).IsRequired();
         builder.Property(job => job.Error).HasMaxLength(2000);
+        builder.Property(job => job.LeasedBy).HasMaxLength(VideoConversionInstance.MaximumLength);
         builder.HasIndex(job => new { job.Status, job.CreatedAt });
+        builder.HasIndex(job => new { job.Status, job.LeaseUntil });
     }
 }

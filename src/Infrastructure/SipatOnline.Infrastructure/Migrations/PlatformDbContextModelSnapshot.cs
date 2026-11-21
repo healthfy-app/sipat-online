@@ -23,6 +23,25 @@ namespace SipatOnline.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Microsoft.AspNetCore.DataProtection.EntityFrameworkCore.DataProtectionKey", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("FriendlyName")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Xml")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("DataProtectionKeys", "identity");
+                });
+
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole<System.Guid>", b =>
                 {
                     b.Property<Guid>("Id")
@@ -191,6 +210,25 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasIndex("TenantId", "OccurredAt");
 
                     b.ToTable("AuditEntries", "audit");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.LoginAttemptWindowEntity", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("WindowStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Key", "WindowStart");
+
+                    b.HasIndex("WindowStart");
+
+                    b.ToTable("LoginAttemptWindows", "identity");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Identity.PlatformIdentityUser", b =>
@@ -446,6 +484,9 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<long>("DurationMilliseconds")
                         .HasColumnType("bigint");
 
+                    b.Property<bool>("IsBonus")
+                        .HasColumnType("boolean");
+
                     b.Property<int>("Position")
                         .HasColumnType("integer");
 
@@ -481,7 +522,7 @@ namespace SipatOnline.Infrastructure.Migrations
 
                     b.ToTable("LearningLessons", "learning", t =>
                         {
-                            t.HasCheckConstraint("CK_LearningLessons_Duration", "\"DurationMilliseconds\" > 0");
+                            t.HasCheckConstraint("CK_LearningLessons_Duration", "\"DurationMilliseconds\" > 0 OR (\"IsBonus\" AND \"DurationMilliseconds\" = 0)");
 
                             t.HasCheckConstraint("CK_LearningLessons_Position", "\"Position\" > 0");
                         });
@@ -799,14 +840,28 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<long>("DurationMilliseconds")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("ExternalId")
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
                     b.Property<bool>("HasSd480")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")
                         .HasDefaultValue(false);
 
+                    b.Property<Guid?>("OwnerTenantId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("ProcessingError")
                         .HasMaxLength(500)
                         .HasColumnType("character varying(500)");
+
+                    b.Property<string>("Provider")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasDefaultValue("Sipat");
 
                     b.Property<long>("SizeBytes")
                         .HasColumnType("bigint");
@@ -826,6 +881,10 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("CreatedAt");
+
+                    b.HasIndex("Provider", "ExternalId")
+                        .IsUnique()
+                        .HasFilter("\"ExternalId\" IS NOT NULL");
 
                     b.ToTable("PlatformCourseVideos", "learning");
                 });
@@ -1065,6 +1124,13 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LeasedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1079,6 +1145,8 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("Status", "LeaseUntil");
 
                     b.ToTable("VideoConversionJobs", "learning");
                 });

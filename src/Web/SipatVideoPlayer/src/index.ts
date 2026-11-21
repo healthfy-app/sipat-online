@@ -1,5 +1,9 @@
 export { default as SipatVideoPlayer } from './react/SipatVideoPlayer';
 export type { SipatVideoPlayerHandle, SipatVideoPlayerProps } from './react/SipatVideoPlayer';
+export { default as ExternalVideoPlayer } from './react/ExternalVideoPlayer';
+export type { ExternalVideoPlayerProps } from './react/ExternalVideoPlayer';
+export { default as ExternalVideoLink } from './react/ExternalVideoLink';
+export type { ExternalVideoLinkProps } from './react/ExternalVideoLink';
 export { texts as playerTexts } from './react/texts';
 export * from './core/quality';
 export * from './core/events';
@@ -9,3 +13,4 @@ export * from './core/saveSchedule';
 export * from './core/checkpoints';
 export * from './core/attach';
 export * from './core/sources';
+export * from './core/external';

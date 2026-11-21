@@ -166,7 +166,7 @@ public sealed class EfPlaybackQualityDashboardStore(PlatformDbContext dbContext)
             .Select(video => new { video.Id, video.Title })
             .ToDictionaryAsync(video => video.Id, video => video.Title, cancellationToken);
         var lessonTitles = await dbContext.LearningLessons.AsNoTracking()
-            .Where(lesson => keys.Contains(lesson.Id))
+            .Where(lesson => keys.Contains(lesson.Id) && !lesson.IsBonus)
             .Select(lesson => new { lesson.Id, lesson.Title })
             .ToListAsync(cancellationToken);
 

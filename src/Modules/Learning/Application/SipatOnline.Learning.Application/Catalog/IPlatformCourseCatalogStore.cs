@@ -10,6 +10,19 @@ public interface IPlatformCourseCatalogStore
 
     Task<PlatformCourseVideo?> FindVideoAsync(Guid videoId, CancellationToken cancellationToken);
 
+    Task<PlatformCourseVideo> AddExternalVideoAsync(
+        VideoProvider provider,
+        string externalId,
+        string title,
+        long durationMilliseconds,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken);
+
+    Task<PlatformCourseVideo?> FindExternalVideoAsync(
+        VideoProvider provider,
+        string externalId,
+        CancellationToken cancellationToken);
+
     Task<Result<bool>> AddCourseAsync(PlatformCourse course, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<PlatformLibraryVideo>> ListVideosAsync(CancellationToken cancellationToken);

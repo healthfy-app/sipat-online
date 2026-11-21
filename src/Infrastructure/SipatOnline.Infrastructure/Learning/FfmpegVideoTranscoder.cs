@@ -20,7 +20,17 @@ public sealed class VideoConversionOptions
 
     public TimeSpan Timeout { get; set; } = TimeSpan.FromHours(1);
 
+    /// <summary>
+    /// The worker switch: true runs the conversion worker in this process. Several instances may run it
+    /// (they share the queue safely), or only a dedicated converter does.
+    /// </summary>
     public bool RunInBackground { get; set; } = true;
+
+    /// <summary>How long a claimed job stays owned without a renewal before another worker may take it over.</summary>
+    public TimeSpan LeaseDuration { get; set; } = TimeSpan.FromMinutes(2);
+
+    /// <summary>How often the owner of a running job renews its lease.</summary>
+    public TimeSpan LeaseRenewInterval { get; set; } = TimeSpan.FromSeconds(30);
 }
 
 public sealed record TranscodeResult(bool Succeeded, string? Error, bool Canceled = false);

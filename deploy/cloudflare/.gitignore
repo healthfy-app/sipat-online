@@ -1,0 +1,4 @@
+node_modules/
+dist-dry/
+.wrangler/
+worker-configuration.d.ts

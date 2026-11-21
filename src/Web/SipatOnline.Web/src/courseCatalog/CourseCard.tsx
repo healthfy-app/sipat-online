@@ -3,7 +3,7 @@ import type { PlatformCourse } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getCourseCover } from '@/courseCover';
-import { formatDuration, pluralize, statusLabels } from '@/courseEditor/courseFormat';
+import { extrasSuffix, formatDuration, houseVideos, pluralize, statusLabels } from '@/courseEditor/courseFormat';
 
 export default function CourseCard({
   course,
@@ -20,7 +20,8 @@ export default function CourseCard({
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
-  const totalMilliseconds = course.videos.reduce((sum, video) => sum + video.durationMilliseconds, 0);
+  const house = houseVideos(course.videos);
+  const totalMilliseconds = house.reduce((sum, video) => sum + video.durationMilliseconds, 0);
   const published = course.status === 'Published';
 
   return (
@@ -60,8 +61,8 @@ export default function CourseCard({
           </button>
         </h3>
         <p className="m-0 text-[0.8125rem] tabular-nums text-muted-foreground">
-          {pluralize(course.videos.length, 'vídeo', 'vídeos')}
-          {course.videos.length > 0 && ` · ${formatDuration(totalMilliseconds)}`}
+          {pluralize(house.length, 'vídeo', 'vídeos')}
+          {house.length > 0 && ` · ${formatDuration(totalMilliseconds)}`}{extrasSuffix(course.videos.length - house.length)}
         </p>
       </div>
 

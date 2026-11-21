@@ -45,7 +45,7 @@ public static class LearningEngagementEndpoints
             Guid trackId, string activityId, ActivityOutcomeRequest request, HttpContext context,
             LearningEngagementService service, CancellationToken token) =>
         {
-            var result = await service.SaveOutcomeAsync(trackId, activityId, request.Outcome, token);
+            var result = await service.SaveOutcomeAsync(trackId, activityId, request.Outcome, request.LessonId, token);
             return result.IsSuccess ? Results.Ok(new { saved = true }) : Problem(result.Error);
         });
         learning.MapGet("/certificates", async (LearningEngagementService service, CancellationToken token) =>
@@ -197,7 +197,8 @@ public static class LearningEngagementEndpoints
     internal static IResult Problem(DomainError error) => Results.Problem(
         statusCode: error.Code.EndsWith("_not_found", StringComparison.Ordinal) ? 404 :
             error.Code.EndsWith("forbidden", StringComparison.Ordinal) ? 403 :
-            error.Code is "learning.certificate_pending" or "learning.certificate_logo_pending" or "learning.certificate_busy" ? 409 : 400,
+            error.Code is "learning.certificate_pending" or "learning.certificate_logo_pending" or "learning.certificate_busy"
+                or "learning.activity.stale" ? 409 : 400,
         title: error.Code, detail: error.Message, extensions: new Dictionary<string, object?> { ["code"] = error.Code });
 
 
@@ -216,4 +217,5 @@ public static class LearningEngagementEndpoints
 
 }
 
-public sealed record ActivityOutcomeRequest(string Outcome);
+/// <summary>An answer to a game; <paramref name="LessonId"/> is the video a game in the middle of a video was shown in (optional).</summary>
+public sealed record ActivityOutcomeRequest(string Outcome, Guid? LessonId = null);

@@ -11,13 +11,23 @@ public sealed class PlatformCourseCatalogService(
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
     TimeProvider timeProvider,
-    IVideoConversionQueue conversionQueue)
+    IVideoConversionQueue conversionQueue,
+    IDirectVideoUploadStore directUploads)
 {
     private static readonly TimeSpan PreviewLinkLifetime = TimeSpan.FromMinutes(10);
+
+    /// <summary>Long enough for 250 MB on a slow office uplink.</summary>
+    private static readonly TimeSpan DirectUploadLifetime = TimeSpan.FromHours(1);
+
+    private const string VideoTypeInvalidCode = "learning.platform_course.video_type_invalid";
+    private const string VideoTypeInvalidMessage = "Envie um vídeo MP4 ou WebM.";
+    private const string VideoSizeInvalidCode = "learning.platform_course.video_size_invalid";
+    private const string VideoSizeInvalidMessage = "O vídeo deve ter entre 1 byte e 250 MB.";
 
     public const long MaximumVideoSizeBytes = 250 * 1024 * 1024;
     public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
+    private const int MaximumExternalIdLength = 32;
 
     public async Task<Result<IReadOnlyList<PlatformCourse>>> ListAsync(
         CancellationToken cancellationToken)
@@ -431,34 +441,13 @@ public sealed class PlatformCourseCatalogService(
             return Result<PlatformCourseVideo>.Failure(permission.Error);
         }
 
-        if (courseId is { } requestedCourseId &&
-            await catalogStore.FindCourseAsync(requestedCourseId, cancellationToken) is null)
+        var details = await ValidateNewVideoAsync(courseId, title, durationMilliseconds, cancellationToken);
+        if (!details.IsSuccess)
         {
-            return CourseNotFound<PlatformCourseVideo>();
+            return Result<PlatformCourseVideo>.Failure(details.Error);
         }
 
-        var normalizedTitle = title?.Trim();
-        if (string.IsNullOrWhiteSpace(normalizedTitle) || normalizedTitle.Length > 200)
-        {
-            return Failure<PlatformCourseVideo>(
-                "learning.platform_course.video_title_invalid",
-                "O título do vídeo deve ter entre 1 e 200 caracteres.");
-        }
-
-        if (durationMilliseconds is < 1 or > 86_400_000)
-        {
-            return Failure<PlatformCourseVideo>(
-                "learning.platform_course.video_duration_invalid",
-                "A duração do vídeo deve estar entre 1 milissegundo e 24 horas.");
-        }
-
-        if (!Guid.TryParse(currentActor.UserId, out var actorId))
-        {
-            return Failure<PlatformCourseVideo>(
-                "learning.platform_course.actor_required",
-                "Não foi possível identificar o operador da plataforma.");
-        }
-
+        var (normalizedTitle, actorId) = details.Value;
         var videoId = Guid.NewGuid();
         // With conversion on, the upload waits in the work folder and only the converted files reach the storage.
         var converts = conversionQueue.IsEnabled;
@@ -520,6 +509,298 @@ public sealed class PlatformCourseCatalogService(
         return Result<PlatformCourseVideo>.Success(video);
     }
 
+    /// <summary>
+    /// Says how the operator sends a video. With direct upload on, issues a new video id and a presigned PUT for it;
+    /// nothing is stored until <see cref="CompleteDirectUploadAsync"/> verifies what the browser sent.
+    /// </summary>
+    public async Task<Result<DirectUploadStart>> StartDirectUploadAsync(
+        string? contentType,
+        long sizeBytes,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<DirectUploadStart>.Failure(permission.Error);
+        }
+
+        if (!IsVideoContentType(contentType))
+        {
+            return Failure<DirectUploadStart>(VideoTypeInvalidCode, VideoTypeInvalidMessage);
+        }
+
+        if (sizeBytes is < 1 or > MaximumVideoSizeBytes)
+        {
+            return Failure<DirectUploadStart>(VideoSizeInvalidCode, VideoSizeInvalidMessage);
+        }
+
+        if (!directUploads.IsEnabled)
+        {
+            return Result<DirectUploadStart>.Success(new DirectUploadStart(DirectUploadStart.Multipart, null));
+        }
+
+        var ticket = await directUploads.CreateAsync(Guid.NewGuid(), contentType!, DirectUploadLifetime, cancellationToken);
+        return Result<DirectUploadStart>.Success(new DirectUploadStart(DirectUploadStart.Direct, ticket));
+    }
+
+    /// <summary>
+    /// Registers what the browser uploaded for <paramref name="videoId"/> after checking that it exists, fits the size
+    /// limit and starts like the declared format. An object that fails the checks is deleted.
+    /// </summary>
+    public async Task<Result<PlatformCourseVideo>> CompleteDirectUploadAsync(
+        Guid videoId,
+        Guid? courseId,
+        string? title,
+        long durationMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<PlatformCourseVideo>.Failure(permission.Error);
+        }
+
+        var details = await ValidateNewVideoAsync(courseId, title, durationMilliseconds, cancellationToken);
+        if (!details.IsSuccess)
+        {
+            return Result<PlatformCourseVideo>.Failure(details.Error);
+        }
+
+        if (!directUploads.IsEnabled || videoId == Guid.Empty)
+        {
+            return UploadNotFound();
+        }
+
+        // Checked before the bucket: without conversion the first complete already moved the upload away.
+        if (await catalogStore.FindVideoAsync(videoId, cancellationToken) is not null)
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.platform_course.upload_already_completed",
+                "Este envio já foi concluído.");
+        }
+
+        var uploaded = await directUploads.InspectAsync(videoId, cancellationToken);
+        if (uploaded is null)
+        {
+            return UploadNotFound();
+        }
+
+        if (uploaded.SizeBytes is < 1 or > MaximumVideoSizeBytes)
+        {
+            await directUploads.DeleteAsync(videoId, CancellationToken.None);
+            return Failure<PlatformCourseVideo>(VideoSizeInvalidCode, VideoSizeInvalidMessage);
+        }
+
+        if (!IsVideoContentType(uploaded.ContentType) || !HasVideoSignature(uploaded.Header, uploaded.ContentType))
+        {
+            await directUploads.DeleteAsync(videoId, CancellationToken.None);
+            return Failure<PlatformCourseVideo>(
+                "learning.platform_course.video_content_invalid",
+                "O arquivo não corresponde ao formato de vídeo informado.");
+        }
+
+        var (normalizedTitle, actorId) = details.Value;
+        // With conversion on, the upload already sits where the conversion reads the original from.
+        var converts = conversionQueue.IsEnabled;
+        var video = new PlatformCourseVideo(
+            videoId,
+            normalizedTitle,
+            uploaded.ContentType,
+            uploaded.SizeBytes,
+            durationMilliseconds,
+            timeProvider.GetUtcNow(),
+            [],
+            Status: converts ? PlatformVideoStatus.Processing : PlatformVideoStatus.Ready);
+
+        var metadataPersisted = false;
+        try
+        {
+            if (!converts)
+            {
+                await directUploads.PromoteAsync(videoId, uploaded.ContentType, cancellationToken);
+            }
+
+            await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+            await catalogStore.AddVideoAsync(video, courseId, cancellationToken);
+            if (converts)
+            {
+                await conversionQueue.EnqueueAsync(videoId, cancellationToken);
+            }
+
+            await auditTrail.WriteAsync(
+                new AuditRecord(
+                    actorId.ToString("D"),
+                    null,
+                    "learning.platform_course.video_uploaded",
+                    "platform_course_video",
+                    video.Id.ToString("D"),
+                    timeProvider.GetUtcNow()),
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            metadataPersisted = true;
+        }
+        finally
+        {
+            // A concurrent complete of the same id may have registered it meanwhile: its files must stay.
+            if (!metadataPersisted && !await IsVideoRegisteredAsync(videoId))
+            {
+                await directUploads.DeleteAsync(videoId, CancellationToken.None);
+                if (!converts)
+                {
+                    await videoStorage.DeleteAsync(videoId, CancellationToken.None);
+                }
+            }
+        }
+
+        return Result<PlatformCourseVideo>.Success(video);
+    }
+
+    /// <summary>True when the first bytes match the declared format: <c>ftyp</c> at offset 4 for MP4, the EBML magic for WebM.</summary>
+    public static bool HasVideoSignature(ReadOnlySpan<byte> header, string contentType) =>
+        contentType switch
+        {
+            "video/mp4" => header.Length >= 8 && header.Slice(4, 4).SequenceEqual("ftyp"u8),
+            "video/webm" => header.Length >= 4 && header[..4].SequenceEqual(new byte[] { 0x1A, 0x45, 0xDF, 0xA3 }),
+            _ => false
+        };
+
+    private static bool IsVideoContentType(string? contentType) => contentType is "video/mp4" or "video/webm";
+
+    private async Task<bool> IsVideoRegisteredAsync(Guid videoId)
+    {
+        try
+        {
+            return await catalogStore.FindVideoAsync(videoId, CancellationToken.None) is not null;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // Cleanup after a failure: when the lookup fails too, the upload is treated as orphaned.
+            return false;
+        }
+    }
+
+    /// <summary>The title, duration, course and operator checks every new uploaded video goes through.</summary>
+    private async Task<Result<(string Title, Guid ActorId)>> ValidateNewVideoAsync(
+        Guid? courseId,
+        string? title,
+        long durationMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        if (courseId is { } requestedCourseId &&
+            await catalogStore.FindCourseAsync(requestedCourseId, cancellationToken) is null)
+        {
+            return CourseNotFound<(string, Guid)>();
+        }
+
+        var normalizedTitle = title?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedTitle) || normalizedTitle.Length > 200)
+        {
+            return Failure<(string, Guid)>(
+                "learning.platform_course.video_title_invalid",
+                "O título do vídeo deve ter entre 1 e 200 caracteres.");
+        }
+
+        if (durationMilliseconds is < 1 or > 86_400_000)
+        {
+            return Failure<(string, Guid)>(
+                "learning.platform_course.video_duration_invalid",
+                "A duração do vídeo deve estar entre 1 milissegundo e 24 horas.");
+        }
+
+        if (!Guid.TryParse(currentActor.UserId, out var actorId))
+        {
+            return Failure<(string, Guid)>(
+                "learning.platform_course.actor_required",
+                "Não foi possível identificar o operador da plataforma.");
+        }
+
+        return Result<(string Title, Guid ActorId)>.Success((normalizedTitle, actorId));
+    }
+
+    private static Result<PlatformCourseVideo> UploadNotFound() =>
+        Failure<PlatformCourseVideo>(
+            "learning.platform_course.upload_not_found",
+            "O envio não foi encontrado. Envie o vídeo de novo.");
+
+    /// <summary>Registers a YouTube or Vimeo link as a library item; the same link twice returns the first one.</summary>
+    public async Task<Result<PlatformCourseVideo>> CreateExternalVideoAsync(
+        string? provider,
+        string? url,
+        string? title,
+        long? durationMilliseconds,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<PlatformCourseVideo>.Failure(permission.Error);
+        }
+
+        if (!Enum.TryParse<VideoProvider>(provider?.Trim(), true, out var parsedProvider)
+            || parsedProvider == VideoProvider.Sipat
+            || !Enum.IsDefined(parsedProvider))
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.catalog.external_provider_invalid",
+                "Escolha YouTube ou Vimeo.");
+        }
+
+        if (!ExternalVideoLink.TryParse(parsedProvider, url, out var externalId) || externalId.Length > MaximumExternalIdLength)
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.catalog.external_link_invalid",
+                "Não reconhecemos este link. Cole o endereço do vídeo no YouTube ou no Vimeo.");
+        }
+
+        var normalizedTitle = title?.Trim();
+        if (string.IsNullOrWhiteSpace(normalizedTitle) || normalizedTitle.Length > MaximumTitleLength)
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.platform_course.video_title_invalid",
+                "O título do vídeo deve ter entre 1 e 200 caracteres.");
+        }
+
+        if (!Guid.TryParse(currentActor.UserId, out var actorId))
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.platform_course.actor_required",
+                "Não foi possível identificar o operador da plataforma.");
+        }
+
+        var existing = await catalogStore.FindExternalVideoAsync(parsedProvider, externalId, cancellationToken);
+        if (existing is not null)
+        {
+            return Result<PlatformCourseVideo>.Success(existing);
+        }
+
+        var now = timeProvider.GetUtcNow();
+        var video = await catalogStore.AddExternalVideoAsync(
+            parsedProvider,
+            externalId,
+            normalizedTitle,
+            durationMilliseconds is > 0 ? durationMilliseconds.Value : 0,
+            now,
+            cancellationToken);
+
+        // A concurrent request may have registered the same link first; only the creator audits it.
+        if (video.CreatedAt == now)
+        {
+            await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+            await auditTrail.WriteAsync(
+                new AuditRecord(
+                    actorId.ToString("D"),
+                    null,
+                    "learning.catalog.external_video_created",
+                    "platform_course_video",
+                    video.Id.ToString("D"),
+                    now),
+                cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        return Result<PlatformCourseVideo>.Success(video);
+    }
+
     /// <summary>The operator preview: asks for a signed link first and opens the file only when there is none.</summary>
     public async Task<Result<PlatformVideoFile>> GetVideoFileAsync(
         Guid videoId,
@@ -533,6 +814,13 @@ public sealed class PlatformCourseCatalogService(
 
         var video = await catalogStore.FindVideoAsync(videoId, cancellationToken);
         if (video is null)
+        {
+            return Failure<PlatformVideoFile>(
+                "learning.platform_course.video_not_found",
+                "O vídeo não foi encontrado.");
+        }
+
+        if (video.Provider != VideoProvider.Sipat)
         {
             return Failure<PlatformVideoFile>(
                 "learning.platform_course.video_not_found",

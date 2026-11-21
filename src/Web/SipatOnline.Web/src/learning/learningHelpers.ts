@@ -92,7 +92,13 @@ export function formatCourseDuration(milliseconds: number): string {
   return `${minutes} min`;
 }
 
-export function getResumeLesson(lessons: LearningLessonProgress[]): LearningLessonProgress | null {
+/** The videos that count for progress: an extra (YouTube or Vimeo) is never one of them. */
+export function houseLessons(lessons: LearningLessonProgress[]): LearningLessonProgress[] {
+  return lessons.filter(lesson => !lesson.isBonus);
+}
+
+export function getResumeLesson(allLessons: LearningLessonProgress[]): LearningLessonProgress | null {
+  const lessons = houseLessons(allLessons);
   return lessons.find(lesson => !lesson.isCompleted &&
     (lesson.lastPlaybackPositionMilliseconds > 0 || lesson.watchedPercentage > 0))
     ?? lessons.find(lesson => !lesson.isCompleted)
@@ -104,7 +110,7 @@ export function getRemainingCourseMinutes(
   currentLesson: LearningLessonProgress,
 ): number | null {
   const remainingMilliseconds = lessons.reduce((total, lesson) => {
-    if (lesson.isCompleted) {
+    if (lesson.isCompleted || lesson.isBonus) {
       return total;
     }
     return total + Math.max(
@@ -134,10 +140,13 @@ export function getTrackProgress(track: LearningTrackCard): number {
     : Math.min(99, Math.max(0, track.progressPercentage));
 }
 
-export function getNextLesson(lessons: LearningLessonProgress[]): LearningLessonProgress | null {
+/** Where to start: never an extra on its own, unless the day has nothing else. */
+export function getNextLesson(allLessons: LearningLessonProgress[]): LearningLessonProgress | null {
+  const lessons = houseLessons(allLessons);
   return lessons.find((lesson) => !lesson.isCompleted && lesson.watchedPercentage > 0)
     ?? lessons.find((lesson) => !lesson.isCompleted)
     ?? lessons[0]
+    ?? allLessons[0]
     ?? null;
 }
 

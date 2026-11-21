@@ -33,12 +33,19 @@ public sealed class EfLearningEngagementStore(PlatformDbContext db, ILearningSto
             .Where(item => item.TenantId == tenantId && item.ParticipantId == participantId && item.RevisionId == revisionId)
             .ToDictionaryAsync(item => item.ActivityId, item => item.Outcome, token);
         var modules = content.Modules.ToDictionary(item => item.Id);
+        var hasExtras = experience.Lessons.Any(lesson => lesson.IsBonus);
         var activities = new List<LearningActivity>();
         foreach (var (placement, index) in content.Placements.Select((item, index) => (item, index)))
         {
             var id = $"placement-{index}";
+            // an extra is never watched for progress, so a game placed after it is due after the last house video before it
+            var afterVideoCount = !hasExtras ? placement.AfterVideoCount : experience.Lessons
+                .Where(lesson => !lesson.IsBonus && lesson.Position <= placement.AfterVideoCount)
+                .Select(lesson => lesson.Position)
+                .DefaultIfEmpty(0)
+                .Max();
             activities.Add(new LearningActivity(id, modules[placement.ModuleId],
-                placement.AfterVideoCount, null, null, outcomes.GetValueOrDefault(id)));
+                afterVideoCount, null, null, outcomes.GetValueOrDefault(id)));
         }
         for (var index = 0; index < content.Videos.Count && index < experience.Lessons.Count; index++)
         {
@@ -89,9 +96,11 @@ public sealed class EfLearningEngagementStore(PlatformDbContext db, ILearningSto
                 var experience = await learning.GetAssignedExperienceAsync(new TenantId(tenantId), participantId, track.Id, token);
                 var lessons = await db.LearningLessons.AsNoTracking()
                     .Where(item => item.TenantId == tenantId && item.RevisionId == track.CurrentRevisionId).ToListAsync(token);
-                duration += lessons.Sum(item => item.DurationMilliseconds);
+                // extras never count: neither their duration nor whether they were watched
+                duration += lessons.Where(item => !item.IsBonus).Sum(item => item.DurationMilliseconds);
                 demonstration |= lessons.Any(item => item.ProviderAssetReference.StartsWith("development:", StringComparison.Ordinal));
-                if (experience is not null && experience.Lessons.Count > 0 && experience.Lessons.All(item => item.IsCompleted)) completed++;
+                var counted = experience?.Lessons.Where(item => !item.IsBonus).ToArray() ?? [];
+                if (counted.Length > 0 && counted.All(item => item.IsCompleted)) completed++;
                 basis.Add($"{track.Id:D}:{track.CurrentRevisionId:D}");
             }
             var certificate = existing is null

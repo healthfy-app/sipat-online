@@ -81,7 +81,7 @@ describe('tenant portal', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
-    expect(screen.queryByRole('link', { name: 'SIPATs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Formações' })).not.toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('link', { name: 'Acompanhamento' }));
     expect(await screen.findByText(/Modo de consulta/)).toBeVisible();
@@ -356,7 +356,7 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
-    expect(screen.getByRole('link', { name: 'SIPATs' })).toHaveAttribute('href', '/admin/sipats');
+    expect(screen.getByRole('link', { name: 'Formações' })).toHaveAttribute('href', '/admin/sipats');
     expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(8));
   });
@@ -397,7 +397,7 @@ describe('tenant portal', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', {
-      name: 'Você ainda não tem uma SIPAT disponível',
+      name: 'Você ainda não tem uma formação disponível',
     })).toBeVisible();
     expect(screen.queryByRole('navigation', { name: 'Navegação principal' }))
       .not.toBeInTheDocument();

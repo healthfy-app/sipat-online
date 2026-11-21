@@ -63,7 +63,7 @@ public static class IdentityEndpoints
             LoginAttemptLimiter limiter,
             CancellationToken cancellationToken) =>
         {
-            if (!limiter.TryAcquire(context, request.LoginIdentifier))
+            if (!await limiter.TryAcquireAsync(context, request.LoginIdentifier, cancellationToken))
             {
                 return LoginAttemptLimiter.TooManyAttempts();
             }

@@ -89,6 +89,11 @@
 .portal-layout-learner .day-status svg { width: 1rem; height: 1rem; flex: none; }
 .portal-layout-learner .day-status.is-complete { color: var(--learner-forest); background: var(--learner-highlight, #7fe0a6); font-weight: 800; }
 
+.portal-layout-learner .day-outside .sipat-player-outside { margin: 0; font-size: 0.9375rem; opacity: 0.85; }
+.portal-layout-learner .day-outside a { display: inline-block; padding: 0.5rem 0; }
+.portal-layout-learner .day-item.is-extra .day-item-mark svg { width: 0.9rem; height: 0.9rem; stroke-width: 2.5; }
+.portal-layout-learner .day-item.is-extra .day-item-meta { font-weight: 500; }
+
 .portal-layout-learner .day-notices { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
 .portal-layout-learner .day-notices:not(:has(:not(:empty))) { display: none; }
 .portal-layout-learner .day-notice { padding: 0.5rem 0.8rem; border-radius: 10px; color: var(--learner-forest); background: var(--learner-progress-accent); font-size: 0.9375rem; font-weight: 600; }

@@ -241,7 +241,8 @@ public static class LearningEndpoints
                 "learning.sipat_not_found" or "learning.participant_not_found" => StatusCodes.Status404NotFound,
             "learning.assignment_exists" or "learning.track_not_published" or
                 "learning.draft_not_found" or "learning.published_revision_not_found" or
-                "learning.revision.immutable" or "learning.draft_exists" => StatusCodes.Status409Conflict,
+                "learning.revision.immutable" or "learning.draft_exists" or
+                BonusLesson.RefusedCode => StatusCodes.Status409Conflict,
             "learning.evidence_invalid" => StatusCodes.Status400BadRequest,
             "learning.video_provider_unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest

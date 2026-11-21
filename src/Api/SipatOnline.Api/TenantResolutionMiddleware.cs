@@ -18,6 +18,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         IWebHostEnvironment environment)
     {
         if (context.Request.Path.Equals("/health", StringComparison.OrdinalIgnoreCase) ||
+            context.Request.Path.Equals("/health/conversion", StringComparison.OrdinalIgnoreCase) ||
             (environment.IsDevelopment() &&
              context.Request.Path.StartsWithSegments("/openapi", StringComparison.OrdinalIgnoreCase)))
         {

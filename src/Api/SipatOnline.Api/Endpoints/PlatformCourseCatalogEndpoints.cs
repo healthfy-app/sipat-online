@@ -231,6 +231,72 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("UploadPlatformLibraryVideo");
 
+        catalog.MapPost("/videos/uploads", async (
+            StartPlatformVideoUploadRequest request,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.StartDirectUploadAsync(
+                request.ContentType,
+                request.SizeBytes,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return ToProblem(result.Error);
+            }
+
+            if (result.Value.Ticket is not { } ticket)
+            {
+                return Results.Ok(new MultipartVideoUploadResponse(
+                    DirectUploadStart.Multipart,
+                    PlatformCourseCatalogService.MaximumVideoSizeBytes));
+            }
+
+            return Results.Ok(new DirectVideoUploadResponse(
+                DirectUploadStart.Direct,
+                ticket.VideoId,
+                ticket.UploadUrl.AbsoluteUri,
+                "PUT",
+                new Dictionary<string, string> { ["Content-Type"] = ticket.ContentType },
+                ticket.ExpiresAt,
+                PlatformCourseCatalogService.MaximumVideoSizeBytes));
+        })
+        .WithName("StartPlatformVideoUpload");
+
+        catalog.MapPost("/videos/uploads/{videoId:guid}/complete", async (
+            Guid videoId,
+            CompletePlatformVideoUploadRequest request,
+            HttpContext context,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.CompleteDirectUploadAsync(
+                videoId,
+                request.CourseId,
+                request.Title,
+                request.DurationMilliseconds,
+                cancellationToken);
+            return CreatedVideo(result, context);
+        })
+        .WithName("CompletePlatformVideoUpload");
+
+        catalog.MapPost("/videos/external", async (
+            CreateExternalVideoRequest request,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.CreateExternalVideoAsync(
+                request.Provider,
+                request.Url,
+                request.Title,
+                request.DurationMilliseconds,
+                cancellationToken);
+            return result.IsSuccess
+                ? Results.Created($"/api/platform/catalog/videos/{result.Value.Id:D}", ToResponse(result.Value))
+                : ToProblem(result.Error);
+        })
+        .WithName("CreatePlatformExternalVideo");
+
         catalog.MapPost("/courses/{courseId:guid}/videos", (
             Guid courseId,
             HttpContext context,
@@ -540,6 +606,11 @@ public static class PlatformCourseCatalogEndpoints
             file.ContentType,
             file.Length,
             cancellationToken);
+        return CreatedVideo(result, context);
+    }
+
+    private static IResult CreatedVideo(Result<PlatformCourseVideo> result, HttpContext context)
+    {
         if (!result.IsSuccess)
         {
             return ToProblem(result.Error);
@@ -583,13 +654,15 @@ public static class PlatformCourseCatalogEndpoints
             video.SizeBytes,
             video.DurationMilliseconds,
             video.CreatedAt,
-            $"/api/platform/catalog/videos/{video.Id:D}/file",
+            video.Provider == VideoProvider.Sipat ? $"/api/platform/catalog/videos/{video.Id:D}/file" : string.Empty,
             video.Checkpoints.Select(item => new VideoCheckpointDto(item.TimeMilliseconds, item.ModuleId)).ToArray(),
             video.LessonId,
             video.LibraryTitle,
             video.Status.ToString(),
             video.ProcessingError,
-            video.HasSd480);
+            video.HasSd480,
+            video.Provider.ToString(),
+            video.ExternalId);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -628,13 +701,16 @@ public static class PlatformCourseCatalogEndpoints
                 "learning.program.video_not_found" or
                 "learning.program.game_not_found" or
                 "learning.platform_course.cover_not_found" or
-                "learning.platform_course.video_not_found" => StatusCodes.Status404NotFound,
+                "learning.platform_course.video_not_found" or
+                "learning.platform_course.upload_not_found" => StatusCodes.Status404NotFound,
             "learning.platform_course.storage_unconfigured" or
                 "learning.platform_course.video_file_missing" => StatusCodes.Status503ServiceUnavailable,
             "learning.platform_course.actor_required" => StatusCodes.Status400BadRequest,
             "learning.platform_course.video_in_use" or
+                "learning.catalog.external_no_checkpoints" or
                 "learning.platform_course.video_processing" or
-                "learning.platform_course.video_failed" => StatusCodes.Status409Conflict,
+                "learning.platform_course.video_failed" or
+                "learning.platform_course.upload_already_completed" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 
@@ -660,6 +736,23 @@ public sealed record UpdatePlatformCourseRequest(
     string? GameType = null);
 
 public sealed record SetPlatformCourseVideosRequest(IReadOnlyList<Guid>? VideoIds);
+
+public sealed record StartPlatformVideoUploadRequest(string? ContentType, long SizeBytes);
+
+public sealed record CompletePlatformVideoUploadRequest(string? Title, long DurationMilliseconds, Guid? CourseId);
+
+/// <summary>The browser sends the file in the API's multipart form.</summary>
+public sealed record MultipartVideoUploadResponse(string Mode, long MaxSizeBytes);
+
+/// <summary>The browser PUTs the file to <see cref="UploadUrl"/> with exactly <see cref="Headers"/>, then calls complete.</summary>
+public sealed record DirectVideoUploadResponse(
+    string Mode,
+    Guid VideoId,
+    string UploadUrl,
+    string Method,
+    IReadOnlyDictionary<string, string> Headers,
+    DateTimeOffset ExpiresAt,
+    long MaxSizeBytes);
 
 public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Video, int CourseCount);
 
@@ -747,6 +840,14 @@ public sealed record PlatformCourseVideoResponse(
     string? LibraryTitle = null,
     string Status = "Ready",
     string? ProcessingError = null,
-    bool HasSd480 = false);
+    bool HasSd480 = false,
+    string Provider = "Sipat",
+    string? ExternalId = null);
+
+public sealed record CreateExternalVideoRequest(
+    string? Provider,
+    string? Url,
+    string? Title,
+    long? DurationMilliseconds);
 
 public sealed record CourseCategoryResponse(Guid Id, string Name, int CourseCount);

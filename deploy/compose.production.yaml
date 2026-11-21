@@ -18,6 +18,8 @@ x-api-environment: &api-environment
   SipatOnline__VideoStorage__R2__AccessKeyId: ${R2_ACCESS_KEY_ID:-}
   SipatOnline__VideoStorage__R2__SecretAccessKey: ${R2_SECRET_ACCESS_KEY:-}
   SipatOnline__VideoStorage__R2__Bucket: ${R2_VIDEO_BUCKET:-}
+  # true = o navegador do operador envia o original direto ao R2 (precisa da regra CORS no bucket)
+  SipatOnline__VideoStorage__R2__DirectUpload: ${R2_DIRECT_UPLOAD:-false}
   # cada envio vira 720p e 480p na propria API (ffmpeg na imagem), um por vez e em prioridade baixa;
   # a pasta guarda o original so ate a conversao terminar
   SipatOnline__VideoConversion__Enabled: "true"
@@ -27,6 +29,8 @@ x-api-environment: &api-environment
   SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-}
   SipatOnline__PlatformOperator__Password: ${PLATFORM_OPERATOR_PASSWORD:-}
   SipatOnline__ForwardedHeaders__KnownProxies__0: 172.28.0.2
+  # opcional: uma rede inteira de proxies confiaveis (CIDR); vazio = so o nginx acima, como hoje
+  SipatOnline__ForwardedHeaders__KnownNetworks__0: ${TRUSTED_PROXY_NETWORK:-}
   SipatOnline__BootstrapAdmin__LoginIdentifier: ${BOOTSTRAP_ADMIN_LOGIN_IDENTIFIER:-}
   SipatOnline__BootstrapAdmin__DisplayName: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-}
   SipatOnline__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}
@@ -71,7 +75,6 @@ services:
       dockerfile: Dockerfile
     environment: *api-environment
     volumes:
-      - aspnet-data-protection:/root/.aspnet/DataProtection-Keys
       - platform-videos:/var/sipat/videos
       - video-work:/var/sipat/video-work
     expose:
@@ -118,7 +121,6 @@ services:
 
 volumes:
   postgres-data:
-  aspnet-data-protection:
   platform-videos:
   video-work:
 

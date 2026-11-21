@@ -141,3 +141,11 @@ Tira o arquivo da VM e o R2 não cobra saída, mas **não converte nem gera HLS*
 - Cloudflare Stream: https://developers.cloudflare.com/stream/pricing
 - Mux: https://www.mux.com/pricing
 - Bunny Stream: https://bunny.net/pricing/stream/
+
+## 2026-11-15 — vídeos extras
+
+A regra "nada vai para terceiros" passa a ter uma exceção: o player incorporado (iframe) do provedor de um vídeo extra. Os provedores aceitos são o YouTube, pelo domínio `youtube-nocookie.com`, e o Vimeo, com `dnt=1`. A exceção vale só para vídeos extras de um Assunto. Os vídeos da casa nunca são incorporados de terceiros e continuam servidos pela nossa VM.
+
+- Nenhum dado de progresso ou de qualidade sobre um vídeo extra é registrado ou enviado pelo nosso sistema.
+- O vídeo extra não conta para progresso, conclusão nem certificado.
+- Se a rede da empresa bloquear o provedor, o participante vê a linha "Não abriu? Abrir no YouTube/Vimeo", com o link para abrir o vídeo fora do player.
