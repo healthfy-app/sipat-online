@@ -119,6 +119,8 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
 ### Backup diário do banco no R2
 O banco roda na própria VM; sem cópia externa, perder o disco é perder tudo. Todo dia às 03:00 um *timer* grava um `pg_dump` no R2 e apaga as cópias com mais de 30 dias.
 
+> **O backup é sensível.** As chaves de login e segurança do sistema (Data Protection) ficam no banco, sem criptografia. Quem tiver uma cópia do banco consegue forjar sessões: guarde o bucket de backups privado e com chave de acesso só dele.
+
 1. Instale o rclone: `sudo apt install rclone` (ou `curl https://rclone.org/install.sh | sudo bash`).
 2. No painel da Cloudflare, em **R2**, crie um bucket **privado** só para backups (por exemplo, `sipat-backups`, separado do bucket de vídeos). Crie uma chave de API do R2 com leitura e escrita **somente nesse bucket**.
 3. Configure o remote chamado `r2` (rode como o usuário que executará o backup, normalmente `root`): `rclone config`, `n`, nome `r2`, tipo `s3`, provedor `Cloudflare`, informe *Access Key ID* e *Secret Access Key*, e em *endpoint* `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`. Teste com `rclone lsd r2:`.

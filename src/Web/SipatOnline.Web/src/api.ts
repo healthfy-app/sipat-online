@@ -881,12 +881,18 @@ export async function uploadPlatformVideo(
   }
 
   // The bucket is another origin: no cookies and no CSRF header, only what the signed URL asks for.
-  const put = await fetch(start.uploadUrl, {
-    method: 'PUT',
-    body: file,
-    headers: start.headers,
-    credentials: 'omit',
-  });
+  let put: Response;
+  try {
+    put = await fetch(start.uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: start.headers,
+      credentials: 'omit',
+    });
+  } catch {
+    // network failure or a CORS refusal: the browser only says "Failed to fetch"
+    throw new ApiError('Não foi possível enviar o vídeo. Verifique a conexão e tente de novo.', 0);
+  }
   if (!put.ok) {
     throw new ApiError('Não foi possível enviar o vídeo. Verifique a conexão e tente de novo.', put.status);
   }

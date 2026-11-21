@@ -146,16 +146,18 @@ Todas as chaves abaixo vivem em `SipatOnline:` e viram variável de ambiente tro
 | `SipatOnline:VideoConversion:LeaseRenewInterval` (`SipatOnline__VideoConversion__LeaseRenewInterval`): de quanto em quanto o dono renova; deve ser positivo e menor que `LeaseDuration` | `00:00:30` | — | — | — | — |
 | Intervalo de verificação do worker de conversão (`PollInterval`): **constante** de 30 s no código (`VideoConversionWorker.PollInterval`), não configurável | 30 s | igual | igual | igual | igual |
 | `SipatOnline:VideoConversion:WorkPath` (`SipatOnline__VideoConversion__WorkPath`): pasta temporária das conversões (obrigatória com `Enabled=true`) | vazio | `/var/sipat/video-work` | `/var/sipat/video-work` (volume) | `/tmp/sipat-video-work` (disco efêmero) | igual ao dev |
-| `SipatOnline:VideoStorage:Provider` (`SipatOnline__VideoStorage__Provider`): `File` ou `R2` | `File` | — (`File`) | `${VIDEO_STORAGE_PROVIDER:-File}` | `R2` | `R2` |
-| `SipatOnline:VideoStorage:R2:DirectUpload` (`SipatOnline__VideoStorage__R2__DirectUpload`): envio direto do navegador ao R2 (exige CORS no bucket) | `false` | — | `${R2_DIRECT_UPLOAD:-false}` | `true` | `true` |
-| `SipatOnline:VideoStorage:R2:ServiceUrl` (`…__R2__ServiceUrl`) | vazio (obrigatória com `R2`) | — | `${R2_SERVICE_URL:-}` | var `R2_SERVICE_URL` | var `R2_SERVICE_URL` |
-| `SipatOnline:VideoStorage:R2:AccessKeyId` (`…__R2__AccessKeyId`) | vazio (obrigatória com `R2`) | — | `${R2_ACCESS_KEY_ID:-}` | segredo `R2_ACCESS_KEY_ID` | segredo `R2_ACCESS_KEY_ID` |
-| `SipatOnline:VideoStorage:R2:SecretAccessKey` (`…__R2__SecretAccessKey`) | vazio (obrigatória com `R2`) | — | `${R2_SECRET_ACCESS_KEY:-}` | segredo `R2_SECRET_ACCESS_KEY` | segredo `R2_SECRET_ACCESS_KEY` |
-| `SipatOnline:VideoStorage:R2:Bucket` (`…__R2__Bucket`) | vazio (obrigatória com `R2`) | — | `${R2_VIDEO_BUCKET:-}` | `sipat-videos-dev` | `sipat-videos` |
+| `SipatOnline:VideoStorage:Provider` (`SipatOnline__VideoStorage__Provider`): `File` ou `R2` | `File` | `${VIDEO_STORAGE_PROVIDER:-File}` | `${VIDEO_STORAGE_PROVIDER:-File}` | `R2` | `R2` |
+| `SipatOnline:VideoStorage:R2:DirectUpload` (`SipatOnline__VideoStorage__R2__DirectUpload`): envio direto do navegador ao R2 (exige CORS no bucket) | `false` | `${R2_DIRECT_UPLOAD:-false}` | `${R2_DIRECT_UPLOAD:-false}` | `true` | `true` |
+| `SipatOnline:VideoStorage:R2:ServiceUrl` (`…__R2__ServiceUrl`) | vazio (obrigatória com `R2`) | `${R2_SERVICE_URL:-}` | `${R2_SERVICE_URL:-}` | var `R2_SERVICE_URL` | var `R2_SERVICE_URL` |
+| `SipatOnline:VideoStorage:R2:AccessKeyId` (`…__R2__AccessKeyId`) | vazio (obrigatória com `R2`) | `${R2_ACCESS_KEY_ID:-}` | `${R2_ACCESS_KEY_ID:-}` | segredo `R2_ACCESS_KEY_ID` | segredo `R2_ACCESS_KEY_ID` |
+| `SipatOnline:VideoStorage:R2:SecretAccessKey` (`…__R2__SecretAccessKey`) | vazio (obrigatória com `R2`) | `${R2_SECRET_ACCESS_KEY:-}` | `${R2_SECRET_ACCESS_KEY:-}` | segredo `R2_SECRET_ACCESS_KEY` | segredo `R2_SECRET_ACCESS_KEY` |
+| `SipatOnline:VideoStorage:R2:Bucket` (`…__R2__Bucket`) | vazio (obrigatória com `R2`) | `${R2_VIDEO_BUCKET:-}` | `${R2_VIDEO_BUCKET:-}` | `sipat-videos-dev` | `sipat-videos` |
 | `SipatOnline:ForwardedHeaders:KnownProxies` (`SipatOnline__ForwardedHeaders__KnownProxies__0`): IPs de proxy confiáveis; fora do Development é obrigatório ter proxies ou redes | vazio | — (em Development vale `DevelopmentProxy:Host`, padrão `localhost`; o compose usa `web`) | `172.28.0.2` (o Nginx) | — | — |
-| `SipatOnline:ForwardedHeaders:KnownNetworks` (`SipatOnline__ForwardedHeaders__KnownNetworks__0`, `__1`): redes confiáveis, alternativa a `KnownProxies` (decisão 15 do plano; entregue pela Task 7) | vazio | — | — | `0.0.0.0/0` e `::/0` | `0.0.0.0/0` e `::/0` |
+| `SipatOnline:ForwardedHeaders:KnownNetworks` (`SipatOnline__ForwardedHeaders__KnownNetworks__0`, `__1`): redes confiáveis, alternativa a `KnownProxies` (decisão 15 do plano; entregue pela Task 7) | vazio | — (Development não lê esta chave) | `${TRUSTED_PROXY_NETWORK:-}` (vazio = só `KnownProxies`) | `0.0.0.0/0` e `::/0` | `0.0.0.0/0` e `::/0` |
 
 Notas de leitura da tabela:
+
+- O deploy automático no Cloudflare fica **desligado** até a conta estar pronta: crie a variável de repositório `CLOUDFLARE_DEPLOY_ENABLED=true` no GitHub para ligá-lo.
 
 - Local e VM não precisam de nenhuma chave nova para continuar como antes. A VM em R2 só passa a usar o envio direto quando alguém aplica o CORS no bucket e põe `R2_DIRECT_UPLOAD=true` em `deploy/.env.production`.
 - Os valores do Cloudflare vêm de `deploy/cloudflare/src/index.ts` (função `apiEnv`) e de `vars` em `wrangler.jsonc`. Para mudar um valor no Cloudflare, edite `apiEnv`; para os domínios, edite `vars` e as variáveis do ambiente no GitHub (devem coincidir).

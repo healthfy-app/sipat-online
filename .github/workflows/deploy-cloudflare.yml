@@ -14,11 +14,14 @@ permissions:
 jobs:
   verify:
     name: Verify
+    # off until the Cloudflare account is set up: set the repository variable CLOUDFLARE_DEPLOY_ENABLED=true
+    if: vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
     uses: ./.github/workflows/ci.yml
 
   deploy:
     name: Deploy (${{ startsWith(github.ref, 'refs/tags/') && 'prod' || 'dev' }})
     needs: verify
+    if: vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     environment: ${{ startsWith(github.ref, 'refs/tags/') && 'prod' || 'dev' }}
