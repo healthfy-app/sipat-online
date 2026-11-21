@@ -15,6 +15,8 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             .Include(course => course.VideoLinks)
             .ThenInclude(link => link.Video)
             .ThenInclude(video => video.Checkpoints)
+            // one query per collection: joined, modules x lessons x videos x checkpoints multiply the rows
+            .AsSplitQuery()
             .OrderBy(course => course.Title)
             .ThenBy(course => course.Id)
             .ToListAsync(cancellationToken);
@@ -31,6 +33,8 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             .Include(item => item.VideoLinks)
             .ThenInclude(link => link.Video)
             .ThenInclude(video => video.Checkpoints)
+            // one query per collection: joined, modules x lessons x videos x checkpoints multiply the rows
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
         return course is null ? null : ToDomain(course);
     }

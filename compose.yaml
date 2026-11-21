@@ -61,7 +61,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    environment: *api-environment
+    environment:
+      <<: *api-environment
+      # traces, metrics and logs go to the local dashboard (http://localhost:18888);
+      # set OTEL_EXPORTER_OTLP_ENDPOINT= (empty) in .env to turn it off
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT-http://aspire-dashboard:18889}
+      OTEL_EXPORTER_OTLP_PROTOCOL: grpc
+      OTEL_SERVICE_NAME: sipat-online-api
     volumes:
       - platform-course-videos:/app/platform-course-videos
       - video-work:/var/sipat/video-work
@@ -70,6 +76,21 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      aspire-dashboard:
+        condition: service_started
+    restart: unless-stopped
+
+  # Local observability panel: traces, logs and metrics of the API, plus the browser errors it logs.
+  # Open http://localhost:18888. No login: the unsecured mode is for development only, so the
+  # ports are bound to this computer (127.0.0.1). The data lives in memory and is gone on restart.
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.2
+    environment:
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:${DASHBOARD_PORT:-18888}:18888"
+      # OTLP/gRPC, so that an API started with dotnet run can send to it too
+      - "${DASHBOARD_BIND_ADDRESS:-127.0.0.1}:${DASHBOARD_OTLP_PORT:-18889}:18889"
     restart: unless-stopped
 
   web:

@@ -1,4 +1,5 @@
 import type { PlayerQualitySummary } from '@sipat/video-player';
+import { reportFailedRequest } from './telemetry';
 
 export interface TenantBranding {
   tenantKey: string;
@@ -587,9 +588,32 @@ async function getAntiforgeryToken(): Promise<string> {
   return payload.requestToken;
 }
 
+interface RequestOptions {
+  /**
+   * Reuse the page's antiforgery token instead of fetching one before the call. For the calls the
+   * player repeats while a video plays: one round trip per save instead of two. A rejected token
+   * is renewed and the call sent once more.
+   */
+  reuseAntiforgeryToken?: boolean;
+}
+
+async function sharedAntiforgeryToken(): Promise<string> {
+  return cachedAntiforgeryToken ?? (cachedAntiforgeryToken = await getAntiforgeryToken());
+}
+
+async function isAntiforgeryRejection(response: Response): Promise<boolean> {
+  if (response.status !== 400) return false;
+  try {
+    return (await response.clone().text()).includes('antifalsifica');
+  } catch {
+    return false;
+  }
+}
+
 async function request(
   path: string,
   init: RequestInit = {},
+  options: RequestOptions = {},
 ): Promise<Response> {
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
@@ -599,8 +623,11 @@ async function request(
     headers.set('X-Sipat-Company', companyAdministrationId);
   }
 
-  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    headers.set('X-CSRF-TOKEN', await getAntiforgeryToken());
+  const mutating = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+  if (mutating) {
+    headers.set('X-CSRF-TOKEN', options.reuseAntiforgeryToken
+      ? await sharedAntiforgeryToken()
+      : await getAntiforgeryToken());
   }
 
   if (
@@ -611,13 +638,29 @@ async function request(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(path, {
-    ...init,
-    method,
-    credentials: 'include',
-    headers,
-  });
+  const send = async (): Promise<Response> => {
+    try {
+      return await fetch(path, {
+        ...init,
+        method,
+        credentials: 'include',
+        headers,
+      });
+    } catch (error) {
+      reportFailedRequest(method, path, error);
+      throw error;
+    }
+  };
 
+  let response = await send();
+  if (mutating && options.reuseAntiforgeryToken && await isAntiforgeryRejection(response)) {
+    // the saved token went stale (new sign-in, expired cookie): renew it and send once more
+    cachedAntiforgeryToken = null;
+    headers.set('X-CSRF-TOKEN', await sharedAntiforgeryToken());
+    response = await send();
+  }
+
+  if (response.status >= 500) reportFailedRequest(method, path, response.status);
   if (!response.ok) {
     throw await readError(response);
   }
@@ -625,8 +668,8 @@ async function request(
   return response;
 }
 
-async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  return (await request(path, init)).json() as Promise<T>;
+async function requestJson<T>(path: string, init?: RequestInit, options?: RequestOptions): Promise<T> {
+  return (await request(path, init, options)).json() as Promise<T>;
 }
 
 export function getTenantBranding(): Promise<TenantBranding> {
@@ -671,12 +714,15 @@ export async function signIn(
     method: 'POST',
     body: JSON.stringify({ loginIdentifier, password }),
   });
+  // the token is tied to who is signed in
+  cachedAntiforgeryToken = null;
 }
 
 export async function signOut(platform = false): Promise<void> {
   await request(platform ? '/api/platform/identity/logout' : '/api/identity/logout', {
     method: 'POST',
   });
+  cachedAntiforgeryToken = null;
 }
 
 export function listPlatformCompanies(): Promise<PlatformCompany[]> {
@@ -1069,6 +1115,11 @@ export function startLearningPlayback(
 
 let cachedAntiforgeryToken: string | null = null;
 
+/** Drops the saved antiforgery token; the next call that reuses it fetches a fresh one. */
+export function forgetAntiforgeryToken(): void {
+  cachedAntiforgeryToken = null;
+}
+
 export async function primeAntiforgeryToken(): Promise<void> {
   try {
     cachedAntiforgeryToken = await getAntiforgeryToken();
@@ -1107,6 +1158,7 @@ export function saveLearningPosition(
       method: 'PUT',
       body: JSON.stringify({ positionMilliseconds }),
     },
+    { reuseAntiforgeryToken: true },
   );
 }
 
@@ -1129,6 +1181,7 @@ export function recordLearningPlaybackRange(
         positionMilliseconds,
       }),
     },
+    { reuseAntiforgeryToken: true },
   );
 }
 

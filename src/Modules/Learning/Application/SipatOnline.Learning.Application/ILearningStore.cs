@@ -69,6 +69,18 @@ public interface ILearningStore
         TenantId tenantId,
         CancellationToken cancellationToken);
 
+    /// <summary>The same rows as <see cref="ListParticipantProgressAsync(TenantId, CancellationToken)"/>, for one participant only.</summary>
+    Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
+        TenantId tenantId,
+        Guid participantId,
+        CancellationToken cancellationToken);
+
+    /// <summary>Every track assigned to the participant, with its lessons and progress, newest assignment first.</summary>
+    Task<IReadOnlyList<LearningExperience>> ListAssignedExperiencesAsync(
+        TenantId tenantId,
+        Guid participantId,
+        CancellationToken cancellationToken);
+
     Task<LearningExperience?> GetAssignedExperienceAsync(
         TenantId tenantId,
         Guid participantId,
@@ -88,7 +100,11 @@ public interface ILearningStore
         Guid lessonId,
         CancellationToken cancellationToken);
 
-    Task AddProgressAsync(LearningProgress progress, CancellationToken cancellationToken);
+    /// <summary>
+    /// Creates the progress row right away. False when the participant's progress for this lesson
+    /// was created at the same moment by another request (two tabs, a resend): nothing is written.
+    /// </summary>
+    Task<bool> TryAddProgressAsync(LearningProgress progress, CancellationToken cancellationToken);
 
     Task SaveProgressAsync(LearningProgress progress, CancellationToken cancellationToken);
 }

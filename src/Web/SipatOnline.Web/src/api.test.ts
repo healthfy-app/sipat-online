@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureCompanyAdministration, createParticipant, getPlatformCompanyEmployees, getSession, listAllParticipants, signIn, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality } from './api';
+import { configureCompanyAdministration, createParticipant, forgetAntiforgeryToken, getPlatformCompanyEmployees, getSession, listAllParticipants, recordLearningPlaybackRange, saveLearningPosition, signIn, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality } from './api';
 
 afterEach(() => {
   configureCompanyAdministration(null);
@@ -164,5 +164,64 @@ describe('API client', () => {
     expect(posts).toHaveLength(2);
     expect(new Headers(posts[0][1].headers).get('X-CSRF-TOKEN')).toBe('old');
     expect(new Headers(posts[1][1].headers).get('X-CSRF-TOKEN')).toBe('fresh');
+  });
+});
+
+describe('video progress saves', () => {
+  afterEach(() => {
+    forgetAntiforgeryToken();
+    vi.unstubAllGlobals();
+  });
+
+  const progress = { lessonId: 'l1', lastPlaybackPositionMilliseconds: 1000 };
+
+  it('fetch the antiforgery token once and reuse it while the video plays', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn().mockImplementation(async (path: string) =>
+      path === '/api/identity/antiforgery' ? Response.json({ requestToken: 'csrf-1' }) : Response.json(progress));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await saveLearningPosition('t1', 'l1', 1000);
+    await saveLearningPosition('t1', 'l1', 2000);
+    await recordLearningPlaybackRange('t1', 'l1', 's1', 0, 2000, 2000);
+
+    const paths = fetchMock.mock.calls.map((call) => call[0]);
+    expect(paths.filter((path) => path === '/api/identity/antiforgery')).toHaveLength(1);
+    expect(paths).toHaveLength(4);
+    for (const call of fetchMock.mock.calls.slice(1)) {
+      expect(new Headers(call[1].headers).get('X-CSRF-TOKEN')).toBe('csrf-1');
+    }
+  });
+
+  it('renew a rejected token and send the save once more', async () => {
+    forgetAntiforgeryToken();
+    let tokens = 0;
+    let saves = 0;
+    const fetchMock = vi.fn().mockImplementation(async (path: string) => {
+      if (path === '/api/identity/antiforgery') return Response.json({ requestToken: `csrf-${++tokens}` });
+      saves += 1;
+      return saves === 1
+        ? Response.json({ title: 'Token antifalsificação inválido.' }, { status: 400 })
+        : Response.json(progress);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(saveLearningPosition('t1', 'l1', 1000)).resolves.toEqual(progress);
+
+    expect(saves).toBe(2);
+    const lastSave = fetchMock.mock.calls.at(-1)!;
+    expect(new Headers(lastSave[1].headers).get('X-CSRF-TOKEN')).toBe('csrf-2');
+  });
+
+  it('do not retry other rejections', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn().mockImplementation(async (path: string) =>
+      path === '/api/identity/antiforgery'
+        ? Response.json({ requestToken: 'csrf-1' })
+        : Response.json({ title: 'O vídeo não foi encontrado.' }, { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(saveLearningPosition('t1', 'l1', 1000)).rejects.toThrow('O vídeo não foi encontrado.');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

@@ -153,5 +153,24 @@ docker compose --env-file deploy/.env.production -f deploy/compose.production.ya
 
 **Nesta versão o `db-init` é obrigatório, antes de subir a API nova.** Ele cria as tabelas `PlaybackGrants` (sessões de reprodução), `PlaybackQualitySessions` (medição de qualidade do vídeo) e `VideoConversionJobs` (fila de conversão), além do estado de conversão de cada vídeo. Sem elas, toda reprodução e todo envio de vídeo falham. Depois de subir a API nova, rode `--convert-catalog-videos` (seção 5) para gerar a 480p dos vídeos antigos. Rode o `db-init` primeiro e só depois o `up --build -d api web`.
 
+## 7. Observabilidade (opcional, Grafana Cloud grátis)
+A API já sabe enviar **traces** (cada requisição, com as consultas SQL e as chamadas ao R2), **métricas** (tempo e quantidade de requisições, memória, CPU, conexões do banco) e **logs** (inclusive os erros do navegador dos participantes) por OpenTelemetry (OTLP). **Em produção vem desligado:** com `OTEL_EXPORTER_OTLP_ENDPOINT` vazio a API só escreve logs no console (`docker compose ... logs api`), como antes.
+
+Para ver tudo num painel, a opção mais barata é a **camada grátis do Grafana Cloud**:
+
+1. Crie uma conta em grafana.com (plano *Free*, sem cartão). Escolha a região **São Paulo** (`sa-east-1`) ao criar o *stack*.
+2. No portal do Grafana Cloud, abra o seu *stack*, vá em **OpenTelemetry → Configure**, gere um token (*Generate now*) e copie as variáveis que a página mostra: o endpoint (algo como `https://otlp-gateway-prod-sa-east-1.grafana.net/otlp`) e o cabeçalho `Authorization=Basic%20...` (o `%20` é o espaço, deixe assim).
+3. No `deploy/.env.production`, descomente e preencha:
+   ```bash
+   OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-prod-sa-east-1.grafana.net/otlp
+   OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+   OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20<o valor que o Grafana mostrou>
+   ```
+   O token é um segredo, como as senhas: fica só nesse arquivo (permissão 600).
+4. Reinicie só a API: `docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml up -d api`.
+5. No Grafana, em **Explore**: *Tempo* mostra os traces (serviço `sipat-online-api`), *Loki* os logs e *Prometheus/Mimir* as métricas (por exemplo `http_server_request_duration_seconds`). Os logs e traces trazem `sipat.tenant.id`/`TenantId` (a empresa) e `enduser.id`/`UserId` (o id interno do usuário); nunca senha, matrícula ou token.
+
+**Custo.** Grátis até o limite da camada (na data desta versão: 50 GB de logs, 50 GB de traces e 10 mil séries de métricas por mês, guardados por 14 dias). Uma SIPAT de 600 pessoas fica bem abaixo disso. Na camada grátis não há cobrança: o que passar do limite é descartado até o mês seguinte. Confira os limites atuais em grafana.com/pricing antes do go-live. Para desligar, apague `OTEL_EXPORTER_OTLP_ENDPOINT` e reinicie a API.
+
 ## Limites desta topologia
 Uma VM, sem alta disponibilidade, banco não gerenciado e sem CDN para vídeo. Para o MVP e um cliente de 600+ pessoas é um começo razoável, desde que haja cópia externa testada e um plano para o dia do pico.
