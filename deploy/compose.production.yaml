@@ -29,6 +29,8 @@ x-api-environment: &api-environment
   SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-}
   SipatOnline__PlatformOperator__Password: ${PLATFORM_OPERATOR_PASSWORD:-}
   SipatOnline__ForwardedHeaders__KnownProxies__0: 172.28.0.2
+  # opcional: uma rede inteira de proxies confiaveis (CIDR); vazio = so o nginx acima, como hoje
+  SipatOnline__ForwardedHeaders__KnownNetworks__0: ${TRUSTED_PROXY_NETWORK:-}
   SipatOnline__BootstrapAdmin__LoginIdentifier: ${BOOTSTRAP_ADMIN_LOGIN_IDENTIFIER:-}
   SipatOnline__BootstrapAdmin__DisplayName: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:-}
   SipatOnline__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}

@@ -346,6 +346,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton(options);
         services.AddSingleton<VideoConversionSignal>();
         services.AddSingleton<VideoConversionInstance>();
+        services.AddSingleton<VideoConversionActivity>();
         services.AddSingleton<FfmpegVideoTranscoder>();
         if (string.Equals(configuration["SipatOnline:VideoStorage:Provider"], "R2", StringComparison.OrdinalIgnoreCase))
         {

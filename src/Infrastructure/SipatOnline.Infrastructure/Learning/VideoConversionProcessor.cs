@@ -21,6 +21,7 @@ public sealed class VideoConversionProcessor(
     FfmpegVideoTranscoder transcoder,
     VideoConversionOptions options,
     VideoConversionInstance instance,
+    VideoConversionActivity activity,
     IServiceScopeFactory scopes,
     TimeProvider clock,
     ILogger<VideoConversionProcessor> logger)
@@ -113,6 +114,7 @@ public sealed class VideoConversionProcessor(
     /// <summary>Converts a job this instance claimed, renewing its lease meanwhile; stops and writes nothing once the lease is lost.</summary>
     public async Task ProcessClaimedAsync(ClaimedConversionJob job, CancellationToken cancellationToken)
     {
+        using var running = activity.Begin();
         await using var lease = VideoConversionLease.Start(scopes, job.JobId, instance.Id, options, clock, logger);
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lease.Lost);
         try
