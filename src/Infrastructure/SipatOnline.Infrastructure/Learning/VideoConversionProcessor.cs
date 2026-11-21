@@ -17,6 +17,7 @@ public sealed record ClaimedConversionJob(Guid JobId, Guid VideoId, int Attempts
 public sealed class VideoConversionProcessor(
     PlatformDbContext db,
     IPlatformCourseVideoStorage storage,
+    IVideoSourceStore sourceStore,
     FfmpegVideoTranscoder transcoder,
     VideoConversionOptions options,
     VideoConversionInstance instance,
@@ -37,7 +38,7 @@ public sealed class VideoConversionProcessor(
     /// <summary>
     /// Jobs left "Running" by a worker that stopped renewing them (its process died) go back to the queue.
     /// A job whose lease is still live is someone's current work and is left alone. Rows from before leases
-    /// existed have none and count as abandoned.
+    /// existed have none and count as abandoned. A job that used up its attempts is failed, never requeued.
     /// </summary>
     public async Task<int> RequeueInterruptedAsync(CancellationToken cancellationToken)
     {
@@ -57,6 +58,7 @@ public sealed class VideoConversionProcessor(
 
         return await db.VideoConversionJobs
             .Where(abandoned)
+            .Where(job => job.Attempts < MaximumAttempts)
             .ExecuteUpdateAsync(setters => setters
                 .SetProperty(job => job.Status, VideoConversionJobEntity.Pending)
                 .SetProperty(job => job.StartedAt, (DateTimeOffset?)null)
@@ -115,7 +117,7 @@ public sealed class VideoConversionProcessor(
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, lease.Lost);
         try
         {
-            var outcome = await ConvertAsync(job, linked.Token);
+            var outcome = await ConvertAsync(job, lease, linked.Token);
             if (outcome.LeaseLost)
             {
                 LogLeaseLost(job);
@@ -164,23 +166,10 @@ public sealed class VideoConversionProcessor(
         var count = 0;
         foreach (var videoId in videoIds)
         {
-            await using (var current = await storage.OpenReadAsync(videoId, VideoRendition.Hd720, cancellationToken))
+            if (!await sourceStore.CopyFromRenditionAsync(videoId, VideoRendition.Hd720, cancellationToken))
             {
-                if (current is null)
-                {
-                    logger.LogWarning("Video {VideoId} has no file in the storage; it was not queued", videoId);
-                    continue;
-                }
-
-                Directory.CreateDirectory(EfVideoConversionQueue.WorkFolder(options, videoId));
-                await using var source = new FileStream(
-                    EfVideoConversionQueue.SourcePath(options, videoId),
-                    FileMode.Create,
-                    FileAccess.Write,
-                    FileShare.None,
-                    81_920,
-                    FileOptions.Asynchronous | FileOptions.SequentialScan);
-                await current.CopyToAsync(source, cancellationToken);
+                logger.LogWarning("Video {VideoId} has no file in the storage; it was not queued", videoId);
+                continue;
             }
 
             db.VideoConversionJobs.Add(new VideoConversionJobEntity
@@ -197,7 +186,8 @@ public sealed class VideoConversionProcessor(
         return count;
     }
 
-    private async Task<ConversionOutcome> ConvertAsync(ClaimedConversionJob job, CancellationToken cancellationToken)
+    private async Task<ConversionOutcome> ConvertAsync(
+        ClaimedConversionJob job, VideoConversionLease lease, CancellationToken cancellationToken)
     {
         var videoId = job.VideoId;
         var status = await db.PlatformCourseVideos.AsNoTracking()
@@ -209,8 +199,10 @@ public sealed class VideoConversionProcessor(
             return ConversionOutcome.Failure("O vídeo foi excluído antes da conversão.");
         }
 
-        var source = EfVideoConversionQueue.SourcePath(options, videoId);
-        if (!File.Exists(source))
+        var jobFolder = EfVideoConversionQueue.JobFolder(options, job.JobId);
+        Directory.CreateDirectory(jobFolder);
+        var source = await sourceStore.GetLocalCopyAsync(videoId, jobFolder, cancellationToken);
+        if (source is null)
         {
             return ConversionOutcome.Failure("O arquivo enviado não foi encontrado para a conversão. Envie o vídeo de novo.");
         }
@@ -218,7 +210,6 @@ public sealed class VideoConversionProcessor(
         // A video that is already ready may be playing right now: rewriting its 720p would answer
         // the viewers' range requests from another encoding. It only gains the 480p, made from that 720p.
         var addsSd480Only = status == Ready;
-        Directory.CreateDirectory(EfVideoConversionQueue.JobFolder(options, job.JobId));
         var hd = OutputPath(job.JobId, VideoRendition.Hd720);
         var sd = OutputPath(job.JobId, VideoRendition.Sd480);
         var renditions = addsSd480Only
@@ -244,7 +235,17 @@ public sealed class VideoConversionProcessor(
         {
             duration = await transcoder.ProbeDurationMillisecondsAsync(hd, cancellationToken);
             size = new FileInfo(hd).Length;
+            if (lease.IsLost)
+            {
+                return ConversionOutcome.Lost;
+            }
+
             await storage.SaveRenditionAsync(videoId, VideoRendition.Hd720, hd, cancellationToken);
+        }
+
+        if (lease.IsLost)
+        {
+            return ConversionOutcome.Lost;
         }
 
         await storage.SaveRenditionAsync(videoId, VideoRendition.Sd480, sd, cancellationToken);
@@ -296,7 +297,7 @@ public sealed class VideoConversionProcessor(
             await transaction.CommitAsync(cancellationToken);
         }
 
-        DeleteSourceFolder(videoId);
+        await DiscardSourceAsync(videoId);
         if (addsSd480Only)
         {
             logger.LogInformation("Video {VideoId} gained its 480p; its 720p was left untouched", videoId);
@@ -337,7 +338,7 @@ public sealed class VideoConversionProcessor(
                     .SetProperty(video => video.Status, FailedVideo)
                     .SetProperty(video => video.ProcessingError, Truncate(error, VideoErrorLength)), CancellationToken.None);
             await transaction.CommitAsync(CancellationToken.None);
-            DeleteSourceFolder(videoId);
+            await DiscardSourceAsync(videoId);
         }
         catch (Exception exception)
         {
@@ -384,8 +385,18 @@ public sealed class VideoConversionProcessor(
             EfVideoConversionQueue.JobFolder(options, jobId),
             rendition == VideoRendition.Sd480 ? "480p.mp4" : "720p.mp4");
 
-    private void DeleteSourceFolder(Guid videoId) =>
-        TryDeleteFolder(EfVideoConversionQueue.WorkFolder(options, videoId), "the work folder of video", videoId);
+    /// <summary>The original is no longer needed; failing to remove it is logged, never a reason to undo the result.</summary>
+    private async Task DiscardSourceAsync(Guid videoId)
+    {
+        try
+        {
+            await sourceStore.DeleteAsync(videoId, CancellationToken.None);
+        }
+        catch (Exception exception)
+        {
+            logger.LogWarning(exception, "Could not delete the original of video {VideoId}", videoId);
+        }
+    }
 
     private void DeleteJobFolder(Guid jobId) =>
         TryDeleteFolder(EfVideoConversionQueue.JobFolder(options, jobId), "the folder of conversion job", jobId);

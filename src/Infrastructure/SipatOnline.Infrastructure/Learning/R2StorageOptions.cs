@@ -9,4 +9,7 @@ public sealed class R2StorageOptions
     public string AccessKeyId { get; set; } = string.Empty;
     public string SecretAccessKey { get; set; } = string.Empty;
     public string Bucket { get; set; } = string.Empty;
+
+    /// <summary>True for the plain-HTTP MinIO of the tests; R2 itself is always HTTPS.</summary>
+    public bool UsesHttp => ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
 }

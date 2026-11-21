@@ -5,13 +5,16 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging.Abstractions;
 using SipatOnline.Api.Endpoints;
 using SipatOnline.Infrastructure;
+using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Infrastructure.Learning;
+using SipatOnline.Learning.Application.Catalog;
 using Testcontainers.PostgreSql;
 
 namespace SipatOnline.IntegrationTests;
@@ -222,6 +225,101 @@ public sealed class VideoConversionLeaseTests : IDisposable
         });
 
         Assert.DoesNotContain(factory.Services.GetServices<IHostedService>(), service => service is VideoConversionWorker);
+    }
+
+    [DockerFact]
+    public async Task An_exhausted_job_that_could_not_be_failed_is_not_requeued_for_another_attempt()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = await StartFactory(postgres.GetConnectionString());
+        var job = RunningJob(attempts: VideoConversionProcessor.MaximumAttempts, leaseUntil: DateTimeOffset.UtcNow.AddMinutes(-1));
+        await InsertJobs(factory, [job]);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            // The database refuses to record the failure, so the sweep finds the exhausted job still Running.
+            await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Database.ExecuteSqlRawAsync(
+                """
+                CREATE FUNCTION learning.refuse_failed_jobs() RETURNS trigger LANGUAGE plpgsql AS '
+                BEGIN
+                    IF NEW."Status" = ''Failed'' THEN RAISE EXCEPTION ''refused''; END IF;
+                    RETURN NEW;
+                END';
+                CREATE TRIGGER refuse_failed_jobs BEFORE UPDATE ON learning."VideoConversionJobs"
+                    FOR EACH ROW EXECUTE FUNCTION learning.refuse_failed_jobs();
+                """);
+        }
+
+        Assert.Equal(0, await Requeue(factory));
+
+        var row = (await Jobs(factory)).Single();
+        Assert.Equal(VideoConversionJobEntity.Running, row.Status);
+        Assert.Equal(VideoConversionProcessor.MaximumAttempts, row.Attempts);
+        Assert.False(await ConvertNext(factory));
+    }
+
+    [DockerFfmpegFact]
+    public async Task A_processor_that_lost_its_lease_uploads_no_more_renditions()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = await StartFactory(
+            postgres.GetConnectionString(), leaseDuration: "00:00:05", leaseRenewInterval: "00:00:00.200");
+        using var client = await OperatorClient(factory);
+        var videoId = await Upload(client, await File.ReadAllBytesAsync(await GenerateVideo("lost-upload.mp4", seconds: 2)));
+        var uploads = new List<VideoRendition>();
+        using var decorated = factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+        {
+            var original = services.Single(service => service.ServiceType == typeof(IPlatformCourseVideoStorage));
+            services.Remove(original);
+            services.AddSingleton<IPlatformCourseVideoStorage>(provider => new TakeOverAfterFirstUpload(
+                (IPlatformCourseVideoStorage)original.ImplementationFactory!(provider),
+                uploads,
+                async () =>
+                {
+                    await TakeOver(factory);
+                    // Several renewals: the processor has noticed by now.
+                    await Task.Delay(TimeSpan.FromSeconds(1.5));
+                }));
+        }));
+
+        await using (var scope = decorated.Services.CreateAsyncScope())
+        {
+            Assert.True(await scope.ServiceProvider.GetRequiredService<VideoConversionProcessor>().ProcessNextAsync(CancellationToken.None));
+        }
+
+        Assert.Equal(new[] { VideoRendition.Hd720 }, uploads);
+        var row = (await Jobs(factory)).Single();
+        Assert.Equal(VideoConversionJobEntity.Running, row.Status);
+        Assert.Equal("other", row.LeasedBy);
+        Assert.Equal(videoId, row.VideoId);
+    }
+
+    private sealed class TakeOverAfterFirstUpload(
+        IPlatformCourseVideoStorage inner, List<VideoRendition> uploads, Func<Task> afterFirstUpload) : IPlatformCourseVideoStorage
+    {
+        public Task<Result<StoredPlatformVideo>> SaveAsync(
+            Guid videoId, Stream content, string contentType, long declaredSize, CancellationToken cancellationToken) =>
+            inner.SaveAsync(videoId, content, contentType, declaredSize, cancellationToken);
+
+        public async Task SaveRenditionAsync(
+            Guid videoId, VideoRendition rendition, string filePath, CancellationToken cancellationToken)
+        {
+            // The token is ignored on purpose: only the processor's own check can stop a later upload.
+            await inner.SaveRenditionAsync(videoId, rendition, filePath, CancellationToken.None);
+            uploads.Add(rendition);
+            if (uploads.Count == 1)
+            {
+                await afterFirstUpload();
+            }
+        }
+
+        public Task<Stream?> OpenReadAsync(Guid videoId, VideoRendition rendition, CancellationToken cancellationToken) =>
+            inner.OpenReadAsync(videoId, rendition, cancellationToken);
+
+        public Task<Uri?> GetPlaybackUrlAsync(
+            Guid videoId, VideoRendition rendition, TimeSpan validFor, CancellationToken cancellationToken) =>
+            inner.GetPlaybackUrlAsync(videoId, rendition, validFor, cancellationToken);
+
+        public Task DeleteAsync(Guid videoId, CancellationToken cancellationToken) => inner.DeleteAsync(videoId, cancellationToken);
     }
 
     private async Task AssertTakenOverJobIsLeftAlone(WebApplicationFactory<Program> factory, int seconds, Stopwatch? watch = null)
