@@ -233,17 +233,9 @@ public static class PlatformCourseCatalogEndpoints
 
         catalog.MapPost("/videos/external", async (
             CreateExternalVideoRequest request,
-            HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await catalogService.CreateExternalVideoAsync(
                 request.Provider,
                 request.Url,
