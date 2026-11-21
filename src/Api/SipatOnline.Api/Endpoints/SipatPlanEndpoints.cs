@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Antiforgery;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Infrastructure.Learning;
 using SipatOnline.Learning.Application.Catalog;
@@ -15,11 +14,11 @@ public static class SipatPlanEndpoints
             .RequireAuthorization("ManageTenantSipats");
 
         group.MapGet("/capabilities", async (
-            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans, HttpContext context, CancellationToken token) =>
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans, CancellationToken token) =>
         {
             var plan = await plans.CurrentAsync(token);
             var capabilities = SipatOnline.Infrastructure.Tenancy.CompanyCapabilities.For(plan);
-            // the plan name is for the operator; the company only sees what it can do
+            // the company sees its plan (the medal beside its logo) and what it can do
             return Results.Ok(new
             {
                 capabilities.CustomizeGrid,
@@ -27,7 +26,7 @@ public static class SipatPlanEndpoints
                 capabilities.CustomCertificate,
                 capabilities.Quizzes,
                 capabilities.InternalVideos,
-                plan = context.User.IsInRole(SipatOnline.BuildingBlocks.Application.PlatformRoles.PlatformOperator) ? plan.ToString() : null
+                plan = plan.ToString()
             });
         })
         .WithName("GetCompanyCapabilities");
@@ -47,11 +46,9 @@ public static class SipatPlanEndpoints
         .WithName("GetSipatPlan");
 
         group.MapPut("/sipats/{sipatId:guid}/plan", async (
-            Guid sipatId, SaveSipatPlanRequest request, HttpContext context, IAntiforgery antiforgery,
+            Guid sipatId, SaveSipatPlanRequest request, HttpContext context,
             SipatPlanService service, CancellationToken token) =>
         {
-            var csrf = await ValidateAsync(antiforgery, context);
-            if (csrf is not null) return csrf;
             var days = request.Days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, day.Date, day.Subject,
                 day.VideoIds ?? [], day.GameIds ?? [])).ToArray();
             var result = await service.SaveAsync(sipatId, days, token);
@@ -60,21 +57,17 @@ public static class SipatPlanEndpoints
         .WithName("SaveSipatPlan");
 
         group.MapPost("/sipats/{sipatId:guid}/plan/copy-from/{sourceId:guid}", async (
-            Guid sipatId, Guid sourceId, HttpContext context, IAntiforgery antiforgery,
+            Guid sipatId, Guid sourceId, HttpContext context,
             SipatPlanService service, CancellationToken token) =>
         {
-            var csrf = await ValidateAsync(antiforgery, context);
-            if (csrf is not null) return csrf;
             var result = await service.CopyAsync(sipatId, sourceId, token);
             return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
         })
         .WithName("CopySipatPlan");
 
         group.MapPost("/sipats/{sipatId:guid}/plan/launch", async (
-            Guid sipatId, HttpContext context, IAntiforgery antiforgery, SipatPlanService service, CancellationToken token) =>
+            Guid sipatId, HttpContext context, SipatPlanService service, CancellationToken token) =>
         {
-            var csrf = await ValidateAsync(antiforgery, context);
-            if (csrf is not null) return csrf;
             var result = await service.LaunchAsync(sipatId, token);
             return result.IsSuccess
                 ? Results.Ok(new { days = result.Value.Days, created = result.Value.Created, updated = result.Value.Updated, kept = result.Value.Kept })
@@ -97,14 +90,6 @@ public static class SipatPlanEndpoints
         },
         title: error.Code, detail: error.Message, extensions: new Dictionary<string, object?> { ["code"] = error.Code });
 
-    private static async Task<IResult?> ValidateAsync(IAntiforgery antiforgery, HttpContext context)
-    {
-        try { await antiforgery.ValidateRequestAsync(context); return null; }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(statusCode: 400, title: "Token antifalsificação inválido.");
-        }
-    }
 }
 
 public sealed record SaveSipatPlanRequest(IReadOnlyList<ProgramDayDto>? Days);

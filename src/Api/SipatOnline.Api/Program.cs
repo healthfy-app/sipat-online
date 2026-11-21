@@ -9,10 +9,11 @@ using SipatOnline.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseSerilog((_, loggerConfiguration) => loggerConfiguration
+builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
     .MinimumLevel.Information()
     .Enrich.FromLogContext()
-    .WriteTo.Console());
+    .WriteToSipatSinks(context.Configuration, context.HostingEnvironment.EnvironmentName));
+builder.AddSipatObservability();
 
 builder.Services.AddOpenApi();
 builder.Services.AddProblemDetails();
@@ -37,10 +38,28 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     var knownProxyAddresses = builder.Configuration
         .GetSection("SipatOnline:ForwardedHeaders:KnownProxies")
         .Get<string[]>() ?? [];
-    if (knownProxyAddresses.Length == 0)
+    // Whole networks for a container reachable only through its proxy (Cloudflare Containers: 0.0.0.0/0 and ::/0).
+    var knownNetworks = builder.Configuration
+        .GetSection("SipatOnline:ForwardedHeaders:KnownNetworks")
+        .Get<string[]>()?
+        .Where(network => !string.IsNullOrWhiteSpace(network))
+        .ToArray() ?? [];
+    if (knownProxyAddresses.Length == 0 && knownNetworks.Length == 0)
     {
         throw new InvalidOperationException(
-            "At least one trusted forwarded-header proxy must be configured outside Development.");
+            "Configure SipatOnline:ForwardedHeaders:KnownProxies or SipatOnline:ForwardedHeaders:KnownNetworks " +
+            "with at least one trusted forwarded-header proxy outside Development.");
+    }
+
+    foreach (var network in knownNetworks)
+    {
+        if (!System.Net.IPNetwork.TryParse(network, out var trustedNetwork))
+        {
+            throw new InvalidOperationException(
+                $"The trusted forwarded-header network '{network}' is not a valid CIDR range.");
+        }
+
+        options.KnownIPNetworks.Add(trustedNetwork);
     }
 
     foreach (var address in knownProxyAddresses)
@@ -66,17 +85,30 @@ builder.Services.AddAntiforgery(options =>
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    // per address only as a flood guard: a whole factory signs in through one NAT address (see LoginAttemptLimiter)
+    var perAddress = builder.Configuration.GetValue(
+        $"{LoginAttemptLimiter.SectionName}:PerAddressPerMinute", LoginAttemptLimiter.DefaultPerAddressPerMinute);
     options.AddPolicy("identity-auth", context =>
         RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 10,
+                PermitLimit = perAddress,
                 Window = TimeSpan.FromMinutes(1),
                 QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
                 QueueLimit = 0
             }));
+    options.AddPolicy(ClientErrorEndpoints.RateLimitPolicy, context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0
+            }));
 });
+builder.Services.AddScoped<LoginAttemptLimiter>();
 builder.Services.AddSipatInfrastructure(builder.Configuration);
 
 var app = builder.Build();
@@ -160,10 +192,16 @@ app.UseRateLimiter();
 app.UseAuthentication();
 app.UseMiddleware<PlatformCompanyContextMiddleware>();
 app.UseMiddleware<TenantAuthorizationMiddleware>();
+app.UseMiddleware<ObservabilityContextMiddleware>();
 app.UseAuthorization();
-app.UseAntiforgery();
+app.UseMiddleware<ApiAntiforgeryMiddleware>();
 
 app.MapHealthChecks("/health");
+// Anonymous like /health: the Cloudflare Worker keeps the converter awake while this says busy.
+app.MapGet("/health/conversion", (SipatOnline.Infrastructure.Learning.VideoConversionActivity activity) =>
+    Results.Ok(new { busy = activity.IsBusy }))
+    .WithName("GetConversionHealth");
+app.MapClientErrorEndpoints();
 app.MapIdentityEndpoints();
 app.MapPlatformEndpoints();
 app.MapPlatformCourseCatalogEndpoints();

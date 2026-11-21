@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.Extensions.Options;
 using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.BuildingBlocks.Domain;
@@ -55,16 +54,9 @@ public static class TenantEndpoints
         group.MapPut("/branding", async (
             UpdateTenantBrandingRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             TenantBrandingService brandingService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await brandingService.UpdateAsync(request, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(result.Value)
@@ -92,20 +84,4 @@ public static class TenantEndpoints
             extensions: new Dictionary<string, object?> { ["code"] = error.Code });
     }
 
-    private static async Task<IResult?> ValidateAntiforgeryAsync(
-        IAntiforgery antiforgery,
-        HttpContext context)
-    {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(context);
-            return null;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Token antifalsificação inválido.");
-        }
-    }
 }

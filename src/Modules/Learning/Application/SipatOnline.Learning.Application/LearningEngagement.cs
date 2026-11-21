@@ -53,12 +53,20 @@ public sealed class LearningEngagementService(
             : Result<LearningActivities>.Success(activities);
     }
 
-    public async Task<Result<bool>> SaveOutcomeAsync(Guid trackId, string activityId, string outcome, CancellationToken token)
+    /// <param name="lessonId">
+    /// The video the page showed the game in, when the page sends it. A game in the middle of a video is known by the
+    /// video's place, so after extras moved the videos a page opened before could name another video's game.
+    /// </param>
+    public async Task<Result<bool>> SaveOutcomeAsync(Guid trackId, string activityId, string outcome, Guid? lessonId,
+        CancellationToken token)
     {
         var activities = await GetActivitiesAsync(trackId, token);
         if (!activities.IsSuccess) return Result<bool>.Failure(activities.Error);
-        if (outcome is not ("completed" or "skipped") || !activities.Value.Items.Any(item => item.Id == activityId))
+        var activity = activities.Value.Items.FirstOrDefault(item => item.Id == activityId);
+        if (outcome is not ("completed" or "skipped") || activity is null)
             return Failure<bool>("learning.activity_invalid", "A atividade ou o resultado informado não é válido.");
+        if (lessonId is Guid shown && activity.LessonId is Guid actual && shown != actual)
+            return Failure<bool>("learning.activity.stale", "A lista de atividades mudou. Atualize a página.");
         TryIdentity(out var tenantId, out var participantId);
         await store.SaveOutcomeAsync(tenantId, participantId, activities.Value.RevisionId, activityId, outcome, token);
         return Result<bool>.Success(true);

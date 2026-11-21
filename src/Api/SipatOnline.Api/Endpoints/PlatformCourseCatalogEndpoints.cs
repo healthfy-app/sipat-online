@@ -1,5 +1,4 @@
 using System.Globalization;
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Domain;
@@ -31,16 +30,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapPost("/courses", async (
             CreatePlatformCourseRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await catalogService.CreateAsync(
                 request.Title,
                 request.Description,
@@ -58,16 +50,9 @@ public static class PlatformCourseCatalogEndpoints
             Guid courseId,
             UpdatePlatformCourseRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             if (!Enum.TryParse<PlatformCourseStatus>(request.Status, true, out var status) ||
                 !Enum.IsDefined(status))
             {
@@ -105,16 +90,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapDelete("/courses/{courseId:guid}", async (
             Guid courseId,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService courseService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await courseService.DeleteCourseAsync(courseId, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
         })
@@ -123,16 +101,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapDelete("/videos/{videoId:guid}", async (
             Guid videoId,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService courseService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await courseService.DeleteVideoAsync(videoId, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
         })
@@ -141,16 +112,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapPost("/courses/{courseId:guid}/duplicate", async (
             Guid courseId,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await catalogService.DuplicateAsync(courseId, cancellationToken);
             return result.IsSuccess
                 ? Results.Created(
@@ -164,16 +128,9 @@ public static class PlatformCourseCatalogEndpoints
             Guid courseId,
             SetPlatformCourseVideosRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await catalogService.SetVideosAsync(courseId, request.VideoIds, cancellationToken);
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
         })
@@ -183,16 +140,9 @@ public static class PlatformCourseCatalogEndpoints
             Guid courseId,
             SetPlatformCourseStructureRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var lessons = request.Lessons?
                 .Select(item => new CourseLessonDraft(
                     item.Id,
@@ -208,16 +158,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapPut("/courses/{courseId:guid}/cover", async (
             Guid courseId,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var form = await context.Request.ReadFormAsync(cancellationToken);
             var file = form.Files.GetFile("cover");
             if (file is null)
@@ -242,16 +185,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapDelete("/courses/{courseId:guid}/cover", async (
             Guid courseId,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await catalogService.RemoveCoverAsync(courseId, cancellationToken);
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
         })
@@ -284,10 +220,9 @@ public static class PlatformCourseCatalogEndpoints
 
         catalog.MapPost("/videos", (
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
-            UploadVideoAsync(null, context, antiforgery, catalogService, cancellationToken))
+            UploadVideoAsync(null, context, catalogService, cancellationToken))
         .WithMetadata(new RequestSizeLimitAttribute(
             PlatformCourseCatalogService.MaximumVideoSizeBytes + 1_048_576))
         .WithMetadata(new RequestFormLimitsAttribute
@@ -296,13 +231,78 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("UploadPlatformLibraryVideo");
 
+        catalog.MapPost("/videos/uploads", async (
+            StartPlatformVideoUploadRequest request,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.StartDirectUploadAsync(
+                request.ContentType,
+                request.SizeBytes,
+                cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return ToProblem(result.Error);
+            }
+
+            if (result.Value.Ticket is not { } ticket)
+            {
+                return Results.Ok(new MultipartVideoUploadResponse(
+                    DirectUploadStart.Multipart,
+                    PlatformCourseCatalogService.MaximumVideoSizeBytes));
+            }
+
+            return Results.Ok(new DirectVideoUploadResponse(
+                DirectUploadStart.Direct,
+                ticket.VideoId,
+                ticket.UploadUrl.AbsoluteUri,
+                "PUT",
+                new Dictionary<string, string> { ["Content-Type"] = ticket.ContentType },
+                ticket.ExpiresAt,
+                PlatformCourseCatalogService.MaximumVideoSizeBytes));
+        })
+        .WithName("StartPlatformVideoUpload");
+
+        catalog.MapPost("/videos/uploads/{videoId:guid}/complete", async (
+            Guid videoId,
+            CompletePlatformVideoUploadRequest request,
+            HttpContext context,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.CompleteDirectUploadAsync(
+                videoId,
+                request.CourseId,
+                request.Title,
+                request.DurationMilliseconds,
+                cancellationToken);
+            return CreatedVideo(result, context);
+        })
+        .WithName("CompletePlatformVideoUpload");
+
+        catalog.MapPost("/videos/external", async (
+            CreateExternalVideoRequest request,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.CreateExternalVideoAsync(
+                request.Provider,
+                request.Url,
+                request.Title,
+                request.DurationMilliseconds,
+                cancellationToken);
+            return result.IsSuccess
+                ? Results.Created($"/api/platform/catalog/videos/{result.Value.Id:D}", ToResponse(result.Value))
+                : ToProblem(result.Error);
+        })
+        .WithName("CreatePlatformExternalVideo");
+
         catalog.MapPost("/courses/{courseId:guid}/videos", (
             Guid courseId,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
-            UploadVideoAsync(courseId, context, antiforgery, catalogService, cancellationToken))
+            UploadVideoAsync(courseId, context, catalogService, cancellationToken))
         .WithMetadata(new RequestSizeLimitAttribute(
             PlatformCourseCatalogService.MaximumVideoSizeBytes + 1_048_576))
         .WithMetadata(new RequestFormLimitsAttribute
@@ -348,16 +348,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapPost("/modules", async (
             SaveGameModuleRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             GameModuleService moduleService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             if (!TryParseGameType(request.GameType, out var gameType))
             {
                 return ToProblem(GameTypeInvalid);
@@ -375,16 +368,9 @@ public static class PlatformCourseCatalogEndpoints
             Guid moduleId,
             SaveGameModuleRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             GameModuleService moduleService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             if (!TryParseGameType(request.GameType, out var gameType))
             {
                 return ToProblem(GameTypeInvalid);
@@ -399,16 +385,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapDelete("/modules/{moduleId:guid}", async (
             Guid moduleId,
             HttpContext context,
-            IAntiforgery antiforgery,
             GameModuleService moduleService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await moduleService.DeleteAsync(moduleId, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
         })
@@ -426,16 +405,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapPost("/programs", async (
             SaveProgramRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatProgramService programService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await programService.CreateAsync(request.Title, ToProgramDays(request.Days), cancellationToken);
             return result.IsSuccess
                 ? Results.Created($"/api/platform/catalog/programs/{result.Value.Id:D}", ToProgramResponse(result.Value))
@@ -447,16 +419,9 @@ public static class PlatformCourseCatalogEndpoints
             Guid programId,
             SaveProgramRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatProgramService programService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await programService.UpdateAsync(programId, request.Title, ToProgramDays(request.Days), cancellationToken);
             return result.IsSuccess ? Results.Ok(ToProgramResponse(result.Value)) : ToProblem(result.Error);
         })
@@ -465,16 +430,9 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapDelete("/programs/{programId:guid}", async (
             Guid programId,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatProgramService programService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await programService.DeleteAsync(programId, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
         })
@@ -484,16 +442,9 @@ public static class PlatformCourseCatalogEndpoints
             Guid courseId,
             SetCourseModulesRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             GameModuleService moduleService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await moduleService.SetCourseModulesAsync(
                 courseId,
                 request.Items?.Select(item => new CourseModulePlacement(item.ModuleId, item.AfterVideoCount)).ToArray(),
@@ -506,16 +457,9 @@ public static class PlatformCourseCatalogEndpoints
             Guid videoId,
             SetVideoCheckpointsRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             GameModuleService moduleService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await moduleService.SetVideoCheckpointsAsync(
                 videoId,
                 request.Items?.Select(item => new VideoCheckpoint(item.TimeMilliseconds, item.ModuleId)).ToArray(),
@@ -556,16 +500,9 @@ public static class PlatformCourseCatalogEndpoints
             string plan,
             SetPlanSubjectsRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             if (!SipatOnline.Infrastructure.Tenancy.CompanyPlans.TryParse(plan, out var parsed))
             {
                 return Results.Problem(statusCode: 400, title: "tenant.plan.invalid", detail: "Escolha um plano válido: Bronze, Prata, Ouro ou Diamante.");
@@ -637,16 +574,9 @@ public static class PlatformCourseCatalogEndpoints
     private static async Task<IResult> UploadVideoAsync(
         Guid? courseId,
         HttpContext context,
-        IAntiforgery antiforgery,
         PlatformCourseCatalogService catalogService,
         CancellationToken cancellationToken)
     {
-        var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-        if (antiforgeryResult is not null)
-        {
-            return antiforgeryResult;
-        }
-
         var form = await context.Request.ReadFormAsync(cancellationToken);
         var file = form.Files.GetFile("video");
         if (file is null)
@@ -676,6 +606,11 @@ public static class PlatformCourseCatalogEndpoints
             file.ContentType,
             file.Length,
             cancellationToken);
+        return CreatedVideo(result, context);
+    }
+
+    private static IResult CreatedVideo(Result<PlatformCourseVideo> result, HttpContext context)
+    {
         if (!result.IsSuccess)
         {
             return ToProblem(result.Error);
@@ -719,13 +654,15 @@ public static class PlatformCourseCatalogEndpoints
             video.SizeBytes,
             video.DurationMilliseconds,
             video.CreatedAt,
-            $"/api/platform/catalog/videos/{video.Id:D}/file",
+            video.Provider == VideoProvider.Sipat ? $"/api/platform/catalog/videos/{video.Id:D}/file" : string.Empty,
             video.Checkpoints.Select(item => new VideoCheckpointDto(item.TimeMilliseconds, item.ModuleId)).ToArray(),
             video.LessonId,
             video.LibraryTitle,
             video.Status.ToString(),
             video.ProcessingError,
-            video.HasSd480);
+            video.HasSd480,
+            video.Provider.ToString(),
+            video.ExternalId);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -764,13 +701,16 @@ public static class PlatformCourseCatalogEndpoints
                 "learning.program.video_not_found" or
                 "learning.program.game_not_found" or
                 "learning.platform_course.cover_not_found" or
-                "learning.platform_course.video_not_found" => StatusCodes.Status404NotFound,
+                "learning.platform_course.video_not_found" or
+                "learning.platform_course.upload_not_found" => StatusCodes.Status404NotFound,
             "learning.platform_course.storage_unconfigured" or
                 "learning.platform_course.video_file_missing" => StatusCodes.Status503ServiceUnavailable,
             "learning.platform_course.actor_required" => StatusCodes.Status400BadRequest,
             "learning.platform_course.video_in_use" or
+                "learning.catalog.external_no_checkpoints" or
                 "learning.platform_course.video_processing" or
-                "learning.platform_course.video_failed" => StatusCodes.Status409Conflict,
+                "learning.platform_course.video_failed" or
+                "learning.platform_course.upload_already_completed" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 
@@ -781,22 +721,6 @@ public static class PlatformCourseCatalogEndpoints
             extensions: new Dictionary<string, object?> { ["code"] = error.Code });
     }
 
-    private static async Task<IResult?> ValidateAntiforgeryAsync(
-        IAntiforgery antiforgery,
-        HttpContext context)
-    {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(context);
-            return null;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Token antifalsificação inválido.");
-        }
-    }
 }
 
 public sealed record CreatePlatformCourseRequest(
@@ -812,6 +736,23 @@ public sealed record UpdatePlatformCourseRequest(
     string? GameType = null);
 
 public sealed record SetPlatformCourseVideosRequest(IReadOnlyList<Guid>? VideoIds);
+
+public sealed record StartPlatformVideoUploadRequest(string? ContentType, long SizeBytes);
+
+public sealed record CompletePlatformVideoUploadRequest(string? Title, long DurationMilliseconds, Guid? CourseId);
+
+/// <summary>The browser sends the file in the API's multipart form.</summary>
+public sealed record MultipartVideoUploadResponse(string Mode, long MaxSizeBytes);
+
+/// <summary>The browser PUTs the file to <see cref="UploadUrl"/> with exactly <see cref="Headers"/>, then calls complete.</summary>
+public sealed record DirectVideoUploadResponse(
+    string Mode,
+    Guid VideoId,
+    string UploadUrl,
+    string Method,
+    IReadOnlyDictionary<string, string> Headers,
+    DateTimeOffset ExpiresAt,
+    long MaxSizeBytes);
 
 public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Video, int CourseCount);
 
@@ -899,6 +840,14 @@ public sealed record PlatformCourseVideoResponse(
     string? LibraryTitle = null,
     string Status = "Ready",
     string? ProcessingError = null,
-    bool HasSd480 = false);
+    bool HasSd480 = false,
+    string Provider = "Sipat",
+    string? ExternalId = null);
+
+public sealed record CreateExternalVideoRequest(
+    string? Provider,
+    string? Url,
+    string? Title,
+    long? DurationMilliseconds);
 
 public sealed record CourseCategoryResponse(Guid Id, string Name, int CourseCount);

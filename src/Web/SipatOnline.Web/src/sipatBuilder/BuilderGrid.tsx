@@ -3,9 +3,10 @@ import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { extrasSuffix } from '@/courseEditor/courseFormat';
 import { cn } from '@/lib/utils';
 import {
-  addDays, dayDuration, formatClock, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay,
+  addDays, dayDuration, dayVideoCounts, formatClock, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay,
   type Catalog, type DaySlots,
 } from './model';
 import { DayBox, dropId, ThemeTray } from './ThemeCards';
@@ -107,10 +108,10 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
             })}
 
             {days.map((day, index) => {
-              const count = filled(day.videos).length;
+              const counts = dayVideoCounts(filled(day.videos), catalog);
               return <div className="builder-col flex items-baseline justify-between gap-2 border-r border-border bg-muted px-4 py-3" key={`time-${day.key}`} style={{ ...column(index), gridColumn: index + 1, gridRow: 3 }}>
                 <span className="text-xl font-extrabold tabular-nums text-foreground">{formatClock(dayDuration(day, catalog))}</span>
-                <span className="text-xs text-muted-foreground">{count} {count === 1 ? 'vídeo' : 'vídeos'}</span>
+                <span className="text-xs text-muted-foreground">{`${counts.house} ${counts.house === 1 ? 'vídeo' : 'vídeos'}${extrasSuffix(counts.extras)}`}</span>
               </div>;
             })}
 

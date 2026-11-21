@@ -21,13 +21,13 @@ Pesquisa consultada em 2 de novembro de 2026. A comparação orienta padrões de
 
 ## Padrões selecionados
 
-- Deixar claro que a pessoa está acessando uma **trilha de uma SIPAT**, com título, contexto e progresso antes ou ao lado do vídeo.
+- Deixar claro que a pessoa está acessando os **conteúdos de uma SIPAT**, com título, contexto e progresso antes ou ao lado do vídeo.
 - Manter vídeo como área principal e currículo como navegação secundária, sem widgets ou cartões decorativos que concorram por atenção.
 - Exibir itens em ordem livre, estado textual (não apenas cor), duração e um indicador de progresso cuja origem seja a API.
 - Persistir posição para retomada separadamente da cobertura verificada. Posição atual e seek do navegador jamais marcam conteúdo como assistido.
 - Mostrar estados claros de carregamento, vazio, falha/repetição e indisponibilidade de provedor; nunca renderizar dados demonstrativos como se fossem conteúdo real.
 - Usar HTML semântico e controles nativos enquanto o player/provedor não for escolhido. Quando um provedor for selecionado, revalidar controles, captions, teclado, fullscreen, velocidade e acessibilidade em navegadores reais.
-- Em mobile, priorizar vídeo e navegação de trilha acessível sem overflow horizontal; preservar posição ao trocar item.
+- Em mobile, priorizar vídeo e navegação acessível entre conteúdos do dia sem overflow horizontal; preservar posição ao trocar item.
 - Reservar `aria-live` para confirmações e erros, não para atualizações frequentes do playhead. Animar apenas progress feedback e respeitar `prefers-reduced-motion`.
 - Preservar marca e cores fornecidas pelo tenant; não criar identidade visual paralela à SIPAT Online.
 

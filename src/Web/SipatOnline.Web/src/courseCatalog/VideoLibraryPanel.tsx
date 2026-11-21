@@ -1,8 +1,10 @@
 import { Trash2 } from 'lucide-react';
-import type { PlatformLibraryVideo } from '@/api';
+import { isExtra, videoProvider, type PlatformLibraryVideo } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/page';
+import ExtraBadge from '@/courseEditor/ExtraBadge';
+import { ExternalVideoFrame, ExternalVideoOutside } from '@/ExternalVideoPreview';
 import { formatBytes, formatDuration, pluralize } from '@/courseEditor/courseFormat';
 import VideoPreview from '@/VideoPreview';
 
@@ -35,7 +37,9 @@ export default function VideoLibraryPanel({
             <article className="flex min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-card" key={video.id}>
               <div className="aspect-video bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
                 {video.status === 'Ready' ? (
-                  <VideoPreview preload="metadata" src={video.fileUrl} title={`Prévia de ${video.title}`} />
+                  isExtra(video)
+                    ? <ExternalVideoFrame title={`Prévia de ${video.title}`} video={video} />
+                    : <VideoPreview preload="metadata" src={video.fileUrl} title={`Prévia de ${video.title}`} />
                 ) : (
                   <p className="m-0 grid size-full place-items-center p-4 text-center text-[0.8125rem] leading-snug text-white/80">
                     {video.status === 'Processing'
@@ -45,10 +49,13 @@ export default function VideoLibraryPanel({
                 )}
               </div>
               <div className="grid gap-1.5 px-4 pb-4 pt-3.5">
-                <h3 className="m-0 line-clamp-2 text-[0.9375rem] font-semibold leading-[1.35]" title={video.title}>{video.title}</h3>
+                <h3 className="m-0 line-clamp-2 text-[0.9375rem] font-semibold leading-[1.35]" title={video.title}>{video.title}{isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</h3>
                 <p className="m-0 text-[0.8125rem] tabular-nums text-muted-foreground">
-                  {formatDuration(video.durationMilliseconds)} · {formatBytes(video.sizeBytes)}
+                  {isExtra(video)
+                    ? `${videoProvider(video)}${video.durationMilliseconds > 0 ? ` · ${formatDuration(video.durationMilliseconds)}` : ''}`
+                    : `${formatDuration(video.durationMilliseconds)} · ${formatBytes(video.sizeBytes)}`}
                 </p>
+                {isExtra(video) && <ExternalVideoOutside video={video} />}
                 <div className="mt-1 flex items-center justify-between gap-2">
                   {video.status === 'Processing' ? <Badge variant="warning">Processando</Badge>
                     : video.status === 'Failed' ? <Badge variant="destructive">Falhou</Badge>

@@ -7,13 +7,12 @@ using SipatOnline.Tenancy.Domain.Tenants;
 
 namespace SipatOnline.Infrastructure.Tenancy;
 
-public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
+public sealed class EfTenantStore(PlatformDbContext dbContext, TenantHostCache hostCache) : ITenantStore
 {
     public async Task<Tenant?> FindAsync(TenantId tenantId, CancellationToken cancellationToken)
     {
-        var entity = await dbContext.Tenants
-            .AsNoTracking()
-            .SingleOrDefaultAsync(tenant => tenant.Id == tenantId.Value, cancellationToken);
+        var entity = await WithoutImages(dbContext.Tenants.Where(tenant => tenant.Id == tenantId.Value))
+            .SingleOrDefaultAsync(cancellationToken);
 
         return entity is null ? null : Reconstitute(entity);
     }
@@ -22,17 +21,15 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
         TenantKey tenantKey,
         CancellationToken cancellationToken)
     {
-        var entity = await dbContext.Tenants
-            .AsNoTracking()
-            .SingleOrDefaultAsync(tenant => tenant.Key == tenantKey.Value, cancellationToken);
+        var entity = await WithoutImages(dbContext.Tenants.Where(tenant => tenant.Key == tenantKey.Value))
+            .SingleOrDefaultAsync(cancellationToken);
 
         return entity is null ? null : Reconstitute(entity);
     }
 
     public async Task<IReadOnlyList<Tenant>> ListAsync(CancellationToken cancellationToken)
     {
-        var tenants = await dbContext.Tenants
-            .AsNoTracking()
+        var tenants = await WithoutImages(dbContext.Tenants)
             .OrderBy(tenant => tenant.Name)
             .ThenBy(tenant => tenant.Id)
             .ToListAsync(cancellationToken);
@@ -49,6 +46,7 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
         try
         {
             await dbContext.SaveChangesAsync(cancellationToken);
+            hostCache.Forget(entity.Key);
             return Result<Tenant>.Success(tenant);
         }
         catch (DbUpdateException exception) when (
@@ -63,6 +61,23 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
                 new DomainError("tenant.key.duplicate", "Já existe uma empresa com esse identificador."));
         }
     }
+
+    // The company is looked up on every request (tenant resolution): never bring the portal logo,
+    // the banner or the certificate logo along, they are megabytes nobody reads here.
+    private static IQueryable<TenantEntity> WithoutImages(IQueryable<TenantEntity> tenants) =>
+        tenants.AsNoTracking().Select(tenant => new TenantEntity
+        {
+            Id = tenant.Id,
+            Key = tenant.Key,
+            Name = tenant.Name,
+            LogoReference = tenant.LogoReference,
+            PrimaryColor = tenant.PrimaryColor,
+            SecondaryColor = tenant.SecondaryColor,
+            CustomDomain = tenant.CustomDomain,
+            CreatedAt = tenant.CreatedAt,
+            IsActive = tenant.IsActive,
+            Plan = tenant.Plan
+        });
 
     private static Tenant Reconstitute(TenantEntity entity)
     {
@@ -123,5 +138,6 @@ public sealed class EfTenantStore(PlatformDbContext dbContext) : ITenantStore
         entity.CustomDomain = tenant.Branding.CustomDomain;
         entity.IsActive = tenant.IsActive;
         await dbContext.SaveChangesAsync(cancellationToken);
+        hostCache.Forget(entity.Key);
     }
 }

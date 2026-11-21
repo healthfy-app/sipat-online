@@ -590,85 +590,6 @@
   font-weight: 800;
 }
 
-.portal-layout-learner .learning-journey-card {
-  margin-bottom: 1rem;
-  padding: 1.25rem;
-  border: 1px solid var(--learner-border);
-  border-radius: 16px;
-  background: var(--learner-surface);
-}
-
-.portal-layout-learner .learning-journey-heading {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 0.875rem;
-}
-
-.portal-layout-learner .learning-journey-heading h2 {
-  margin: 0;
-  color: var(--learner-forest);
-  font-size: 1.15rem;
-}
-
-.portal-layout-learner .learning-journey-heading > span {
-  color: var(--learner-text-secondary);
-  font-size: 0.82rem;
-}
-
-.portal-layout-learner .learning-journey-steps {
-  display: flex;
-  gap: 0.625rem;
-  margin: 1rem 0 0;
-  padding: 0 0 0.5rem;
-  overflow-x: auto;
-  list-style: none;
-}
-
-.portal-layout-learner .learning-journey-step {
-  flex: 0 0 min(15rem, 75vw);
-  min-width: 0;
-}
-
-.portal-layout-learner .learning-journey-step a {
-  display: flex;
-  min-height: 4.5rem;
-  flex-direction: column;
-  justify-content: center;
-  gap: 0.25rem;
-  padding: 0.7rem 0.8rem;
-  border: 1px solid var(--learner-border);
-  border-radius: 10px;
-  color: var(--learner-text-secondary);
-  background: var(--learner-canvas);
-  text-decoration: none;
-}
-
-.portal-layout-learner .learning-journey-step strong {
-  overflow: hidden;
-  color: inherit;
-  font-size: 0.8rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.portal-layout-learner .learning-journey-step span {
-  font-size: 0.72rem;
-}
-
-.portal-layout-learner .learning-journey-step.is-complete a {
-  border-color: var(--learner-complete-bg);
-  color: var(--learner-complete-text);
-  background: var(--learner-complete-bg);
-}
-
-.portal-layout-learner .learning-journey-step.is-current a {
-  border: 2px solid var(--learner-action);
-  color: var(--learner-forest);
-  background: var(--learner-surface);
-}
-
 .portal-layout-learner .learning-milestone {
   margin: 0 0 1.25rem;
   padding: 0.9rem 1rem;
@@ -1600,12 +1521,6 @@
 
   .portal-layout-learner .learning-resume-cover {
     width: 100%;
-  }
-
-  .portal-layout-learner .learning-journey-heading {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.25rem;
   }
 
   .portal-layout-learner .learning-catalog-filters {

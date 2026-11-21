@@ -66,6 +66,15 @@ public sealed class PlatformCourseVideoEntity
 
     public bool HasSd480 { get; set; }
 
+    /// <summary>Sipat (uploaded file), YouTube or Vimeo (see <c>VideoProvider</c>).</summary>
+    public string Provider { get; set; } = "Sipat";
+
+    /// <summary>The video id at the external provider; null for uploaded files.</summary>
+    public string? ExternalId { get; set; }
+
+    /// <summary>Reserved for videos owned by a company; always null for now.</summary>
+    public Guid? OwnerTenantId { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> CourseLinks { get; set; } = [];
 
     public ICollection<PlatformVideoCheckpointEntity> Checkpoints { get; set; } = [];

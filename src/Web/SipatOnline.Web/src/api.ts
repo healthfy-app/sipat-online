@@ -1,4 +1,5 @@
 import type { PlayerQualitySummary } from '@sipat/video-player';
+import { reportFailedRequest } from './telemetry';
 
 export interface TenantBranding {
   tenantKey: string;
@@ -25,7 +26,7 @@ export interface PlatformCompany {
   isActive: boolean;
 }
 
-/** The plans sold on the site. The company is never shown its own plan; only the operator sees and changes it. */
+/** The plans sold on the site. The company sees its own plan; only the operator changes it. */
 export type CompanyPlan = 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
 
 export interface PlatformCompanyOverview extends PlatformCompany {
@@ -169,9 +170,10 @@ export function getLearningActivities(trackId: string): Promise<{ revisionId: st
   return requestJson(`/api/learning/tracks/${trackId}/activities`);
 }
 
-export function saveLearningActivityOutcome(trackId: string, activityId: string, outcome: string): Promise<{ saved: boolean }> {
+/** A checkpoint outcome names its lesson: the server refuses it (409 `learning.activity.stale`) when the list changed. */
+export function saveLearningActivityOutcome(trackId: string, activityId: string, outcome: string, lessonId?: string): Promise<{ saved: boolean }> {
   return requestJson(`/api/learning/tracks/${trackId}/activities/${activityId}/outcome`, {
-    method: 'PUT', body: JSON.stringify({ outcome }),
+    method: 'PUT', body: JSON.stringify(lessonId ? { outcome, lessonId } : { outcome }),
   });
 }
 
@@ -293,6 +295,20 @@ export interface PlatformCourseVideo {
   checkpoints: VideoCheckpoint[];
   lessonId?: string | null;
   libraryTitle?: string | null;
+  /** Missing in payloads from before external videos: read it with `videoProvider`. */
+  provider?: VideoProvider;
+  externalId?: string | null;
+}
+
+export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo';
+
+export function videoProvider(video: { provider?: VideoProvider }): VideoProvider {
+  return video.provider ?? 'Sipat';
+}
+
+/** A YouTube or Vimeo video: an appendix of the Assunto that never counts for progress or the certificate. */
+export function isExtra(video: { provider?: string }): boolean {
+  return (video.provider ?? 'Sipat') !== 'Sipat';
 }
 
 export interface PlatformLibraryVideo {
@@ -507,6 +523,10 @@ export interface LearningLessonProgress {
   completedAt: string | null;
   sectionTitle?: string | null;
   watchedMilliseconds?: number;
+  /** An extra (YouTube or Vimeo): never counts for progress. Missing in payloads from before external videos. */
+  isBonus?: boolean;
+  provider?: 'YouTube' | 'Vimeo' | null;
+  externalId?: string | null;
 }
 
 export interface LearningExperience {
@@ -538,6 +558,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -557,16 +578,18 @@ export function getCompanyAdministrationId(): string | null {
 async function readError(response: Response): Promise<ApiError> {
   let message = `Não foi possível concluir a solicitação (HTTP ${response.status}).`;
 
+  let code: string | undefined;
   try {
-    const problem = (await response.json()) as { detail?: string; title?: string };
+    const problem = (await response.json()) as { detail?: string; title?: string; code?: string };
     message = problem.detail ?? problem.title ?? message;
+    code = problem.code;
   } catch (error) {
     if (!(error instanceof SyntaxError)) {
       throw error;
     }
   }
 
-  return new ApiError(message, response.status);
+  return new ApiError(message, response.status, code);
 }
 
 async function getAntiforgeryToken(): Promise<string> {
@@ -587,6 +610,30 @@ async function getAntiforgeryToken(): Promise<string> {
   return payload.requestToken;
 }
 
+/** Reused across writes: one GET /antiforgery per session instead of one per save. */
+let cachedAntiforgeryToken: string | null = null;
+
+/** The next write fetches a fresh token (the signed-in person changed or the session ended). */
+export function forgetAntiforgeryToken(): void {
+  cachedAntiforgeryToken = null;
+}
+
+async function currentAntiforgeryToken(): Promise<string> {
+  return cachedAntiforgeryToken ?? (cachedAntiforgeryToken = await getAntiforgeryToken());
+}
+
+const antiforgeryRejectionTitle = 'Token antifalsificação inválido.';
+
+async function isAntiforgeryRejection(response: Response): Promise<boolean> {
+  if (response.status !== 400 || typeof response.clone !== 'function') return false;
+  try {
+    const problem = (await response.clone().json()) as { title?: string };
+    return problem?.title === antiforgeryRejectionTitle;
+  } catch {
+    return false;
+  }
+}
+
 async function request(
   path: string,
   init: RequestInit = {},
@@ -599,8 +646,9 @@ async function request(
     headers.set('X-Sipat-Company', companyAdministrationId);
   }
 
-  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    headers.set('X-CSRF-TOKEN', await getAntiforgeryToken());
+  const writes = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+  if (writes) {
+    headers.set('X-CSRF-TOKEN', await currentAntiforgeryToken());
   }
 
   if (
@@ -611,13 +659,30 @@ async function request(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(path, {
-    ...init,
-    method,
-    credentials: 'include',
-    headers,
-  });
+  const send = async (): Promise<Response> => {
+    try {
+      return await fetch(path, {
+        ...init,
+        method,
+        credentials: 'include',
+        headers: new Headers(headers),
+      });
+    } catch (error) {
+      reportFailedRequest(method, path, error);
+      throw error;
+    }
+  };
+  let response = await send();
 
+  // The token is tied to the signed-in person: after a login, logout or expired session it is stale.
+  // Fetch a fresh one and send once more.
+  if (writes && await isAntiforgeryRejection(response)) {
+    cachedAntiforgeryToken = null;
+    headers.set('X-CSRF-TOKEN', await currentAntiforgeryToken());
+    response = await send();
+  }
+
+  if (response.status >= 500) reportFailedRequest(method, path, response.status);
   if (!response.ok) {
     throw await readError(response);
   }
@@ -671,12 +736,18 @@ export async function signIn(
     method: 'POST',
     body: JSON.stringify({ loginIdentifier, password }),
   });
+  // the token is tied to who is signed in
+  cachedAntiforgeryToken = null;
 }
 
 export async function signOut(platform = false): Promise<void> {
-  await request(platform ? '/api/platform/identity/logout' : '/api/identity/logout', {
-    method: 'POST',
-  });
+  try {
+    await request(platform ? '/api/platform/identity/logout' : '/api/identity/logout', {
+      method: 'POST',
+    });
+  } finally {
+    cachedAntiforgeryToken = null;
+  }
 }
 
 export function listPlatformCompanies(): Promise<PlatformCompany[]> {
@@ -762,7 +833,35 @@ export function listPlatformLibraryVideos(): Promise<PlatformLibraryVideo[]> {
   return requestJson<PlatformLibraryVideo[]>('/api/platform/catalog/videos');
 }
 
-export function uploadPlatformVideo(
+export type VideoUploadStart =
+  | {
+      mode: 'direct';
+      videoId: string;
+      uploadUrl: string;
+      method: 'PUT';
+      headers: Record<string, string>;
+      expiresAt: string;
+      maxSizeBytes: number;
+    }
+  | { mode: 'multipart'; maxSizeBytes: number };
+
+async function startVideoUpload(file: File): Promise<VideoUploadStart> {
+  try {
+    return await requestJson<VideoUploadStart>('/api/platform/catalog/videos/uploads', {
+      method: 'POST',
+      body: JSON.stringify({ contentType: file.type, sizeBytes: file.size }),
+    });
+  } catch (error) {
+    // An API older than this web build has no /uploads route: keep using the multipart upload.
+    if (error instanceof ApiError && error.status === 404) {
+      return { mode: 'multipart', maxSizeBytes: 0 };
+    }
+
+    throw error;
+  }
+}
+
+function uploadVideoMultipart(
   title: string,
   durationMilliseconds: number,
   file: File,
@@ -778,6 +877,55 @@ export function uploadPlatformVideo(
       : '/api/platform/catalog/videos',
     { method: 'POST', body: formData },
   );
+}
+
+export async function uploadPlatformVideo(
+  title: string,
+  durationMilliseconds: number,
+  file: File,
+  courseId?: string,
+): Promise<PlatformCourseVideo> {
+  const start = await startVideoUpload(file);
+  if (start.mode !== 'direct') {
+    return uploadVideoMultipart(title, durationMilliseconds, file, courseId);
+  }
+
+  // The bucket is another origin: no cookies and no CSRF header, only what the signed URL asks for.
+  let put: Response;
+  try {
+    put = await fetch(start.uploadUrl, {
+      method: 'PUT',
+      body: file,
+      headers: start.headers,
+      credentials: 'omit',
+    });
+  } catch {
+    // network failure or a CORS refusal: the browser only says "Failed to fetch"
+    throw new ApiError('Não foi possível enviar o vídeo. Verifique a conexão e tente de novo.', 0);
+  }
+  if (!put.ok) {
+    throw new ApiError('Não foi possível enviar o vídeo. Verifique a conexão e tente de novo.', put.status);
+  }
+
+  return requestJson<PlatformCourseVideo>(
+    `/api/platform/catalog/videos/uploads/${start.videoId}/complete`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ title, durationMilliseconds, courseId: courseId ?? null }),
+    },
+  );
+}
+
+export function createExternalPlatformVideo(data: {
+  provider: 'YouTube' | 'Vimeo';
+  url: string;
+  title: string;
+  durationMilliseconds: number | null;
+}): Promise<PlatformCourseVideo> {
+  return requestJson<PlatformCourseVideo>('/api/platform/catalog/videos/external', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function setPlatformCourseCover(courseId: string, file: File): Promise<PlatformCourse> {
@@ -841,7 +989,7 @@ export function changeCompanyPlan(companyId: string, plan: CompanyPlan): Promise
   return requestJson<{ plan: CompanyPlan }>(`/api/platform/companies/${companyId}/plan`, { method: 'PUT', body: JSON.stringify({ plan }) });
 }
 
-/** What the company can do (never the name of its plan, unless the operator is the one asking). */
+/** What the company can do, and the plan that grants it. */
 export interface CompanyCapabilities {
   customizeGrid: boolean; customBranding: boolean; customCertificate: boolean; quizzes: boolean; internalVideos: boolean; plan?: CompanyPlan | null;
 }
@@ -1067,11 +1215,9 @@ export function startLearningPlayback(
   );
 }
 
-let cachedAntiforgeryToken: string | null = null;
-
 export async function primeAntiforgeryToken(): Promise<void> {
   try {
-    cachedAntiforgeryToken = await getAntiforgeryToken();
+    await currentAntiforgeryToken();
   } catch {
     // The measurement must never disturb the video.
   }
@@ -1084,7 +1230,7 @@ export async function sendPlaybackQuality(
   trackId: string,
   summary: PlaybackQualitySummary,
 ): Promise<void> {
-  const token = cachedAntiforgeryToken ?? (cachedAntiforgeryToken = await getAntiforgeryToken());
+  const token = await currentAntiforgeryToken();
   const response = await fetch(`/api/learning/tracks/${trackId}/playback-quality`, {
     method: 'POST',
     keepalive: true,

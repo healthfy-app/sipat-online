@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -40,7 +40,7 @@ describe('SIPAT builder', () => {
       { key: 'a', title: 'Abertura', date: '2026-11-09', subject: '', videos: ['v1'], games: [] },
       { key: 'b', title: ' ', date: '', subject: '', videos: [null], games: [] },
     ]);
-    expect(issues.name).toBe('Dê um nome à SIPAT.');
+    expect(issues.name).toBe('Dê um nome à formação.');
     expect(issues.days).toEqual({ 1: ['Falta o slogan do dia.', 'Falta um assunto com vídeos.'] });
   });
 
@@ -76,13 +76,13 @@ describe('SIPAT builder', () => {
     expect(screen.queryByRole('button', { name: /Importar CSV/ })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Mais/ }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /Encerrar esta SIPAT/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Encerrar esta formação/ }));
     expect(await screen.findByRole('dialog', { name: 'Encerrar "SIPAT 2026"?' })).toBeVisible();
     expect(api.cancelSipatEvent).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: /Encerrar SIPAT/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Encerrar formação/ }));
     expect(api.cancelSipatEvent).toHaveBeenCalledWith('s1');
-    expect(await screen.findByText('SIPAT encerrada.')).toBeVisible();
+    expect(await screen.findByText('Formação encerrada.')).toBeVisible();
   });
 
   it('names the SIPAT that leaves the air when another is published', async () => {
@@ -96,20 +96,54 @@ describe('SIPAT builder', () => {
     vi.mocked(api.getSipatPlan).mockResolvedValue([{ id: 'd1', title: 'Abertura', date: '2026-11-09', subject: null, videoIds: ['v1'], gameIds: [] }]);
     renderBuilder();
     await userEvent.click(await screen.findByRole('button', { name: /Publicar/ }));
-    expect(await screen.findByRole('dialog', { name: 'Publicar a SIPAT?' })).toHaveTextContent('"SIPAT 2025" deixa de aparecer para os participantes.');
+    expect(await screen.findByRole('dialog', { name: 'Publicar a formação?' })).toHaveTextContent('"SIPAT 2025" deixa de aparecer para os participantes.');
   });
 
   it('asks before leaving through a link with unsaved changes', async () => {
     renderBuilder();
     await userEvent.type(await screen.findByRole('textbox', { name: 'Título do dia 2' }), 'Mãos seguras');
-    await userEvent.click(screen.getByRole('link', { name: /Todas as SIPATs/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Todas as formações/ }));
 
     expect(await screen.findByRole('dialog', { name: 'Sair sem salvar?' })).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }));
     expect(screen.queryByText('Lista de SIPATs')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('link', { name: /Todas as SIPATs/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Todas as formações/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Sair sem salvar' }));
     expect(await screen.findByText('Lista de SIPATs')).toBeVisible();
+  });
+
+  describe('extras', () => {
+    const house = (id: string, ms = 60000) => ({
+      courseCount: 1,
+      video: {
+        id, title: `Vídeo ${id}`, contentType: 'video/mp4', sizeBytes: 1, durationMilliseconds: ms, createdAt: '2026-11-10T12:00:00Z',
+        fileUrl: `/videos/${id}`, checkpoints: [], status: 'Ready' as const, processingError: null, hasSd480: true,
+      },
+    });
+    const extra = {
+      courseCount: 1,
+      video: { ...house('x1').video, title: 'Dicas do canal', provider: 'YouTube' as const, externalId: 'dQw4w9WgXcQ', fileUrl: '', durationMilliseconds: 0 },
+    };
+
+    it('keeps a day with 5 house videos and 1 extra valid and saves all 6 ids in order', async () => {
+      const library = [house('a'), house('b'), house('c'), house('d'), house('e'), extra];
+      vi.mocked(api.getSipatCatalog).mockResolvedValue({ courses: [], videos: library, games: [] });
+      const ids = ['a', 'b', 'c', 'd', 'e', 'x1'];
+      const plan = [{ id: 'd1', title: 'Abertura', date: '2026-11-09', subject: null, videoIds: ids, gameIds: [] }];
+      vi.mocked(api.getSipatPlan).mockResolvedValue(plan);
+      vi.mocked(api.saveSipatPlan).mockResolvedValue(plan);
+      renderBuilder();
+
+      const content = await screen.findByRole('group', { name: 'Conteúdo do dia 1' });
+      expect(within(content).getAllByText('Extra')).toHaveLength(1);
+      expect(within(content).getByText('YouTube')).toBeVisible();
+      expect(screen.getByText('5 vídeos + 1 extra')).toBeVisible();
+      expect(screen.getByText('0:05:00')).toBeVisible();
+
+      await userEvent.type(screen.getByRole('textbox', { name: 'Título do dia 1' }), '!');
+      await userEvent.click(screen.getByRole('button', { name: /Salvar rascunho/ }));
+      await waitFor(() => expect(api.saveSipatPlan).toHaveBeenCalledWith('s1', [expect.objectContaining({ videoIds: ids })]));
+    });
   });
 });

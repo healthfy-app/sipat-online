@@ -104,19 +104,22 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
 8. **Todo vídeo novo é convertido sozinho no envio** (H.264 720p de cerca de 2 Mbps e 480p de cerca de 1 Mbps, áudio AAC e `faststart`). Não é preciso preparar o arquivo antes.
 
 ### Conversão automática
-- A imagem da API já traz o `ffmpeg`. Cada envio fica guardado no volume `video-work` (na API: `/var/sipat/video-work`) e aparece na biblioteca como **Processando**; a API converte **um vídeo por vez**, em prioridade baixa (`nice`), para não disputar a CPU com quem está assistindo. Ao terminar, o vídeo fica **Pronto** e o original sai da pasta. Um vídeo **Processando** não pode entrar num Dia.
+- A imagem da API já traz o `ffmpeg`. Cada envio fica guardado (com `VIDEO_STORAGE_PROVIDER=File`, no volume `video-work`, na API `/var/sipat/video-work`; com `R2`, veja o item seguinte) e aparece na biblioteca como **Processando**; a API converte **um vídeo por vez**, em prioridade baixa (`nice`), para não disputar a CPU com quem está assistindo. Ao terminar, o vídeo fica **Pronto** e o original sai da pasta. Um vídeo **Processando** não pode entrar num Dia.
+- **Com `VIDEO_STORAGE_PROVIDER=R2` o original espera no bucket**, em `uploads/<id do vídeo>/source`, e sai de lá quando a conversão termina ou falha. O volume `video-work` passa a ser só rascunho: a API baixa o original para uma pasta temporária (`jobs/<id do trabalho>/`) durante a conversão e apaga a pasta no fim. Se o original sumir do bucket antes da conversão, o vídeo fica como **Falhou** e deve ser enviado de novo. Originais abandonados no bucket (envio que nunca foi convertido) ficam em `uploads/`, que é o prefixo a limpar com a regra de ciclo de vida do R2; nunca `videos/`.
 - Se o arquivo estiver corrompido, o vídeo fica como **Falhou**, com o motivo na biblioteca, e a fila segue com os próximos. Envie o arquivo de novo.
 - Se a API reiniciar no meio de uma conversão (atualização, queda da VM), o trabalho volta para a fila e roda de novo na partida; nada se perde.
 - Vídeos enviados antes desta versão não têm a versão 480p. Para eles a API cria **só a 480p**; a 720p que as pessoas assistem **não é recodificada nem trocada**. Com a API no ar, coloque-os na fila (o comando só enfileira e sai; quem converte é a API em execução):
   ```bash
   docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml exec api dotnet SipatOnline.Api.dll --convert-catalog-videos
   ```
-  Ele imprime `N vídeos na fila de conversão.`. Acompanhe na biblioteca da operação; os vídeos continuam disponíveis enquanto são convertidos. Pode ser repetido: vídeos que já estão na fila ou já têm 480p não entram de novo. **Espaço em disco:** cada vídeo enfileirado tem a 720p atual copiada antes para o volume `video-work`; confira que há espaço livre de aproximadamente o tamanho de toda a biblioteca antes de rodar o comando.
+  Ele imprime `N vídeos na fila de conversão.`. Acompanhe na biblioteca da operação; os vídeos continuam disponíveis enquanto são convertidos. Pode ser repetido: vídeos que já estão na fila ou já têm 480p não entram de novo. **Espaço em disco (somente com `File`):** cada vídeo enfileirado tem a 720p atual copiada antes para o volume `video-work`; confira que há espaço livre de aproximadamente o tamanho de toda a biblioteca antes de rodar o comando. Com `R2` a cópia é feita dentro do bucket (a 720p vira `uploads/<id>/source` sem passar pelo disco), então não é preciso reservar espaço no volume.
 
 **Antes do go-live:** confirme nos termos de uso da Cloudflare que servir vídeo pelo R2 é permitido no seu plano. **Plano B:** se houver qualquer problema, defina `VIDEO_STORAGE_PROVIDER=File` (ou apague a variável) e reinicie a API; ela volta a servir os vídeos do volume `platform-videos`, que por isso deve continuar existindo e com cópia externa. **Atenção:** vídeos enviados enquanto o R2 estava ativo existem **somente no R2** e não estão no volume. Antes de voltar para `File`, reenvie esses vídeos pelo painel ou copie-os de volta do bucket para o volume; do contrário eles ficam sem arquivo.
 
 ### Backup diário do banco no R2
 O banco roda na própria VM; sem cópia externa, perder o disco é perder tudo. Todo dia às 03:00 um *timer* grava um `pg_dump` no R2 e apaga as cópias com mais de 30 dias.
+
+> **O backup é sensível.** As chaves de login e segurança do sistema (Data Protection) ficam no banco, sem criptografia. Quem tiver uma cópia do banco consegue forjar sessões: guarde o bucket de backups privado e com chave de acesso só dele.
 
 1. Instale o rclone: `sudo apt install rclone` (ou `curl https://rclone.org/install.sh | sudo bash`).
 2. No painel da Cloudflare, em **R2**, crie um bucket **privado** só para backups (por exemplo, `sipat-backups`, separado do bucket de vídeos). Crie uma chave de API do R2 com leitura e escrita **somente nesse bucket**.
@@ -152,6 +155,27 @@ docker compose --env-file deploy/.env.production -f deploy/compose.production.ya
 ```
 
 **Nesta versão o `db-init` é obrigatório, antes de subir a API nova.** Ele cria as tabelas `PlaybackGrants` (sessões de reprodução), `PlaybackQualitySessions` (medição de qualidade do vídeo) e `VideoConversionJobs` (fila de conversão), além do estado de conversão de cada vídeo. Sem elas, toda reprodução e todo envio de vídeo falham. Depois de subir a API nova, rode `--convert-catalog-videos` (seção 5) para gerar a 480p dos vídeos antigos. Rode o `db-init` primeiro e só depois o `up --build -d api web`.
+
+As chaves de proteção de dados (que assinam os cookies de login) agora ficam no banco, e o `db-init` cria a primeira. O volume `aspnet-data-protection` não é mais usado: depois da atualização ele pode ser removido com `docker volume rm` (o nome leva o prefixo do projeto do compose). Quem estava logado precisa entrar de novo uma única vez.
+
+## 7. Observabilidade (opcional, Grafana Cloud grátis)
+A API já sabe enviar **traces** (cada requisição, com as consultas SQL e as chamadas ao R2), **métricas** (tempo e quantidade de requisições, memória, CPU, conexões do banco) e **logs** (inclusive os erros do navegador dos participantes) por OpenTelemetry (OTLP). **Em produção vem desligado:** com `OTEL_EXPORTER_OTLP_ENDPOINT` vazio a API só escreve logs no console (`docker compose ... logs api`), como antes.
+
+Para ver tudo num painel, a opção mais barata é a **camada grátis do Grafana Cloud**:
+
+1. Crie uma conta em grafana.com (plano *Free*, sem cartão). Escolha a região **São Paulo** (`sa-east-1`) ao criar o *stack*.
+2. No portal do Grafana Cloud, abra o seu *stack*, vá em **OpenTelemetry → Configure**, gere um token (*Generate now*) e copie as variáveis que a página mostra: o endpoint (algo como `https://otlp-gateway-prod-sa-east-1.grafana.net/otlp`) e o cabeçalho `Authorization=Basic%20...` (o `%20` é o espaço, deixe assim).
+3. No `deploy/.env.production`, descomente e preencha:
+   ```bash
+   OTEL_EXPORTER_OTLP_ENDPOINT=https://otlp-gateway-prod-sa-east-1.grafana.net/otlp
+   OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
+   OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic%20<o valor que o Grafana mostrou>
+   ```
+   O token é um segredo, como as senhas: fica só nesse arquivo (permissão 600).
+4. Reinicie só a API: `docker compose --env-file deploy/.env.production -f deploy/compose.production.yaml up -d api`.
+5. No Grafana, em **Explore**: *Tempo* mostra os traces (serviço `sipat-online-api`), *Loki* os logs e *Prometheus/Mimir* as métricas (por exemplo `http_server_request_duration_seconds`). Os logs e traces trazem `sipat.tenant.id`/`TenantId` (a empresa) e `enduser.id`/`UserId` (o id interno do usuário); nunca senha, matrícula ou token.
+
+**Custo.** Grátis até o limite da camada (na data desta versão: 50 GB de logs, 50 GB de traces e 10 mil séries de métricas por mês, guardados por 14 dias). Uma SIPAT de 600 pessoas fica bem abaixo disso. Na camada grátis não há cobrança: o que passar do limite é descartado até o mês seguinte. Confira os limites atuais em grafana.com/pricing antes do go-live. Para desligar, apague `OTEL_EXPORTER_OTLP_ENDPOINT` e reinicie a API.
 
 ## Limites desta topologia
 Uma VM, sem alta disponibilidade, banco não gerenciado e sem CDN para vídeo. Para o MVP e um cliente de 600+ pessoas é um começo razoável, desde que haja cópia externa testada e um plano para o dia do pico.

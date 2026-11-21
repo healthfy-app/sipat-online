@@ -59,14 +59,13 @@ public static class IdentityEndpoints
         group.MapPost("/login", async (
             LoginRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             UserApplicationService userService,
+            LoginAttemptLimiter limiter,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
+            if (!await limiter.TryAcquireAsync(context, request.LoginIdentifier, cancellationToken))
             {
-                return antiforgeryResult;
+                return LoginAttemptLimiter.TooManyAttempts();
             }
 
             var result = await userService.SignInAsync(
@@ -89,16 +88,9 @@ public static class IdentityEndpoints
 
         group.MapPost("/logout", async (
             HttpContext context,
-            IAntiforgery antiforgery,
             UserApplicationService userService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             await userService.SignOutAsync(cancellationToken);
             return Results.NoContent();
         })
@@ -108,22 +100,6 @@ public static class IdentityEndpoints
         return endpoints;
     }
 
-    private static async Task<IResult?> ValidateAntiforgeryAsync(
-        IAntiforgery antiforgery,
-        HttpContext context)
-    {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(context);
-            return null;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Token antifalsificação inválido.");
-        }
-    }
 }
 
 public sealed record LoginRequest(string? LoginIdentifier, string? Password);

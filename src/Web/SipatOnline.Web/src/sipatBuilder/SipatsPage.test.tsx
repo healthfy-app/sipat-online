@@ -26,9 +26,9 @@ describe('SIPATs of a company', () => {
     vi.mocked(api.listSipatPlans).mockResolvedValue([{ sipatEventId: 'b', days: 5, videos: 18 }]);
     render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
 
-    const first = await screen.findByRole('region', { name: 'SIPATs de 2027' });
-    const second = screen.getByRole('region', { name: 'SIPATs de 2026' });
-    const third = screen.getByRole('region', { name: 'SIPATs de 2025' });
+    const first = await screen.findByRole('region', { name: 'Formações de 2027' });
+    const second = screen.getByRole('region', { name: 'Formações de 2026' });
+    const third = screen.getByRole('region', { name: 'Formações de 2025' });
     expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(second.compareDocumentPosition(third) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(within(second).getByText('Em andamento')).toBeVisible();
@@ -36,7 +36,7 @@ describe('SIPATs of a company', () => {
     expect(within(first).getByText('Rascunho')).toBeVisible();
     expect(within(first).getByText('Dias ainda não montados')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Abrir SIPAT 2026' })).toHaveAttribute('href', '/admin/sipats/b');
-    expect(screen.getByRole('link', { name: 'Nova SIPAT' })).toHaveAttribute('href', '/admin/sipats/nova');
+    expect(screen.getByRole('link', { name: 'Nova formação' })).toHaveAttribute('href', '/admin/sipats/nova');
   });
 
   it('shows a cancelled SIPAT disabled, with a way to bring it back as a draft', async () => {

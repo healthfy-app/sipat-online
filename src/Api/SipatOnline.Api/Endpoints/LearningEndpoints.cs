@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Antiforgery;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application;
 using SipatOnline.Learning.Application.Quality;
@@ -64,16 +63,9 @@ public static class LearningEndpoints
             Guid sipatEventId,
             CreateLearningTrackRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await learningService.CreateTrackAsync(
                 sipatEventId,
                 request.Title,
@@ -91,16 +83,9 @@ public static class LearningEndpoints
             Guid trackId,
             CreateLearningLessonRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await learningService.AddLessonAsync(
                 trackId,
                 request.Title,
@@ -119,16 +104,9 @@ public static class LearningEndpoints
         admin.MapPost("/learning/tracks/{trackId:guid}/revisions", async (
             Guid trackId,
             HttpContext context,
-            IAntiforgery antiforgery,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await learningService.CreateNextRevisionAsync(trackId, cancellationToken);
             return result.IsSuccess
                 ? Results.Created(
@@ -141,16 +119,9 @@ public static class LearningEndpoints
         admin.MapPost("/learning/tracks/{trackId:guid}/publish", async (
             Guid trackId,
             HttpContext context,
-            IAntiforgery antiforgery,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await learningService.PublishAsync(trackId, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(ToResponse(result.Value))
@@ -162,16 +133,9 @@ public static class LearningEndpoints
             Guid trackId,
             AssignLearningTrackRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await learningService.AssignAsync(trackId, request.ParticipantId, cancellationToken);
             return result.IsSuccess
                 ? Results.Created(
@@ -208,16 +172,9 @@ public static class LearningEndpoints
             Guid trackId,
             Guid lessonId,
             HttpContext context,
-            IAntiforgery antiforgery,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await learningService.StartPlaybackAsync(trackId, lessonId, cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
         })
@@ -228,16 +185,9 @@ public static class LearningEndpoints
             Guid lessonId,
             SavePlaybackPositionRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await learningService.SavePositionAsync(
                 trackId,
                 lessonId,
@@ -252,16 +202,9 @@ public static class LearningEndpoints
             Guid lessonId,
             RecordPlaybackRangeRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await learningService.RecordPlaybackRangeAsync(
                 trackId,
                 lessonId,
@@ -278,16 +221,9 @@ public static class LearningEndpoints
             Guid trackId,
             PlaybackQualityRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlaybackQualityService qualityService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await qualityService.RecordAsync(trackId, request, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
         })
@@ -305,7 +241,8 @@ public static class LearningEndpoints
                 "learning.sipat_not_found" or "learning.participant_not_found" => StatusCodes.Status404NotFound,
             "learning.assignment_exists" or "learning.track_not_published" or
                 "learning.draft_not_found" or "learning.published_revision_not_found" or
-                "learning.revision.immutable" or "learning.draft_exists" => StatusCodes.Status409Conflict,
+                "learning.revision.immutable" or "learning.draft_exists" or
+                BonusLesson.RefusedCode => StatusCodes.Status409Conflict,
             "learning.evidence_invalid" => StatusCodes.Status400BadRequest,
             "learning.video_provider_unavailable" => StatusCodes.Status503ServiceUnavailable,
             _ => StatusCodes.Status400BadRequest
@@ -318,22 +255,6 @@ public static class LearningEndpoints
             extensions: new Dictionary<string, object?> { ["code"] = error.Code });
     }
 
-    private static async Task<IResult?> ValidateAntiforgeryAsync(
-        IAntiforgery antiforgery,
-        HttpContext context)
-    {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(context);
-            return null;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Token antifalsificação inválido.");
-        }
-    }
 
     private static LearningTrackResponse ToResponse(LearningTrack track) =>
         new(

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using SipatOnline.Api.Endpoints;
 using SipatOnline.Infrastructure;
 using SipatOnline.Infrastructure.Learning;
+using SipatOnline.Tenancy.Application.Provisioning;
 using Testcontainers.PostgreSql;
 
 namespace SipatOnline.IntegrationTests;
@@ -288,6 +289,204 @@ public sealed class PlatformCourseCatalogApiTests
         Assert.Equal(["Introdução", "Prática"], copied.GetProperty("lessons").EnumerateArray().Select(item => item.GetProperty("title").GetString()));
         Assert.Equal("Boas-vindas à ergonomia", copied.GetProperty("videos")[0].GetProperty("title").GetString());
         Assert.NotEqual(lessonId, copied.GetProperty("lessons")[0].GetProperty("id").GetGuid());
+    }
+
+    private const string YouTubeLink = "https://www.youtube.com/watch?v=dQw4w9WgXcQ";
+
+    [DockerFact]
+    public async Task Creates_an_external_youtube_video()
+    {
+        await using var env = await ExternalEnvironment.StartAsync();
+
+        using var response = await SendAsync(
+            env.Operator,
+            HttpMethod.Post,
+            "/api/platform/catalog/videos/external",
+            new { provider = "YouTube", url = YouTubeLink, title = "Dicas de segurança", durationMilliseconds = 212_000L });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        var video = await ReadAsync(response);
+        Assert.Equal("YouTube", video.GetProperty("provider").GetString());
+        Assert.Equal("dQw4w9WgXcQ", video.GetProperty("externalId").GetString());
+        Assert.Equal("Ready", video.GetProperty("status").GetString());
+        Assert.Equal(string.Empty, video.GetProperty("fileUrl").GetString());
+
+        using var library = await env.Operator.GetAsync($"https://{Host}/api/platform/catalog/videos");
+        var item = Assert.Single((await ReadAsync(library)).EnumerateArray());
+        Assert.Equal(video.GetProperty("id").GetGuid(), item.GetProperty("video").GetProperty("id").GetGuid());
+    }
+
+    [DockerFact]
+    public async Task Same_link_twice_returns_the_same_video()
+    {
+        await using var env = await ExternalEnvironment.StartAsync();
+        var body = new { provider = "YouTube", url = YouTubeLink, title = "Dicas", durationMilliseconds = 1000L };
+
+        using var first = await SendAsync(env.Operator, HttpMethod.Post, "/api/platform/catalog/videos/external", body);
+        using var second = await SendAsync(
+            env.Operator,
+            HttpMethod.Post,
+            "/api/platform/catalog/videos/external",
+            new { provider = "YouTube", url = "https://youtu.be/dQw4w9WgXcQ", title = "Outro título", durationMilliseconds = 1000L });
+
+        Assert.Equal(HttpStatusCode.Created, first.StatusCode);
+        Assert.Equal(HttpStatusCode.Created, second.StatusCode);
+        Assert.Equal((await ReadAsync(first)).GetProperty("id").GetGuid(), (await ReadAsync(second)).GetProperty("id").GetGuid());
+        using var library = await env.Operator.GetAsync($"https://{Host}/api/platform/catalog/videos");
+        Assert.Single((await ReadAsync(library)).EnumerateArray());
+    }
+
+    [DockerFact]
+    public async Task Refuses_an_unknown_link()
+    {
+        await using var env = await ExternalEnvironment.StartAsync();
+
+        using var response = await SendAsync(
+            env.Operator,
+            HttpMethod.Post,
+            "/api/platform/catalog/videos/external",
+            new { provider = "YouTube", url = "https://example.com/video", title = "Dicas", durationMilliseconds = 1000L });
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("learning.catalog.external_link_invalid", (await ReadAsync(response)).GetProperty("code").GetString());
+    }
+
+    [DockerFact]
+    public async Task External_video_has_no_file()
+    {
+        await using var env = await ExternalEnvironment.StartAsync();
+        var id = await env.CreateExternalAsync();
+
+        using var response = await env.Operator.GetAsync($"https://{Host}/api/platform/catalog/videos/{id}/file");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [DockerFact]
+    public async Task External_video_refuses_checkpoints()
+    {
+        await using var env = await ExternalEnvironment.StartAsync();
+        var id = await env.CreateExternalAsync();
+
+        using var response = await SendAsync(
+            env.Operator,
+            HttpMethod.Put,
+            $"/api/platform/catalog/videos/{id}/checkpoints",
+            new SetVideoCheckpointsRequest([]));
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+        Assert.Equal("learning.catalog.external_no_checkpoints", (await ReadAsync(response)).GetProperty("code").GetString());
+    }
+
+    [DockerFact]
+    public async Task Company_admin_cannot_create_external_video()
+    {
+        await using var env = await ExternalEnvironment.StartAsync();
+        using var created = await SendAsync(
+            env.Operator,
+            HttpMethod.Post,
+            "/api/platform/companies",
+            new CreateTenantRequest("acme-ext", "Acme Ext", "acme-admin", "Admin Acme", "AdminPassword123", "Bronze"));
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var admin = env.Factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+        {
+            BaseAddress = new Uri("https://acme-ext.localhost"),
+            AllowAutoRedirect = false
+        });
+        using var token = await admin.GetAsync("/api/identity/antiforgery");
+        var csrf = (await token.Content.ReadFromJsonAsync<AntiforgeryTokenResponse>())!.RequestToken;
+        using var login = new HttpRequestMessage(HttpMethod.Post, "/api/identity/login")
+        {
+            Content = JsonContent.Create(new LoginRequest("acme-admin", "AdminPassword123"))
+        };
+        login.Headers.Add("X-CSRF-TOKEN", csrf);
+        using var loginResponse = await admin.SendAsync(login);
+        Assert.Equal(HttpStatusCode.NoContent, loginResponse.StatusCode);
+
+        using var tokenAfter = await admin.GetAsync("/api/identity/antiforgery");
+        var csrfAfter = (await tokenAfter.Content.ReadFromJsonAsync<AntiforgeryTokenResponse>())!.RequestToken;
+        using var request = new HttpRequestMessage(HttpMethod.Post, "/api/platform/catalog/videos/external")
+        {
+            Content = JsonContent.Create(new { provider = "YouTube", url = YouTubeLink, title = "Dicas", durationMilliseconds = 1000L })
+        };
+        request.Headers.Add("X-CSRF-TOKEN", csrfAfter);
+        using var response = await admin.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [DockerFact]
+    public async Task Uploaded_video_reports_provider_sipat()
+    {
+        await using var env = await ExternalEnvironment.StartAsync();
+        await SeedVideoAsync(env.Factory, "Da casa");
+
+        using var library = await env.Operator.GetAsync($"https://{Host}/api/platform/catalog/videos");
+        var video = Assert.Single((await ReadAsync(library)).EnumerateArray()).GetProperty("video");
+
+        Assert.Equal("Sipat", video.GetProperty("provider").GetString());
+        Assert.Equal(JsonValueKind.Null, video.GetProperty("externalId").ValueKind);
+        Assert.NotEqual(string.Empty, video.GetProperty("fileUrl").GetString());
+    }
+
+    private sealed class ExternalEnvironment : IAsyncDisposable
+    {
+        private readonly PostgreSqlContainer postgres;
+
+        private ExternalEnvironment(PostgreSqlContainer postgres, SipatOnlineApiFactory factory, HttpClient client)
+        {
+            this.postgres = postgres;
+            Factory = factory;
+            Operator = client;
+        }
+
+        public SipatOnlineApiFactory Factory { get; }
+
+        public HttpClient Operator { get; }
+
+        public static async Task<ExternalEnvironment> StartAsync()
+        {
+            var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+            await postgres.StartAsync();
+            var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+            await using (var scope = factory.Services.CreateAsyncScope())
+            {
+                await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>()
+                    .InitializeAsync(CancellationToken.None);
+            }
+
+            var client = factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
+            {
+                BaseAddress = new Uri("https://integration-test.localhost"),
+                AllowAutoRedirect = false
+            });
+            using var login = await SendAsync(
+                client,
+                HttpMethod.Post,
+                "/api/platform/identity/login",
+                new LoginRequest("platform-operator", "PlatformPassword123"));
+            Assert.Equal(HttpStatusCode.NoContent, login.StatusCode);
+            return new ExternalEnvironment(postgres, factory, client);
+        }
+
+        public async Task<Guid> CreateExternalAsync()
+        {
+            using var response = await SendAsync(
+                Operator,
+                HttpMethod.Post,
+                "/api/platform/catalog/videos/external",
+                new { provider = "YouTube", url = YouTubeLink, title = "Dicas", durationMilliseconds = 60_000L });
+            Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+            return (await ReadAsync(response)).GetProperty("id").GetGuid();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            Operator.Dispose();
+            await Factory.DisposeAsync();
+            await postgres.DisposeAsync();
+        }
     }
 
     private static async Task<Guid> SeedVideoAsync(SipatOnlineApiFactory factory, string title)

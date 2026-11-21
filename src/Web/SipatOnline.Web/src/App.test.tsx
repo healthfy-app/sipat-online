@@ -39,6 +39,29 @@ describe('tenant portal', () => {
       expect(screen.queryByRole('button', { name: 'Salvar identidade visual' })).not.toBeInTheDocument();
     }
   });
+  it('shows the company its plan medal beside the logo, with the plan on hover', async () => {
+    window.history.pushState({}, '', '/admin/appearance');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/tenant/branding') return Response.json({
+        tenantKey: 'acme', tenantName: 'Acme', primaryColor: '#123456', secondaryColor: '#FFFFFF',
+        logoReference: null, customDomain: null,
+      });
+      if (url === '/api/identity/session') return Response.json({
+        id: 'user', loginIdentifier: 'user', displayName: 'User', roles: ['ClientAdmin'],
+      });
+      if (url === '/api/admin/capabilities') return Response.json({
+        customizeGrid: true, customBranding: true, customCertificate: true, quizzes: false, internalVideos: false, plan: 'Ouro',
+      });
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+    render(<App />);
+    const navigation = await screen.findByRole('complementary', { name: 'Navegação principal' });
+    const medal = await within(navigation).findByRole('button', { name: 'Plano Ouro' });
+    expect(within(navigation).getByRole('link', { name: 'Acme - início' })).not.toContainElement(medal);
+    await userEvent.setup().hover(medal);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(within(tooltip).getByText(/Inclusão de logos e cores personalizadas/)).toHaveTextContent('(incluído)');
+  });
   it('lets a supervisor view company progress without administration controls', async () => {
     window.history.pushState({}, '', '/');
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
@@ -58,7 +81,7 @@ describe('tenant portal', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
-    expect(screen.queryByRole('link', { name: 'SIPATs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Formações' })).not.toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('link', { name: 'Acompanhamento' }));
     expect(await screen.findByText(/Modo de consulta/)).toBeVisible();
@@ -178,7 +201,8 @@ describe('tenant portal', () => {
     vi.stubGlobal('fetch', fetch);
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
-    expect(fetch).toHaveBeenCalledTimes(role === 'ClientAdmin' ? 3 : 2);
+    // a company admin also asks for its capabilities, which may land just after the heading
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(role === 'ClientAdmin' ? 3 : 2));
     expect(screen.queryByRole('navigation', { name: 'Etapas do curso' })).not.toBeInTheDocument();
   });
 
@@ -333,7 +357,7 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
-    expect(screen.getByRole('link', { name: 'SIPATs' })).toHaveAttribute('href', '/admin/sipats');
+    expect(screen.getByRole('link', { name: 'Formações' })).toHaveAttribute('href', '/admin/sipats');
     expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(8));
   });
@@ -374,7 +398,7 @@ describe('tenant portal', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', {
-      name: 'Você ainda não tem uma SIPAT disponível',
+      name: 'Você ainda não tem uma formação disponível',
     })).toBeVisible();
     expect(screen.queryByRole('navigation', { name: 'Navegação principal' }))
       .not.toBeInTheDocument();
@@ -485,7 +509,12 @@ describe('tenant portal', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Acesse a plataforma' })).toBeVisible();
-    expect(screen.getByRole('region', { name: 'Acesso à plataforma' })).toBeVisible();
+    const platformLogin = screen.getByRole('region', { name: 'Acesso à plataforma' });
+    expect(platformLogin).toBeVisible();
+    expect(platformLogin.querySelector('.login-brand-panel')).toHaveClass('has-banner');
+    expect(platformLogin.querySelector('.login-brand-panel')).toHaveStyle({
+      '--login-banner': 'url("/platform-login-banner.jpg")',
+    });
     expect(screen.getByText('Acesso exclusivo para a equipe de operação.')).toBeVisible();
     await user.type(screen.getByLabelText('Login'), 'operator');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');

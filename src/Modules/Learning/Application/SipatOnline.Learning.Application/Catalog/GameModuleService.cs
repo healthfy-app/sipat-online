@@ -176,6 +176,13 @@ public sealed class GameModuleService(
                 "O vídeo não foi encontrado.");
         }
 
+        if (video.Provider != VideoProvider.Sipat)
+        {
+            return Failure<PlatformCourseVideo>(
+                "learning.catalog.external_no_checkpoints",
+                "Vídeo externo não recebe jogos no meio.");
+        }
+
         if (checkpoints is null || checkpoints.Count > MaximumItems ||
             checkpoints.Any(item => item.TimeMilliseconds < 1 || item.TimeMilliseconds > video.DurationMilliseconds))
         {

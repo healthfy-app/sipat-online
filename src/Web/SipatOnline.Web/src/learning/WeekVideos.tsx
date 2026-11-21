@@ -18,12 +18,9 @@ export function formatDayDate(date: string | null | undefined): string | null {
 
 type LessonsByTrack = Record<string, LearningLessonProgress[] | 'error'>;
 
-/**
- * The videos of the SIPAT week, day by day, three to a row. With a day chosen on the trail only that day shows;
- * with none, the whole week does. Each video opens the day at that video.
- */
-export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: {
-  days: DayGroup[]; allTracks: LearningTrackCard[]; selectedKey: string | null; onShowAll: () => void;
+/** The videos of the SIPAT week, grouped by day. Each video opens the day at that video. */
+export default function WeekVideos({ days, allTracks }: {
+  days: DayGroup[]; allTracks: LearningTrackCard[];
 }) {
   const [lessons, setLessons] = useState<LessonsByTrack>({});
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
@@ -40,19 +37,14 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
     return () => { current = false; };
   }, [trackIds]);
 
-  const shown = selectedKey ? days.filter(day => day.key === selectedKey) : days;
-  const selected = selectedKey ? shown[0] : undefined;
-
   return <section aria-labelledby="week-videos-title" className="week-videos">
     <div className="week-videos-heading">
-      <h2 id="week-videos-title">{selected ? selected.title : 'Vídeos da semana'}</h2>
-      {selected
-        ? <button className="week-videos-all" onClick={onShowAll} type="button">Ver a semana toda</button>
-        : <p>Toque em um dia no caminho para ver só os vídeos dele.</p>}
+      <h2 id="week-videos-title">Vídeos da semana</h2>
+      <p>Vídeos e progresso organizados por dia.</p>
     </div>
 
     <div className="week-videos-days">
-      {shown.map((day, dayIndex) => {
+      {days.map((day, dayIndex) => {
         const total = day.tracks.reduce((sum, track) => sum + track.lessonCount, 0);
         const done = day.tracks.reduce((sum, track) => sum + track.completedLessonCount, 0);
         const date = formatDayDate(day.tracks[0]?.dayDate);
@@ -94,7 +86,7 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
             const path = getTrackPath(track, allTracks);
             const cover = track.coverUrl ?? getCourseCover(track.title);
             const subject = getTrackDisplayTitle(track.title);
-            const nextId = Array.isArray(items) ? items.find(lesson => !lesson.isCompleted)?.id : undefined;
+            const nextId = Array.isArray(items) ? items.find(lesson => !lesson.isBonus && !lesson.isCompleted)?.id : undefined;
             return <div className="week-day-track" key={track.id}>
               {(day.tracks.length > 1 || subject !== day.title) && <p className="week-day-subject">{subject}</p>}
               {items === undefined && <p className="week-videos-note" role="status">Carregando os vídeos...</p>}
@@ -103,20 +95,22 @@ export default function WeekVideos({ days, allTracks, selectedKey, onShowAll }: 
               </p>}
               {Array.isArray(items) && <ol className="week-video-grid">
                 {items.map((lesson, index) => {
-                  const state = lesson.isCompleted ? 'done' : lesson.watchedPercentage > 0 ? 'progress' : lesson.id === nextId ? 'next' : 'todo';
+                  // an extra is an appendix: no progress, no number
+                  const houseNumber = items.slice(0, index + 1).filter(item => !item.isBonus).length;
+                  const state = lesson.isBonus ? 'todo' : lesson.isCompleted ? 'done' : lesson.watchedPercentage > 0 ? 'progress' : lesson.id === nextId ? 'next' : 'todo';
                   return <li key={lesson.id}>
-                    <Link className={`week-video is-${state}`} to={`${path}?video=${encodeURIComponent(lesson.id)}`}>
+                    <Link className={`week-video is-${state}${lesson.isBonus ? ' is-extra' : ''}`} to={`${path}?video=${encodeURIComponent(lesson.id)}`}>
                       <span className="week-video-cover">
                         <img alt="" decoding="async" loading="lazy" src={cover} />
                         <span aria-hidden="true" className="week-video-play">{lesson.isCompleted ? <Check /> : <Play />}</span>
-                        <span className="week-video-time">{formatDuration(lesson.durationMilliseconds)}</span>
+                        {!lesson.isBonus && <span className="week-video-time">{formatDuration(lesson.durationMilliseconds)}</span>}
                         {state === 'progress' && <span aria-hidden="true" className="week-video-bar"><span style={{ width: `${lesson.watchedPercentage}%` }} /></span>}
                       </span>
                       <span className="week-video-body">
-                        <span className="week-video-kicker">Vídeo {index + 1}</span>
+                        <span className="week-video-kicker">{lesson.isBonus ? 'Extra' : `Vídeo ${houseNumber}`}</span>
                         <strong>{lesson.title}</strong>
                         <span className="week-video-state">
-                          {state === 'done' ? 'Assistido' : state === 'progress' ? `Continuar · ${Math.round(lesson.watchedPercentage)}%` : state === 'next' ? 'Próximo' : 'Para assistir'}
+                          {lesson.isBonus ? `Extra · ${lesson.provider ?? 'externo'}` : state === 'done' ? 'Assistido' : state === 'progress' ? `Continuar · ${Math.round(lesson.watchedPercentage)}%` : state === 'next' ? 'Próximo' : 'Para assistir'}
                         </span>
                       </span>
                     </Link>

@@ -1,6 +1,6 @@
 namespace SipatOnline.Infrastructure.Tenancy;
 
-/// <summary>The plans sold on the site: they decide how much a company can personalize. The company itself never sees the name.</summary>
+/// <summary>The plans sold on the site: they decide how much a company can personalize. The company sees its plan; only the operator changes it.</summary>
 public enum CompanyPlan
 {
     Bronze = 0,

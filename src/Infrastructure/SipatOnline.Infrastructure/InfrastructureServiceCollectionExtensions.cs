@@ -2,6 +2,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using FluentValidation;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -121,6 +122,11 @@ public static class InfrastructureServiceCollectionExtensions
                 npgsql => npgsql.MigrationsAssembly(typeof(PlatformDbContext).Assembly.FullName));
         });
 
+        // Keys live in the database so every instance (and every restart) reads the same ring.
+        services.AddDataProtection()
+            .SetApplicationName(DataProtectionSetup.ApplicationName)
+            .PersistKeysToDbContext<PlatformDbContext>();
+
         services.AddIdentity<PlatformIdentityUser, IdentityRole<Guid>>(options =>
             {
                 options.User.RequireUniqueEmail = false;
@@ -133,11 +139,14 @@ public static class InfrastructureServiceCollectionExtensions
                 options.Password.RequiredUniqueChars = 1;
                 options.Lockout.AllowedForNewUsers = true;
                 options.Lockout.MaxFailedAccessAttempts = 5;
-                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                // short: the per-login rate limit (LoginAttemptLimiter) already stops brute force, and a
+                // guessable registration number must not let anyone keep a colleague out for long
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
             })
             .AddEntityFrameworkStores<PlatformDbContext>()
             .AddDefaultTokenProviders();
         services.AddScoped<IUserClaimsPrincipalFactory<PlatformIdentityUser>, TenantClaimsPrincipalFactory>();
+        services.AddScoped<ILoginAttemptCounter, EfLoginAttemptCounter>();
 
         services.ConfigureApplicationCookie(options =>
         {
@@ -228,6 +237,7 @@ public static class InfrastructureServiceCollectionExtensions
             GetVideoPlaybackProvider(provider, configuration));
         services.AddScoped<IPlaybackEvidenceVerifier>(provider =>
             GetPlaybackEvidenceVerifier(provider, configuration));
+        services.AddSingleton<TenantHostCache>();
         services.AddScoped<ITenantStore, EfTenantStore>();
         services.AddScoped<IInitialClientAdminProvisioner, EfInitialClientAdminProvisioner>();
         services.AddScoped<TenantProvisioningService>();
@@ -282,7 +292,9 @@ public static class InfrastructureServiceCollectionExtensions
                 ServiceUrl = RequireR2Setting(configuration, nameof(R2StorageOptions.ServiceUrl)),
                 AccessKeyId = RequireR2Setting(configuration, nameof(R2StorageOptions.AccessKeyId)),
                 SecretAccessKey = RequireR2Setting(configuration, nameof(R2StorageOptions.SecretAccessKey)),
-                Bucket = RequireR2Setting(configuration, nameof(R2StorageOptions.Bucket))
+                Bucket = RequireR2Setting(configuration, nameof(R2StorageOptions.Bucket)),
+                DirectUpload = configuration.GetValue<bool>(
+                    $"{R2StorageOptions.SectionName}:{nameof(R2StorageOptions.DirectUpload)}")
             };
             services.AddSingleton(options);
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
@@ -297,9 +309,19 @@ public static class InfrastructureServiceCollectionExtensions
                 }));
             services.TryAddSingleton(TimeProvider.System);
             services.AddSingleton<IPlatformCourseVideoStorage, R2PlatformCourseVideoStorage>();
+            if (options.DirectUpload)
+            {
+                services.AddSingleton<IDirectVideoUploadStore, R2DirectVideoUploadStore>();
+            }
+            else
+            {
+                services.AddSingleton<IDirectVideoUploadStore, NoDirectVideoUploadStore>();
+            }
+
             return;
         }
 
+        services.AddSingleton<IDirectVideoUploadStore, NoDirectVideoUploadStore>();
         services.AddSingleton<IPlatformCourseVideoStorage>(serviceProvider =>
             new FilePlatformCourseVideoStorage(
                 configuration["SipatOnline:PlatformCatalog:StoragePath"],
@@ -315,14 +337,31 @@ public static class InfrastructureServiceCollectionExtensions
             throw new InvalidOperationException($"Configure {VideoConversionOptions.SectionName}:WorkPath.");
         }
 
+        if (options.LeaseRenewInterval <= TimeSpan.Zero || options.LeaseRenewInterval >= options.LeaseDuration)
+        {
+            throw new InvalidOperationException(
+                $"{VideoConversionOptions.SectionName}:LeaseRenewInterval must be positive and shorter than LeaseDuration.");
+        }
+
         services.AddSingleton(options);
         services.AddSingleton<VideoConversionSignal>();
+        services.AddSingleton<VideoConversionInstance>();
+        services.AddSingleton<VideoConversionActivity>();
         services.AddSingleton<FfmpegVideoTranscoder>();
+        if (string.Equals(configuration["SipatOnline:VideoStorage:Provider"], "R2", StringComparison.OrdinalIgnoreCase))
+        {
+            services.AddSingleton<IVideoSourceStore, R2VideoSourceStore>();
+        }
+        else
+        {
+            services.AddSingleton<IVideoSourceStore, FileVideoSourceStore>();
+        }
+
         services.AddScoped<IVideoConversionQueue, EfVideoConversionQueue>();
         services.AddScoped<VideoConversionProcessor>();
         if (options.Enabled && options.RunInBackground)
         {
-            // A single worker: conversions run one at a time.
+            // One worker per instance, one conversion at a time; instances share the queue through leases.
             services.AddHostedService<VideoConversionWorker>();
         }
     }

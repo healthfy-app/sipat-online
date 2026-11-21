@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureCompanyAdministration, createParticipant, getPlatformCompanyEmployees, getSession, listAllParticipants, signIn, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality } from './api';
+import { configureCompanyAdministration, createParticipant, forgetAntiforgeryToken, getPlatformCompanyEmployees, getSession, uploadPlatformVideo, ApiError, listAllParticipants, signIn, saveLearningPosition, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality, createExternalPlatformVideo, isExtra, videoProvider, recordLearningPlaybackRange } from './api';
 
 afterEach(() => {
   configureCompanyAdministration(null);
+  forgetAntiforgeryToken();
   vi.unstubAllGlobals();
 });
 
@@ -118,6 +119,49 @@ describe('API client', () => {
     );
   });
 
+  it('reuses one antiforgery token across the participant saves', async () => {
+    const progress = { lessonId: 'l1' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf-1' }))
+      .mockImplementation(async () => Response.json(progress));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await saveLearningPosition('t1', 'l1', 1000);
+    await saveLearningPosition('t1', 'l1', 11000);
+    await saveLearningPosition('t1', 'l1', 21000);
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/identity/antiforgery')).toHaveLength(1);
+    const saves = fetchMock.mock.calls.filter(([url]) => url === '/api/learning/tracks/t1/lessons/l1/position');
+    expect(saves).toHaveLength(3);
+    for (const [, init] of saves) expect(new Headers(init.headers).get('X-CSRF-TOKEN')).toBe('csrf-1');
+  });
+
+  it('fetches a fresh token and sends once more when the server rejects the cached one', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'stale' }))
+      .mockResolvedValueOnce(Response.json({ title: 'Token antifalsificação inválido.' }, { status: 400 }))
+      .mockResolvedValueOnce(Response.json({ requestToken: 'fresh' }))
+      .mockResolvedValueOnce(Response.json({ lessonId: 'l1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(saveLearningPosition('t1', 'l1', 1000)).resolves.toEqual({ lessonId: 'l1' });
+
+    const saves = fetchMock.mock.calls.filter(([url]) => url === '/api/learning/tracks/t1/lessons/l1/position');
+    expect(saves).toHaveLength(2);
+    expect(new Headers(saves[0][1].headers).get('X-CSRF-TOKEN')).toBe('stale');
+    expect(new Headers(saves[1][1].headers).get('X-CSRF-TOKEN')).toBe('fresh');
+  });
+
+  it('does not retry an ordinary validation error', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(Response.json({ title: 'learning.invalid_position' }, { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(saveLearningPosition('t1', 'l1', -1)).rejects.toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it('treats an unauthenticated session as an empty session', async () => {
     vi.stubGlobal(
       'fetch',
@@ -164,5 +208,185 @@ describe('API client', () => {
     expect(posts).toHaveLength(2);
     expect(new Headers(posts[0][1].headers).get('X-CSRF-TOKEN')).toBe('old');
     expect(new Headers(posts[1][1].headers).get('X-CSRF-TOKEN')).toBe('fresh');
+  });
+});
+
+describe('external videos', () => {
+  it('posts the provider link and reads an old payload without provider as a house video', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(Response.json({ id: 'v1', title: 'Dicas', provider: 'YouTube', externalId: 'dQw4w9WgXcQ' }, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+    const data = { provider: 'YouTube' as const, url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Dicas', durationMilliseconds: null };
+
+    const video = await createExternalPlatformVideo(data);
+
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/platform/catalog/videos/external');
+    expect(fetchMock.mock.calls[1][1].method).toBe('POST');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual(data);
+    expect(video.externalId).toBe('dQw4w9WgXcQ');
+    expect(isExtra(video)).toBe(true);
+    const old: { provider?: 'Sipat' } = {};
+    expect(videoProvider(old)).toBe('Sipat');
+    expect(isExtra(old)).toBe(false);
+  });
+});
+
+describe('video upload', () => {
+  const file = new File(['abc'], 'a.mp4', { type: 'video/mp4' });
+  const direct = {
+    mode: 'direct', videoId: 'vid-1', uploadUrl: 'https://bucket.r2.cloudflarestorage.com/x?sig=1',
+    method: 'PUT', headers: { 'Content-Type': 'video/mp4' }, expiresAt: '2026-11-21T10:00:00Z', maxSizeBytes: 1000,
+  };
+  const video = { id: 'vid-1', title: 'Aula' };
+
+  afterEach(() => {
+    forgetAntiforgeryToken();
+    vi.unstubAllGlobals();
+  });
+
+  it('uploads straight to storage when the API offers a direct upload', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(Response.json(direct))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(Response.json(video, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(uploadPlatformVideo('Aula', 1234, file)).resolves.toEqual(video);
+
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/identity/antiforgery');
+    expect(fetchMock.mock.calls[1][0]).toBe('/api/platform/catalog/videos/uploads');
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ contentType: 'video/mp4', sizeBytes: 3 });
+    const [putUrl, putInit] = fetchMock.mock.calls[2];
+    expect(putUrl).toBe(direct.uploadUrl);
+    expect(putInit.method).toBe('PUT');
+    expect(putInit.body).toBe(file);
+    expect(putInit.credentials).toBe('omit');
+    const putHeaders = new Headers(putInit.headers);
+    expect(putHeaders.get('Content-Type')).toBe('video/mp4');
+    expect(putHeaders.has('X-CSRF-TOKEN')).toBe(false);
+    expect(fetchMock.mock.calls[3][0]).toBe('/api/platform/catalog/videos/uploads/vid-1/complete');
+    expect(JSON.parse(fetchMock.mock.calls[3][1].body)).toEqual({ title: 'Aula', durationMilliseconds: 1234, courseId: null });
+  });
+
+  it('sends the course id to complete when uploading into a course', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(Response.json(direct))
+      .mockResolvedValueOnce(new Response(null, { status: 200 }))
+      .mockResolvedValueOnce(Response.json(video, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await uploadPlatformVideo('Aula', 1234, file, 'course-9');
+
+    expect(JSON.parse(fetchMock.mock.calls[3][1].body).courseId).toBe('course-9');
+  });
+
+  it('falls back to the multipart form when the API says multipart', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(Response.json({ mode: 'multipart', maxSizeBytes: 1000 }))
+      .mockResolvedValueOnce(Response.json(video, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(uploadPlatformVideo('Aula', 1234, file)).resolves.toEqual(video);
+
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/platform/catalog/videos');
+    const form = fetchMock.mock.calls[2][1].body as FormData;
+    expect(form.get('title')).toBe('Aula');
+    expect(form.get('durationMilliseconds')).toBe('1234');
+    expect((form.get('video') as File).name).toBe('a.mp4');
+  });
+
+  it('falls back to the multipart form on an older API without the uploads route', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(new Response(null, { status: 404 }))
+      .mockResolvedValueOnce(Response.json(video, { status: 201 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(uploadPlatformVideo('Aula', 1234, file, 'course-9')).resolves.toEqual(video);
+
+    expect(fetchMock.mock.calls[2][0]).toBe('/api/platform/catalog/courses/course-9/videos');
+  });
+
+  it('reports a failed direct PUT in Portuguese and does not complete', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(Response.json(direct))
+      .mockResolvedValueOnce(new Response(null, { status: 403 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error = await uploadPlatformVideo('Aula', 1234, file).catch(e => e);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect(error.status).toBe(403);
+    expect(error.message).toBe('Não foi possível enviar o vídeo. Verifique a conexão e tente de novo.');
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe('video progress saves', () => {
+  afterEach(() => {
+    forgetAntiforgeryToken();
+    vi.unstubAllGlobals();
+  });
+
+  const progress = { lessonId: 'l1', lastPlaybackPositionMilliseconds: 1000 };
+
+  it('fetch the antiforgery token once and reuse it while the video plays', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn().mockImplementation(async (path: string) =>
+      path === '/api/identity/antiforgery' ? Response.json({ requestToken: 'csrf-1' }) : Response.json(progress));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await saveLearningPosition('t1', 'l1', 1000);
+    await saveLearningPosition('t1', 'l1', 2000);
+    await recordLearningPlaybackRange('t1', 'l1', 's1', 0, 2000, 2000);
+
+    const paths = fetchMock.mock.calls.map((call) => call[0]);
+    expect(paths.filter((path) => path === '/api/identity/antiforgery')).toHaveLength(1);
+    expect(paths).toHaveLength(4);
+    for (const call of fetchMock.mock.calls.slice(1)) {
+      expect(new Headers(call[1].headers).get('X-CSRF-TOKEN')).toBe('csrf-1');
+    }
+  });
+
+  it('renew a rejected token and send the save once more', async () => {
+    forgetAntiforgeryToken();
+    let tokens = 0;
+    let saves = 0;
+    const fetchMock = vi.fn().mockImplementation(async (path: string) => {
+      if (path === '/api/identity/antiforgery') return Response.json({ requestToken: `csrf-${++tokens}` });
+      saves += 1;
+      return saves === 1
+        ? Response.json({ title: 'Token antifalsificação inválido.' }, { status: 400 })
+        : Response.json(progress);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(saveLearningPosition('t1', 'l1', 1000)).resolves.toEqual(progress);
+
+    expect(saves).toBe(2);
+    const lastSave = fetchMock.mock.calls.at(-1)!;
+    expect(new Headers(lastSave[1].headers).get('X-CSRF-TOKEN')).toBe('csrf-2');
+  });
+
+  it('do not retry other rejections', async () => {
+    forgetAntiforgeryToken();
+    const fetchMock = vi.fn().mockImplementation(async (path: string) =>
+      path === '/api/identity/antiforgery'
+        ? Response.json({ requestToken: 'csrf-1' })
+        : Response.json({ title: 'O vídeo não foi encontrado.' }, { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(saveLearningPosition('t1', 'l1', 1000)).rejects.toThrow('O vídeo não foi encontrado.');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

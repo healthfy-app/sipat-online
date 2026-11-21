@@ -1,6 +1,7 @@
 import { ChevronRight, Clapperboard, Eye, Plus, Puzzle, Trash2 } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 import {
+  isExtra,
   setPlatformCourseModules,
   setVideoCheckpoints,
   type CourseModulePlacement,
@@ -14,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, NativeSelect } from '@/components/ui/input';
+import { houseVideos } from '@/courseEditor/courseFormat';
 import { gameTypeLabel } from '@/courseEditor/courseTrack';
 import { cn } from '@/lib/utils';
 
@@ -168,7 +170,7 @@ export default function CourseGamesSection({
         number={2}
         title="Atividade durante o vídeo"
       >
-        {course.videos.length === 0 ? (
+        {houseVideos(course.videos).length === 0 ? (
           <p className="m-0 rounded-md border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
             Adicione um vídeo ao curso antes de configurar uma pergunta durante a reprodução.
           </p>
@@ -178,7 +180,7 @@ export default function CourseGamesSection({
           </p>
         ) : (
           <div className="grid gap-2">
-            {course.videos.map((video, index) => (
+            {course.videos.map((video, index) => isExtra(video) ? null : (
               <CheckpointEditor
                 key={video.id}
                 modules={modules}

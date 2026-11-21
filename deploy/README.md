@@ -95,3 +95,7 @@ Use `https://<chave-do-tenant>.<dominio>` para entrar. A raiz do domínio e chav
 - Destruição: `terraform destroy` remove a VM, a rede, a zona e os dados persistidos nela; exporte os backups e confirme a delegação DNS antes de executar.
 
 Esse provisionamento não cria alta disponibilidade, escalonamento horizontal, banco gerenciado, CDN de vídeo nem domínio customizado por empresa. Essas decisões dependem de orçamento, volume, requisitos de disponibilidade, retenção e região.
+
+## Alternativa: Cloudflare Containers
+
+O mesmo código também roda como Worker + Containers, com Postgres gerenciado e vídeos no R2. Veja [CLOUDFLARE-CONTAINERS.md](CLOUDFLARE-CONTAINERS.md). A VM continua sendo o plano de contingência: o banco e o R2 são os mesmos.

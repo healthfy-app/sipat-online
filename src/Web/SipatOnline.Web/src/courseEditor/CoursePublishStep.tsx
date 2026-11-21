@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { pluralize } from './courseFormat';
+import { extrasSuffix, houseVideos, pluralize } from './courseFormat';
 import CourseStepHeading, { StepPage } from './CourseStepHeading';
 
 interface ChecklistItem {
@@ -43,7 +43,8 @@ export default function CoursePublishStep({
   onPublish: () => void;
   onUnpublish: () => void;
 }) {
-  const hasVideos = course.videos.length > 0;
+  const house = houseVideos(course.videos);
+  const hasVideos = house.length > 0;
   const isPublished = status === 'Published';
   const checklist: ChecklistItem[] = [
     { label: 'Nome do curso', state: title.trim() ? 'ready' : 'required', text: title.trim() ? 'Pronto' : 'Obrigatório' },
@@ -55,7 +56,7 @@ export default function CoursePublishStep({
   const summary = [
     { term: 'Título', value: title || 'Não informado' },
     { term: 'Descrição', value: description || 'Sem descrição' },
-    { term: 'Vídeos', value: pluralize(course.videos.length, 'vídeo', 'vídeos') },
+    { term: 'Vídeos', value: pluralize(house.length, 'vídeo', 'vídeos') + extrasSuffix(course.videos.length - house.length) },
     { term: 'Gamificação', value: gamificationEnabled ? 'Ativada após os vídeos' : 'Desativada' },
   ];
 

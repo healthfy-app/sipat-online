@@ -1,17 +1,11 @@
 /*
- * The videos of the SIPAT week below the trail: one block per day, three videos to a row on a desktop.
+ * The videos of the SIPAT week: one block per day, three videos to a row on a desktop.
  * Calm surfaces, one accent (the SIPAT yellow) for what comes next, and a check (never color alone) for what is done.
  */
 .portal-layout-learner .week-videos { display: grid; gap: 1.25rem; }
 .portal-layout-learner .week-videos-heading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.5rem 1rem; }
 .portal-layout-learner .week-videos-heading h2 { margin: 0; color: var(--learner-forest); font-size: 1.5rem; font-weight: 800; letter-spacing: -0.02em; overflow-wrap: anywhere; }
 .portal-layout-learner .week-videos-heading p { margin: 0; color: var(--learner-text-secondary); font-size: 0.9375rem; }
-.portal-layout-learner .week-videos-all {
-  min-height: 2.5rem; padding: 0 1rem; border: 1px solid var(--learner-border); border-radius: 999px; color: var(--learner-forest);
-  background: var(--learner-surface); font: inherit; font-size: 0.9375rem; font-weight: 700; cursor: pointer;
-}
-.portal-layout-learner .week-videos-all:hover { border-color: var(--learner-forest); }
-.portal-layout-learner .week-videos-all:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
 .portal-layout-learner .week-videos-note { margin: 0; color: var(--learner-text-secondary); font-size: 0.9375rem; }
 
 .portal-layout-learner .week-videos-days { display: grid; gap: 1.25rem; }

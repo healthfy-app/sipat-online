@@ -37,6 +37,7 @@ import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
 import CompanyNav from './companies/CompanyNav';
+import PlanMedal from './companies/PlanMedal';
 import PlaybackQualityPage from './quality/PlaybackQualityPage';
 import PlaybackQualityComparisonPage from './quality/PlaybackQualityComparisonPage';
 import PlatformSettingsPage from './PlatformSettingsPage';
@@ -187,7 +188,11 @@ export default function App() {
               path="/admin/dashboard"
               element={
                 state.session && canViewCompany(state.session) ? (
-                  <TenantLearningDashboardPage readOnly={!hasAdminRole(state.session)} />
+                  <TenantLearningDashboardPage
+                    brandColor={state.tenant.primaryColor}
+                    companyName={state.tenant.tenantName}
+                    readOnly={!hasAdminRole(state.session)}
+                  />
                 ) : (
                   <AccessDenied />
                 )
@@ -397,8 +402,12 @@ function LoginPage({
       className="login-layout"
     >
       <div
-        className={`login-brand-panel${tenant.bannerReference ? ' has-banner' : ''}`}
-        style={tenant.bannerReference ? ({ '--login-banner': `url("${tenant.bannerReference}")` } as React.CSSProperties) : undefined}
+        className={`login-brand-panel${tenant.bannerReference || tenant.tenantKey === 'platform' ? ' has-banner' : ''}`}
+        style={
+          tenant.bannerReference || tenant.tenantKey === 'platform'
+            ? ({ '--login-banner': `url("${tenant.bannerReference || '/platform-login-banner.jpg'}")` } as React.CSSProperties)
+            : undefined
+        }
       >
         <TenantIdentity tenant={tenant} compact={false} />
         <div className="login-intro">
@@ -410,11 +419,11 @@ function LoginPage({
             </>
           ) : (
             <>
-              <p className="eyebrow">CONTEÚDOS DA SUA SIPAT</p>
+              <p className="eyebrow">CONTEÚDOS DA SUA FORMAÇÃO</p>
               <h1>Aprender também faz parte de cuidar.</h1>
               <p>
                 Acesse os vídeos e demais conteúdos que sua empresa preparou para
-                a SIPAT.
+                a formação.
               </p>
             </>
           )}
@@ -506,7 +515,7 @@ function ProtectedPortal({
   const [error, setError] = useState('');
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null);
-  // what the company can do (its plan is never shown): the menu offers only what is available
+  // what the company can do and its plan: the menu offers only what is available, the medal by the logo shows the plan
   const [capabilities, setCapabilities] = useState<CompanyCapabilities | null>(null);
   useEffect(() => {
     if (!session || !(hasAdminRole(session) || (session.roles.includes('PlatformOperator') && getCompanyAdministrationId() !== null))) return;
@@ -633,18 +642,21 @@ function ProtectedPortal({
           </aside>
         )}
         {!isLearnerOnly && <aside aria-label="Navegação principal" className="sidebar">
-          <Link
-            aria-label={`${tenant.tenantName} - início`}
-            className="brand-link sidebar-brand"
-            to={getLandingPage(session)}
-          >
-            <TenantIdentity tenant={tenant} compact />
-          </Link>
+          <div className="sidebar-brand">
+            <Link
+              aria-label={`${tenant.tenantName} - início`}
+              className="brand-link sidebar-brand-link"
+              to={getLandingPage(session)}
+            >
+              <TenantIdentity tenant={tenant} compact />
+            </Link>
+            {capabilities?.plan && (!isPlatformOperator || isPlatformCompanyContext) && <PlanMedal plan={capabilities.plan} />}
+          </div>
           {session.roles.includes('Participant') && !isPlatformCompanyContext && (
             <>
               <p className="sidebar-label">APRENDIZAGEM</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/learning">
-                Minhas trilhas
+                Minhas formações
               </NavLink>
             </>
           )}
@@ -653,7 +665,7 @@ function ProtectedPortal({
               <p className="sidebar-label">GESTÃO DA EMPRESA</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
               {hasAdminRole(session) && <>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">SIPATs</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">Formações</NavLink>
                 {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
               </>}
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">

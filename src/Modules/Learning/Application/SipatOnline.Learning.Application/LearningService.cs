@@ -102,7 +102,7 @@ public sealed class LearningService(
         var track = await learningStore.FindTrackAsync(tenantId.Value, trackId, cancellationToken);
         if (track is null)
         {
-            return Failure<LearningLesson>("learning.track_not_found", "A trilha não foi encontrada.");
+            return Failure<LearningLesson>("learning.track_not_found", "A formação não foi encontrada.");
         }
 
         var revision = await learningStore.FindDraftRevisionAsync(
@@ -113,7 +113,7 @@ public sealed class LearningService(
         {
             return Failure<LearningLesson>(
                 "learning.draft_not_found",
-                "A trilha não possui uma revisão em rascunho.");
+                "A formação não possui uma revisão em rascunho.");
         }
 
         var addResult = revision.AddLesson(title, description, providerAssetReference, durationMilliseconds);
@@ -156,7 +156,7 @@ public sealed class LearningService(
         {
             return Failure<LearningTrackDraft>(
                 "learning.draft_not_found",
-                "A trilha não possui uma revisão em rascunho.");
+                "A formação não possui uma revisão em rascunho.");
         }
 
         return Result<LearningTrackDraft>.Success(new LearningTrackDraft(
@@ -196,7 +196,7 @@ public sealed class LearningService(
         var track = await learningStore.FindTrackAsync(tenantId.Value, trackId, cancellationToken);
         if (track is null)
         {
-            return Failure<LearningTrackRevision>("learning.track_not_found", "A trilha não foi encontrada.");
+            return Failure<LearningTrackRevision>("learning.track_not_found", "A formação não foi encontrada.");
         }
 
         var current = await learningStore.FindCurrentRevisionAsync(
@@ -207,14 +207,14 @@ public sealed class LearningService(
         {
             return Failure<LearningTrackRevision>(
                 "learning.published_revision_not_found",
-                "A trilha ainda não possui uma revisão publicada.");
+                "A formação ainda não possui uma revisão publicada.");
         }
 
         if (await learningStore.FindDraftRevisionAsync(tenantId.Value, trackId, cancellationToken) is not null)
         {
             return Failure<LearningTrackRevision>(
                 "learning.draft_exists",
-                "A trilha já possui uma revisão em rascunho.");
+                "A formação já possui uma revisão em rascunho.");
         }
 
         var draftResult = current.CreateNextDraft(timeProvider.GetUtcNow());
@@ -252,7 +252,7 @@ public sealed class LearningService(
         var track = await learningStore.FindTrackAsync(tenantId.Value, trackId, cancellationToken);
         if (track is null)
         {
-            return Failure<LearningTrackRevision>("learning.track_not_found", "A trilha não foi encontrada.");
+            return Failure<LearningTrackRevision>("learning.track_not_found", "A formação não foi encontrada.");
         }
 
         var revision = await learningStore.FindDraftRevisionAsync(
@@ -263,7 +263,7 @@ public sealed class LearningService(
         {
             return Failure<LearningTrackRevision>(
                 "learning.draft_not_found",
-                "A trilha não possui uma revisão em rascunho.");
+                "A formação não possui uma revisão em rascunho.");
         }
 
         var publishResult = revision.Publish(timeProvider.GetUtcNow());
@@ -311,7 +311,7 @@ public sealed class LearningService(
         {
             return Failure<LearningAssignment>(
                 "learning.track_not_published",
-                "Somente trilhas publicadas podem ser atribuídas.");
+                "Somente formações publicadas podem ser atribuídas.");
         }
 
         if (!await learningStore.IsActiveParticipantAsync(
@@ -332,7 +332,7 @@ public sealed class LearningService(
         {
             return Failure<LearningAssignment>(
                 "learning.assignment_exists",
-                "A trilha já está atribuída a este participante.");
+                "A formação já está atribuída a este participante.");
         }
 
         var assignment = LearningAssignment.Create(
@@ -409,14 +409,13 @@ public sealed class LearningService(
             return Result<LearningParticipantReport>.Failure(tenantId.Error);
         }
 
-        var rows = (await learningStore.ListParticipantProgressAsync(tenantId.Value, cancellationToken))
-            .Where(item => item.ParticipantId == participantId)
-            .ToArray();
+        // only this participant's rows and tracks, in a fixed number of queries
+        var rows = await learningStore.ListParticipantProgressAsync(tenantId.Value, participantId, cancellationToken);
+        var experiences = await learningStore.ListAssignedExperiencesAsync(tenantId.Value, participantId, cancellationToken);
         var tracks = new List<LearningExperience>();
         foreach (var row in rows)
         {
-            var experience = await learningStore.GetAssignedExperienceAsync(
-                tenantId.Value, participantId, row.TrackId, cancellationToken);
+            var experience = experiences.FirstOrDefault(item => item.Track.Id == row.TrackId);
             if (experience is not null)
             {
                 tracks.Add(experience);
@@ -474,7 +473,7 @@ public sealed class LearningService(
         return experience is null
             ? Failure<LearningExperience>(
                 "learning.track_not_found",
-                "A trilha não foi encontrada ou não está atribuída a você.")
+                "A formação não foi encontrada ou não está atribuída a você.")
             : Result<LearningExperience>.Success(experience);
     }
 
@@ -506,6 +505,11 @@ public sealed class LearningService(
             return Failure<PlaybackSession>(
                 "learning.lesson_not_found",
                 "O vídeo não foi encontrado ou não está disponível para você.");
+        }
+
+        if (lesson.IsBonus)
+        {
+            return Result<PlaybackSession>.Failure(BonusLesson.Refused);
         }
 
         return await videoPlaybackProvider.CreateSessionAsync(
@@ -546,55 +550,20 @@ public sealed class LearningService(
                 "O vídeo não foi encontrado ou não está disponível para você.");
         }
 
-        var progress = await learningStore.FindProgressAsync(
+        if (lesson.IsBonus)
+        {
+            return Result<LearningProgress>.Failure(BonusLesson.Refused);
+        }
+
+        var savedAt = timeProvider.GetUtcNow();
+        return await ApplyToProgressAsync(
             tenantId.Value,
             participant.Value,
-            lessonId,
+            trackId,
+            lesson,
+            savedAt,
+            (progress, at) => progress.SavePlaybackPosition(positionMilliseconds, at),
             cancellationToken);
-        var isNew = progress is null;
-        if (progress is null)
-        {
-            var startResult = LearningProgress.Start(
-                tenantId.Value,
-                participant.Value,
-                trackId,
-                lesson.RevisionId,
-                lesson.LessonId,
-                lesson.DurationMilliseconds,
-                completionThresholdPercent,
-                timeProvider.GetUtcNow());
-            if (!startResult.IsSuccess)
-            {
-                return startResult;
-            }
-
-            progress = startResult.Value;
-        }
-        else if (progress.TrackId != trackId || progress.RevisionId != lesson.RevisionId)
-        {
-            return Failure<LearningProgress>(
-                "learning.progress.revision_mismatch",
-                "O progresso pertence a outra revisão da trilha.");
-        }
-
-        var saveResult = progress.SavePlaybackPosition(positionMilliseconds, timeProvider.GetUtcNow());
-        if (!saveResult.IsSuccess)
-        {
-            return saveResult;
-        }
-
-        await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
-        if (isNew)
-        {
-            await learningStore.AddProgressAsync(progress, cancellationToken);
-        }
-        else
-        {
-            await learningStore.SaveProgressAsync(progress, cancellationToken);
-        }
-
-        await transaction.CommitAsync(cancellationToken);
-        return saveResult;
     }
 
     public async Task<Result<LearningProgress>> RecordPlaybackRangeAsync(
@@ -631,6 +600,11 @@ public sealed class LearningService(
                 "O vídeo não foi encontrado ou não está disponível para você.");
         }
 
+        if (lesson.IsBonus)
+        {
+            return Result<LearningProgress>.Failure(BonusLesson.Refused);
+        }
+
         var evidenceResult = await playbackEvidenceVerifier.VerifyRangeAsync(
             sessionId,
             participant.Value,
@@ -650,23 +624,58 @@ public sealed class LearningService(
                 "Não foi possível validar este trecho de reprodução.");
         }
 
-        var progress = await learningStore.FindProgressAsync(
+        var savedAt = timeProvider.GetUtcNow();
+        return await ApplyToProgressAsync(
             tenantId.Value,
             participant.Value,
-            lessonId,
+            trackId,
+            lesson,
+            savedAt,
+            (progress, at) =>
+            {
+                var rangeResult = progress.RecordVerifiedRange(startMilliseconds, endMilliseconds, at);
+                if (!rangeResult.IsSuccess)
+                {
+                    return rangeResult;
+                }
+
+                var positionResult = progress.SavePlaybackPosition(positionMilliseconds, at);
+                return positionResult.IsSuccess ? rangeResult : positionResult;
+            },
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Applies one save to the participant's progress for the lesson, creating it on the first save.
+    /// When two saves create it at the same moment (two tabs, a resend), the later one is applied on
+    /// top of the row the other created, instead of failing.
+    /// </summary>
+    private async Task<Result<LearningProgress>> ApplyToProgressAsync(
+        TenantId tenantId,
+        Guid participantId,
+        Guid trackId,
+        LearningLessonContext lesson,
+        DateTimeOffset now,
+        Func<LearningProgress, DateTimeOffset, Result<LearningProgress>> apply,
+        CancellationToken cancellationToken)
+    {
+        var progress = await learningStore.FindProgressAsync(
+            tenantId,
+            participantId,
+            lesson.LessonId,
             cancellationToken);
         var isNew = progress is null;
-        if (isNew)
+        if (progress is null)
         {
             var startResult = LearningProgress.Start(
-                tenantId.Value,
-                participant.Value,
+                tenantId,
+                participantId,
                 trackId,
                 lesson.RevisionId,
                 lesson.LessonId,
                 lesson.DurationMilliseconds,
                 completionThresholdPercent,
-                timeProvider.GetUtcNow());
+                now);
             if (!startResult.IsSuccess)
             {
                 return startResult;
@@ -674,39 +683,52 @@ public sealed class LearningService(
 
             progress = startResult.Value;
         }
-        else if (progress!.TrackId != trackId || progress.RevisionId != lesson.RevisionId)
+        else if (progress.TrackId != trackId || progress.RevisionId != lesson.RevisionId)
         {
-            return Failure<LearningProgress>(
-                "learning.progress.revision_mismatch",
-                "O progresso pertence a outra revisão da trilha.");
+            return RevisionMismatch();
         }
 
-        var savedAt = timeProvider.GetUtcNow();
-        var rangeResult = progress!.RecordVerifiedRange(startMilliseconds, endMilliseconds, savedAt);
-        if (!rangeResult.IsSuccess)
+        var result = apply(progress, now);
+        if (!result.IsSuccess)
         {
-            return rangeResult;
-        }
-
-        var positionResult = progress.SavePlaybackPosition(positionMilliseconds, savedAt);
-        if (!positionResult.IsSuccess)
-        {
-            return positionResult;
+            return result;
         }
 
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
-        if (isNew)
-        {
-            await learningStore.AddProgressAsync(progress, cancellationToken);
-        }
-        else
+        if (!isNew)
         {
             await learningStore.SaveProgressAsync(progress, cancellationToken);
         }
+        else if (!await learningStore.TryAddProgressAsync(progress, cancellationToken))
+        {
+            var existing = await learningStore.FindProgressAsync(
+                tenantId,
+                participantId,
+                lesson.LessonId,
+                cancellationToken);
+            if (existing is null || existing.TrackId != trackId || existing.RevisionId != lesson.RevisionId)
+            {
+                return RevisionMismatch();
+            }
+
+            // the other save may have stamped a later time than ours: this one happens now
+            result = apply(existing, timeProvider.GetUtcNow());
+            if (!result.IsSuccess)
+            {
+                return result;
+            }
+
+            await learningStore.SaveProgressAsync(existing, cancellationToken);
+        }
 
         await transaction.CommitAsync(cancellationToken);
-        return rangeResult;
+        return result;
     }
+
+    private static Result<LearningProgress> RevisionMismatch() =>
+        Failure<LearningProgress>(
+            "learning.progress.revision_mismatch",
+            "O progresso pertence a outra revisão da formação.");
 
     private Result<Unit> EnsureAdministrator() =>
         currentActor.IsInRole(PlatformRoles.PlatformOperator) ||
@@ -714,7 +736,7 @@ public sealed class LearningService(
             ? Result<Unit>.Success(Unit.Value)
             : Result<Unit>.Failure(new DomainError(
                 "learning.forbidden",
-                "Você não tem permissão para administrar as trilhas."));
+                "Você não tem permissão para administrar as formações."));
 
     private Result<Unit> EnsureReportViewer() =>
         currentActor.IsInRole(PlatformRoles.Supervisor)

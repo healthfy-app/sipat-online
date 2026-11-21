@@ -57,8 +57,10 @@
 
   --animate-overlay-in: overlay-in 160ms ease-out;
   --animate-dialog-in: dialog-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-tooltip-in: tooltip-in 160ms cubic-bezier(0.23, 1, 0.32, 1);
 
   @keyframes overlay-in { from { opacity: 0; } }
+  @keyframes tooltip-in { from { opacity: 0; transform: scale(0.96); } }
   @keyframes dialog-in { from { opacity: 0; transform: translate(-50%, -48%) scale(0.97); } }
   @keyframes sheet-in { from { transform: translateX(100%); } }
 }
@@ -72,7 +74,7 @@ select[data-slot="select"] {
 }
 
 /* diálogos, menus e painéis renderizam fora do layout: levam a fonte do design system */
-[data-slot="dialog"], [data-slot="dropdown-menu"], [data-slot="sheet"] { font-family: var(--font-sans); }
+[data-slot="dialog"], [data-slot="dropdown-menu"], [data-slot="sheet"], [data-slot="tooltip"] { font-family: var(--font-sans); }
 
 /* ---------- Ponte para as telas de gestão ainda não reescritas ----------
  * As classes antigas (.button, .field, .form-card...) ganham as medidas e cores do design

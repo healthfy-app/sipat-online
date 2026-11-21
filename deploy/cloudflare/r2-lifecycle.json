@@ -1,0 +1,11 @@
+{
+  "rules": [
+    {
+      "id": "expire-abandoned-uploads",
+      "enabled": true,
+      "conditions": { "prefix": "uploads/" },
+      "deleteObjectsTransition": { "condition": { "type": "Age", "maxAge": 604800 } },
+      "abortMultipartUploadsTransition": { "condition": { "type": "Age", "maxAge": 86400 } }
+    }
+  ]
+}

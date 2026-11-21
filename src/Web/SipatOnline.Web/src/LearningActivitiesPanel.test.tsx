@@ -52,7 +52,7 @@ describe('course activities during playback', () => {
     await user.click(screen.getByRole('button', { name: 'Ver resultado' }));
     await user.click(screen.getByRole('button', { name: 'Continuar' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(save).toHaveBeenCalledExactlyOnceWith('track-1', 'checkpoint-0-0', 'completed');
+    expect(save).toHaveBeenCalledExactlyOnceWith('track-1', 'checkpoint-0-0', 'completed', 'lesson-1');
     expect(video.play).toHaveBeenCalledTimes(1);
     fireEvent.timeUpdate(video);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
@@ -109,7 +109,7 @@ describe('course activities during playback', () => {
     expect(video.play).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: 'Pular' }));
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
-    expect(save).toHaveBeenNthCalledWith(2, 'track-1', 'checkpoint-0-0', 'skipped');
+    expect(save).toHaveBeenNthCalledWith(2, 'track-1', 'checkpoint-0-0', 'skipped', 'lesson-1');
     expect(video.play).toHaveBeenCalledTimes(1);
   });
 
@@ -158,5 +158,83 @@ describe('course activities during playback', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('Atividades indisponíveis.');
     expect(screen.getByRole('button', { name: 'Recarregar atividades' })).toBeVisible();
     expect(video.pause).not.toHaveBeenCalled();
+  });
+});
+
+describe('activities with extras in the list', () => {
+  const placement = (id: string, afterVideoCount: number): LearningActivity =>
+    ({ ...checkpoint, id, lessonId: null, timeMilliseconds: null, afterVideoCount });
+
+  function playingVideo(paused = false) {
+    const video = document.createElement('video');
+    Object.defineProperty(video, 'paused', { configurable: true, writable: true, value: paused });
+    return video;
+  }
+
+  it('sends the lessonId of a checkpoint outcome, and none for a placement', async () => {
+    const user = userEvent.setup();
+    const { video } = await setup([checkpoint, placement('placement-9', 0)]);
+    expect(await screen.findByRole('dialog')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Pular' }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('track-1', 'placement-9', 'skipped'));
+    video.currentTime = 2; fireEvent.timeUpdate(video);
+    await user.click(await screen.findByRole('button', { name: 'Pular' }));
+    await waitFor(() => expect(save).toHaveBeenCalledWith('track-1', 'checkpoint-0-0', 'skipped', 'lesson-1'));
+  });
+
+  it('reloads the activities and warns, without marking the answer, when the list went stale', async () => {
+    const user = userEvent.setup();
+    const { video } = await setup([checkpoint]);
+    save.mockRejectedValueOnce(Object.assign(new Error('A lista de atividades mudou. Atualize a página.'),
+      { status: 409, code: 'learning.activity.stale' }));
+    load.mockClear();
+    load.mockResolvedValue({ revisionId: 'revision-2', items: [{ ...checkpoint, id: 'checkpoint-new' }] });
+    video.currentTime = 2; fireEvent.timeUpdate(video);
+    await user.click(await screen.findByRole('button', { name: 'Pular' }));
+
+    await waitFor(() => expect(load).toHaveBeenCalledTimes(1));
+    expect(await screen.findByRole('status')).toHaveTextContent('A lista de atividades mudou. Atualize a página.');
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ver atividades' }));
+    expect(screen.getByRole('button', { name: 'Pratique segurança · Iniciar atividade' })).toBeVisible();
+    expect(save).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens a game placed before the first house video when the track starts with an extra', async () => {
+    load.mockResolvedValue({ revisionId: 'r', items: [placement('placement-0', 0)] });
+    const video = playingVideo();
+    render(<LearningActivitiesPanel trackId="track-1" lessonId="lesson-2" lessonPosition={2}
+      boundaryBefore={0} playbackKey="session-2" videoRef={{ current: video }} />);
+    await screen.findByRole('region', { name: 'Atividades para praticar' });
+    fireEvent.playing(video);
+    expect(await screen.findByRole('dialog')).toBeVisible();
+  });
+
+  it('opens a game after house video 1 when it ends even if extras follow', async () => {
+    load.mockResolvedValue({ revisionId: 'r', items: [placement('placement-1', 1)] });
+    const video = playingVideo(true);
+    render(<LearningActivitiesPanel trackId="track-1" lessonId="lesson-1" lessonPosition={1}
+      boundaryBefore={0} playbackKey="session-1" videoRef={{ current: video }} />);
+    await screen.findByRole('region', { name: 'Atividades para praticar' });
+    fireEvent.ended(video);
+    expect(await screen.findByRole('dialog')).toBeVisible();
+  });
+
+  it('does not open a game placed after the previous house video when the next house video plays', async () => {
+    load.mockResolvedValue({ revisionId: 'r', items: [placement('placement-2', 2)] });
+    const video = playingVideo();
+    render(<LearningActivitiesPanel trackId="track-1" lessonId="lesson-3" lessonPosition={3}
+      boundaryBefore={1} playbackKey="session-3" videoRef={{ current: video }} />);
+    await screen.findByRole('region', { name: 'Atividades para praticar' });
+    fireEvent.playing(video);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('does nothing, and does not crash, while an extra (no video element) is selected', async () => {
+    load.mockResolvedValue({ revisionId: 'r', items: [placement('placement-0', 0), checkpoint] });
+    render(<LearningActivitiesPanel trackId="track-1" lessonId="lesson-2" lessonPosition={2}
+      boundaryBefore={0} playbackKey={undefined} videoRef={{ current: null }} />);
+    await screen.findByRole('region', { name: 'Atividades para praticar' });
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 });

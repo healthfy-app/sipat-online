@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Application;
@@ -40,9 +41,29 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         if (!access.Value.Events.Any(item => item.Id == sipatId))
             return Failure<Guid>("learning.sipat_not_found", "Escolha uma SIPAT publicada desta empresa.");
         var existing = access.Value.Courses.SingleOrDefault(item => item.SipatEventId == sipatId && item.SourceCourseId == courseId);
-        if (existing is not null) return Result<Guid>.Success(existing.TrackId);
         var course = await catalog.FindCourseAsync(courseId, token);
-        if (course is null || course.Status != PlatformCourseStatus.Published || course.Videos.Count == 0)
+        if (existing is not null)
+        {
+            // delivered before: only extras added or taken out since then reach it, and only when that is safe
+            if (course is not null && course.Status == PlatformCourseStatus.Published && HasHouseVideo(course.Videos))
+            {
+                var track = await db.LearningTracks.SingleAsync(item => item.Id == existing.TrackId && item.TenantId == tenantId, token);
+                if (track.CurrentRevisionId is Guid revisionId)
+                {
+                    await using var transaction = await db.Database.BeginTransactionAsync(token);
+                    if (await MergeBonusLessonsAsync(track, revisionId, course, token))
+                    {
+                        await audit.WriteAsync(new AuditRecord(actor.UserId!, new TenantId(tenantId), "learning.course.extras_updated",
+                            "learning_track", track.Id.ToString("D"), clock.GetUtcNow()), token);
+                        await db.SaveChangesAsync(token);
+                        await transaction.CommitAsync(token);
+                    }
+                }
+            }
+            return Result<Guid>.Success(existing.TrackId);
+        }
+        // extras never count, so a course made only of extras would have nothing to complete
+        if (course is null || course.Status != PlatformCourseStatus.Published || !HasHouseVideo(course.Videos))
             return Failure<Guid>("learning.course_invalid", "Escolha um curso publicado com vídeos.");
         return await CreateTrackFromCourseAsync(tenantId, sipatId, course, token);
     }
@@ -57,19 +78,18 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var track = LearningTrack.Create(tenant, sipatId, course.Title, course.Description, now);
         if (!track.IsSuccess) return Result<Guid>.Failure(track.Error);
         var revision = LearningTrackRevision.CreateDraft(track.Value.Id, tenant, 1, now).Value;
-        var sectionByVideo = (course.Lessons ?? [])
-            .SelectMany(group => group.VideoIds.Select(id => (id, group.Title)))
-            .ToDictionary(item => item.id, item => item.Title);
+        var sectionByVideo = SectionTitles(course);
         foreach (var video in course.Videos)
         {
-            var lesson = revision.AddLesson(video.Title, null, $"catalog:{video.Id:D}", video.DurationMilliseconds);
+            var lesson = revision.AddLesson(video.Title, null, LessonReference.For(video), video.DurationMilliseconds, IsBonus(video));
             if (!lesson.IsSuccess) return Result<Guid>.Failure(lesson.Error);
         }
         var published = revision.Publish(now);
         if (!published.IsSuccess) return Result<Guid>.Failure(published.Error);
         var trackPublished = track.Value.PublishRevision(revision);
         if (!trackPublished.IsSuccess) return Result<Guid>.Failure(trackPublished.Error);
-        await using var transaction = await db.Database.BeginTransactionAsync(token);
+        // a SIPAT delivered day by day holds one transaction for all its days: this track joins it
+        await using var transaction = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(token) : null;
         await learning.CreateTrackAsync(track.Value, revision, token);
         db.LearningTracks.Local.Single(item => item.Id == track.Value.Id).SourceCourseId = course.Id;
         db.LearningLessons.AddRange(revision.Lessons.Select(item => new LearningLessonEntity
@@ -83,7 +103,9 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             Position = item.Position,
             ProviderAssetReference = item.ProviderAssetReference,
             DurationMilliseconds = item.DurationMilliseconds,
-            SectionTitle = sectionByVideo.GetValueOrDefault(Guid.Parse(item.ProviderAssetReference.Replace("catalog:", "")))
+            IsBonus = item.IsBonus,
+            // lessons follow the course's videos one to one, so the position finds the video (an extra's reference is no id)
+            SectionTitle = sectionByVideo.GetValueOrDefault(course.Videos[item.Position - 1].Id)
         }));
         var cover = await catalog.GetCoverAsync(course.Id, token);
         db.LearningContentSnapshots.Add(new LearningContentSnapshotEntity
@@ -102,10 +124,10 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             if (await learning.IsActiveParticipantAsync(tenant, participantId, token))
                 await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, track.Value.Id, participantId, now).Value, token);
         }
-        await db.SaveChangesAsync(token);
         await audit.WriteAsync(new AuditRecord(actor.UserId!, tenant, "learning.course.distributed",
             "learning_track", track.Value.Id.ToString("D"), now), token);
-        await transaction.CommitAsync(token);
+        await db.SaveChangesAsync(token);
+        if (transaction is not null) await transaction.CommitAsync(token);
         return Result<Guid>.Success(track.Value.Id);
     }
 
@@ -148,6 +170,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
                     return Failure<ProgramApplication>("learning.program_video_invalid", $"Um vídeo do dia \"{day.Title}\" não existe mais. Revise o programa.");
                 videos.Add(video);
             }
+            if (!HasHouseVideo(videos))
+                return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra a SIPAT em Construção SIPAT, escolha um tema para cada dia e salve.");
             var placements = (day.GameIds ?? []).Select(gameId => new CourseModulePlacement(gameId, videos.Count)).ToArray();
             var course = new PlatformCourse(day.Id, day.Title, day.Subject, now, PlatformCourseStatus.Published, true, videos, placements);
             var snapshot = await CreateSnapshotAsync(course, token);
@@ -155,6 +179,24 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             courses.Add(course);
         }
 
+        // and deliver every day in one transaction: a day that fails takes back the ones before it
+        await using var transaction = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(token) : null;
+        var delivered = await DeliverDaysAsync(tenantId, sipatId, days, courses, auditSubjectId, auditAction, auditSubjectType, token);
+        if (transaction is null) return delivered;
+        if (delivered.IsSuccess)
+        {
+            await transaction.CommitAsync(token);
+            return delivered;
+        }
+        await transaction.RollbackAsync(token);
+        // what was saved is gone, so nothing tracked may claim it was
+        db.ChangeTracker.Clear();
+        return delivered;
+    }
+
+    private async Task<Result<ProgramApplication>> DeliverDaysAsync(Guid tenantId, Guid sipatId, IReadOnlyList<ProgramDay> days,
+        List<PlatformCourse> courses, Guid auditSubjectId, string auditAction, string auditSubjectType, CancellationToken token)
+    {
         int created = 0, updated = 0, kept = 0;
         for (var index = 0; index < courses.Count; index++)
         {
@@ -183,6 +225,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         await EnsureAssignmentsAsync(tenantId, null, token);
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(tenantId), auditAction,
             auditSubjectType, auditSubjectId.ToString("D"), clock.GetUtcNow()), token);
+        await db.SaveChangesAsync(token);
         return Result<ProgramApplication>.Success(new ProgramApplication(courses.Count, created, updated, kept));
     }
 
@@ -226,11 +269,15 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         return added;
     }
 
-    /// <summary>Replaces the lessons and activities of a day's track, unless some participant already has progress in it.</summary>
+    /// <summary>
+    /// Replaces the lessons and activities of a day's track. Once some participant has progress in it, only extras
+    /// added or taken out are applied (see <see cref="MergeBonusLessonsAsync"/>).
+    /// </summary>
     private async Task<bool> RefreshDayTrackAsync(LearningTrackEntity track, PlatformCourse course, CancellationToken token)
     {
         if (track.CurrentRevisionId is not Guid revisionId) return false;
-        if (await db.LearningProgress.AnyAsync(item => item.TrackId == track.Id, token)) return false;
+        if (await db.LearningProgress.AnyAsync(item => item.TrackId == track.Id, token))
+            return await MergeBonusLessonsAsync(track, revisionId, course, token);
 
         var snapshot = await CreateSnapshotAsync(course, token);
         if (!snapshot.IsSuccess) return false;
@@ -238,7 +285,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var current = await db.LearningLessons.Where(item => item.RevisionId == revisionId).ToListAsync(token);
         var fresh = current.Count == course.Videos.Count
             && current.OrderBy(item => item.Position).Select(item => item.ProviderAssetReference)
-                .SequenceEqual(course.Videos.Select(video => $"catalog:{video.Id:D}"));
+                .SequenceEqual(course.Videos.Select(LessonReference.For));
 
         track.Title = course.Title;
         track.Description = course.Description;
@@ -246,7 +293,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         if (fresh) return true;
 
         var scratch = LearningTrackRevision.CreateDraft(track.Id, new TenantId(track.TenantId), 1, clock.GetUtcNow()).Value;
-        foreach (var video in course.Videos) scratch.AddLesson(video.Title, null, $"catalog:{video.Id:D}", video.DurationMilliseconds);
+        foreach (var video in course.Videos)
+            scratch.AddLesson(video.Title, null, LessonReference.For(video), video.DurationMilliseconds, IsBonus(video));
         db.LearningLessons.RemoveRange(current);
         db.LearningLessons.AddRange(scratch.Lessons.Select(item => new LearningLessonEntity
         {
@@ -258,10 +306,141 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             Description = item.Description,
             Position = item.Position,
             ProviderAssetReference = item.ProviderAssetReference,
-            DurationMilliseconds = item.DurationMilliseconds
+            DurationMilliseconds = item.DurationMilliseconds,
+            IsBonus = item.IsBonus
         }));
         return true;
     }
+
+    /// <summary>
+    /// Brings to a track people already follow only the extras added to or taken out of its course. Every house lesson
+    /// keeps its row (id, progress, completion, certificate), extras are matched by their link, and the answers given
+    /// to the games in the middle of a house video follow that video to its new place. Anything else (a house video
+    /// added, removed or moved, other games, nothing changed at all) leaves the track exactly as it is and returns false.
+    /// </summary>
+    private async Task<bool> MergeBonusLessonsAsync(LearningTrackEntity track, Guid revisionId, PlatformCourse course, CancellationToken token)
+    {
+        var tenantId = track.TenantId;
+        var old = (await db.LearningLessons.Where(item => item.TenantId == tenantId && item.RevisionId == revisionId).ToListAsync(token))
+            .OrderBy(item => item.Position).ToList();
+        var next = course.Videos;
+        var oldReferences = old.Select(item => item.ProviderAssetReference).ToArray();
+        var nextReferences = next.Select(LessonReference.For).ToArray();
+        if (old.Count == 0 || oldReferences.SequenceEqual(nextReferences)) return false;
+        if (oldReferences.Distinct().Count() != old.Count || nextReferences.Distinct().Count() != next.Count) return false;
+        if (old.Any(item => item.IsBonus != LessonReference.IsBonus(item.ProviderAssetReference))) return false;
+        var oldHouse = Enumerable.Range(0, old.Count).Where(index => !old[index].IsBonus).ToArray();
+        var nextHouse = Enumerable.Range(0, next.Count).Where(index => !IsBonus(next[index])).ToArray();
+        if (!oldHouse.Select(index => oldReferences[index]).SequenceEqual(nextHouse.Select(index => nextReferences[index]))) return false;
+
+        var nextIndex = Enumerable.Range(0, next.Count).ToDictionary(index => nextReferences[index]);
+        var removed = old.Where(item => !nextIndex.ContainsKey(item.ProviderAssetReference)).ToArray();
+        var removedIds = removed.Select(item => item.Id).ToArray();
+        if (await db.LearningProgress.AnyAsync(item => item.TenantId == tenantId && removedIds.Contains(item.LessonId), token)) return false;
+
+        // the answers are kept by the place of the game, so the games must be the very same ones
+        var snapshot = await CreateSnapshotAsync(course, token);
+        if (!snapshot.IsSuccess) return false;
+        var stored = await db.LearningContentSnapshots.SingleOrDefaultAsync(item => item.TenantId == tenantId && item.RevisionId == revisionId, token);
+        if (stored is null) return false;
+        var previous = JsonSerializer.Deserialize<LearningContentSnapshot>(stored.ContentJson, EfLearningEngagementStore.JsonOptions);
+        if (previous?.Placements is null || previous.Videos is null || previous.Videos.Count != old.Count
+            || previous.Videos.Any(item => item?.Checkpoints is null)) return false;
+        if (previous.GamificationEnabled != snapshot.Value.GamificationEnabled
+            || !previous.Placements.Select(item => item.ModuleId).SequenceEqual(snapshot.Value.Placements.Select(item => item.ModuleId))
+            || next.Where(IsBonus).Any(video => video.Checkpoints.Count > 0)
+            || oldHouse.Where((index, house) => !previous.Videos[index].Checkpoints.SequenceEqual(snapshot.Value.Videos[nextHouse[house]].Checkpoints)).Any())
+            return false;
+
+        // only house videos have games in the middle, so every answer must belong to one of them
+        var answered = await db.LearningActivityOutcomes.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && item.RevisionId == revisionId && item.ActivityId.StartsWith(CheckpointPrefix))
+            .Select(item => item.ActivityId).Distinct().ToListAsync(token);
+        if (answered.Any(id => CheckpointLessonIndex(id) is not int index || !oldHouse.Contains(index))) return false;
+
+        var scratch = LearningTrackRevision.CreateDraft(track.Id, new TenantId(tenantId), 1, clock.GetUtcNow()).Value;
+        foreach (var video in next)
+            if (!scratch.AddLesson(video.Title, null, LessonReference.For(video), video.DurationMilliseconds, IsBonus(video)).IsSuccess) return false;
+        var fresh = scratch.Lessons.OrderBy(item => item.Position).ToArray();
+        var sections = SectionTitles(course);
+        var kept = old.Except(removed).ToDictionary(item => item.ProviderAssetReference);
+
+        await using var transaction = db.Database.CurrentTransaction is null ? await db.Database.BeginTransactionAsync(token) : null;
+        // positions are unique per revision: first everything parks past both lists, then lands in its place
+        var parking = Math.Max(old.Max(item => item.Position), next.Count);
+        db.LearningLessons.RemoveRange(removed);
+        foreach (var lesson in kept.Values) lesson.Position = parking + nextIndex[lesson.ProviderAssetReference] + 1;
+        await db.SaveChangesAsync(token);
+
+        for (var index = 0; index < next.Count; index++)
+        {
+            var section = sections.GetValueOrDefault(next[index].Id);
+            if (kept.TryGetValue(nextReferences[index], out var lesson))
+            {
+                lesson.Position = index + 1;
+                if (!lesson.IsBonus) continue;
+                lesson.Title = fresh[index].Title;
+                lesson.DurationMilliseconds = fresh[index].DurationMilliseconds;
+                lesson.SectionTitle = section;
+                continue;
+            }
+            db.LearningLessons.Add(new LearningLessonEntity
+            {
+                Id = fresh[index].Id,
+                TenantId = tenantId,
+                TrackId = track.Id,
+                RevisionId = revisionId,
+                Title = fresh[index].Title,
+                Description = fresh[index].Description,
+                Position = index + 1,
+                ProviderAssetReference = fresh[index].ProviderAssetReference,
+                DurationMilliseconds = fresh[index].DurationMilliseconds,
+                IsBonus = fresh[index].IsBonus,
+                SectionTitle = section
+            });
+        }
+        track.Title = course.Title;
+        track.Description = course.Description;
+        stored.ContentJson = JsonSerializer.Serialize(snapshot.Value, EfLearningEngagementStore.JsonOptions);
+        await db.SaveChangesAsync(token);
+
+        // a game in the middle of a video is known by the video's place: its answers follow the house video. Moving up
+        // from the last one and down from the first one, an id is always free when it is taken
+        var moves = Enumerable.Range(0, oldHouse.Length).Select(house => (From: oldHouse[house], To: nextHouse[house])).ToArray();
+        var ordered = moves.Where(move => move.To > move.From).OrderByDescending(move => move.From)
+            .Concat(moves.Where(move => move.To < move.From).OrderBy(move => move.From));
+        foreach (var (from, to) in ordered)
+        {
+            var oldPrefix = $"{CheckpointPrefix}{from}-";
+            var newPrefix = $"{CheckpointPrefix}{to}-";
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                UPDATE learning."LearningActivityOutcomes"
+                SET "ActivityId" = {newPrefix} || substr("ActivityId", {oldPrefix.Length + 1})
+                WHERE "TenantId" = {tenantId} AND "RevisionId" = {revisionId} AND left("ActivityId", {oldPrefix.Length}) = {oldPrefix}
+                """, token);
+        }
+
+        if (transaction is not null) await transaction.CommitAsync(token);
+        return true;
+    }
+
+    private const string CheckpointPrefix = "checkpoint-";
+
+    /// <summary>The 0-based lesson index of a checkpoint activity id (<c>checkpoint-{index}-{n}</c>), or null when it is not one.</summary>
+    private static int? CheckpointLessonIndex(string activityId)
+    {
+        var parts = activityId[CheckpointPrefix.Length..].Split('-');
+        return parts.Length == 2
+            && int.TryParse(parts[0], NumberStyles.None, CultureInfo.InvariantCulture, out var index)
+            && int.TryParse(parts[1], NumberStyles.None, CultureInfo.InvariantCulture, out _)
+            ? index : null;
+    }
+
+    /// <summary>The name of the course lesson ("Aula") each video sits in.</summary>
+    private static Dictionary<Guid, string> SectionTitles(PlatformCourse course) =>
+        (course.Lessons ?? [])
+            .SelectMany(group => group.VideoIds.Select(id => (id, group.Title)))
+            .ToDictionary(item => item.id, item => item.Title);
 
     public async Task<Result<LearningContentSnapshot>> CreateSnapshotAsync(PlatformCourse course, CancellationToken token)
     {
@@ -280,6 +459,10 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             course.GamificationEnabled || games.Count > 0, games, course.Modules,
             course.Videos.Select(item => new SnapshotVideo(item.Id, item.Checkpoints)).ToArray()));
     }
+
+    private static bool IsBonus(PlatformCourseVideo video) => video.Provider != VideoProvider.Sipat;
+
+    private static bool HasHouseVideo(IReadOnlyList<PlatformCourseVideo> videos) => videos.Any(video => !IsBonus(video));
 
     private static Result<T> Failure<T>(string code, string message) where T : notnull =>
         Result<T>.Failure(new DomainError(code, message));

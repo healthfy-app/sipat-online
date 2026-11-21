@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Application;
@@ -18,7 +17,8 @@ public static class TenantAppearanceEndpoints
         endpoints.MapGet("/api/tenant/logo/{key}", async (
             string key, ITenantContext tenant, PlatformDbContext db, HttpContext context, CancellationToken token) =>
         {
-            var company = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Key == key && item.IsActive, token);
+            var company = await db.Tenants.AsNoTracking().Where(item => item.Key == key && item.IsActive)
+                .Select(item => new { item.Id, item.PortalLogoData }).SingleOrDefaultAsync(token);
             if (company?.PortalLogoData is null ||
                 (tenant.CurrentTenantId is { } current && current.Value != company.Id)) return Results.NotFound();
             context.Response.Headers.CacheControl = "no-cache";
@@ -29,7 +29,8 @@ public static class TenantAppearanceEndpoints
         endpoints.MapGet("/api/tenant/banner/{key}", async (
             string key, ITenantContext tenant, PlatformDbContext db, HttpContext context, CancellationToken token) =>
         {
-            var company = await db.Tenants.AsNoTracking().SingleOrDefaultAsync(item => item.Key == key && item.IsActive, token);
+            var company = await db.Tenants.AsNoTracking().Where(item => item.Key == key && item.IsActive)
+                .Select(item => new { item.Id, item.PortalBannerData, item.PortalBannerContentType }).SingleOrDefaultAsync(token);
             if (company?.PortalBannerData is null ||
                 (tenant.CurrentTenantId is { } current && current.Value != company.Id)) return Results.NotFound();
             context.Response.Headers.CacheControl = "public, max-age=3600";
@@ -38,16 +39,11 @@ public static class TenantAppearanceEndpoints
         }).AllowAnonymous();
 
         endpoints.MapPut("/api/tenant/branding/appearance", async (
-            TenantAppearanceRequest request, HttpContext context, IAntiforgery antiforgery,
+            TenantAppearanceRequest request, HttpContext context,
             ITenantContext tenant, ICurrentActor actor, PlatformDbContext db, IAuditTrail audit,
             SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             TimeProvider clock, ILoggerFactory logs, CancellationToken token) =>
         {
-            try { await antiforgery.ValidateRequestAsync(context); }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.Problem(statusCode: 400, detail: "Token antifalsificação inválido. Recarregue a página.");
-            }
             if (!(await plans.CapabilitiesAsync(token)).CustomBranding)
                 return Results.Problem(statusCode: 403, title: "tenant.branding.unavailable", detail: "A personalização da identidade visual não está disponível para a sua empresa.");
             if (tenant.CurrentTenantId is not { } companyId || string.IsNullOrWhiteSpace(actor.UserId)) return Results.Forbid();

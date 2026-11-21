@@ -1,4 +1,3 @@
-using Microsoft.AspNetCore.Antiforgery;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application;
 using SipatOnline.Infrastructure;
@@ -44,11 +43,9 @@ public static class LearningEngagementEndpoints
         });
         learning.MapPut("/tracks/{trackId:guid}/activities/{activityId}/outcome", async (
             Guid trackId, string activityId, ActivityOutcomeRequest request, HttpContext context,
-            IAntiforgery antiforgery, LearningEngagementService service, CancellationToken token) =>
+            LearningEngagementService service, CancellationToken token) =>
         {
-            var csrf = await ValidateAsync(antiforgery, context);
-            if (csrf is not null) return csrf;
-            var result = await service.SaveOutcomeAsync(trackId, activityId, request.Outcome, token);
+            var result = await service.SaveOutcomeAsync(trackId, activityId, request.Outcome, request.LessonId, token);
             return result.IsSuccess ? Results.Ok(new { saved = true }) : Problem(result.Error);
         });
         learning.MapGet("/certificates", async (LearningEngagementService service, CancellationToken token) =>
@@ -66,10 +63,8 @@ public static class LearningEngagementEndpoints
             })) : Problem(result.Error);
         });
         learning.MapPost("/sipats/{sipatId:guid}/certificate", async (Guid sipatId, HttpContext context,
-            IAntiforgery antiforgery, LearningEngagementService service, CancellationToken token) =>
+            LearningEngagementService service, CancellationToken token) =>
         {
-            var csrf = await ValidateAsync(antiforgery, context);
-            if (csrf is not null) return csrf;
             var result = await service.IssueAsync(sipatId, token);
             return result.IsSuccess ? Results.Ok(CertificateResponse(result.Value)) : Problem(result.Error);
         });
@@ -106,17 +101,16 @@ public static class LearningEngagementEndpoints
         {
             var access = await service.GetAsync(companyId, token);
             if (!access.IsSuccess) return Problem(access.Error);
-            var company = await db.Tenants.AsNoTracking().SingleAsync(item => item.Id == companyId, token);
+            var company = await db.Tenants.AsNoTracking().Where(item => item.Id == companyId)
+                .Select(item => new { item.CertificateLogoData }).SingleAsync(token);
             return company.CertificateLogoData is null ? Results.NotFound() :
                 Results.File(company.CertificateLogoData, "image/png");
         });
-        platform.MapPut("/certificate-logo", async (Guid companyId, HttpContext context, IAntiforgery antiforgery,
+        platform.MapPut("/certificate-logo", async (Guid companyId, HttpContext context,
             LearningDistributionService service, PlatformDbContext db, ICurrentActor actor,
             SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             IAuditTrail audit, TimeProvider clock, ILoggerFactory logs, CancellationToken token) =>
         {
-            var csrf = await ValidateAsync(antiforgery, context);
-            if (csrf is not null) return csrf;
             var access = await service.GetAsync(companyId, token);
             if (!access.IsSuccess) return Problem(access.Error);
             if (!SipatOnline.Infrastructure.Tenancy.CompanyCapabilities.For(await plans.GetAsync(companyId, token)).CustomCertificate)
@@ -147,20 +141,16 @@ public static class LearningEngagementEndpoints
             return result.IsSuccess ? Results.Ok(result.Value) : Problem(result.Error);
         });
         platform.MapPost("/sipats/{sipatId:guid}/courses/{courseId:guid}", async (
-            Guid companyId, Guid sipatId, Guid courseId, HttpContext context, IAntiforgery antiforgery,
+            Guid companyId, Guid sipatId, Guid courseId, HttpContext context,
             LearningDistributionService service, CancellationToken token) =>
         {
-            var csrf = await ValidateAsync(antiforgery, context);
-            if (csrf is not null) return csrf;
             var result = await service.DistributeAsync(companyId, sipatId, courseId, token);
             return result.IsSuccess ? Results.Ok(new { trackId = result.Value }) : Problem(result.Error);
         });
         platform.MapPost("/sipats/{sipatId:guid}/programs/{programId:guid}", async (
-            Guid companyId, Guid sipatId, Guid programId, HttpContext context, IAntiforgery antiforgery,
+            Guid companyId, Guid sipatId, Guid programId, HttpContext context,
             LearningDistributionService service, CancellationToken token) =>
         {
-            var csrf = await ValidateAsync(antiforgery, context);
-            if (csrf is not null) return csrf;
             var result = await service.ApplyProgramAsync(companyId, sipatId, programId, token);
             return result.IsSuccess
                 ? Results.Ok(new { days = result.Value.Days, created = result.Value.Created, updated = result.Value.Updated, kept = result.Value.Kept })
@@ -208,17 +198,10 @@ public static class LearningEngagementEndpoints
     internal static IResult Problem(DomainError error) => Results.Problem(
         statusCode: error.Code.EndsWith("_not_found", StringComparison.Ordinal) ? 404 :
             error.Code.EndsWith("forbidden", StringComparison.Ordinal) ? 403 :
-            error.Code is "learning.certificate_pending" or "learning.certificate_logo_pending" or "learning.certificate_busy" ? 409 : 400,
+            error.Code is "learning.certificate_pending" or "learning.certificate_logo_pending" or "learning.certificate_busy"
+                or "learning.activity.stale" ? 409 : 400,
         title: error.Code, detail: error.Message, extensions: new Dictionary<string, object?> { ["code"] = error.Code });
 
-    internal static async Task<IResult?> ValidateAsync(IAntiforgery antiforgery, HttpContext context)
-    {
-        try { await antiforgery.ValidateRequestAsync(context); return null; }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(statusCode: 400, title: "Token antifalsificação inválido.");
-        }
-    }
 
     private static object CertificateResponse(ParticipationCertificate certificate) => new
     {
@@ -235,4 +218,5 @@ public static class LearningEngagementEndpoints
 
 }
 
-public sealed record ActivityOutcomeRequest(string Outcome);
+/// <summary>An answer to a game; <paramref name="LessonId"/> is the video a game in the middle of a video was shown in (optional).</summary>
+public sealed record ActivityOutcomeRequest(string Outcome, Guid? LessonId = null);

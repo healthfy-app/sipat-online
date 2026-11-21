@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application.Catalog;
 
@@ -15,6 +16,8 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             .Include(course => course.VideoLinks)
             .ThenInclude(link => link.Video)
             .ThenInclude(video => video.Checkpoints)
+            // one query per collection: joined, modules x lessons x videos x checkpoints multiply the rows
+            .AsSplitQuery()
             .OrderBy(course => course.Title)
             .ThenBy(course => course.Id)
             .ToListAsync(cancellationToken);
@@ -31,6 +34,8 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             .Include(item => item.VideoLinks)
             .ThenInclude(link => link.Video)
             .ThenInclude(video => video.Checkpoints)
+            // one query per collection: joined, modules x lessons x videos x checkpoints multiply the rows
+            .AsSplitQuery()
             .SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
         return course is null ? null : ToDomain(course);
     }
@@ -84,7 +89,12 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
         var themes = await dbContext.PlatformCourseVideoLinks.CountAsync(link => link.VideoId == videoId, cancellationToken);
         var text = videoId.ToString("D");
         var programs = await dbContext.SipatPrograms.CountAsync(program => program.DaysJson.Contains(text), cancellationToken);
-        var reference = $"catalog:{text}";
+        var identity = await dbContext.PlatformCourseVideos.AsNoTracking()
+            .Where(video => video.Id == videoId)
+            .Select(video => new { video.Provider, video.ExternalId })
+            .SingleOrDefaultAsync(cancellationToken);
+        var provider = identity is not null && Enum.TryParse<VideoProvider>(identity.Provider, out var parsed) ? parsed : VideoProvider.Sipat;
+        var reference = LessonReference.For(videoId, provider, identity?.ExternalId);
         var delivered = await dbContext.LearningLessons.CountAsync(lesson => lesson.ProviderAssetReference == reference, cancellationToken);
         return new PlatformVideoUsage(themes, programs, delivered);
     }
@@ -127,7 +137,9 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             CreatedAt = video.CreatedAt,
             Status = video.Status.ToString(),
             ProcessingError = video.ProcessingError,
-            HasSd480 = video.HasSd480
+            HasSd480 = video.HasSd480,
+            Provider = video.Provider.ToString(),
+            ExternalId = video.ExternalId
         });
 
         if (courseId is { } linkedCourseId)
@@ -146,6 +158,59 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task<PlatformCourseVideo> AddExternalVideoAsync(
+        VideoProvider provider,
+        string externalId,
+        string title,
+        long durationMilliseconds,
+        DateTimeOffset createdAt,
+        CancellationToken cancellationToken)
+    {
+        var entity = new PlatformCourseVideoEntity
+        {
+            Id = Guid.NewGuid(),
+            Title = title,
+            ContentType = "external",
+            SizeBytes = 0,
+            DurationMilliseconds = durationMilliseconds,
+            CreatedAt = createdAt,
+            Status = nameof(PlatformVideoStatus.Ready),
+            HasSd480 = false,
+            Provider = provider.ToString(),
+            ExternalId = externalId
+        };
+        dbContext.PlatformCourseVideos.Add(entity);
+        try
+        {
+            await dbContext.SaveChangesAsync(cancellationToken);
+            return ToDomain(entity);
+        }
+        catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+        {
+            // Another request registered the same link first: hand back that one.
+            dbContext.Entry(entity).State = EntityState.Detached;
+            var existing = await FindExternalVideoAsync(provider, externalId, cancellationToken);
+            if (existing is null)
+            {
+                throw;
+            }
+
+            return existing;
+        }
+    }
+
+    public async Task<PlatformCourseVideo?> FindExternalVideoAsync(
+        VideoProvider provider,
+        string externalId,
+        CancellationToken cancellationToken)
+    {
+        var name = provider.ToString();
+        var video = await dbContext.PlatformCourseVideos.AsNoTracking()
+            .Include(item => item.Checkpoints)
+            .SingleOrDefaultAsync(item => item.Provider == name && item.ExternalId == externalId, cancellationToken);
+        return video is null ? null : ToDomain(video);
     }
 
     public async Task<bool> UpdateCourseAsync(
@@ -550,5 +615,7 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             // An unknown value is never treated as ready, so it cannot slip into a Day.
             Status: Enum.TryParse<PlatformVideoStatus>(entity.Status, out var status) ? status : PlatformVideoStatus.Failed,
             ProcessingError: entity.ProcessingError,
-            HasSd480: entity.HasSd480);
+            HasSd480: entity.HasSd480,
+            Provider: Enum.TryParse<VideoProvider>(entity.Provider, out var provider) ? provider : VideoProvider.Sipat,
+            ExternalId: entity.ExternalId);
 }
