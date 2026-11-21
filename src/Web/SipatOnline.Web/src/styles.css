@@ -2660,24 +2660,6 @@ select:focus-visible,
   height: 0.55rem;
 }
 
-.learning-journey {
-  margin-bottom: 1.25rem;
-  padding: 0.5rem 0 0.85rem;
-}
-
-.learning-journey-connector {
-  stroke: var(--line-strong);
-}
-
-.learning-journey-indicator {
-  background: var(--line-strong);
-}
-
-.learning-journey-node.is-current .learning-journey-indicator {
-  color: var(--ink);
-  background: var(--signal);
-}
-
 .learning-experience-layout {
   grid-template-columns: minmax(0, 1.5fr) minmax(17rem, 1fr);
   gap: 0 2.5rem;
@@ -2952,11 +2934,6 @@ select:focus-visible,
     width: min(100%, 16rem);
   }
 
-  .learning-journey {
-    margin-inline: -1rem;
-    padding-inline: 1rem;
-  }
-
   .learning-experience-layout {
     grid-template-columns: 1fr;
     gap: 0;
@@ -3180,118 +3157,6 @@ select:focus-visible,
   font-weight: 500;
 }
 
-.learning-journey {
-  display: flex;
-  overflow-x: auto;
-  align-items: flex-start;
-  margin: 0 0 1.375rem;
-  padding: 0.5rem 0 0.875rem;
-  overscroll-behavior-inline: contain;
-  scrollbar-color: var(--line) transparent;
-}
-
-.learning-journey-stop {
-  position: relative;
-  display: grid;
-  min-width: 10rem;
-  flex: 1 0 10rem;
-  justify-items: center;
-  padding: 0 0.5rem;
-}
-
-.learning-journey-connector {
-  position: absolute;
-  z-index: 0;
-  top: 0;
-  left: 50%;
-  width: 100%;
-  height: 4rem;
-  overflow: visible;
-  fill: none;
-  stroke: var(--muted);
-  stroke-width: 2;
-  pointer-events: none;
-}
-
-.learning-journey-connector.is-complete {
-  stroke: var(--green);
-}
-
-.learning-journey-connector path {
-  vector-effect: non-scaling-stroke;
-  stroke-linecap: round;
-}
-
-.learning-journey-node {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  width: 100%;
-  justify-items: center;
-  gap: 0.4375rem;
-  padding: 0 0.25rem;
-  border: 0;
-  color: var(--ink);
-  background: transparent;
-  cursor: pointer;
-  text-align: center;
-}
-
-.learning-journey-indicator {
-  display: grid;
-  width: 2.125rem;
-  height: 2.125rem;
-  place-items: center;
-  border: 0;
-  border-radius: 50%;
-  color: var(--ink);
-  background: var(--line-strong);
-  box-shadow: 0 0 0 0.25rem var(--canvas);
-  font-size: 1.15rem;
-  font-weight: 700;
-  transition: box-shadow 140ms ease, transform 140ms ease;
-}
-
-.learning-journey-indicator-wrap {
-  display: grid;
-  width: 4rem;
-  height: 4rem;
-  place-items: center;
-}
-
-.learning-journey-node:hover .learning-journey-indicator {
-  transform: translateY(-2px);
-}
-
-.learning-journey-node.is-current .learning-journey-indicator {
-  width: 3.375rem;
-  height: 3.375rem;
-  color: var(--ink);
-  background: var(--signal);
-}
-
-.learning-journey-node.is-complete .learning-journey-indicator {
-  color: var(--on);
-  background: var(--green);
-}
-
-.learning-journey-title {
-  max-width: 11.875rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  line-height: 1.35;
-  overflow-wrap: anywhere;
-}
-
-.learning-journey-node.is-current .learning-journey-title {
-  font-weight: 700;
-}
-
-.learning-journey-status {
-  color: var(--muted);
-  font-size: 0.72rem;
-}
-
 .learning-video-track-label {
   position: absolute;
   z-index: 2;
@@ -3338,15 +3203,6 @@ select:focus-visible,
     padding: 0 0.5rem;
   }
 
-  .learning-journey {
-    margin-inline: -1rem;
-    padding-inline: 1rem;
-  }
-
-  .learning-journey-stop {
-    min-width: 10rem;
-    flex-basis: 10rem;
-  }
 }
 
 /* Shared light interface */
@@ -3670,11 +3526,6 @@ select:focus-visible,
     padding: 1.5rem 1rem 2.5rem;
   }
 
-  .learning-journey {
-    margin-inline: 0;
-    padding-inline: 0;
-  }
-
   .learning-experience-layout {
     grid-template-columns: 1fr;
   }
@@ -3720,130 +3571,6 @@ select:focus-visible,
 
 .learning-progress-track {
   height: 0.4rem;
-}
-
-.learning-journey {
-  margin-bottom: 0.75rem;
-  padding: 0.25rem 0 0.375rem;
-}
-
-.learning-journey-stop {
-  min-width: 8.5rem;
-  flex-basis: 8.5rem;
-  padding-inline: 0.25rem;
-}
-
-.learning-journey-connector {
-  height: 3.25rem;
-}
-
-.learning-journey-node {
-  gap: 0.25rem;
-}
-
-.learning-journey-indicator-wrap {
-  width: 2.875rem;
-  height: 2.875rem;
-}
-
-.learning-journey-indicator,
-.learning-journey-node.is-current .learning-journey-indicator {
-  position: relative;
-  width: 2.5rem;
-  height: 2.5rem;
-  overflow: visible;
-  border: 1px solid transparent;
-  border-radius: 0.75rem;
-  box-shadow: none;
-  background: #e7ece9;
-}
-
-.learning-journey-indicator[data-artwork='ergonomics'] {
-  --artwork-background: #dcece4;
-  color: #17684d;
-  background: var(--artwork-background);
-}
-
-.learning-journey-indicator[data-artwork='nutrition'] {
-  --artwork-background: #f3edcf;
-  color: #765d0a;
-  background: var(--artwork-background);
-}
-
-.learning-journey-indicator[data-artwork='first-aid'] {
-  --artwork-background: #f6e2dc;
-  color: #a44130;
-  background: var(--artwork-background);
-}
-
-.learning-journey-indicator[data-artwork='safety'] {
-  --artwork-background: #dfeaf2;
-  color: #315d81;
-  background: var(--artwork-background);
-}
-
-.learning-journey-indicator[data-artwork='practice'] {
-  --artwork-background: #e9e3f3;
-  color: #61518a;
-  background: var(--artwork-background);
-}
-
-.learning-journey-node.is-current .learning-journey-indicator {
-  border: 2px solid var(--green);
-  background: var(--artwork-background, #e7ece9);
-}
-
-.learning-journey-node.is-complete .learning-journey-indicator {
-  color: inherit;
-  background: var(--artwork-background, #e7ece9);
-}
-
-.learning-journey-indicator svg {
-  width: 1.4rem;
-  height: 1.4rem;
-  stroke: currentColor;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.8;
-}
-
-.learning-journey-indicator[data-artwork='first-aid'] svg,
-.learning-journey-indicator[data-artwork='practice'] svg,
-.learning-journey-indicator[data-artwork='course'] svg {
-  fill: currentColor;
-  stroke: none;
-}
-
-.learning-journey-indicator[data-artwork='first-aid'] svg {
-  width: 1.35rem;
-  height: 1.35rem;
-}
-
-.learning-journey-completion {
-  position: absolute;
-  right: -0.3rem;
-  bottom: -0.3rem;
-  display: grid;
-  width: 1.15rem;
-  height: 1.15rem;
-  place-items: center;
-  border: 2px solid var(--canvas);
-  border-radius: 50%;
-  color: var(--on);
-  background: var(--green);
-  font-size: 0.68rem;
-  font-weight: 700;
-}
-
-.learning-journey-title {
-  max-width: 12rem;
-  font-size: 0.75rem;
-  line-height: 1.25;
-}
-
-.learning-journey-status {
-  font-size: 0.66rem;
-  line-height: 1.2;
 }
 
 .learning-experience-layout {
@@ -3982,16 +3709,6 @@ select:focus-visible,
 
   .learning-student-progress {
     width: min(100%, 13rem);
-  }
-
-  .learning-journey {
-    margin-inline: -0.875rem;
-    padding-inline: 0.875rem;
-  }
-
-  .learning-journey-stop {
-    min-width: 8rem;
-    flex-basis: 8rem;
   }
 
   .learning-player-frame {

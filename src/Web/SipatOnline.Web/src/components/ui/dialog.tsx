@@ -48,7 +48,7 @@ export function Dialog({
         />
         <DialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-0 overflow-hidden',
+            'fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] grid-rows-[auto_minmax(0,1fr)] -translate-x-1/2 -translate-y-1/2 gap-0 overflow-hidden',
             'rounded-xl bg-card text-card-foreground shadow-overlay outline-none animate-dialog-in',
             sizes[size],
             className,

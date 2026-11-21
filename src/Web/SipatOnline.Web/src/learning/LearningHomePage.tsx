@@ -31,7 +31,6 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
-import TrailPath from './TrailPath';
 import WeekVideos from './WeekVideos';
 import { sipatPhase } from '@/sipatBuilder/sipatPhase';
 import ProgressBar from './ProgressBar';
@@ -65,7 +64,6 @@ export default function LearningHomePage({ participantName, setSummary }: {
   const [category, setCategory] = useState<CourseCategory>('all');
   const [sortMode, setSortMode] = useState<CourseSort>('recommended');
   const [shownMilestone, setShownMilestone] = useState<number | null>(null);
-  const [selectedDay, setSelectedDay] = useState<string | null>(null);
   // the first arrival of the session opens in a short cascade; later visits show the page at once
   const [isFirstArrival] = useState(() => readSessionFlag(firstArrivalKey) !== '1');
   const isArriving = isFirstArrival && !isLoading && !error;
@@ -254,11 +252,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
   ] as const;
 
   const dayGroups = groupTracksByDay(visibleTracks, tracks);
-  // the trail always shows every day, whatever the filters on the course list are
-  const trailDays = groupTracksByDay(tracks, tracks);
-  // a SIPAT built by days: the trail stays in front from the first visit, a day on it filters the videos below
-  const dayMode = trailDays !== null;
-  const programDays = trailDays?.filter(day => day.position !== null) ?? [];
+  const weekDays = groupTracksByDay(tracks, tracks);
+  const dayMode = weekDays !== null;
+  const programDays = weekDays?.filter(day => day.position !== null) ?? [];
   const completedDays = programDays.filter(day => day.total > 0 && day.completed === day.total).length;
   const renderCourse = (track: LearningTrackCard) => {
     const percentage = getTrackProgress(track);
@@ -322,7 +318,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
           {startedAnyCourse
             ? 'Continue de onde parou e avance no seu ritmo.'
             : dayMode
-              ? 'Siga o caminho dos dias e assista no seu ritmo, um vídeo de cada vez.'
+              ? 'Explore os vídeos da sua SIPAT e acompanhe seu progresso, no seu ritmo.'
               : 'Explore os cursos da sua SIPAT e acompanhe cada conquista, no seu ritmo.'}
         </p>
       </header>}
@@ -453,61 +449,23 @@ export default function LearningHomePage({ participantName, setSummary }: {
         )}
 
         {sipats.length > 1 && currentSipat && <nav aria-label="SIPATs" className="sipat-years">
-          {sipats.map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} onClick={() => { setChosenSipat(item.id); setSelectedDay(null); }} type="button">
+          {sipats.map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} onClick={() => setChosenSipat(item.id)} type="button">
             <strong>{yearOf(item) !== null && sipats.filter(other => yearOf(other) === yearOf(item)).length === 1 ? yearOf(item) : item.title}</strong>
             <span>{item.phase === 'running' ? 'Em andamento' : item.phase === 'published' ? 'Em breve' : 'Concluída'}</span>
           </button>)}
         </nav>}
 
-        {(startedAnyCourse || dayMode) && (overallProgress < 100 || dayMode) && (
-          <>
-            {trailDays
-              ? <TrailPath allTracks={tracks} days={trailDays} onSelect={setSelectedDay} selectedKey={selectedDay} />
-              : (
-              <section aria-labelledby="learning-journey-title" className="learning-journey-card">
-                <div className="learning-journey-heading">
-                  <h2 id="learning-journey-title">Sua trilha</h2>
-                  <span>Passo {currentStepNumber} de {tracks.length} · {overallProgress}% da formação</span>
-                </div>
-                <ProgressBar label="Progresso da SIPAT" value={overallProgress} />
-                <ol aria-label="Etapas da formação" className="learning-journey-steps">
-                  {tracks.map((track, index) => {
-                    const percentage = getTrackProgress(track);
-                    const isComplete = percentage === 100;
-                    const isCurrent = index === activeStepIndex && !isComplete;
-                    const title = getTrackDisplayTitle(track.title);
-                    return (
-                      <li className={`learning-journey-step${isComplete ? ' is-complete' : ''}${isCurrent ? ' is-current' : ''}`} key={track.id}>
-                        <Link
-                          aria-current={isCurrent ? 'step' : undefined}
-                          to={getTrackPath(track, tracks)}
-                        >
-                          <strong>{index + 1} · {title}</strong>
-                          <span>{isComplete
-                            ? 'Concluído'
-                            : isCurrent
-                              ? `Em andamento · ${track.completedLessonCount} de ${track.lessonCount} vídeos`
-                              : 'A seguir'}</span>
-                        </Link>
-                      </li>
-                    );
-                  })}
-                </ol>
-              </section>
-              )}
-            {shownMilestone !== null && shownMilestone < 100 && (
-              <p className="learning-milestone" role="status">
-                {shownMilestone === 25
-                  ? completedCourses > 0
-                    ? `Você concluiu ${completedCourses} ${completedCourses === 1 ? 'curso' : 'cursos'}. Falta pouco para a metade da formação.`
-                    : 'Você já avançou na formação. Continue no seu ritmo.'
-                  : 'Você chegou à metade da formação. Continue no seu ritmo.'}
-              </p>
-            )}
-          </>
+        {startedAnyCourse && shownMilestone !== null && shownMilestone < 100 && (
+          <p className="learning-milestone" role="status">
+            {shownMilestone === 25
+              ? completedCourses > 0
+                ? `Você concluiu ${completedCourses} ${completedCourses === 1 ? 'curso' : 'cursos'}. Falta pouco para a metade da formação.`
+                : 'Você já avançou na formação. Continue no seu ritmo.'
+              : 'Você chegou à metade da formação. Continue no seu ritmo.'}
+          </p>
         )}
 
-        {dayMode && trailDays && <WeekVideos allTracks={tracks} days={trailDays} onShowAll={() => setSelectedDay(null)} selectedKey={selectedDay} />}
+        {dayMode && weekDays && <WeekVideos allTracks={tracks} days={weekDays} />}
 
         {!dayMode && <section aria-labelledby="learning-catalog-title" className="learning-catalog-list-section">
           <div className="learning-catalog-list-heading">

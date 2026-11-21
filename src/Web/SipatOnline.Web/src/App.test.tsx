@@ -485,7 +485,12 @@ describe('tenant portal', () => {
     render(<App />);
 
     expect(await screen.findByRole('heading', { name: 'Acesse a plataforma' })).toBeVisible();
-    expect(screen.getByRole('region', { name: 'Acesso à plataforma' })).toBeVisible();
+    const platformLogin = screen.getByRole('region', { name: 'Acesso à plataforma' });
+    expect(platformLogin).toBeVisible();
+    expect(platformLogin.querySelector('.login-brand-panel')).toHaveClass('has-banner');
+    expect(platformLogin.querySelector('.login-brand-panel')).toHaveStyle({
+      '--login-banner': 'url("/platform-login-banner.jpg")',
+    });
     expect(screen.getByText('Acesso exclusivo para a equipe de operação.')).toBeVisible();
     await user.type(screen.getByLabelText('Login'), 'operator');
     await user.type(screen.getByLabelText('Senha'), 'SenhaForte123');
