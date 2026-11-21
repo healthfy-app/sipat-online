@@ -187,7 +187,11 @@ export default function App() {
               path="/admin/dashboard"
               element={
                 state.session && canViewCompany(state.session) ? (
-                  <TenantLearningDashboardPage readOnly={!hasAdminRole(state.session)} />
+                  <TenantLearningDashboardPage
+                    brandColor={state.tenant.primaryColor}
+                    companyName={state.tenant.tenantName}
+                    readOnly={!hasAdminRole(state.session)}
+                  />
                 ) : (
                   <AccessDenied />
                 )
