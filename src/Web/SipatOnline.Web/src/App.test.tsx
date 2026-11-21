@@ -201,7 +201,8 @@ describe('tenant portal', () => {
     vi.stubGlobal('fetch', fetch);
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
-    expect(fetch).toHaveBeenCalledTimes(role === 'ClientAdmin' ? 3 : 2);
+    // a company admin also asks for its capabilities, which may land just after the heading
+    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(role === 'ClientAdmin' ? 3 : 2));
     expect(screen.queryByRole('navigation', { name: 'Etapas do curso' })).not.toBeInTheDocument();
   });
 
