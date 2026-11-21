@@ -342,7 +342,8 @@ public sealed class EfLearningStore(
                 completedLessonCount == revisionLessons.Length ? participantProgress.Max(item => item.CompletedAt) : null,
                 participantProgress.Length == 0
                     ? null
-                    : lastAccessByParticipantAndRevision[(assignment.ParticipantId, revisionId)]));
+                    : lastAccessByParticipantAndRevision[(assignment.ParticipantId, revisionId)],
+                track.SipatEventId));
         }
 
         return rows

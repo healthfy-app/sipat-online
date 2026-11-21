@@ -50,6 +50,10 @@ public sealed class LearningApiTests
         Assert.Contains(
             participationJson.RootElement.EnumerateArray(),
             row => row.GetProperty("loginIdentifier").GetString() == "participant-demo");
+        // every progress row says which training it belongs to
+        var trainingOfTrack = tenantTracks.ToDictionary(track => track.GetProperty("id").GetGuid(), track => track.GetProperty("sipatEventId").GetGuid());
+        Assert.All(participationJson.RootElement.EnumerateArray(), row =>
+            Assert.Equal(trainingOfTrack[row.GetProperty("trackId").GetGuid()], row.GetProperty("sipatEventId").GetGuid()));
 
         var sipatEventId = tenantTracks[0].GetProperty("sipatEventId").GetGuid();
         var token = await GetAntiforgeryTokenAsync(client);

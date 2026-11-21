@@ -13,4 +13,5 @@ public sealed record LearningParticipantProgress(
     bool IsCompleted,
     long WatchedMilliseconds = 0,
     DateTimeOffset? CompletedAt = null,
-    DateTimeOffset? LastAccessedAt = null);
+    DateTimeOffset? LastAccessedAt = null,
+    Guid? SipatEventId = null);
