@@ -38,12 +38,12 @@ export default function CertificatesPage() {
   }
   return <section className="page-content">
     <header className="page-heading"><div><p className="eyebrow">SUA PARTICIPAÇÃO</p><h1>Meus certificados</h1>
-      <p className="muted-copy">Cada formação tem o seu certificado. Assista a todos os vídeos de todos os dias da formação para emitir o seu. Jogos são opcionais.</p>
+      <p className="muted-copy">Cada treinamento tem o seu certificado. Assista a todos os vídeos de todos os dias do treinamento para emitir o seu. Jogos são opcionais.</p>
     </div></header>
     {loading && <LoadingState>Carregando certificados...</LoadingState>}
     {error && <div className="form-error" role="alert"><p>{error}</p>
       <button className="button button-secondary" onClick={() => setRetry(value => value + 1)} type="button">Tentar novamente</button></div>}
-    {!loading && !error && !items.length && <div className="empty-state"><p>Você ainda não tem uma formação atribuída para certificação.</p></div>}
+    {!loading && !error && !items.length && <div className="empty-state"><p>Você ainda não tem um treinamento atribuído para certificação.</p></div>}
     <div className="learning-catalog-grid">{items.map(item => <article className="form-card" key={item.sipatEventId}>
       {period(item) && <p className="eyebrow">{period(item)}</p>}
       <h2>{item.eventTitle}</h2>

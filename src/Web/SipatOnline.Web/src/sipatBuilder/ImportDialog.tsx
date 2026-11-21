@@ -23,7 +23,7 @@ export default function ImportDialog({ catalog, hasPlan, onImport, onTemplate, o
   }
 
   return <Dialog description="Salve a planilha como CSV (separado por ponto e vírgula) e envie aqui. Os vídeos são encontrados pelo código, como A1V4, ou pelo nome."
-    onClose={onClose} size="lg" title="Importar formação de um CSV">
+    onClose={onClose} size="lg" title="Importar treinamento de um CSV">
     <div className="grid gap-4">
       <div className="flex flex-wrap items-center gap-3">
         <FilePicker accept=".csv,.txt,text/csv" buttonLabel="Escolher arquivo CSV" file={fileName ? new File([], fileName) : null} id="sipat-csv" onChange={file => void read(file)} />

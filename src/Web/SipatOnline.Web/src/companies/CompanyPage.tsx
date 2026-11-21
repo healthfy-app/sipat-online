@@ -181,7 +181,7 @@ export default function CompanyPage() {
         {missingAdministrator && !showingAdministrators && (
           <div className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning-soft px-4 py-3 text-warning" role="status">
             <TriangleAlert aria-hidden="true" className="size-5 shrink-0" />
-            <p className="m-0 min-w-0 flex-1 text-sm font-medium">Esta empresa ainda não tem administrador. Sem ele, ninguém da empresa consegue cuidar da SIPAT.</p>
+            <p className="m-0 min-w-0 flex-1 text-sm font-medium">Esta empresa ainda não tem administrador. Sem ele, ninguém da empresa consegue cuidar dos treinamentos.</p>
             <Button onClick={() => setAddingAdmin(true)} size="sm"><UserPlus /> Adicionar administrador</Button>
           </div>
         )}
@@ -291,7 +291,7 @@ export default function CompanyPage() {
                 <h2 className="m-0 text-lg font-semibold tracking-tight" id="company-administrators-title">
                   Administradores <span className="font-normal text-muted-foreground tabular-nums">· {administrators?.length ?? overview?.administratorCount ?? 0}</span>
                 </h2>
-                <p className="m-0 text-sm text-muted-foreground">Quem administra a SIPAT desta empresa: participantes, cursos e certificados.</p>
+                <p className="m-0 text-sm text-muted-foreground">Quem administra os treinamentos desta empresa: participantes, cursos e certificados.</p>
               </div>
               {!missingAdministrator && <Button onClick={() => setAddingAdmin(true)} variant="outline"><UserPlus /> Adicionar administrador</Button>}
             </div>
@@ -300,7 +300,7 @@ export default function CompanyPage() {
             ) : administrators.length === 0 ? (
               <EmptyState
                 action={<Button onClick={() => setAddingAdmin(true)}><UserPlus /> Adicionar administrador</Button>}
-                description="Sem um administrador, ninguém da empresa consegue gerenciar a SIPAT dela."
+                description="Sem um administrador, ninguém da empresa consegue gerenciar os treinamentos dela."
                 title="Esta empresa ainda não tem administrador."
               />
             ) : (

@@ -5,7 +5,7 @@ export const statusLabels: Record<ParticipantProgressStatus, string> = {
   completed: 'Concluíram todos os dias',
   'in-progress': 'Em andamento',
   'not-started': 'Ainda não iniciaram',
-  'no-tracks': 'Sem dias da SIPAT',
+  'no-tracks': 'Sem dias',
   inactive: 'Participantes inativos',
 };
 

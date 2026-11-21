@@ -81,7 +81,7 @@ describe('tenant learning dashboard', () => {
 
     expect(await screen.findByText('Participantes ativos')).toBeVisible();
     expect(within(screen.getByRole('list', { name: 'Legenda do progresso' }))
-      .getByText('Sem dias da SIPAT')).toBeVisible();
+      .getByText('Sem dias')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Escolher participantes' }))
       .toHaveAttribute('href', '/admin/learning?status=no-tracks');
   });

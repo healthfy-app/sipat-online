@@ -5,11 +5,11 @@ export type SipatPhase = 'draft' | 'created' | 'published' | 'running' | 'finish
 
 export const phaseLabel: Record<SipatPhase, { text: string; variant: 'default' | 'success' | 'warning' | 'neutral' | 'outline' }> = {
   draft: { text: 'Rascunho', variant: 'warning' },
-  created: { text: 'Criada', variant: 'outline' },
-  published: { text: 'Publicada', variant: 'success' },
+  created: { text: 'Criado', variant: 'outline' },
+  published: { text: 'Publicado', variant: 'success' },
   running: { text: 'Em andamento', variant: 'default' },
-  finished: { text: 'Concluída', variant: 'neutral' },
-  cancelled: { text: 'Encerrada', variant: 'neutral' },
+  finished: { text: 'Concluído', variant: 'neutral' },
+  cancelled: { text: 'Encerrado', variant: 'neutral' },
 };
 
 /**

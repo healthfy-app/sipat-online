@@ -16,13 +16,13 @@ public sealed record SipatEventTitle
         if (string.IsNullOrWhiteSpace(normalizedValue))
         {
             return Result<SipatEventTitle>.Failure(
-                new DomainError("sipat.title.required", "O título da SIPAT é obrigatório."));
+                new DomainError("sipat.title.required", "O título do treinamento é obrigatório."));
         }
 
         if (normalizedValue.Length > MaximumLength)
         {
             return Result<SipatEventTitle>.Failure(
-                new DomainError("sipat.title.too_long", $"O título da SIPAT não pode exceder {MaximumLength} caracteres."));
+                new DomainError("sipat.title.too_long", $"O título do treinamento não pode exceder {MaximumLength} caracteres."));
         }
 
         return Result<SipatEventTitle>.Success(new SipatEventTitle(normalizedValue));

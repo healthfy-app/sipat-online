@@ -49,22 +49,22 @@ public sealed class LearningTrack
         var normalizedTitle = title?.Trim();
         if (tenantId.IsEmpty)
         {
-            return Failure("learning.tenant.required", "A empresa da formação é obrigatória.");
+            return Failure("learning.tenant.required", "A empresa do conteúdo é obrigatória.");
         }
 
         if (sipatEventId == Guid.Empty)
         {
-            return Failure("learning.sipat.required", "A SIPAT da formação é obrigatória.");
+            return Failure("learning.sipat.required", "O treinamento do conteúdo é obrigatório.");
         }
 
         if (string.IsNullOrWhiteSpace(normalizedTitle))
         {
-            return Failure("learning.track.title_required", "O título da formação é obrigatório.");
+            return Failure("learning.track.title_required", "O título do conteúdo é obrigatório.");
         }
 
         if (normalizedTitle.Length > MaximumTitleLength)
         {
-            return Failure("learning.track.title_too_long", "O título da formação excede o limite permitido.");
+            return Failure("learning.track.title_too_long", "O título do conteúdo excede o limite permitido.");
         }
 
         var normalizedDescription = string.IsNullOrWhiteSpace(description) ? null : description.Trim();
@@ -72,7 +72,7 @@ public sealed class LearningTrack
         {
             return Failure(
                 "learning.track.description_too_long",
-                "A descrição da formação excede o limite permitido.");
+                "A descrição do conteúdo excede o limite permitido.");
         }
 
         if (createdAt == default)
@@ -108,7 +108,7 @@ public sealed class LearningTrack
 
         if (id == Guid.Empty || currentRevisionId == Guid.Empty)
         {
-            return Failure("learning.track.id_required", "O identificador da formação é obrigatório.");
+            return Failure("learning.track.id_required", "O identificador do conteúdo é obrigatório.");
         }
 
         var track = result.Value;
@@ -130,7 +130,7 @@ public sealed class LearningTrack
             revision.TenantId != TenantId ||
             revision.Status != LearningTrackRevisionStatus.Published)
         {
-            return Failure("learning.revision.invalid", "A revisão publicada não pertence a esta formação.");
+            return Failure("learning.revision.invalid", "A revisão publicada não pertence a este conteúdo.");
         }
 
         CurrentRevisionId = revision.Id;

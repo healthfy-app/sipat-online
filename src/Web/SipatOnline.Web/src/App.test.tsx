@@ -398,7 +398,7 @@ describe('tenant portal', () => {
     await user.click(screen.getByRole('button', { name: 'Entrar no portal' }));
 
     expect(await screen.findByRole('heading', {
-      name: 'Você ainda não tem uma formação disponível',
+      name: 'Você ainda não tem um treinamento disponível',
     })).toBeVisible();
     expect(screen.queryByRole('navigation', { name: 'Navegação principal' }))
       .not.toBeInTheDocument();

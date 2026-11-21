@@ -50,7 +50,7 @@ export default function PlanSubjectsPanel() {
 
   return <section aria-label="Assuntos por plano" className="grid min-w-0 gap-4">
     <p className="m-0 text-sm text-muted-foreground">
-      Marque os assuntos que cada plano pode usar na grade da SIPAT. Todos começam liberados; ao desmarcar, as empresas daquele plano deixam de ver o assunto.
+      Marque os assuntos que cada plano pode usar na grade dos treinamentos. Todos começam liberados; ao desmarcar, as empresas daquele plano deixam de ver o assunto.
     </p>
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
 

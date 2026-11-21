@@ -130,7 +130,7 @@ export default function PlaybackQualityComparisonPage() {
         />
         {message && <ErrorMessage>{message}</ErrorMessage>}
         {message || !data ? null : sorted.length === 0
-          ? <EmptyState description="Escolha outro período para comparar as empresas." title="Nenhuma empresa teve SIPAT neste período" />
+          ? <EmptyState description="Escolha outro período para comparar as empresas." title="Nenhuma empresa teve treinamento neste período" />
           : (
             <div aria-busy={loading} className={loading ? 'ops-table opacity-50' : 'ops-table'}>
               <Table aria-label="Qualidade do vídeo por empresa">

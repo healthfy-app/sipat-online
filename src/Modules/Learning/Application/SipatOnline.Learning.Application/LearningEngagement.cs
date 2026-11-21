@@ -91,12 +91,12 @@ public sealed class LearningEngagementService(
         var candidates = await store.GetCertificateCandidatesAsync(tenantId, participantId, token);
         var candidate = candidates.SingleOrDefault(item => item.Snapshot.SipatEventId == sipatEventId);
         if (candidate is null)
-            return Failure<ParticipationCertificate>("learning.sipat_not_found", "A SIPAT não foi encontrada para este participante.");
+            return Failure<ParticipationCertificate>("learning.sipat_not_found", "O treinamento não foi encontrado para este participante.");
         if (candidate.Snapshot.IssuedAt != default) return Result<ParticipationCertificate>.Success(candidate.Snapshot);
         if (candidate.Snapshot.CompanyLogo is null)
             return Failure<ParticipationCertificate>("learning.certificate_logo_pending", "A empresa precisa cadastrar sua logo para liberar a emissão do certificado.");
         if (!candidate.IsEligible)
-            return Failure<ParticipationCertificate>("learning.certificate_pending", "Conclua todos os cursos atribuídos a esta SIPAT para emitir o certificado.");
+            return Failure<ParticipationCertificate>("learning.certificate_pending", "Conclua todos os cursos atribuídos a este treinamento para emitir o certificado.");
         var issued = await store.IssueAsync(candidate.Snapshot with { Id = Guid.NewGuid(), IssuedAt = timeProvider.GetUtcNow() }, token);
         if (!issued.IsSuccess) return issued;
         await audit.WriteAsync(new AuditRecord(actor.UserId!, new TenantId(tenantId),

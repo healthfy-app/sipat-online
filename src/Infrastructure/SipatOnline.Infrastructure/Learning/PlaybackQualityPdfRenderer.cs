@@ -42,7 +42,7 @@ public sealed class PlaybackQualityPdfRenderer : IPlaybackQualityPdfRenderer
         graphics.DrawRectangle(new XSolidBrush(XColor.FromArgb(247, 249, 246)), 0, 0, PageWidth, PageHeight);
         Line(graphics, "Qualidade do vídeo", 26, ink, Margin, 52, width, 34);
         Line(graphics, content.CompanyName, 15, ink, Margin, 94, width, 22);
-        Line(graphics, $"SIPAT: {content.SipatTitle}", 12, muted, Margin, 120, width, 18);
+        Line(graphics, $"Treinamento: {content.SipatTitle}", 12, muted, Margin, 120, width, 18);
         Line(graphics, content.DayLabel, 12, muted, Margin, 140, width, 18);
 
         var top = 180d;

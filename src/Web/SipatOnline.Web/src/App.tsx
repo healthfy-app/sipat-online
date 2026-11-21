@@ -429,7 +429,7 @@ function LoginPage({
               <h1>Aprender também faz parte de cuidar.</h1>
               <p>
                 Acesse os vídeos e demais conteúdos que sua empresa preparou para
-                a formação.
+                o treinamento.
               </p>
             </>
           )}

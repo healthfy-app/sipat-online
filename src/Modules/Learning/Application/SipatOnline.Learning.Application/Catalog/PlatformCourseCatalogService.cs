@@ -230,8 +230,8 @@ public sealed class PlatformCourseCatalogService(
         {
             var where = new List<string>();
             if (usage.Themes > 0) where.Add(usage.Themes == 1 ? "1 tema" : $"{usage.Themes} temas");
-            if (usage.Programs > 0) where.Add(usage.Programs == 1 ? "1 SIPAT pronta" : $"{usage.Programs} SIPATs prontas");
-            if (usage.DeliveredLessons > 0) where.Add("SIPATs já entregues a empresas");
+            if (usage.Programs > 0) where.Add(usage.Programs == 1 ? "1 treinamento pronto" : $"{usage.Programs} treinamentos prontos");
+            if (usage.DeliveredLessons > 0) where.Add("treinamentos já entregues a empresas");
             return Failure<bool>(
                 "learning.platform_course.video_in_use",
                 $"Este vídeo ainda está em uso ({string.Join(", ", where)}). Tire-o de lá antes de excluir.");

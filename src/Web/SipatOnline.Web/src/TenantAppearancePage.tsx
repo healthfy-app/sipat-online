@@ -278,7 +278,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
                   <strong className="text-sm">{tenant.tenantName}</strong>
                 </div>
                 <div className="grid gap-2 p-4">
-                  <span className="text-xs font-semibold text-primary">Minha formação</span>
+                  <span className="text-xs font-semibold text-primary">Meus treinamentos</span>
                   <h3 className="m-0 text-xl font-semibold leading-tight">Aprender também faz parte de cuidar.</h3>
                   <p className="m-0 text-sm text-muted-foreground">Os cursos e conteúdos da sua empresa, em um só lugar.</p>
                   <span className="mt-1 inline-flex w-fit items-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold"

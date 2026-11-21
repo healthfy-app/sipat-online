@@ -42,7 +42,7 @@ public sealed class LearningService(
         {
             return Failure<LearningTrack>(
                 "learning.sipat_not_found",
-                "A SIPAT não foi encontrada para esta empresa.");
+                "O treinamento não foi encontrado para esta empresa.");
         }
 
         var trackResult = LearningTrack.Create(
@@ -102,7 +102,7 @@ public sealed class LearningService(
         var track = await learningStore.FindTrackAsync(tenantId.Value, trackId, cancellationToken);
         if (track is null)
         {
-            return Failure<LearningLesson>("learning.track_not_found", "A formação não foi encontrada.");
+            return Failure<LearningLesson>("learning.track_not_found", "O conteúdo não foi encontrado.");
         }
 
         var revision = await learningStore.FindDraftRevisionAsync(
@@ -113,7 +113,7 @@ public sealed class LearningService(
         {
             return Failure<LearningLesson>(
                 "learning.draft_not_found",
-                "A formação não possui uma revisão em rascunho.");
+                "O conteúdo não possui uma revisão em rascunho.");
         }
 
         var addResult = revision.AddLesson(title, description, providerAssetReference, durationMilliseconds);
@@ -156,7 +156,7 @@ public sealed class LearningService(
         {
             return Failure<LearningTrackDraft>(
                 "learning.draft_not_found",
-                "A formação não possui uma revisão em rascunho.");
+                "O conteúdo não possui uma revisão em rascunho.");
         }
 
         return Result<LearningTrackDraft>.Success(new LearningTrackDraft(
@@ -196,7 +196,7 @@ public sealed class LearningService(
         var track = await learningStore.FindTrackAsync(tenantId.Value, trackId, cancellationToken);
         if (track is null)
         {
-            return Failure<LearningTrackRevision>("learning.track_not_found", "A formação não foi encontrada.");
+            return Failure<LearningTrackRevision>("learning.track_not_found", "O conteúdo não foi encontrado.");
         }
 
         var current = await learningStore.FindCurrentRevisionAsync(
@@ -207,14 +207,14 @@ public sealed class LearningService(
         {
             return Failure<LearningTrackRevision>(
                 "learning.published_revision_not_found",
-                "A formação ainda não possui uma revisão publicada.");
+                "O conteúdo ainda não possui uma revisão publicada.");
         }
 
         if (await learningStore.FindDraftRevisionAsync(tenantId.Value, trackId, cancellationToken) is not null)
         {
             return Failure<LearningTrackRevision>(
                 "learning.draft_exists",
-                "A formação já possui uma revisão em rascunho.");
+                "O conteúdo já possui uma revisão em rascunho.");
         }
 
         var draftResult = current.CreateNextDraft(timeProvider.GetUtcNow());
@@ -252,7 +252,7 @@ public sealed class LearningService(
         var track = await learningStore.FindTrackAsync(tenantId.Value, trackId, cancellationToken);
         if (track is null)
         {
-            return Failure<LearningTrackRevision>("learning.track_not_found", "A formação não foi encontrada.");
+            return Failure<LearningTrackRevision>("learning.track_not_found", "O conteúdo não foi encontrado.");
         }
 
         var revision = await learningStore.FindDraftRevisionAsync(
@@ -263,7 +263,7 @@ public sealed class LearningService(
         {
             return Failure<LearningTrackRevision>(
                 "learning.draft_not_found",
-                "A formação não possui uma revisão em rascunho.");
+                "O conteúdo não possui uma revisão em rascunho.");
         }
 
         var publishResult = revision.Publish(timeProvider.GetUtcNow());
@@ -311,7 +311,7 @@ public sealed class LearningService(
         {
             return Failure<LearningAssignment>(
                 "learning.track_not_published",
-                "Somente formações publicadas podem ser atribuídas.");
+                "Somente conteúdos publicados podem ser atribuídos.");
         }
 
         if (!await learningStore.IsActiveParticipantAsync(
@@ -332,7 +332,7 @@ public sealed class LearningService(
         {
             return Failure<LearningAssignment>(
                 "learning.assignment_exists",
-                "A formação já está atribuída a este participante.");
+                "O conteúdo já está atribuído a este participante.");
         }
 
         var assignment = LearningAssignment.Create(
@@ -473,7 +473,7 @@ public sealed class LearningService(
         return experience is null
             ? Failure<LearningExperience>(
                 "learning.track_not_found",
-                "A formação não foi encontrada ou não está atribuída a você.")
+                "O conteúdo não foi encontrado ou não está atribuído a você.")
             : Result<LearningExperience>.Success(experience);
     }
 
@@ -728,7 +728,7 @@ public sealed class LearningService(
     private static Result<LearningProgress> RevisionMismatch() =>
         Failure<LearningProgress>(
             "learning.progress.revision_mismatch",
-            "O progresso pertence a outra revisão da formação.");
+            "O progresso pertence a outra revisão do conteúdo.");
 
     private Result<Unit> EnsureAdministrator() =>
         currentActor.IsInRole(PlatformRoles.PlatformOperator) ||
@@ -736,7 +736,7 @@ public sealed class LearningService(
             ? Result<Unit>.Success(Unit.Value)
             : Result<Unit>.Failure(new DomainError(
                 "learning.forbidden",
-                "Você não tem permissão para administrar as formações."));
+                "Você não tem permissão para administrar os treinamentos."));
 
     private Result<Unit> EnsureReportViewer() =>
         currentActor.IsInRole(PlatformRoles.Supervisor)

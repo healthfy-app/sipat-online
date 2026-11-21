@@ -52,7 +52,7 @@ public sealed class SipatEvent
         if (tenantId.IsEmpty)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.tenant.required", "A empresa da SIPAT é obrigatória."));
+                new DomainError("sipat.tenant.required", "A empresa do treinamento é obrigatória."));
         }
 
         var titleResult = SipatEventTitle.Create(title);
@@ -67,7 +67,7 @@ public sealed class SipatEvent
             return Result<SipatEvent>.Failure(
                 new DomainError(
                     "sipat.description.too_long",
-                    $"A descrição da SIPAT não pode exceder {MaximumDescriptionLength} caracteres."));
+                    $"A descrição do treinamento não pode exceder {MaximumDescriptionLength} caracteres."));
         }
 
         var scheduleResult = ValidateSchedule(startsAt, endsAt);
@@ -79,7 +79,7 @@ public sealed class SipatEvent
         if (createdAt == default)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.created_at.required", "A data de criação da SIPAT é obrigatória."));
+                new DomainError("sipat.created_at.required", "A data de criação do treinamento é obrigatória."));
         }
 
         return Result<SipatEvent>.Success(
@@ -106,13 +106,13 @@ public sealed class SipatEvent
         if (id == Guid.Empty)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.id.required", "O identificador interno da SIPAT é obrigatório."));
+                new DomainError("sipat.id.required", "O identificador interno do treinamento é obrigatório."));
         }
 
         if (tenantId.IsEmpty)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.tenant.required", "A empresa da SIPAT é obrigatória."));
+                new DomainError("sipat.tenant.required", "A empresa do treinamento é obrigatória."));
         }
 
         var titleResult = SipatEventTitle.Create(title);
@@ -127,7 +127,7 @@ public sealed class SipatEvent
             return Result<SipatEvent>.Failure(
                 new DomainError(
                     "sipat.description.too_long",
-                    $"A descrição da SIPAT não pode exceder {MaximumDescriptionLength} caracteres."));
+                    $"A descrição do treinamento não pode exceder {MaximumDescriptionLength} caracteres."));
         }
 
         var scheduleResult = ValidateSchedule(startsAt, endsAt);
@@ -139,13 +139,13 @@ public sealed class SipatEvent
         if (createdAt == default)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.created_at.required", "A data de criação da SIPAT é obrigatória."));
+                new DomainError("sipat.created_at.required", "A data de criação do treinamento é obrigatória."));
         }
 
         if (!Enum.IsDefined(status))
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.status.invalid", "O estado armazenado da SIPAT é inválido."));
+                new DomainError("sipat.status.invalid", "O estado armazenado do treinamento é inválido."));
         }
 
         return Result<SipatEvent>.Success(
@@ -171,7 +171,7 @@ public sealed class SipatEvent
         if (Status == SipatEventStatus.Cancelled)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.cancelled", "Uma SIPAT cancelada não pode ser alterada."));
+                new DomainError("sipat.cancelled", "Um treinamento cancelado não pode ser alterado."));
         }
 
         var titleResult = SipatEventTitle.Create(title);
@@ -186,7 +186,7 @@ public sealed class SipatEvent
             return Result<SipatEvent>.Failure(
                 new DomainError(
                     "sipat.description.too_long",
-                    $"A descrição da SIPAT não pode exceder {MaximumDescriptionLength} caracteres."));
+                    $"A descrição do treinamento não pode exceder {MaximumDescriptionLength} caracteres."));
         }
 
         var scheduleResult = ValidateSchedule(startsAt, endsAt);
@@ -207,7 +207,7 @@ public sealed class SipatEvent
         if (Status != SipatEventStatus.Draft)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.publish.invalid_state", "Somente uma SIPAT em rascunho pode ser publicada."));
+                new DomainError("sipat.publish.invalid_state", "Somente um treinamento em rascunho pode ser publicado."));
         }
 
         Status = SipatEventStatus.Published;
@@ -219,7 +219,7 @@ public sealed class SipatEvent
         if (Status == SipatEventStatus.Cancelled)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.cancelled", "A SIPAT já está cancelada."));
+                new DomainError("sipat.cancelled", "O treinamento já está cancelado."));
         }
 
         Status = SipatEventStatus.Cancelled;
@@ -232,7 +232,7 @@ public sealed class SipatEvent
         if (Status != SipatEventStatus.Cancelled)
         {
             return Result<SipatEvent>.Failure(
-                new DomainError("sipat.reactivate.invalid_state", "Somente uma SIPAT cancelada pode ser reativada."));
+                new DomainError("sipat.reactivate.invalid_state", "Somente um treinamento cancelado pode ser reativado."));
         }
 
         Status = SipatEventStatus.Draft;
@@ -244,13 +244,13 @@ public sealed class SipatEvent
         if (startsAt == default || endsAt == default)
         {
             return Result<bool>.Failure(
-                new DomainError("sipat.schedule.required", "As datas de início e fim da SIPAT são obrigatórias."));
+                new DomainError("sipat.schedule.required", "As datas de início e fim do treinamento são obrigatórias."));
         }
 
         if (endsAt <= startsAt)
         {
             return Result<bool>.Failure(
-                new DomainError("sipat.schedule.invalid", "O fim da SIPAT deve ser posterior ao início."));
+                new DomainError("sipat.schedule.invalid", "O fim do treinamento deve ser posterior ao início."));
         }
 
         return Result<bool>.Success(true);

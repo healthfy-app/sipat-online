@@ -34,7 +34,7 @@ export interface PlanFeature {
 /** Everything the plans offer, in the order of the site, each from the plan that first includes it. */
 export const planFeatures: PlanFeature[] = [
   { label: 'Escolher dentre os módulos prontos', from: 'Bronze' },
-  { label: 'Relatórios diários de acompanhamento da SIPAT', from: 'Bronze' },
+  { label: 'Relatórios diários de acompanhamento dos treinamentos', from: 'Bronze' },
   { label: 'Certificado padrão', from: 'Bronze' },
   { label: 'Personalização da grade de vídeos', from: 'Prata' },
   { label: 'Inclusão de logos e cores personalizadas', from: 'Ouro' },

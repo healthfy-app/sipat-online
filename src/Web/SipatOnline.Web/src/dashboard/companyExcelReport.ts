@@ -38,7 +38,7 @@ export async function buildCompanyExcelReport(input: CompanyExcelReportInput): P
   const generatedAt = input.generatedAt ?? new Date();
   workbook.creator = 'SIPAT Online';
   workbook.company = input.companyName;
-  workbook.title = `Relatório da SIPAT · ${input.companyName}`;
+  workbook.title = `Relatório de treinamentos · ${input.companyName}`;
   workbook.created = generatedAt;
   workbook.modified = generatedAt;
 
@@ -162,7 +162,7 @@ function addSummarySheet(workbook: Workbook, input: CompanyExcelReportInput, bra
 
   // Conclusão por dia
   row += 3;
-  row = sectionTitle(sheet, row, 'Conclusão por dia da SIPAT', 'Do menor para o maior progresso médio — onde agir primeiro');
+  row = sectionTitle(sheet, row, 'Conclusão por dia', 'Do menor para o maior progresso médio — onde agir primeiro');
   headerRow(sheet, row, ['Dia', 'Receberam', 'Concluíram', 'Taxa de conclusão', 'Progresso médio'], brand, 2);
   const trackStart = row + 1;
   const tracks = [...overview.trackProgress].sort((a, b) => a.averageProgressPercentage - b.averageProgressPercentage
@@ -183,7 +183,7 @@ function addSummarySheet(workbook: Workbook, input: CompanyExcelReportInput, bra
   }
   if (tracks.length === 0) {
     row++;
-    emptyRow(sheet, row, 'Nenhum dia da SIPAT entregue ainda.', 2, 6);
+    emptyRow(sheet, row, 'Nenhum dia entregue ainda.', 2, 6);
   } else {
     dataBar(sheet, `E${trackStart}:E${row}`, 1);
     dataBar(sheet, `F${trackStart}:F${row}`, 1);
@@ -333,7 +333,7 @@ function addHeatmapSheet(workbook: Workbook, input: CompanyExcelReportInput, bra
   });
 
   if (people.length === 0 || tracks.length === 0) {
-    emptyRow(sheet, 4, 'Nenhum dia da SIPAT entregue ainda.', 1, lastColumn);
+    emptyRow(sheet, 4, 'Nenhum dia entregue ainda.', 1, lastColumn);
   } else {
     const lastRow = people.length + 3;
     const range = `B4:${columnLetter(tracks.length + 1)}${lastRow}`;
@@ -411,7 +411,7 @@ function addDetailSheet(workbook: Workbook, input: CompanyExcelReportInput, bran
   });
 
   if (records.length === 0) {
-    emptyRow(sheet, 2, 'Nenhum dia da SIPAT entregue ainda.', 1, columns.length);
+    emptyRow(sheet, 2, 'Nenhum dia entregue ainda.', 1, columns.length);
   } else {
     const last = records.length + 1;
     dataBar(sheet, `F2:F${last}`, 1);

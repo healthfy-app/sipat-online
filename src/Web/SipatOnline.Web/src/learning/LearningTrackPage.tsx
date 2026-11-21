@@ -484,14 +484,14 @@ export default function LearningTrackPage({
   if (error || !experience) {
     return (
       <main className="learning-page">
-        <Link className="learning-back-to-courses" to="/learning">← Sua formação</Link>
+        <Link className="learning-back-to-courses" to="/learning">← Seu treinamento</Link>
         <div className="learning-state learning-error" role="alert">
           <p>{error || 'Não foi possível carregar este dia.'}</p>
           <div className="learning-state-actions">
             <button className="button button-secondary" onClick={() => setRetry((value) => value + 1)} type="button">
               Tentar novamente
             </button>
-            <Link className="button button-quiet" to="/learning">Voltar à formação</Link>
+            <Link className="button button-quiet" to="/learning">Voltar ao treinamento</Link>
           </div>
         </div>
       </main>
@@ -531,7 +531,7 @@ export default function LearningTrackPage({
   return (
     <main className="learning-page day-page">
       <header className="day-top">
-        <Link className="day-back" to="/learning"><ArrowLeft aria-hidden="true" /> Sua formação</Link>
+        <Link className="day-back" to="/learning"><ArrowLeft aria-hidden="true" /> Seu treinamento</Link>
         <div className="day-heading">
           {(dayPosition !== null || dayDate) && <p className="day-kicker">
             {dayPosition !== null && <span className="day-chip">{word} {dayPosition}</span>}
@@ -559,7 +559,7 @@ export default function LearningTrackPage({
           </div>
           {nextDay
             ? <Link className="day-done-action" to={getTrackPath(nextDay, assignedTracks)}>Ir para o {word} {nextDay.dayPosition} <ArrowRight aria-hidden="true" /></Link>
-            : <Link className="day-done-action" to="/learning">Voltar à sua formação <ArrowRight aria-hidden="true" /></Link>}
+            : <Link className="day-done-action" to="/learning">Voltar ao seu treinamento <ArrowRight aria-hidden="true" /></Link>}
         </section>
       )}
 

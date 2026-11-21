@@ -164,18 +164,18 @@ export default function TenantLearningDashboardPage({
                   <p className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-warning">PRÓXIMO PASSO</p>
                   <h2 className="m-0 text-base font-semibold" id="tenant-dashboard-next-step">
                     {noTracksCount > 0
-                      ? `Entregue a SIPAT a ${pluralize(noTracksCount, 'colaborador', 'colaboradores')}`
+                      ? `Entregue o treinamento a ${pluralize(noTracksCount, 'colaborador', 'colaboradores')}`
                       : `Acompanhe ${pluralize(notStartedCount, 'participante', 'participantes')} sem início`}
                   </h2>
                   <p className="m-0 text-sm text-muted-foreground">
                     {noTracksCount > 0
-                      ? 'Esses colaboradores ainda não receberam nenhum dia da SIPAT.'
-                      : 'Veja quem já recebeu os dias da SIPAT e ainda não iniciou.'}
+                      ? 'Esses colaboradores ainda não receberam nenhum dia de treinamento.'
+                      : 'Veja quem já recebeu os dias do treinamento e ainda não iniciou.'}
                   </p>
                 </div>
                 <Link className={buttonVariants()} to={`/admin/learning?status=${nextStepStatus}`}>
                   {noTracksCount > 0
-                    ? readOnly ? 'Ver colaboradores sem dias da SIPAT' : 'Escolher participantes'
+                    ? readOnly ? 'Ver colaboradores sem dias de treinamento' : 'Escolher participantes'
                     : readOnly ? 'Ver acompanhamento' : 'Acompanhar progresso'}
                   <ArrowRight />
                 </Link>
@@ -210,7 +210,7 @@ export default function TenantLearningDashboardPage({
 
             <Panel count={pluralize(overview.trackProgress.length, 'dia', 'dias')} id="track-progress-title" title="Conclusão média por dia">
               {overview.trackProgress.length === 0 ? (
-                <EmptyState description="Quando a SIPAT for publicada, a evolução média de cada dia aparecerá aqui." title="Nenhum dia entregue" />
+                <EmptyState description="Quando um treinamento for publicado, a evolução média de cada dia aparecerá aqui." title="Nenhum dia entregue" />
               ) : (
                 <TrackMeterList overview={overview} />
               )}
@@ -440,7 +440,7 @@ function CompletionTimeline({ participation }: { participation: readonly Learnin
     return (
       <EmptyState
         className="py-8"
-        description="Assim que alguém concluir um dia da SIPAT, as conclusões aparecem aqui por data."
+        description="Assim que alguém concluir um dia de treinamento, as conclusões aparecem aqui por data."
         title="Nenhuma conclusão ainda"
       />
     );

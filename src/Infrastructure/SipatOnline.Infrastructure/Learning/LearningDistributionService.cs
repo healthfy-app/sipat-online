@@ -39,7 +39,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var access = await GetAsync(tenantId, token);
         if (!access.IsSuccess) return Result<Guid>.Failure(access.Error);
         if (!access.Value.Events.Any(item => item.Id == sipatId))
-            return Failure<Guid>("learning.sipat_not_found", "Escolha uma SIPAT publicada desta empresa.");
+            return Failure<Guid>("learning.sipat_not_found", "Escolha um treinamento publicado desta empresa.");
         var existing = access.Value.Courses.SingleOrDefault(item => item.SipatEventId == sipatId && item.SourceCourseId == courseId);
         var course = await catalog.FindCourseAsync(courseId, token);
         if (existing is not null)
@@ -143,7 +143,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var program = await programs.FindAsync(programId, token);
         if (program is null) return Failure<ProgramApplication>("learning.program_not_found", "O programa não foi encontrado.");
         if (!access.Value.Events.Any(item => item.Id == sipatId))
-            return Failure<ProgramApplication>("learning.sipat_not_found", "Escolha uma SIPAT publicada desta empresa.");
+            return Failure<ProgramApplication>("learning.sipat_not_found", "Escolha um treinamento publicado desta empresa.");
         return await ApplyDaysAsync(tenantId, sipatId, program.Days, programId, "learning.program.applied", "sipat_program", token);
     }
 
@@ -161,7 +161,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         {
             // programs saved before days held videos come back without lists: say what to do instead of failing
             if (day.VideoIds is null || day.VideoIds.Count == 0)
-                return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra a SIPAT em Construção SIPAT, escolha um tema para cada dia e salve.");
+                return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra o treinamento em Treinamentos, escolha um assunto para cada dia e salve.");
             var videos = new List<PlatformCourseVideo>(day.VideoIds.Count);
             foreach (var videoId in day.VideoIds)
             {
@@ -171,7 +171,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
                 videos.Add(video);
             }
             if (!HasHouseVideo(videos))
-                return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra a SIPAT em Construção SIPAT, escolha um tema para cada dia e salve.");
+                return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra o treinamento em Treinamentos, escolha um assunto para cada dia e salve.");
             var placements = (day.GameIds ?? []).Select(gameId => new CourseModulePlacement(gameId, videos.Count)).ToArray();
             var course = new PlatformCourse(day.Id, day.Title, day.Subject, now, PlatformCourseStatus.Published, true, videos, placements);
             var snapshot = await CreateSnapshotAsync(course, token);

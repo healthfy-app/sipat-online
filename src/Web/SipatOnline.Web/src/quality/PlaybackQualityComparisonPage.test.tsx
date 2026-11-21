@@ -124,7 +124,7 @@ describe('playback quality comparison page', () => {
   it('says when no company had a SIPAT in the period', async () => {
     vi.mocked(api.getPlaybackQualityComparison).mockResolvedValue(comparison({ companies: [] }));
     renderPage();
-    expect(await screen.findByText('Nenhuma empresa teve SIPAT neste período')).toBeVisible();
+    expect(await screen.findByText('Nenhuma empresa teve treinamento neste período')).toBeVisible();
   });
 
   it('refuses a start date after the end date without calling the API', async () => {

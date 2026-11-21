@@ -25,7 +25,7 @@ const filters: { value: ParticipantProgressFilter; label: string }[] = [
   { value: 'in-progress', label: 'Em andamento' },
   { value: 'completed', label: 'Concluíram' },
   { value: 'not-started', label: 'Não iniciaram' },
-  { value: 'no-tracks', label: 'Sem dias da SIPAT' },
+  { value: 'no-tracks', label: 'Sem dias' },
   { value: 'inactive', label: 'Inativos' },
 ];
 
@@ -107,7 +107,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
         <Button disabled={!people?.length} onClick={() => downloadCsv(reportFileName('empresa'), companyReportCsv(people ?? [], trainingRows))} variant="outline">Baixar relatório (CSV)</Button>
         {!readOnly && <Button onClick={() => setAdding(true)}><UserPlus /> Adicionar colaboradores</Button>}
       </>}
-      description="Todos os colaboradores da empresa e até onde cada um chegou na SIPAT."
+      description="Todos os colaboradores da empresa e até onde cada um chegou em cada treinamento."
       eyebrow="Gestão da empresa"
       title="Colaboradores"
     />
