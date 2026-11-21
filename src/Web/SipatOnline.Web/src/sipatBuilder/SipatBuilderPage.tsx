@@ -14,6 +14,7 @@ import { Page } from '@/components/ui/page';
 import { extrasSuffix, getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import '@/OpsIdentity.css';
+import { partWord } from '@/trainings/partWord';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
@@ -272,7 +273,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const canRename = stage === 'grid' && !cancelled && (sipat === null || sipat.status === 'Draft');
   const nameMissing = showIssues && !!issues.name;
   const showNameInput = canRename && (editingName || nameMissing);
-  const live = others.find(item => item.status === 'Published' && item.id !== sipat?.id);
   const exportCsv = () => download(`${(name || 'sipat').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.csv`, planToCsv(days, catalog));
 
   return <Page className="builder-page">
@@ -360,7 +360,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setNotice('')} size="icon-sm" variant="ghost"><X /></Button>
       </div>}
       {removed && <div className="builder-undo pointer-events-auto flex items-center gap-3 rounded-xl bg-foreground py-2 pr-2 pl-4 text-sm text-background shadow-overlay" role="status">
-        <span>{removed.day.title.trim() ? `"${removed.day.title.trim()}" removido.` : `Dia ${removed.index + 1} removido.`}</span>
+        <span>{removed.day.title.trim() ? `"${removed.day.title.trim()}" removido.` : `${partWord(days.map(day => day.date))} ${removed.index + 1} removido.`}</span>
         <Button className="bg-background/15 text-background hover:bg-background/25 hover:text-background" onClick={undoRemove} size="sm" variant="ghost"><Undo2 /> Desfazer</Button>
         <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setRemoved(null)} size="icon-sm" variant="ghost"><X /></Button>
       </div>}
@@ -384,7 +384,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
 
     {confirmingLaunch && <Dialog description={published
       ? 'Os dias que ninguém começou são atualizados com os assuntos atuais. Os que já têm progresso ficam como estão.'
-      : `Ao publicar, cada dia é entregue aos participantes ativos da empresa.${live ? ` Só uma formação fica publicada por vez: "${live.title}" deixa de aparecer para os participantes.` : ''}`}
+      : 'Ao publicar, cada dia é entregue aos participantes ativos da empresa.'}
       onClose={() => setConfirmingLaunch(false)} title={published ? 'Atualizar os dias da formação?' : 'Publicar a formação?'}>
       <DialogActions>
         <Button onClick={() => setConfirmingLaunch(false)} variant="outline">Voltar</Button>

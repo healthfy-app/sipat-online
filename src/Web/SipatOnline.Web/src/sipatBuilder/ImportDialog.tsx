@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import FilePicker from '@/components/ui/file-picker';
 import { Textarea } from '@/components/ui/input';
+import { partWord } from '@/trainings/partWord';
 import { csvToPlan } from './csv';
 import { type Catalog, type DaySlots } from './model';
 
@@ -41,7 +42,7 @@ export default function ImportDialog({ catalog, hasPlan, onImport, onTemplate, o
         </p>
         <ul className="m-0 grid max-h-44 list-none gap-1 overflow-auto p-0">
           {result.days.map((day, index) => <li className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-1.5 text-sm" key={day.key}>
-            <span className="min-w-0 truncate font-medium">Dia {index + 1} · {day.title}</span>
+            <span className="min-w-0 truncate font-medium">{partWord(result.days.map(item => item.date))} {index + 1} · {day.title}</span>
             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{day.videos.filter(Boolean).length} vídeos · {day.games.filter(Boolean).length} jogos</span>
           </li>)}
         </ul>

@@ -85,7 +85,13 @@ describe('SIPAT builder', () => {
     expect(await screen.findByText('Formação encerrada.')).toBeVisible();
   });
 
-  it('names the SIPAT that leaves the air when another is published', async () => {
+  it('calls the parts Módulo when no day has a date', async () => {
+    vi.mocked(api.getSipatPlan).mockResolvedValue([{ id: 'd1', title: 'Abertura', date: null, subject: null, videoIds: ['v1'], gameIds: [] }]);
+    renderBuilder();
+    expect(await screen.findByRole('textbox', { name: 'Título do módulo 1' })).toBeVisible();
+  });
+
+  it('publishes beside another published training without warning', async () => {
     vi.mocked(api.listSipatEvents).mockResolvedValue({
       offset: 0, limit: 100, totalCount: 2,
       items: [
@@ -96,7 +102,9 @@ describe('SIPAT builder', () => {
     vi.mocked(api.getSipatPlan).mockResolvedValue([{ id: 'd1', title: 'Abertura', date: '2026-11-09', subject: null, videoIds: ['v1'], gameIds: [] }]);
     renderBuilder();
     await userEvent.click(await screen.findByRole('button', { name: /Publicar/ }));
-    expect(await screen.findByRole('dialog', { name: 'Publicar a formação?' })).toHaveTextContent('"SIPAT 2025" deixa de aparecer para os participantes.');
+    const dialog = await screen.findByRole('dialog', { name: 'Publicar a formação?' });
+    expect(dialog).toHaveTextContent('Ao publicar, cada dia é entregue aos participantes ativos da empresa.');
+    expect(dialog).not.toHaveTextContent('deixa de aparecer');
   });
 
   it('asks before leaving through a link with unsaved changes', async () => {
