@@ -21,6 +21,14 @@ x-api-environment: &api-environment
   SipatOnline__PlatformOperator__LoginIdentifier: ${PLATFORM_OPERATOR_LOGIN_IDENTIFIER:-sipat.online.admin}
   SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-Super Admin SIPAT Online}
   SipatOnline__PlatformOperator__Password: ${PLATFORM_OPERATOR_PASSWORD:-}
+  # optional: File (default) keeps the videos in the api volume; R2 (or a local MinIO) needs the four R2_* values,
+  # and R2_DIRECT_UPLOAD=true makes the operator's browser PUT originals straight to the bucket (needs its CORS rule)
+  SipatOnline__VideoStorage__Provider: ${VIDEO_STORAGE_PROVIDER:-File}
+  SipatOnline__VideoStorage__R2__ServiceUrl: ${R2_SERVICE_URL:-}
+  SipatOnline__VideoStorage__R2__AccessKeyId: ${R2_ACCESS_KEY_ID:-}
+  SipatOnline__VideoStorage__R2__SecretAccessKey: ${R2_SECRET_ACCESS_KEY:-}
+  SipatOnline__VideoStorage__R2__Bucket: ${R2_VIDEO_BUCKET:-}
+  SipatOnline__VideoStorage__R2__DirectUpload: ${R2_DIRECT_UPLOAD:-false}
   # every upload is converted to 720p and 480p by the API itself (ffmpeg in the image), one at a time
   SipatOnline__VideoConversion__Enabled: "true"
   SipatOnline__VideoConversion__WorkPath: /var/sipat/video-work

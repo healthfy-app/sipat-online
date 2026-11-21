@@ -292,7 +292,9 @@ public static class InfrastructureServiceCollectionExtensions
                 ServiceUrl = RequireR2Setting(configuration, nameof(R2StorageOptions.ServiceUrl)),
                 AccessKeyId = RequireR2Setting(configuration, nameof(R2StorageOptions.AccessKeyId)),
                 SecretAccessKey = RequireR2Setting(configuration, nameof(R2StorageOptions.SecretAccessKey)),
-                Bucket = RequireR2Setting(configuration, nameof(R2StorageOptions.Bucket))
+                Bucket = RequireR2Setting(configuration, nameof(R2StorageOptions.Bucket)),
+                DirectUpload = configuration.GetValue<bool>(
+                    $"{R2StorageOptions.SectionName}:{nameof(R2StorageOptions.DirectUpload)}")
             };
             services.AddSingleton(options);
             services.AddSingleton<IAmazonS3>(_ => new AmazonS3Client(
@@ -307,9 +309,19 @@ public static class InfrastructureServiceCollectionExtensions
                 }));
             services.TryAddSingleton(TimeProvider.System);
             services.AddSingleton<IPlatformCourseVideoStorage, R2PlatformCourseVideoStorage>();
+            if (options.DirectUpload)
+            {
+                services.AddSingleton<IDirectVideoUploadStore, R2DirectVideoUploadStore>();
+            }
+            else
+            {
+                services.AddSingleton<IDirectVideoUploadStore, NoDirectVideoUploadStore>();
+            }
+
             return;
         }
 
+        services.AddSingleton<IDirectVideoUploadStore, NoDirectVideoUploadStore>();
         services.AddSingleton<IPlatformCourseVideoStorage>(serviceProvider =>
             new FilePlatformCourseVideoStorage(
                 configuration["SipatOnline:PlatformCatalog:StoragePath"],

@@ -153,7 +153,8 @@ internal static class VideoUploadValidation
                 }
             }
 
-            if (totalBytes != declaredSize || !HasExpectedSignature(header, headerLength, contentType))
+            if (totalBytes != declaredSize ||
+                !PlatformCourseCatalogService.HasVideoSignature(header.AsSpan(0, headerLength), contentType))
             {
                 return Failure(
                     "learning.platform_course.video_content_invalid",
@@ -171,15 +172,6 @@ internal static class VideoUploadValidation
             }
         }
     }
-
-    private static bool HasExpectedSignature(byte[] header, int headerLength, string contentType) =>
-        contentType switch
-        {
-            "video/mp4" => headerLength >= 8 && header.AsSpan(4, 4).SequenceEqual("ftyp"u8),
-            "video/webm" => headerLength >= 4 &&
-                            header.AsSpan(0, 4).SequenceEqual(new byte[] { 0x1A, 0x45, 0xDF, 0xA3 }),
-            _ => false
-        };
 
     private static Result<StagedVideoUpload> Failure(string code, string message) =>
         Result<StagedVideoUpload>.Failure(new DomainError(code, message));

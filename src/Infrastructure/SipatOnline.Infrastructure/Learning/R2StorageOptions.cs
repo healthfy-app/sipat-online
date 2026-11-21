@@ -10,6 +10,9 @@ public sealed class R2StorageOptions
     public string SecretAccessKey { get; set; } = string.Empty;
     public string Bucket { get; set; } = string.Empty;
 
+    /// <summary>The operator's browser PUTs originals straight to the bucket; needs a CORS rule on it for the web origin.</summary>
+    public bool DirectUpload { get; set; }
+
     /// <summary>True for the plain-HTTP MinIO of the tests; R2 itself is always HTTPS.</summary>
     public bool UsesHttp => ServiceUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase);
 }
