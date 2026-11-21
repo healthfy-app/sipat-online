@@ -9,6 +9,7 @@ vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api')>()),
   listAllParticipants: vi.fn(), listLearningParticipation: vi.fn(), changeUserStatus: vi.fn(), renameUser: vi.fn(),
   changeEmployeeLogin: vi.fn(), resetEmployeePassword: vi.fn(), createParticipant: vi.fn(),
+  listSipatEvents: vi.fn(), listSipatPlans: vi.fn(),
 }));
 
 const people = [
@@ -24,12 +25,42 @@ const row = (participantId: string, completed: number) => ({
 beforeEach(() => {
   vi.mocked(api.listAllParticipants).mockResolvedValue(people);
   vi.mocked(api.listLearningParticipation).mockResolvedValue([row('p-1', 2), row('p-2', 1)]);
+  vi.mocked(api.listSipatEvents).mockResolvedValue({ offset: 0, limit: 100, totalCount: 0, items: [] });
+  vi.mocked(api.listSipatPlans).mockResolvedValue([]);
 });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 const renderPage = (readOnly = false) => render(<MemoryRouter><CollaboratorsPage readOnly={readOnly} /></MemoryRouter>);
 
 describe('collaborators', () => {
+  it('counts the situation of each person in the training chosen, not across trainings', async () => {
+    const user = userEvent.setup();
+    const training = (id: string, title: string, startsAt: string) =>
+      ({ id, tenantId: 't', title, description: null, startsAt, endsAt: '2099-01-01T00:00:00Z', status: 'Published' as const, createdAt: startsAt });
+    vi.mocked(api.listSipatEvents).mockResolvedValue({ offset: 0, limit: 100, totalCount: 2,
+      items: [training('sipat', 'SIPAT 2026', '2026-11-09T00:00:00Z'), training('fogo', 'Treinamento contra incêndios', '2026-11-20T00:00:00Z')] });
+    vi.mocked(api.listSipatPlans).mockResolvedValue([{ sipatEventId: 'sipat', days: 1, videos: 2 }, { sipatEventId: 'fogo', days: 1, videos: 2 }]);
+    vi.mocked(api.listLearningParticipation).mockResolvedValue([
+      { ...row('p-1', 2), sipatEventId: 'sipat' }, { ...row('p-1', 0), trackId: 't-fogo', sipatEventId: 'fogo' },
+    ]);
+    renderPage();
+    const table = await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+
+    // opens on the training that started first: Maria finished it
+    const picker = await screen.findByRole('combobox', { name: 'Treinamento' });
+    expect(picker).toHaveValue('sipat');
+    expect(within(table).getByRole('progressbar', { name: '100% concluído' })).toBeVisible();
+
+    await user.selectOptions(picker, 'fogo');
+    expect(within(table).queryByRole('progressbar', { name: '100% concluído' })).not.toBeInTheDocument();
+  });
+
+  it('shows no training picker when the company has a single training', async () => {
+    renderPage();
+    await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    expect(screen.queryByRole('combobox', { name: 'Treinamento' })).not.toBeInTheDocument();
+  });
+
   it('lists everyone with where they got to, and filters by name and situation', async () => {
     const user = userEvent.setup();
     renderPage();

@@ -68,7 +68,9 @@ describe('company Excel report', () => {
   });
 
   it('names the file after the company and day', () => {
-    expect(excelReportFileName('Indústria São José', new Date(2026, 10, 21))).toBe('relatorio-sipat-industria-sao-jose-2026-11-21.xlsx');
+    expect(excelReportFileName('Indústria São José', new Date(2026, 10, 21))).toBe('relatorio-treinamentos-industria-sao-jose-2026-11-21.xlsx');
+    expect(excelReportFileName('Indústria São José', new Date(2026, 10, 21), 'Treinamento contra incêndios'))
+      .toBe('relatorio-treinamento-contra-incendios-industria-sao-jose-2026-11-21.xlsx');
   });
 
   it('fills calendar gaps between completions', () => {
@@ -77,5 +79,15 @@ describe('company Excel report', () => {
       { date: '2026-11-18', count: 0 },
       { date: '2026-11-19', count: 1 },
     ]);
+  });
+});
+
+describe('company Excel report of one training', () => {
+  it('names the training in the title of the summary', async () => {
+    const workbook = await buildCompanyExcelReport({
+      companyName: 'Acme', overview: summarizeCompanyProgress(participants, participation),
+      rows: toParticipantRows(summarizeParticipants(participants, participation)), participation, trainingTitle: 'SIPAT 2026',
+    });
+    expect(workbook.getWorksheet('Resumo')?.getCell('B2').value).toBe('Relatório · SIPAT 2026');
   });
 });

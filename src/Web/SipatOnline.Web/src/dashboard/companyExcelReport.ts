@@ -18,6 +18,8 @@ export interface CompanyExcelReportInput {
   /** Cor da marca da empresa (hex). Cai no verde do produto se for clara demais. */
   brandColor?: string;
   generatedAt?: Date;
+  /** The training the report is about; absent when it covers every training. */
+  trainingTitle?: string;
 }
 
 const INK = '1F2A24';
@@ -51,7 +53,7 @@ export async function buildCompanyExcelReport(input: CompanyExcelReportInput): P
 export async function downloadCompanyExcelReport(input: CompanyExcelReportInput): Promise<string> {
   const workbook = await buildCompanyExcelReport(input);
   const buffer = await workbook.xlsx.writeBuffer();
-  const fileName = excelReportFileName(input.companyName, input.generatedAt ?? new Date());
+  const fileName = excelReportFileName(input.companyName, input.generatedAt ?? new Date(), input.trainingTitle);
   const url = URL.createObjectURL(new Blob([buffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   }));
@@ -65,11 +67,12 @@ export async function downloadCompanyExcelReport(input: CompanyExcelReportInput)
   return fileName;
 }
 
-export function excelReportFileName(companyName: string, date: Date): string {
-  const slug = companyName.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'empresa';
+export function excelReportFileName(companyName: string, date: Date, trainingTitle?: string): string {
+  const slugOf = (value: string) => value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = slugOf(companyName) || 'empresa';
   const day = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-  return `relatorio-sipat-${slug}-${day}.xlsx`;
+  return `relatorio-${(trainingTitle && slugOf(trainingTitle)) || 'treinamentos'}-${slug}-${day}.xlsx`;
 }
 
 // ── Resumo ──────────────────────────────────────────────────────────────────
@@ -87,7 +90,7 @@ function addSummarySheet(workbook: Workbook, input: CompanyExcelReportInput, bra
   // Faixa de título
   sheet.mergeCells('B2:F2');
   const title = sheet.getCell('B2');
-  title.value = 'Relatório da SIPAT';
+  title.value = input.trainingTitle ? `Relatório · ${input.trainingTitle}` : 'Relatório de treinamentos';
   title.font = font({ size: 22, bold: true, color: PAPER });
   title.alignment = { vertical: 'middle', indent: 1 };
   sheet.getRow(2).height = 42;

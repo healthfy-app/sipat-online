@@ -1,6 +1,8 @@
 import { Pencil, Search, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { TrainingSelect } from '@/trainings/TrainingSelect';
+import { filterByTraining, useTrainingFilter } from '@/trainings/useTrainingFilter';
 import { changeUserStatus, listAllParticipants, listLearningParticipation, type LearningParticipantProgress, type ParticipantAccount } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -63,7 +65,9 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const summaries = useMemo(() => summarizeParticipants(people ?? [], rows), [people, rows]);
+  const training = useTrainingFilter();
+  const trainingRows = useMemo(() => filterByTraining(rows, training.selectedId), [training.selectedId, rows]);
+  const summaries = useMemo(() => summarizeParticipants(people ?? [], trainingRows), [people, trainingRows]);
   const visible = useMemo(
     () => filterParticipantProgress(summaries, search, filter).sort((a, b) => a.participant.displayName.localeCompare(b.participant.displayName, 'pt-BR')),
     [summaries, search, filter],
@@ -100,7 +104,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   return <Page>
     <PageHeader
       actions={<>
-        <Button disabled={!people?.length} onClick={() => downloadCsv(reportFileName('empresa'), companyReportCsv(people ?? [], rows))} variant="outline">Baixar relatório (CSV)</Button>
+        <Button disabled={!people?.length} onClick={() => downloadCsv(reportFileName('empresa'), companyReportCsv(people ?? [], trainingRows))} variant="outline">Baixar relatório (CSV)</Button>
         {!readOnly && <Button onClick={() => setAdding(true)}><UserPlus /> Adicionar colaboradores</Button>}
       </>}
       description="Todos os colaboradores da empresa e até onde cada um chegou na SIPAT."
@@ -108,6 +112,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       title="Colaboradores"
     />
 
+    <TrainingSelect onChange={training.setSelectedId} trainings={training.trainings} value={training.selectedId} />
     {readOnly && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="note">Modo de consulta: você acompanha o andamento dos colaboradores, mas não altera seus dados.</p>}
     {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}

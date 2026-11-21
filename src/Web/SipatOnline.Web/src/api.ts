@@ -509,6 +509,8 @@ export interface LearningParticipantProgress {
   watchedMilliseconds?: number;
   completedAt?: string | null;
   lastAccessedAt?: string | null;
+  /** The training the day belongs to. */
+  sipatEventId?: string | null;
 }
 
 export interface LearningLessonProgress {

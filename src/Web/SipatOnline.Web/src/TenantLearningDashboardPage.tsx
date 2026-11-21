@@ -26,6 +26,8 @@ import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { cn } from '@/lib/utils';
 import LoadingState from './LoadingState';
+import { TrainingSelect } from './trainings/TrainingSelect';
+import { filterByTraining, useTrainingFilter } from './trainings/useTrainingFilter';
 
 const PAGE_SIZE = 8;
 /** Série única "concluído": mesma cor do status Concluiu, para as duas leituras baterem. */
@@ -50,7 +52,18 @@ export default function TenantLearningDashboardPage({
   companyName = 'Empresa',
   brandColor,
 }: { readOnly?: boolean; companyName?: string; brandColor?: string }) {
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [loaded, setLoaded] = useState<{ participants: Awaited<ReturnType<typeof listAllParticipants>>; participation: LearningParticipantProgress[] } | null>(null);
+  const training = useTrainingFilter();
+  // every number of the page is about the training chosen, so one person's finished SIPAT does not hide a fire drill not started
+  const data = useMemo<DashboardData | null>(() => {
+    if (!loaded) return null;
+    const participation = filterByTraining(loaded.participation, training.selectedId);
+    return {
+      overview: summarizeCompanyProgress(loaded.participants, participation),
+      rows: toParticipantRows(summarizeParticipants(loaded.participants, participation)),
+      participation,
+    };
+  }, [loaded, training.selectedId]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [exportState, setExportState] = useState<{ busy: boolean; message: string }>({ busy: false, message: '' });
@@ -60,11 +73,7 @@ export default function TenantLearningDashboardPage({
     setError('');
     try {
       const [participants, participation] = await Promise.all([listAllParticipants(), listLearningParticipation()]);
-      setData({
-        overview: summarizeCompanyProgress(participants, participation),
-        rows: toParticipantRows(summarizeParticipants(participants, participation)),
-        participation,
-      });
+      setLoaded({ participants, participation });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar o painel.');
     } finally {
@@ -79,7 +88,7 @@ export default function TenantLearningDashboardPage({
     setExportState({ busy: true, message: '' });
     try {
       const { downloadCompanyExcelReport } = await import('./dashboard/companyExcelReport');
-      const fileName = await downloadCompanyExcelReport({ companyName, brandColor, ...data });
+      const fileName = await downloadCompanyExcelReport({ companyName, brandColor, ...data, trainingTitle: training.selected?.title });
       setExportState({ busy: false, message: `Relatório ${fileName} baixado.` });
     } catch (exportError) {
       setExportState({
@@ -109,10 +118,12 @@ export default function TenantLearningDashboardPage({
               <Link className={buttonVariants()} to="/admin/learning">Ver participantes</Link>
             </>
           )}
-          description="Acompanhe o progresso dos colaboradores e dos dias da SIPAT da sua empresa."
+          description="Acompanhe o progresso dos colaboradores em cada treinamento da sua empresa."
           eyebrow="GESTÃO DA EMPRESA"
           title="Visão geral"
         />
+
+        <TrainingSelect onChange={training.setSelectedId} trainings={training.trainings} value={training.selectedId} />
 
         {exportState.message && (
           <p aria-live="polite" className="m-0 text-sm text-muted-foreground" role="status">{exportState.message}</p>
