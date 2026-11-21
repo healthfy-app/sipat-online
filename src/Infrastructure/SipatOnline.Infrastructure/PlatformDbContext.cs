@@ -16,6 +16,8 @@ public sealed class PlatformDbContext(
 {
     public DbSet<DataProtectionKey> DataProtectionKeys => Set<DataProtectionKey>();
 
+    public DbSet<LoginAttemptWindowEntity> LoginAttemptWindows => Set<LoginAttemptWindowEntity>();
+
     public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
 
     public DbSet<AuditEntryEntity> AuditEntries => Set<AuditEntryEntity>();

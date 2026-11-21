@@ -212,6 +212,25 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("AuditEntries", "audit");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.LoginAttemptWindowEntity", b =>
+                {
+                    b.Property<string>("Key")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTimeOffset>("WindowStart")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Count")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Key", "WindowStart");
+
+                    b.HasIndex("WindowStart");
+
+                    b.ToTable("LoginAttemptWindows", "identity");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Identity.PlatformIdentityUser", b =>
                 {
                     b.Property<Guid>("Id")

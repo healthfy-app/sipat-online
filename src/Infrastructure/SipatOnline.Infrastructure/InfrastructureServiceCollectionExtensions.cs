@@ -146,6 +146,7 @@ public static class InfrastructureServiceCollectionExtensions
             .AddEntityFrameworkStores<PlatformDbContext>()
             .AddDefaultTokenProviders();
         services.AddScoped<IUserClaimsPrincipalFactory<PlatformIdentityUser>, TenantClaimsPrincipalFactory>();
+        services.AddScoped<ILoginAttemptCounter, EfLoginAttemptCounter>();
 
         services.ConfigureApplicationCookie(options =>
         {

@@ -80,7 +80,7 @@ builder.Services.AddRateLimiter(options =>
                 QueueLimit = 0
             }));
 });
-builder.Services.AddSingleton<LoginAttemptLimiter>();
+builder.Services.AddScoped<LoginAttemptLimiter>();
 builder.Services.AddSipatInfrastructure(builder.Configuration);
 
 var app = builder.Build();
