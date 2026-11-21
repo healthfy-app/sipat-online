@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureCompanyAdministration, createParticipant, getPlatformCompanyEmployees, getSession, listAllParticipants, signIn, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality } from './api';
+import { configureCompanyAdministration, createParticipant, forgetAntiforgeryToken, getPlatformCompanyEmployees, getSession, listAllParticipants, signIn, saveLearningPosition, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality } from './api';
 
 afterEach(() => {
   configureCompanyAdministration(null);
+  forgetAntiforgeryToken();
   vi.unstubAllGlobals();
 });
 
@@ -116,6 +117,49 @@ describe('API client', () => {
     expect(requestOptions.body).toBe(
       JSON.stringify({ loginIdentifier: 'matricula-123', password: 'SenhaSegura123' }),
     );
+  });
+
+  it('reuses one antiforgery token across the participant saves', async () => {
+    const progress = { lessonId: 'l1' };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf-1' }))
+      .mockImplementation(async () => Response.json(progress));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await saveLearningPosition('t1', 'l1', 1000);
+    await saveLearningPosition('t1', 'l1', 11000);
+    await saveLearningPosition('t1', 'l1', 21000);
+
+    expect(fetchMock.mock.calls.filter(([url]) => url === '/api/identity/antiforgery')).toHaveLength(1);
+    const saves = fetchMock.mock.calls.filter(([url]) => url === '/api/learning/tracks/t1/lessons/l1/position');
+    expect(saves).toHaveLength(3);
+    for (const [, init] of saves) expect(new Headers(init.headers).get('X-CSRF-TOKEN')).toBe('csrf-1');
+  });
+
+  it('fetches a fresh token and sends once more when the server rejects the cached one', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'stale' }))
+      .mockResolvedValueOnce(Response.json({ title: 'Token antifalsificação inválido.' }, { status: 400 }))
+      .mockResolvedValueOnce(Response.json({ requestToken: 'fresh' }))
+      .mockResolvedValueOnce(Response.json({ lessonId: 'l1' }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(saveLearningPosition('t1', 'l1', 1000)).resolves.toEqual({ lessonId: 'l1' });
+
+    const saves = fetchMock.mock.calls.filter(([url]) => url === '/api/learning/tracks/t1/lessons/l1/position');
+    expect(saves).toHaveLength(2);
+    expect(new Headers(saves[0][1].headers).get('X-CSRF-TOKEN')).toBe('stale');
+    expect(new Headers(saves[1][1].headers).get('X-CSRF-TOKEN')).toBe('fresh');
+  });
+
+  it('does not retry an ordinary validation error', async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(Response.json({ requestToken: 'csrf' }))
+      .mockResolvedValueOnce(Response.json({ title: 'learning.invalid_position' }, { status: 400 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(saveLearningPosition('t1', 'l1', -1)).rejects.toBeTruthy();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('treats an unauthenticated session as an empty session', async () => {

@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using Microsoft.AspNetCore.Antiforgery;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Identity.Application.Users;
 using SipatOnline.Infrastructure.Identity;
@@ -20,14 +19,13 @@ public static class PlatformEndpoints
         identity.MapPost("/login", async (
             LoginRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformOperatorAuthenticationService authenticationService,
+            LoginAttemptLimiter limiter,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
+            if (!limiter.TryAcquire(context, request.LoginIdentifier))
             {
-                return antiforgeryResult;
+                return LoginAttemptLimiter.TooManyAttempts();
             }
 
             var signedIn = await authenticationService.SignInAsync(
@@ -65,16 +63,9 @@ public static class PlatformEndpoints
 
         identity.MapPost("/logout", async (
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformOperatorAuthenticationService authenticationService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             await authenticationService.SignOutAsync(cancellationToken);
             return Results.NoContent();
         })
@@ -122,16 +113,9 @@ public static class PlatformEndpoints
             Guid tenantId,
             ChangeEmployeesStatusRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformUserDirectoryService userDirectoryService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await userDirectoryService.ChangeCompanyEmployeesStatusAsync(
                 tenantId,
                 request.UserIds,
@@ -158,17 +142,10 @@ public static class PlatformEndpoints
         companies.MapPost("/", async (
             CreateTenantRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             TenantProvisioningService tenantProvisioningService,
             SipatOnline.Infrastructure.Tenancy.TenantPlanService planService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             if (request.Plan is not null && !SipatOnline.Infrastructure.Tenancy.CompanyPlans.TryParse(request.Plan, out _))
             {
                 return Results.Problem(statusCode: 400, title: "tenant.plan.invalid", detail: "Escolha um plano válido: Bronze, Prata, Ouro ou Diamante.");
@@ -191,16 +168,9 @@ public static class PlatformEndpoints
             Guid tenantId,
             ChangeCompanyPlanRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             SipatOnline.Infrastructure.Tenancy.TenantPlanService planService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             if (!SipatOnline.Infrastructure.Tenancy.CompanyPlans.TryParse(request.Plan, out var plan))
             {
                 return Results.Problem(statusCode: 400, title: "tenant.plan.invalid", detail: "Escolha um plano válido: Bronze, Prata, Ouro ou Diamante.");
@@ -239,16 +209,9 @@ public static class PlatformEndpoints
         platform.MapPost("/users", async (
             CreatePlatformUserRequest request,
             HttpContext context,
-            IAntiforgery antiforgery,
             PlatformUserManagementService userManagementService,
             CancellationToken cancellationToken) =>
         {
-            var antiforgeryResult = await ValidateAntiforgeryAsync(antiforgery, context);
-            if (antiforgeryResult is not null)
-            {
-                return antiforgeryResult;
-            }
-
             var result = await userManagementService.ProvisionAsync(
                 request.TenantId,
                 new ProvisionUserRequest(
@@ -291,22 +254,6 @@ public static class PlatformEndpoints
             extensions: new Dictionary<string, object?> { ["code"] = error.Code });
     }
 
-    private static async Task<IResult?> ValidateAntiforgeryAsync(
-        IAntiforgery antiforgery,
-        HttpContext context)
-    {
-        try
-        {
-            await antiforgery.ValidateRequestAsync(context);
-            return null;
-        }
-        catch (AntiforgeryValidationException)
-        {
-            return Results.Problem(
-                statusCode: StatusCodes.Status400BadRequest,
-                title: "Token antifalsificação inválido.");
-        }
-    }
 }
 
 public sealed record CreatePlatformUserRequest(

@@ -63,6 +63,9 @@ public sealed class EmployeeCredentialService(
 
         // the old sessions of that person stop being valid with the old password
         await users.UpdateSecurityStampAsync(user);
+        // a new password is how the administrator gets a locked-out collaborator back in on the day
+        await users.SetLockoutEndDateAsync(user, null);
+        await users.ResetAccessFailedCountAsync(user);
         await WriteAuditAsync("identity.user.password_reset", userId, token);
         return Result<bool>.Success(true);
     }

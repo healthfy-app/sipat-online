@@ -198,6 +198,86 @@ public sealed class IdentityApiTests
         Assert.Contains(PlatformRoles.SuperAdmin, session.Roles);
     }
 
+    [DockerFact]
+    public async Task Login_LimitsAttemptsPerAccount_NotPerAddress()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+
+        // a whole factory behind one NAT address: 40 different people in the same minute are never refused
+        using var client = CreateClient(factory);
+        for (var person = 0; person < 40; person++)
+        {
+            using var response = await SendJsonWithAntiforgeryAsync(
+                client, HttpMethod.Post, "/api/identity/login",
+                new LoginRequest($"Employee-{person:000}", "wrong-password"),
+                await GetAntiforgeryTokenAsync(client));
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        // one account: the 11th attempt in the minute is refused
+        for (var attempt = 1; attempt <= 10; attempt++)
+        {
+            using var response = await SendJsonWithAntiforgeryAsync(
+                client, HttpMethod.Post, "/api/identity/login",
+                new LoginRequest("Target-Employee", "wrong-password"),
+                await GetAntiforgeryTokenAsync(client));
+            Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        }
+
+        using var refused = await SendJsonWithAntiforgeryAsync(
+            client, HttpMethod.Post, "/api/identity/login",
+            new LoginRequest(" target-employee ", "wrong-password"),
+            await GetAntiforgeryTokenAsync(client));
+        Assert.Equal(HttpStatusCode.TooManyRequests, refused.StatusCode);
+    }
+
+    [DockerFact]
+    public async Task PasswordReset_UnlocksALockedOutCollaborator()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+
+        using var adminClient = CreateClient(factory);
+        await SignInAdminAsync(adminClient);
+        using var provision = await SendJsonWithAntiforgeryAsync(
+            adminClient, HttpMethod.Post, "/api/admin/users",
+            new ProvisionUserRequest("Employee-777", "Locked Person", "ParticipantPass123", PlatformRoles.Participant),
+            await GetAntiforgeryTokenAsync(adminClient));
+        Assert.Equal(HttpStatusCode.Created, provision.StatusCode);
+        var created = await provision.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.NotNull(created);
+
+        using var participantClient = CreateClient(factory);
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            using var wrong = await SendJsonWithAntiforgeryAsync(
+                participantClient, HttpMethod.Post, "/api/identity/login",
+                new LoginRequest("Employee-777", "wrong-password"),
+                await GetAntiforgeryTokenAsync(participantClient));
+            Assert.Equal(HttpStatusCode.Unauthorized, wrong.StatusCode);
+        }
+
+        // locked: even the right password is refused
+        using var locked = await SendJsonWithAntiforgeryAsync(
+            participantClient, HttpMethod.Post, "/api/identity/login",
+            new LoginRequest("Employee-777", "ParticipantPass123"),
+            await GetAntiforgeryTokenAsync(participantClient));
+        Assert.Equal(HttpStatusCode.Unauthorized, locked.StatusCode);
+
+        using var reset = await SendJsonWithAntiforgeryAsync(
+            adminClient, HttpMethod.Put, $"/api/admin/users/{created.Id:D}/password",
+            new ResetPasswordRequest("NewPassword456"),
+            await GetAntiforgeryTokenAsync(adminClient));
+        Assert.Equal(HttpStatusCode.NoContent, reset.StatusCode);
+
+        await SignInAsync(participantClient, "Employee-777", "NewPassword456");
+    }
+
     private static HttpClient CreateClient(SipatOnlineApiFactory factory) =>
         factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {

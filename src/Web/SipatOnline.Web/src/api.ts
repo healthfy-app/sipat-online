@@ -587,6 +587,30 @@ async function getAntiforgeryToken(): Promise<string> {
   return payload.requestToken;
 }
 
+/** Reused across writes: one GET /antiforgery per session instead of one per save. */
+let cachedAntiforgeryToken: string | null = null;
+
+/** The next write fetches a fresh token (the signed-in person changed or the session ended). */
+export function forgetAntiforgeryToken(): void {
+  cachedAntiforgeryToken = null;
+}
+
+async function currentAntiforgeryToken(): Promise<string> {
+  return cachedAntiforgeryToken ?? (cachedAntiforgeryToken = await getAntiforgeryToken());
+}
+
+const antiforgeryRejectionTitle = 'Token antifalsificação inválido.';
+
+async function isAntiforgeryRejection(response: Response): Promise<boolean> {
+  if (response.status !== 400 || typeof response.clone !== 'function') return false;
+  try {
+    const problem = (await response.clone().json()) as { title?: string };
+    return problem?.title === antiforgeryRejectionTitle;
+  } catch {
+    return false;
+  }
+}
+
 async function request(
   path: string,
   init: RequestInit = {},
@@ -599,8 +623,9 @@ async function request(
     headers.set('X-Sipat-Company', companyAdministrationId);
   }
 
-  if (method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS') {
-    headers.set('X-CSRF-TOKEN', await getAntiforgeryToken());
+  const writes = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
+  if (writes) {
+    headers.set('X-CSRF-TOKEN', await currentAntiforgeryToken());
   }
 
   if (
@@ -611,12 +636,21 @@ async function request(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(path, {
+  const send = () => fetch(path, {
     ...init,
     method,
     credentials: 'include',
-    headers,
+    headers: new Headers(headers),
   });
+  let response = await send();
+
+  // The token is tied to the signed-in person: after a login, logout or expired session it is stale.
+  // Fetch a fresh one and send once more.
+  if (writes && await isAntiforgeryRejection(response)) {
+    cachedAntiforgeryToken = null;
+    headers.set('X-CSRF-TOKEN', await currentAntiforgeryToken());
+    response = await send();
+  }
 
   if (!response.ok) {
     throw await readError(response);
@@ -671,12 +705,17 @@ export async function signIn(
     method: 'POST',
     body: JSON.stringify({ loginIdentifier, password }),
   });
+  cachedAntiforgeryToken = null;
 }
 
 export async function signOut(platform = false): Promise<void> {
-  await request(platform ? '/api/platform/identity/logout' : '/api/identity/logout', {
-    method: 'POST',
-  });
+  try {
+    await request(platform ? '/api/platform/identity/logout' : '/api/identity/logout', {
+      method: 'POST',
+    });
+  } finally {
+    cachedAntiforgeryToken = null;
+  }
 }
 
 export function listPlatformCompanies(): Promise<PlatformCompany[]> {
@@ -1067,11 +1106,9 @@ export function startLearningPlayback(
   );
 }
 
-let cachedAntiforgeryToken: string | null = null;
-
 export async function primeAntiforgeryToken(): Promise<void> {
   try {
-    cachedAntiforgeryToken = await getAntiforgeryToken();
+    await currentAntiforgeryToken();
   } catch {
     // The measurement must never disturb the video.
   }
@@ -1084,7 +1121,7 @@ export async function sendPlaybackQuality(
   trackId: string,
   summary: PlaybackQualitySummary,
 ): Promise<void> {
-  const token = cachedAntiforgeryToken ?? (cachedAntiforgeryToken = await getAntiforgeryToken());
+  const token = await currentAntiforgeryToken();
   const response = await fetch(`/api/learning/tracks/${trackId}/playback-quality`, {
     method: 'POST',
     keepalive: true,

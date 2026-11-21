@@ -1,5 +1,4 @@
 using System.Security.Cryptography;
-using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Application;
@@ -38,16 +37,11 @@ public static class TenantAppearanceEndpoints
         }).AllowAnonymous();
 
         endpoints.MapPut("/api/tenant/branding/appearance", async (
-            TenantAppearanceRequest request, HttpContext context, IAntiforgery antiforgery,
+            TenantAppearanceRequest request, HttpContext context,
             ITenantContext tenant, ICurrentActor actor, PlatformDbContext db, IAuditTrail audit,
             SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             TimeProvider clock, ILoggerFactory logs, CancellationToken token) =>
         {
-            try { await antiforgery.ValidateRequestAsync(context); }
-            catch (AntiforgeryValidationException)
-            {
-                return Results.Problem(statusCode: 400, detail: "Token antifalsificação inválido. Recarregue a página.");
-            }
             if (!(await plans.CapabilitiesAsync(token)).CustomBranding)
                 return Results.Problem(statusCode: 403, title: "tenant.branding.unavailable", detail: "A personalização da identidade visual não está disponível para a sua empresa.");
             if (tenant.CurrentTenantId is not { } companyId || string.IsNullOrWhiteSpace(actor.UserId)) return Results.Forbid();

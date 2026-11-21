@@ -133,7 +133,9 @@ public static class InfrastructureServiceCollectionExtensions
                 options.Password.RequiredUniqueChars = 1;
                 options.Lockout.AllowedForNewUsers = true;
                 options.Lockout.MaxFailedAccessAttempts = 5;
-                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(15);
+                // short: the per-login rate limit (LoginAttemptLimiter) already stops brute force, and a
+                // guessable registration number must not let anyone keep a colleague out for long
+                options.Lockout.DefaultLockoutTimeSpan = TimeSpan.FromMinutes(5);
             })
             .AddEntityFrameworkStores<PlatformDbContext>()
             .AddDefaultTokenProviders();
@@ -228,6 +230,7 @@ public static class InfrastructureServiceCollectionExtensions
             GetVideoPlaybackProvider(provider, configuration));
         services.AddScoped<IPlaybackEvidenceVerifier>(provider =>
             GetPlaybackEvidenceVerifier(provider, configuration));
+        services.AddSingleton<TenantHostCache>();
         services.AddScoped<ITenantStore, EfTenantStore>();
         services.AddScoped<IInitialClientAdminProvisioner, EfInitialClientAdminProvisioner>();
         services.AddScoped<TenantProvisioningService>();

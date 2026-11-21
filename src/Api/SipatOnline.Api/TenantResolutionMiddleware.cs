@@ -13,6 +13,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         HttpContext context,
         IRequestTenantContext tenantContext,
         ITenantStore tenantStore,
+        SipatOnline.Infrastructure.Tenancy.TenantHostCache hostCache,
         IOptions<TenantRuntimeOptions> tenantOptions,
         IWebHostEnvironment environment)
     {
@@ -27,7 +28,7 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
         var baseDomain = tenantOptions.Value.BaseDomain.Trim().TrimEnd('.').ToLowerInvariant();
         var host = context.Request.Host.Host.TrimEnd('.').ToLowerInvariant();
         var platformHost = tenantOptions.Value.IsPlatformHost(host);
-        Tenant? tenant;
+        TenantId? tenantId;
 
         if (context.Request.Path.StartsWithSegments("/api/platform", StringComparison.OrdinalIgnoreCase) &&
             !platformHost)
@@ -58,7 +59,12 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
                 return;
             }
 
-            tenant = await tenantStore.FindByKeyAsync(keyResult.Value, context.RequestAborted);
+            tenantId = await hostCache.GetActiveAsync(
+                keyResult.Value.Value,
+                async token => await tenantStore.FindByKeyAsync(keyResult.Value, token) is { IsActive: true } found
+                    ? found.Id
+                    : null,
+                context.RequestAborted);
         }
         else
         {
@@ -66,13 +72,13 @@ public sealed class TenantResolutionMiddleware(RequestDelegate next)
             return;
         }
 
-        if (tenant is null || !tenant.IsActive)
+        if (tenantId is null)
         {
             await WriteTenantNotFoundAsync(context);
             return;
         }
 
-        tenantContext.SetCurrentTenant(tenant.Id);
+        tenantContext.SetCurrentTenant(tenantId.Value);
         await next(context);
     }
 
