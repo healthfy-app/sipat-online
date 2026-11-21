@@ -81,7 +81,7 @@ describe('tenant portal', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
-    expect(screen.queryByRole('link', { name: 'Formações' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Treinamentos' })).not.toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('link', { name: 'Acompanhamento' }));
     expect(await screen.findByText(/Modo de consulta/)).toBeVisible();
@@ -146,7 +146,7 @@ describe('tenant portal', () => {
     }));
     render(<App />);
     const sidebar = await screen.findByRole('complementary', { name: 'Área do aluno' });
-    const courses = within(sidebar).getByRole('link', { name: 'Minha formação' });
+    const courses = within(sidebar).getByRole('link', { name: 'Meus treinamentos' });
     const certificates = within(sidebar).getByRole('link', { name: 'Meus certificados' });
     expect(courses).toHaveClass('learner-sidebar-link');
     expect(certificates).toHaveClass('learner-sidebar-link');
@@ -357,9 +357,9 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
-    expect(screen.getByRole('link', { name: 'Formações' })).toHaveAttribute('href', '/admin/sipats');
+    expect(screen.getByRole('link', { name: 'Treinamentos' })).toHaveAttribute('href', '/admin/treinamentos');
     expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(8));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(10));
   });
 
   it('shows the learner portal without the administration sidebar for participants', async () => {
@@ -403,7 +403,7 @@ describe('tenant portal', () => {
     expect(screen.queryByRole('navigation', { name: 'Navegação principal' }))
       .not.toBeInTheDocument();
     expect(screen.getByRole('navigation', { name: 'Seções da área do aluno' })).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Minha formação' })).toHaveAttribute('href', '/learning');
+    expect(screen.getByRole('link', { name: 'Meus treinamentos' })).toHaveAttribute('href', '/learning');
     expect(screen.queryByText('Fórum')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Buscar cursos' })).toBeVisible();
     expect(screen.getByRole('button', { name: 'Sair' })).toBeVisible();
@@ -473,7 +473,7 @@ describe('tenant portal', () => {
     const sidebar = screen.getByRole('complementary', { name: 'Área do aluno' });
     expect(await within(sidebar).findByText('50% concluído')).toBeVisible();
     expect(within(sidebar).getByText('0 de 1 dias')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Minha formação' })).toHaveAttribute('aria-current', 'page');
+    expect(screen.getByRole('link', { name: 'Meus treinamentos' })).toHaveAttribute('aria-current', 'page');
   });
 
   it('routes platform operators to the company list', async () => {

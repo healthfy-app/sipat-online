@@ -24,6 +24,7 @@ import {
   type TenantBranding,
 } from './api';
 import SipatsPage from './sipatBuilder/SipatsPage';
+import { LegacySipatRedirect } from './trainings/LegacySipatRedirect';
 import CompanyContext from './companies/CompanyContext';
 import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
@@ -199,25 +200,30 @@ export default function App() {
               }
             />
             <Route
-              path="/admin/sipats"
-              element={state.session && hasAdminRole(state.session) ? <SipatsPage basePath="/admin/sipats" /> : <AccessDenied />}
+              path="/admin/treinamentos"
+              element={state.session && hasAdminRole(state.session) ? <SipatsPage basePath="/admin/treinamentos" /> : <AccessDenied />}
             />
             <Route
-              path="/admin/sipats/:sipatId"
-              element={state.session && hasAdminRole(state.session) ? <SipatBuilderPage basePath="/admin/sipats" canEditThemes={false} /> : <AccessDenied />}
+              path="/admin/treinamentos/:sipatId"
+              element={state.session && hasAdminRole(state.session) ? <SipatBuilderPage basePath="/admin/treinamentos" canEditThemes={false} /> : <AccessDenied />}
             />
             <Route
-              path="/platform/companies/:companyId/sipats"
+              path="/platform/companies/:companyId/treinamentos"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/sipats`} />}</CompanyContext>
+                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/treinamentos`} />}</CompanyContext>
                 : <AccessDenied />}
             />
             <Route
-              path="/platform/companies/:companyId/sipats/:sipatId"
+              path="/platform/companies/:companyId/treinamentos/:sipatId"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                ? <CompanyContext>{companyId => <SipatBuilderPage basePath={`/platform/companies/${companyId}/sipats`} canEditThemes />}</CompanyContext>
+                ? <CompanyContext>{companyId => <SipatBuilderPage basePath={`/platform/companies/${companyId}/treinamentos`} canEditThemes />}</CompanyContext>
                 : <AccessDenied />}
             />
+            {/* old /sipats links (bookmarks, shared links) keep working */}
+            <Route element={<LegacySipatRedirect to={() => '/admin/treinamentos'} />} path="/admin/sipats" />
+            <Route element={<LegacySipatRedirect to={({ sipatId }) => `/admin/treinamentos/${sipatId}`} />} path="/admin/sipats/:sipatId" />
+            <Route element={<LegacySipatRedirect to={({ companyId }) => `/platform/companies/${companyId}/treinamentos`} />} path="/platform/companies/:companyId/sipats" />
+            <Route element={<LegacySipatRedirect to={({ companyId, sipatId }) => `/platform/companies/${companyId}/treinamentos/${sipatId}`} />} path="/platform/companies/:companyId/sipats/:sipatId" />
             <Route
               path="/admin/learning"
               element={
@@ -577,10 +583,10 @@ function ProtectedPortal({
             <nav aria-label="Seções da área do aluno" className="learner-sidebar-nav">
               <Link aria-current={location.pathname === '/learning' || location.pathname.startsWith('/learning/tracks/') ? 'page' : undefined}
                 className={`learner-sidebar-link${location.pathname === '/learning' || location.pathname.startsWith('/learning/tracks/') ? ' active' : ''}`}
-                aria-label="Minha formação"
+                aria-label="Meus treinamentos"
                 to="/learning">
-                <span className="learner-nav-desktop-label">Minha formação</span>
-                <span aria-hidden="true" className="learner-nav-mobile-label">Formação</span>
+                <span className="learner-nav-desktop-label">Meus treinamentos</span>
+                <span aria-hidden="true" className="learner-nav-mobile-label">Treinamentos</span>
               </Link>
               <NavLink
                 aria-label="Meus certificados"
@@ -656,7 +662,7 @@ function ProtectedPortal({
             <>
               <p className="sidebar-label">APRENDIZAGEM</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/learning">
-                Minhas formações
+                Meus treinamentos
               </NavLink>
             </>
           )}
@@ -665,7 +671,7 @@ function ProtectedPortal({
               <p className="sidebar-label">GESTÃO DA EMPRESA</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
               {hasAdminRole(session) && <>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">Formações</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
                 {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
               </>}
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">

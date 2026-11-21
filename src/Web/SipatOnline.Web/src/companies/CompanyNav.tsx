@@ -27,13 +27,13 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
   }, [companyId]);
 
   const link = (active: boolean) => `sidebar-link${active ? ' active' : ''}`;
-  const inSipat = pathname === `${base}/sipats` || pathname.startsWith(`${base}/sipats/`);
+  const inSipat = pathname === `${base}/treinamentos` || pathname.startsWith(`${base}/treinamentos/`);
   return <>
     <NavLink className="sidebar-link" end to="/platform"><ArrowLeft aria-hidden="true" className="mr-1.5 inline size-3.5" />Todas as empresas</NavLink>
     <p className="sidebar-label sidebar-label-spaced">EMPRESA</p>
     <strong className="px-3 pb-1 text-sm font-semibold [overflow-wrap:anywhere]">{name || 'Carregando...'}</strong>
     {plan && <div className="px-3 pb-2"><CompanyPlanButton companyId={companyId} onChanged={setPlan} plan={plan} /></div>}
-    <NavLink className={link(inSipat)} to={`${base}/sipats`}>SIPATs</NavLink>
+    <NavLink className={link(inSipat)} to={`${base}/treinamentos`}>Treinamentos</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/participantes`}>Participantes</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/administradores`}>Administradores</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/qualidade`}>Qualidade do vídeo</NavLink>

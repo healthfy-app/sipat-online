@@ -10,18 +10,18 @@ afterEach(cleanup);
 describe('company sidebar', () => {
   it('shows only what belongs to the company and a way back to all companies', async () => {
     vi.mocked(api.getPlatformDashboard).mockResolvedValue([{ id: 'c-1', name: 'Acme', key: 'acme', isActive: true, employeeCount: 1, administratorCount: 1, totalUserCount: 2 }] as never);
-    render(<MemoryRouter initialEntries={['/platform/companies/c-1/sipats/nova']}><CompanyNav companyId="c-1" /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/platform/companies/c-1/treinamentos/nova']}><CompanyNav companyId="c-1" /></MemoryRouter>);
 
     expect(await screen.findByText('Acme')).toBeVisible();
     expect(screen.getByRole('link', { name: /Todas as empresas/ })).toHaveAttribute('href', '/platform');
-    expect(screen.getByRole('link', { name: 'SIPATs' })).toHaveClass('active');
+    expect(screen.getByRole('link', { name: 'Treinamentos' })).toHaveClass('active');
     expect(screen.getByRole('link', { name: 'Participantes' })).toHaveAttribute('href', '/platform/companies/c-1/participantes');
     expect(screen.getByRole('link', { name: 'Administradores' })).toHaveAttribute('href', '/platform/companies/c-1/administradores');
   });
 
   it('links to the video quality of the company', async () => {
     vi.mocked(api.getPlatformDashboard).mockResolvedValue([] as never);
-    render(<MemoryRouter initialEntries={['/platform/companies/c1/sipats']}><CompanyNav companyId="c1" /></MemoryRouter>);
+    render(<MemoryRouter initialEntries={['/platform/companies/c1/treinamentos']}><CompanyNav companyId="c1" /></MemoryRouter>);
 
     expect(await screen.findByRole('link', { name: 'Qualidade do vídeo' })).toHaveAttribute('href', '/platform/companies/c1/qualidade');
   });
