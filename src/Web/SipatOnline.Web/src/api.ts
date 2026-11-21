@@ -25,7 +25,7 @@ export interface PlatformCompany {
   isActive: boolean;
 }
 
-/** The plans sold on the site. The company is never shown its own plan; only the operator sees and changes it. */
+/** The plans sold on the site. The company sees its own plan; only the operator changes it. */
 export type CompanyPlan = 'Bronze' | 'Prata' | 'Ouro' | 'Diamante';
 
 export interface PlatformCompanyOverview extends PlatformCompany {
@@ -880,7 +880,7 @@ export function changeCompanyPlan(companyId: string, plan: CompanyPlan): Promise
   return requestJson<{ plan: CompanyPlan }>(`/api/platform/companies/${companyId}/plan`, { method: 'PUT', body: JSON.stringify({ plan }) });
 }
 
-/** What the company can do (never the name of its plan, unless the operator is the one asking). */
+/** What the company can do, and the plan that grants it. */
 export interface CompanyCapabilities {
   customizeGrid: boolean; customBranding: boolean; customCertificate: boolean; quizzes: boolean; internalVideos: boolean; plan?: CompanyPlan | null;
 }

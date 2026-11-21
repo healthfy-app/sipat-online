@@ -39,6 +39,29 @@ describe('tenant portal', () => {
       expect(screen.queryByRole('button', { name: 'Salvar identidade visual' })).not.toBeInTheDocument();
     }
   });
+  it('shows the company its plan medal beside the logo, with the plan on hover', async () => {
+    window.history.pushState({}, '', '/admin/appearance');
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
+      if (url === '/api/tenant/branding') return Response.json({
+        tenantKey: 'acme', tenantName: 'Acme', primaryColor: '#123456', secondaryColor: '#FFFFFF',
+        logoReference: null, customDomain: null,
+      });
+      if (url === '/api/identity/session') return Response.json({
+        id: 'user', loginIdentifier: 'user', displayName: 'User', roles: ['ClientAdmin'],
+      });
+      if (url === '/api/admin/capabilities') return Response.json({
+        customizeGrid: true, customBranding: true, customCertificate: true, quizzes: false, internalVideos: false, plan: 'Ouro',
+      });
+      throw new Error(`Unexpected request: ${url}`);
+    }));
+    render(<App />);
+    const navigation = await screen.findByRole('complementary', { name: 'Navegação principal' });
+    const medal = await within(navigation).findByRole('button', { name: 'Plano Ouro' });
+    expect(within(navigation).getByRole('link', { name: 'Acme - início' })).not.toContainElement(medal);
+    await userEvent.setup().hover(medal);
+    const tooltip = await screen.findByRole('tooltip');
+    expect(within(tooltip).getByText(/Inclusão de logos e cores personalizadas/)).toHaveTextContent('(incluído)');
+  });
   it('lets a supervisor view company progress without administration controls', async () => {
     window.history.pushState({}, '', '/');
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {

@@ -18,6 +18,30 @@
 }
 .portal-layout:not(.portal-layout-learner) .sidebar-brand .tenant-logo { max-width: 9rem; height: 2.25rem; }
 
+/* The brand row: the logo (and name) is the link home; the plan medal sits beside it, outside the link, so hovering it never navigates.
+   A wide logo and its medal center together as one group. */
+.sidebar-brand { display: flex; align-items: center; gap: 0.5rem; min-width: 0; }
+.sidebar-brand-link { flex: 1 1 auto; }
+.sidebar-brand:has(.has-wide-logo) { justify-content: center; }
+.sidebar-brand:has(.has-wide-logo) .sidebar-brand-link { flex: 0 1 auto; }
+
+.plan-medal {
+  display: grid; flex: 0 0 auto; place-items: center; width: 2rem; height: 2rem; margin: 0; padding: 0;
+  border: 0; border-radius: 0.625rem; cursor: default;
+  box-shadow: inset 0 0 0 1px rgb(14 42 34 / 6%);
+  transition: box-shadow 160ms ease, transform 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.plan-medal[data-state$="open"] { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent); }
+.plan-medal:focus-visible { outline: 2px solid var(--brand-primary, #14694b); outline-offset: 2px; }
+.plan-medal:active { transform: scale(0.95); }
+@media (hover: hover) and (pointer: fine) {
+  .plan-medal:hover { box-shadow: inset 0 0 0 1px color-mix(in srgb, currentColor 40%, transparent); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .plan-medal { transition: box-shadow 160ms ease; }
+  .plan-medal:active { transform: none; }
+}
+
 /* Logo rule for the compact header: a wide logo (a wordmark) stands alone and centered, its name kept for screen readers;
    a square logo or the SIPAT gear keeps the name beside it, wrapping to two lines instead of being cut off */
 .tenant-identity-compact.has-wide-logo { display: flex; width: 100%; justify-content: center; }

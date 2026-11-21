@@ -37,6 +37,7 @@ import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
 import CompanyNav from './companies/CompanyNav';
+import PlanMedal from './companies/PlanMedal';
 import PlaybackQualityPage from './quality/PlaybackQualityPage';
 import PlaybackQualityComparisonPage from './quality/PlaybackQualityComparisonPage';
 import PlatformSettingsPage from './PlatformSettingsPage';
@@ -514,7 +515,7 @@ function ProtectedPortal({
   const [error, setError] = useState('');
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [learningSummary, setLearningSummary] = useState<LearningSummary | null>(null);
-  // what the company can do (its plan is never shown): the menu offers only what is available
+  // what the company can do and its plan: the menu offers only what is available, the medal by the logo shows the plan
   const [capabilities, setCapabilities] = useState<CompanyCapabilities | null>(null);
   useEffect(() => {
     if (!session || !(hasAdminRole(session) || (session.roles.includes('PlatformOperator') && getCompanyAdministrationId() !== null))) return;
@@ -641,13 +642,16 @@ function ProtectedPortal({
           </aside>
         )}
         {!isLearnerOnly && <aside aria-label="Navegação principal" className="sidebar">
-          <Link
-            aria-label={`${tenant.tenantName} - início`}
-            className="brand-link sidebar-brand"
-            to={getLandingPage(session)}
-          >
-            <TenantIdentity tenant={tenant} compact />
-          </Link>
+          <div className="sidebar-brand">
+            <Link
+              aria-label={`${tenant.tenantName} - início`}
+              className="brand-link sidebar-brand-link"
+              to={getLandingPage(session)}
+            >
+              <TenantIdentity tenant={tenant} compact />
+            </Link>
+            {capabilities?.plan && (!isPlatformOperator || isPlatformCompanyContext) && <PlanMedal plan={capabilities.plan} />}
+          </div>
           {session.roles.includes('Participant') && !isPlatformCompanyContext && (
             <>
               <p className="sidebar-label">APRENDIZAGEM</p>

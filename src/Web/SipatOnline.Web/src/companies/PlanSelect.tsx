@@ -15,7 +15,7 @@ export interface PlanInfo {
   ink: string;
 }
 
-/** The plans of sipatonline.com.br. The company is never told its plan; the operator picks it. */
+/** The plans of sipatonline.com.br. The operator picks it; the company sees it as the medal beside its logo. */
 export const planOptions: PlanInfo[] = [
   { id: 'Bronze', label: 'Bronze', summary: 'Grades prontas, relatórios diários e certificado padrão', icon: Medal, tint: '#f3e3d3', ink: '#a15d2b' },
   { id: 'Prata', label: 'Prata', summary: 'Tudo do Bronze + personalização da grade de vídeos', icon: Award, tint: '#e6eaf0', ink: '#667085' },
@@ -24,6 +24,29 @@ export const planOptions: PlanInfo[] = [
 ];
 
 export const planInfo = (plan: string | null | undefined): PlanInfo => planOptions.find(item => item.id === plan) ?? planOptions[0];
+
+export interface PlanFeature {
+  label: string;
+  /** The first plan that includes it; every plan above includes it too. */
+  from: CompanyPlan;
+}
+
+/** Everything the plans offer, in the order of the site, each from the plan that first includes it. */
+export const planFeatures: PlanFeature[] = [
+  { label: 'Escolher dentre os módulos prontos', from: 'Bronze' },
+  { label: 'Relatórios diários de acompanhamento da SIPAT', from: 'Bronze' },
+  { label: 'Certificado padrão', from: 'Bronze' },
+  { label: 'Personalização da grade de vídeos', from: 'Prata' },
+  { label: 'Inclusão de logos e cores personalizadas', from: 'Ouro' },
+  { label: 'Certificado personalizado', from: 'Ouro' },
+  { label: 'Inclusão de vídeo interno da empresa na plataforma', from: 'Diamante' },
+  { label: 'Quiz ao final de cada módulo', from: 'Diamante' },
+];
+
+const planRank = (plan: CompanyPlan) => planOptions.findIndex(item => item.id === plan);
+
+/** Whether the plan includes the feature (the plans are cumulative). */
+export const planIncludes = (plan: CompanyPlan, feature: PlanFeature) => planRank(plan) >= planRank(feature.from);
 
 export function PlanBadge({ plan, className }: { plan: string; className?: string }) {
   const info = planInfo(plan);

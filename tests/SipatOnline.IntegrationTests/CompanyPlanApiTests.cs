@@ -47,12 +47,12 @@ public sealed class CompanyPlanApiTests
         using var admin = Client(factory, "acme-plano.localhost");
         await Send(admin, HttpMethod.Post, "/api/identity/login", new LoginRequest("acme-admin", "AdminPassword123"), HttpStatusCode.NoContent);
 
-        // Bronze: every assunto is available, no quiz and no own identity; the company is never told its plan
+        // Bronze: every assunto is available, no quiz and no own identity; the company is told its plan
         var capabilities = await Get(admin, "/api/admin/capabilities");
         Assert.False(capabilities.GetProperty("customizeGrid").GetBoolean());
         Assert.False(capabilities.GetProperty("customBranding").GetBoolean());
         Assert.False(capabilities.GetProperty("quizzes").GetBoolean());
-        Assert.Equal(JsonValueKind.Null, capabilities.GetProperty("plan").ValueKind);
+        Assert.Equal("Bronze", capabilities.GetProperty("plan").GetString());
 
         var catalog = await Get(admin, "/api/admin/sipat-catalog");
         Assert.Equal(["Ergonomia", "Tema avulso"], catalog.GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()).Order());
