@@ -483,7 +483,7 @@ export default function LearningTrackPage({
   if (error || !experience) {
     return (
       <main className="learning-page">
-        <Link className="learning-back-to-courses" to="/learning">← Sua SIPAT</Link>
+        <Link className="learning-back-to-courses" to="/learning">← Sua formação</Link>
         <div className="learning-state learning-error" role="alert">
           <p>{error || 'Não foi possível carregar este dia.'}</p>
           <div className="learning-state-actions">
@@ -528,7 +528,7 @@ export default function LearningTrackPage({
   return (
     <main className="learning-page day-page">
       <header className="day-top">
-        <Link className="day-back" to="/learning"><ArrowLeft aria-hidden="true" /> Sua SIPAT</Link>
+        <Link className="day-back" to="/learning"><ArrowLeft aria-hidden="true" /> Sua formação</Link>
         <div className="day-heading">
           {(dayPosition !== null || dayDate) && <p className="day-kicker">
             {dayPosition !== null && <span className="day-chip">Dia {dayPosition}</span>}
@@ -556,7 +556,7 @@ export default function LearningTrackPage({
           </div>
           {nextDay
             ? <Link className="day-done-action" to={getTrackPath(nextDay, assignedTracks)}>Ir para o Dia {nextDay.dayPosition} <ArrowRight aria-hidden="true" /></Link>
-            : <Link className="day-done-action" to="/learning">Voltar à sua SIPAT <ArrowRight aria-hidden="true" /></Link>}
+            : <Link className="day-done-action" to="/learning">Voltar à sua formação <ArrowRight aria-hidden="true" /></Link>}
         </section>
       )}
 

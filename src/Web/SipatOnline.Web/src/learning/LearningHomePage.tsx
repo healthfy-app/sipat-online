@@ -76,7 +76,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
     .map(track => {
       const event = { status: track.sipatStatus ?? 'Published', startsAt: track.sipatStartsAt ?? '', endsAt: track.sipatEndsAt ?? track.sipatStartsAt ?? '' };
       return {
-        id: track.sipatEventId, title: track.sipatTitle ?? 'SIPAT', startsAt: event.startsAt,
+        id: track.sipatEventId, title: track.sipatTitle ?? 'Formação', startsAt: event.startsAt,
         phase: sipatPhase(event, 1), hasDays: allTracks.some(item => item.sipatEventId === track.sipatEventId && !!item.dayTitle),
       };
     })
@@ -313,17 +313,17 @@ export default function LearningHomePage({ participantName, setSummary }: {
     <main className={`learning-page learning-catalog${startedAnyCourse ? ' is-returning' : ''}${isArriving ? ' is-arriving' : ''}`}>
       {!heroGreets && <header className="learning-page-heading">
         {firstName && <p className="learning-catalog-greeting">Olá, {firstName}.</p>}
-        <h1>{startedAnyCourse ? 'Bom te ver de volta.' : dayMode ? 'Sua SIPAT. Seu próximo passo.' : 'Seus cursos. Seu próximo passo.'}</h1>
+        <h1>{startedAnyCourse ? 'Bom te ver de volta.' : dayMode ? 'Sua formação. Seu próximo passo.' : 'Seus cursos. Seu próximo passo.'}</h1>
         <p className="muted-copy">
           {startedAnyCourse
             ? 'Continue de onde parou e avance no seu ritmo.'
             : dayMode
-              ? 'Explore os vídeos da sua SIPAT e acompanhe seu progresso, no seu ritmo.'
-              : 'Explore os cursos da sua SIPAT e acompanhe cada conquista, no seu ritmo.'}
+              ? 'Explore os vídeos da sua formação e acompanhe seu progresso, no seu ritmo.'
+              : 'Explore os cursos da sua formação e acompanhe cada conquista, no seu ritmo.'}
         </p>
       </header>}
 
-      {isLoading && <LoadingState className="learning-state">Carregando a sua SIPAT...</LoadingState>}
+      {isLoading && <LoadingState className="learning-state">Carregando a sua formação...</LoadingState>}
       {error && (
         <div className="learning-state learning-error" role="alert">
           <p>{error}</p>
@@ -335,9 +335,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
       {!isLoading && !error && tracks.length === 0 && (
         <section className="learning-empty">
           <span aria-hidden="true" className="learning-empty-mark">✓</span>
-          <h2>Você ainda não tem uma SIPAT disponível</h2>
+          <h2>Você ainda não tem uma formação disponível</h2>
           <p>
-            Sua empresa ainda não abriu a próxima SIPAT. Assim que ela começar, os dias aparecem aqui — é só voltar a esta página.
+            Sua empresa ainda não abriu a próxima formação. Assim que ela começar, os dias aparecem aqui — é só voltar a esta página.
           </p>
         </section>
       )}
@@ -387,7 +387,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                 <h1>{isFormationComplete ? 'Formação concluída. Parabéns!' : 'Bom te ver de volta.'}</h1>
                 <p className="learning-hero-lead">
                   {isFormationComplete
-                    ? 'Você terminou todos os cursos da sua SIPAT. Seus certificados estão disponíveis.'
+                    ? 'Você terminou todos os cursos da sua formação. Seus certificados estão disponíveis.'
                     : 'Continue de onde parou e avance no seu ritmo.'}
                 </p>
               </div>
@@ -448,7 +448,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
           </section>
         )}
 
-        {sipats.length > 1 && currentSipat && <nav aria-label="SIPATs" className="sipat-years">
+        {sipats.length > 1 && currentSipat && <nav aria-label="Formações" className="sipat-years">
           {sipats.map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} onClick={() => setChosenSipat(item.id)} type="button">
             <strong>{yearOf(item) !== null && sipats.filter(other => yearOf(other) === yearOf(item)).length === 1 ? yearOf(item) : item.title}</strong>
             <span>{item.phase === 'running' ? 'Em andamento' : item.phase === 'published' ? 'Em breve' : 'Concluída'}</span>

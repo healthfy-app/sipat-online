@@ -414,11 +414,11 @@ function LoginPage({
             </>
           ) : (
             <>
-              <p className="eyebrow">CONTEÚDOS DA SUA SIPAT</p>
+              <p className="eyebrow">CONTEÚDOS DA SUA FORMAÇÃO</p>
               <h1>Aprender também faz parte de cuidar.</h1>
               <p>
                 Acesse os vídeos e demais conteúdos que sua empresa preparou para
-                a SIPAT.
+                a formação.
               </p>
             </>
           )}
@@ -648,7 +648,7 @@ function ProtectedPortal({
             <>
               <p className="sidebar-label">APRENDIZAGEM</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/learning">
-                Minhas trilhas
+                Minhas formações
               </NavLink>
             </>
           )}
@@ -657,7 +657,7 @@ function ProtectedPortal({
               <p className="sidebar-label">GESTÃO DA EMPRESA</p>
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
               {hasAdminRole(session) && <>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">SIPATs</NavLink>
+                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/sipats">Formações</NavLink>
                 {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
               </>}
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">

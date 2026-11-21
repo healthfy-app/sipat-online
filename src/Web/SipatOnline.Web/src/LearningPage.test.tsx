@@ -341,13 +341,13 @@ describe('learning experience', () => {
     recordRange.mockRejectedValue(new Error('Não foi possível salvar. Tente novamente.'));
     atTime(video, 0); fireEvent.playing(video);
     atTime(video, 2);
-    await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
+    await user.click(screen.getByRole('link', { name: /Sua formação/ }));
     expect(await screen.findByText('Não foi possível salvar. Tente novamente.')).toBeVisible();
     expect(screen.queryByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).not.toBeInTheDocument();
     recordRange.mockResolvedValue(progress(2000));
     await user.click(screen.getByRole('button', { name: 'Tentar salvar progresso' }));
     expect(await screen.findByText('Progresso salvo')).toBeVisible();
-    await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
+    await user.click(screen.getByRole('link', { name: /Sua formação/ }));
     expect(await screen.findByRole('heading', { name: 'Seus cursos. Seu próximo passo.' })).toBeVisible();
   });
 
@@ -463,9 +463,9 @@ describe('learning experience', () => {
     const user = userEvent.setup();
     listAssignedTracks.mockRejectedValueOnce(new Error('Cursos indisponíveis.')).mockResolvedValueOnce([trackCard]);
     renderAt('/learning');
-    expect(screen.getByText('Carregando a sua SIPAT...')).toBeVisible();
+    expect(screen.getByText('Carregando a sua formação...')).toBeVisible();
     expect(await screen.findByRole('alert')).toHaveTextContent('Cursos indisponíveis.');
-    expect(screen.queryByText('Você ainda não tem uma SIPAT disponível')).not.toBeInTheDocument();
+    expect(screen.queryByText('Você ainda não tem uma formação disponível')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Tentar novamente' }));
     expect(await screen.findByRole('link', { name: 'Começar curso Segurança no trabalho' })).toBeVisible();
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
@@ -534,7 +534,7 @@ describe('learning experience', () => {
     expect(screen.queryByRole('navigation', { name: 'Trilhas da SIPAT' })).not.toBeInTheDocument();
     expect(screen.queryByText('Ergonomia')).not.toBeInTheDocument();
     expect(screen.getByRole('progressbar', { name: 'Progresso do dia' })).toHaveAttribute('aria-valuenow', '0');
-    await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
+    await user.click(screen.getByRole('link', { name: /Sua formação/ }));
     await user.click(await screen.findByRole('link', { name: 'Continuar curso Ergonomia' }));
 
     expect(await screen.findByRole('heading', { name: 'Postura no computador' })).toBeVisible();
@@ -716,7 +716,7 @@ describe('learning experience', () => {
     renderAt('/learning');
 
     expect(await screen.findByRole('heading', {
-      name: 'Você ainda não tem uma SIPAT disponível',
+      name: 'Você ainda não tem uma formação disponível',
     })).toBeVisible();
     expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
   });
@@ -816,7 +816,7 @@ describe('learning experience', () => {
     getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'n' ? now : before, lessons: [{ ...lesson, title: trackId === 'n' ? 'Ginástica laboral' : 'Respiração' }] }));
     renderAt('/learning');
 
-    const years = await screen.findByRole('navigation', { name: 'SIPATs' });
+    const years = await screen.findByRole('navigation', { name: 'Formações' });
     expect(within(years).getByRole('button', { name: /2026.*Em andamento/ })).toHaveAttribute('aria-pressed', 'true');
     expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
     expect(screen.queryByRole('region', { name: 'Dia 1 · Mente tranquila' })).not.toBeInTheDocument();
@@ -836,7 +836,7 @@ describe('learning experience', () => {
     // the week by days wins over the legacy one, even though the legacy one starts later
     expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
     // two SIPATs of the same year are told apart by their names, not by the year
-    const years = screen.getByRole('navigation', { name: 'SIPATs' });
+    const years = screen.getByRole('navigation', { name: 'Formações' });
     expect(within(years).getByRole('button', { name: /SIPAT de demonstração 2026/ })).toHaveAttribute('aria-pressed', 'true');
     expect(within(years).getByRole('button', { name: /SIPAT Novembro 2026/ })).toHaveAttribute('aria-pressed', 'false');
   });
@@ -849,7 +849,7 @@ describe('learning experience', () => {
     renderAt('/learning');
 
     expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
-    expect(screen.queryByRole('navigation', { name: 'SIPATs' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Formações' })).not.toBeInTheDocument();
     expect(screen.queryByText('Teste antigo')).not.toBeInTheDocument();
   });
 
@@ -927,7 +927,7 @@ describe('learning experience', () => {
     const { video } = await playableCourse();
     atTime(video, 0); fireEvent.play(video); fireEvent.playing(video);
     atTime(video, 2);
-    await user.click(screen.getByRole('link', { name: /Sua SIPAT/ }));
+    await user.click(screen.getByRole('link', { name: /Sua formação/ }));
     await waitFor(() => expect(sendQuality).toHaveBeenCalledWith('track-1',
       expect.objectContaining({ playbackSessionId: 'session-lesson-1' })));
   });

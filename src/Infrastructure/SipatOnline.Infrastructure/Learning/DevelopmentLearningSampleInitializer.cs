@@ -59,7 +59,7 @@ public sealed class DevelopmentLearningSampleInitializer(
         new(
             Guid.Parse("a1000000-0000-4000-8000-000000000009"),
             "Demonstração técnica — vídeo e progresso",
-            "Trilha separada para testar a reprodução e o salvamento de progresso.",
+            "Formação separada para testar a reprodução e o salvamento de progresso.",
             "Vídeo público de demonstração — flores (MDN)",
             "Amostra CC0 da MDN usada somente para validar o player e o progresso; não faz parte do catálogo da SIPAT Online.",
             "development:mdn-flower-demo",
@@ -192,7 +192,7 @@ public sealed class DevelopmentLearningSampleInitializer(
             sampleSipatId,
             tenant,
             "SIPAT de aprendizagem",
-            "Trilhas de referência para validar o acesso, a reprodução e o progresso.",
+            "Formações de referência para validar o acesso, a reprodução e o progresso.",
             now,
             now.AddYears(1),
             now,

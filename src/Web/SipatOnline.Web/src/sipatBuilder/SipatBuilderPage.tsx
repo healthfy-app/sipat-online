@@ -42,7 +42,7 @@ export function findIssues(name: string, days: DaySlots[]): { name: string | nul
     if (day.date && !isValidDate(day.date)) list.push('A data é inválida.');
     if (list.length > 0) byDay[index] = list;
   });
-  return { name: name.trim() ? null : 'Dê um nome à SIPAT.', days: byDay };
+  return { name: name.trim() ? null : 'Dê um nome à formação.', days: byDay };
 }
 
 /**
@@ -89,7 +89,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       setOthers(events.items);
       if (!isNew && params.sipatId) {
         const found = events.items.find(item => item.id === params.sipatId);
-        if (!found) { setError('Não encontrei esta SIPAT.'); return; }
+        if (!found) { setError('Não encontrei esta formação.'); return; }
         setSipat(found); setName(found.title);
         setDays((await getSipatPlan(found.id)).map(fromProgramDay));
       } else {
@@ -151,7 +151,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const edit = (next: DaySlots[]) => { setDays(next); setDirty(true); setNotice(''); };
 
   function start() {
-    if (!isValidDate(startDate)) { setError('Escolha a data de início da SIPAT.'); return; }
+    if (!isValidDate(startDate)) { setError('Escolha a data de início da formação.'); return; }
     setError('');
     setDays(Array.from({ length: dayCount }, (_, index) => newDay(index, addDays(startDate, index))));
     setStage('grid'); setDirty(true);
@@ -217,7 +217,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       const events = await listSipatEvents(0, 100);
       setOthers(events.items);
       setSipat(events.items.find(item => item.id === id) ?? null);
-      setNotice(result.created > 0 ? `SIPAT publicada: ${pluralize(result.created, 'dia entregue', 'dias entregues')} aos participantes.` : 'SIPAT atualizada. Os dias que já tinham progresso ficaram como estavam.');
+      setNotice(result.created > 0 ? `Formação publicada: ${pluralize(result.created, 'dia entregue', 'dias entregues')} aos participantes.` : 'Formação atualizada. Os dias que já tinham progresso ficaram como estavam.');
     } catch (failure) {
       setError(getErrorMessage(failure));
     } finally { setBusy(false); }
@@ -230,7 +230,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     try {
       const cancelled = await cancelSipatEvent(sipat.id);
       setSipat(cancelled); setDirty(false);
-      setNotice('SIPAT encerrada.');
+      setNotice('Formação encerrada.');
     } catch (failure) {
       setError(getErrorMessage(failure));
     } finally { setBusy(false); }
@@ -257,7 +257,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     } finally { setBusy(false); }
   }
 
-  if (loading) return <LoadingState>Carregando a SIPAT...</LoadingState>;
+  if (loading) return <LoadingState>Carregando a formação...</LoadingState>;
   if (!catalog) {
     return <Page><div className="grid justify-items-start gap-3">
       <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error || 'Não foi possível carregar o catálogo.'}</p>
@@ -278,23 +278,23 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   return <Page className="builder-page">
     <header className="ops-hero" data-slot="page-header">
       <div className="ops-hero-copy">
-        <Link className="ops-hero-back" to={basePath}><ArrowLeft aria-hidden="true" /> Todas as SIPATs</Link>
-        <p className="ops-hero-eyebrow">SIPAT</p>
+        <Link className="ops-hero-back" to={basePath}><ArrowLeft aria-hidden="true" /> Todas as formações</Link>
+        <p className="ops-hero-eyebrow">Formação</p>
         <div className="flex flex-wrap items-center gap-3">
           {showNameInput
-            ? <Input aria-invalid={nameMissing} aria-label="Nome da SIPAT" autoFocus className="ops-hero-title h-auto w-[min(100%,28rem)] border-dashed bg-transparent px-2 py-1"
+            ? <Input aria-invalid={nameMissing} aria-label="Nome da formação" autoFocus className="ops-hero-title h-auto w-[min(100%,28rem)] border-dashed bg-transparent px-2 py-1"
               data-name-issue={nameMissing ? true : undefined} maxLength={200} onBlur={() => setEditingName(false)}
               onChange={event => { setName(event.target.value); setDirty(true); }}
               onKeyDown={event => { if (event.key === 'Enter' || event.key === 'Escape') event.currentTarget.blur(); }}
               placeholder="Ex.: SIPAT 2026" value={name} />
-            : <h1 className="ops-hero-title">{isNew && stage === 'setup' ? 'Nova SIPAT' : name || 'SIPAT'}</h1>}
-          {canRename && !showNameInput && <Button aria-label="Renomear a SIPAT" onClick={() => setEditingName(true)} size="icon-sm" variant="ghost"><Pencil /></Button>}
+            : <h1 className="ops-hero-title">{isNew && stage === 'setup' ? 'Nova formação' : name || 'Formação'}</h1>}
+          {canRename && !showNameInput && <Button aria-label="Renomear a formação" onClick={() => setEditingName(true)} size="icon-sm" variant="ghost"><Pencil /></Button>}
           {label && <Badge variant={label.variant}>{label.text}</Badge>}
           {dirty && <Badge variant="outline">Alterações não salvas</Badge>}
           {stage === 'grid' && sipat && sipat.status === 'Published' && <span className="text-xs text-muted-foreground">O nome fica fixo depois de publicada.</span>}
         </div>
         <p className="ops-hero-lead is-keep">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</p>
-        {stage === 'grid' && <ul aria-label="Resumo da SIPAT" className="ops-hero-stats">
+        {stage === 'grid' && <ul aria-label="Resumo da formação" className="ops-hero-stats">
           <li><strong>{days.length}</strong> {days.length === 1 ? 'dia' : 'dias'}</li>
           <li><Film aria-hidden="true" /><strong>{totals.videos}</strong> {totals.videos === 1 ? 'vídeo' : 'vídeos'}{extrasSuffix(totals.extras)}</li>
           <li><Gamepad2 aria-hidden="true" /><strong>{totals.games}</strong> {totals.games === 1 ? 'jogo' : 'jogos'}</li>
@@ -305,12 +305,12 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild><Button disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
           <DropdownMenuContent>
-            {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outra SIPAT</DropdownMenuItem>}
+            {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outra formação</DropdownMenuItem>}
             <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>
             <DropdownMenuItem disabled={days.length === 0} onSelect={exportCsv}><FileDown /> Exportar CSV</DropdownMenuItem>
             {sipat && <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setConfirmingEnd(true)} variant="destructive"><Ban /> Encerrar esta SIPAT</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setConfirmingEnd(true)} variant="destructive"><Ban /> Encerrar esta formação</DropdownMenuItem>
             </>}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -319,10 +319,10 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       </div>}
     </header>
 
-    {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Esta SIPAT foi encerrada e não pode ser alterada. Para usá-la de novo, reative-a na lista de SIPATs, ou use "Duplicar" em uma nova SIPAT.</p>}
+    {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Esta formação foi encerrada e não pode ser alterada. Para usá-la de novo, reative-a na lista de formações, ou use "Duplicar" em uma nova formação.</p>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {showIssues && issueCount > 0 && stage === 'grid' && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">
-      {issues.name ? 'Dê um nome à SIPAT. ' : ''}
+      {issues.name ? 'Dê um nome à formação. ' : ''}
       {Object.keys(issues.days).length > 0 && `${pluralize(Object.keys(issues.days).length, 'dia precisa', 'dias precisam')} de ajuste antes de salvar. Eles estão marcados em vermelho na grade.`}
     </p>}
     {catalog.subjects.length === 0 && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">O acervo ainda não tem assuntos publicados. Peça à operação para publicar os assuntos.</p>}
@@ -338,7 +338,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${pluralize(imported.length, 'dia importado', 'dias importados')}. Revise e salve.`); }}
       onTemplate={template} />}
 
-    {copying && <Dialog description="Escolha a SIPAT de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outra SIPAT">
+    {copying && <Dialog description="Escolha a formação de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outra formação">
       <ul className="m-0 grid max-h-72 list-none gap-2 overflow-auto p-0">
         {sources.map(item => {
           const plan = plans.find(entry => entry.sipatEventId === item.id);
@@ -366,15 +366,15 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       </div>}
     </div>}
 
-    {confirmingEnd && sipat && <Dialog description="Ela deixa de aparecer para os participantes e fica bloqueada para edição. Dá para reativá-la depois na lista de SIPATs."
+    {confirmingEnd && sipat && <Dialog description="Ela deixa de aparecer para os participantes e fica bloqueada para edição. Dá para reativá-la depois na lista de formações."
       onClose={() => setConfirmingEnd(false)} title={`Encerrar "${sipat.title}"?`}>
       <DialogActions>
         <Button onClick={() => setConfirmingEnd(false)} variant="outline">Voltar</Button>
-        <Button onClick={() => void endThis()} variant="destructive"><Ban /> Encerrar SIPAT</Button>
+        <Button onClick={() => void endThis()} variant="destructive"><Ban /> Encerrar formação</Button>
       </DialogActions>
     </Dialog>}
 
-    {leavingTo && <Dialog description="As alterações desta SIPAT ainda não foram salvas. Se sair agora, elas se perdem." onClose={() => setLeavingTo(null)} title="Sair sem salvar?">
+    {leavingTo && <Dialog description="As alterações desta formação ainda não foram salvas. Se sair agora, elas se perdem." onClose={() => setLeavingTo(null)} title="Sair sem salvar?">
       <DialogActions>
         <Button onClick={() => setLeavingTo(null)} variant="outline">Continuar editando</Button>
         <Button onClick={() => { const to = leavingTo; setDirty(false); setLeavingTo(null); navigate(to); }} variant="destructive">Sair sem salvar</Button>
@@ -384,8 +384,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
 
     {confirmingLaunch && <Dialog description={published
       ? 'Os dias que ninguém começou são atualizados com os assuntos atuais. Os que já têm progresso ficam como estão.'
-      : `Ao publicar, cada dia é entregue aos participantes ativos da empresa.${live ? ` Só uma SIPAT fica publicada por vez: "${live.title}" deixa de aparecer para os participantes.` : ''}`}
-      onClose={() => setConfirmingLaunch(false)} title={published ? 'Atualizar os dias da SIPAT?' : 'Publicar a SIPAT?'}>
+      : `Ao publicar, cada dia é entregue aos participantes ativos da empresa.${live ? ` Só uma formação fica publicada por vez: "${live.title}" deixa de aparecer para os participantes.` : ''}`}
+      onClose={() => setConfirmingLaunch(false)} title={published ? 'Atualizar os dias da formação?' : 'Publicar a formação?'}>
       <DialogActions>
         <Button onClick={() => setConfirmingLaunch(false)} variant="outline">Voltar</Button>
         <Button onClick={() => void publish()}><Rocket /> {published ? 'Atualizar' : 'Publicar agora'}</Button>

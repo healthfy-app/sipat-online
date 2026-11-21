@@ -40,7 +40,7 @@ describe('SIPAT builder', () => {
       { key: 'a', title: 'Abertura', date: '2026-11-09', subject: '', videos: ['v1'], games: [] },
       { key: 'b', title: ' ', date: '', subject: '', videos: [null], games: [] },
     ]);
-    expect(issues.name).toBe('Dê um nome à SIPAT.');
+    expect(issues.name).toBe('Dê um nome à formação.');
     expect(issues.days).toEqual({ 1: ['Falta o slogan do dia.', 'Falta um assunto com vídeos.'] });
   });
 
@@ -76,13 +76,13 @@ describe('SIPAT builder', () => {
     expect(screen.queryByRole('button', { name: /Importar CSV/ })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Mais/ }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /Encerrar esta SIPAT/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Encerrar esta formação/ }));
     expect(await screen.findByRole('dialog', { name: 'Encerrar "SIPAT 2026"?' })).toBeVisible();
     expect(api.cancelSipatEvent).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: /Encerrar SIPAT/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Encerrar formação/ }));
     expect(api.cancelSipatEvent).toHaveBeenCalledWith('s1');
-    expect(await screen.findByText('SIPAT encerrada.')).toBeVisible();
+    expect(await screen.findByText('Formação encerrada.')).toBeVisible();
   });
 
   it('names the SIPAT that leaves the air when another is published', async () => {
@@ -96,19 +96,19 @@ describe('SIPAT builder', () => {
     vi.mocked(api.getSipatPlan).mockResolvedValue([{ id: 'd1', title: 'Abertura', date: '2026-11-09', subject: null, videoIds: ['v1'], gameIds: [] }]);
     renderBuilder();
     await userEvent.click(await screen.findByRole('button', { name: /Publicar/ }));
-    expect(await screen.findByRole('dialog', { name: 'Publicar a SIPAT?' })).toHaveTextContent('"SIPAT 2025" deixa de aparecer para os participantes.');
+    expect(await screen.findByRole('dialog', { name: 'Publicar a formação?' })).toHaveTextContent('"SIPAT 2025" deixa de aparecer para os participantes.');
   });
 
   it('asks before leaving through a link with unsaved changes', async () => {
     renderBuilder();
     await userEvent.type(await screen.findByRole('textbox', { name: 'Título do dia 2' }), 'Mãos seguras');
-    await userEvent.click(screen.getByRole('link', { name: /Todas as SIPATs/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Todas as formações/ }));
 
     expect(await screen.findByRole('dialog', { name: 'Sair sem salvar?' })).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }));
     expect(screen.queryByText('Lista de SIPATs')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('link', { name: /Todas as SIPATs/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Todas as formações/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Sair sem salvar' }));
     expect(await screen.findByText('Lista de SIPATs')).toBeVisible();
   });
