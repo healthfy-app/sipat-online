@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { getAssignedLearningTrack, type LearningLessonProgress, type LearningTrackCard } from '@/api';
 import { getCourseCover } from '@/courseCover';
 import { formatDuration, getTrackDisplayTitle, getTrackPath, type DayGroup } from './learningHelpers';
+import { partWord } from '@/trainings/partWord';
 import ProgressBar from './ProgressBar';
 import './WeekVideos.css';
 
@@ -26,6 +27,8 @@ export default function WeekVideos({ days, allTracks }: {
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const toggle = (key: string) => setClosed(known => { const next = new Set(known); if (!next.delete(key)) next.add(key); return next; });
   const trackIds = days.flatMap(day => day.tracks.map(track => track.id)).join(',');
+  // "Dia" when the training has dates, "Módulo" when none of its parts has one
+  const word = partWord(days.flatMap(day => day.tracks.map(track => track.dayDate)));
 
   useEffect(() => {
     let current = true;
@@ -58,21 +61,21 @@ export default function WeekVideos({ days, allTracks }: {
               {complete ? <Check /> : day.position ?? '•'}
             </span>
             <div className="week-day-heading">
-              <h3 id={headingId}>{day.position ? `Dia ${day.position} · ` : ''}{day.title}</h3>
+              <h3 id={headingId}>{day.position ? `${word} ${day.position} · ` : ''}{day.title}</h3>
               <p>{date ? `${date} · ` : ''}{done === 0 ? `Ainda não começou · ${total} ${total === 1 ? 'vídeo' : 'vídeos'}` : `${done} de ${total} ${total === 1 ? 'vídeo assistido' : 'vídeos assistidos'}`}</p>
             </div>
             <div className="week-day-progress">
               <ProgressBar label={`Progresso de ${day.title}`} value={total === 0 ? 0 : Math.round((done / total) * 100)} />
             </div>
             {day.tracks[0] && <Link
-              aria-label={`Ir para o ${day.position ? `Dia ${day.position}` : day.title}`}
+              aria-label={`Ir para o ${day.position ? `${word} ${day.position}` : day.title}`}
               className="week-day-open"
               to={getTrackPath(day.tracks[0], allTracks)}
             >Abrir dia <ArrowRight aria-hidden="true" /></Link>}
             <button
               aria-controls={bodyId}
               aria-expanded={open}
-              aria-label={`${open ? 'Recolher' : 'Abrir'} ${day.position ? `Dia ${day.position}` : day.title}`}
+              aria-label={`${open ? 'Recolher' : 'Abrir'} ${day.position ? `${word} ${day.position}` : day.title}`}
               className="week-day-toggle"
               onClick={() => toggle(day.key)}
               type="button"

@@ -31,6 +31,7 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
+import { orderTrainings, pickDefaultTraining } from '@/trainings/defaultTraining';
 import WeekVideos from './WeekVideos';
 import { sipatPhase } from '@/sipatBuilder/sipatPhase';
 import ProgressBar from './ProgressBar';
@@ -71,21 +72,18 @@ export default function LearningHomePage({ participantName, setSummary }: {
     if (isArriving) writeSessionFlag(firstArrivalKey, '1');
   }, [isArriving]);
 
-  // a participant can have several SIPATs (one a year): the published one is shown, earlier ones are one tap away
+  // a participant can have several trainings, some at the same time: one is shown, the others are one tap away
   const sipats = Array.from(new Map(allTracks.map(track => [track.sipatEventId, track])).values())
     .map(track => {
       const event = { status: track.sipatStatus ?? 'Published', startsAt: track.sipatStartsAt ?? '', endsAt: track.sipatEndsAt ?? track.sipatStartsAt ?? '' };
       return {
-        id: track.sipatEventId, title: track.sipatTitle ?? 'Formação', startsAt: event.startsAt,
+        id: track.sipatEventId, title: track.sipatTitle ?? 'Treinamento', startsAt: event.startsAt, endsAt: event.endsAt, status: event.status,
         phase: sipatPhase(event, 1), hasDays: allTracks.some(item => item.sipatEventId === track.sipatEventId && !!item.dayTitle),
       };
     })
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  // the one shown first: the week that is happening (or about to), built by days; then the most recent
-  const live = (item: (typeof sipats)[number]) => item.phase === 'running' || item.phase === 'published';
-  const currentSipat = sipats.find(item => item.id === chosenSipat)
-    ?? sipats.find(item => live(item) && item.hasDays) ?? sipats.find(live) ?? sipats[0];
-  const yearOf = (item: (typeof sipats)[number]) => (item.startsAt ? new Date(item.startsAt).getUTCFullYear() : null);
+  // the one shown first: among those running, the one that started first; then the next to start; then the most recent
+  const currentSipat = sipats.find(item => item.id === chosenSipat) ?? pickDefaultTraining(sipats);
   const tracks = sipats.length > 1 && currentSipat ? allTracks.filter(track => track.sipatEventId === currentSipat.id) : allTracks;
   const overallProgress = getOverallProgress(tracks);
   const isFormationComplete = overallProgress >= 100;
@@ -449,8 +447,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
         )}
 
         {sipats.length > 1 && currentSipat && <nav aria-label="Formações" className="sipat-years">
-          {sipats.map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} onClick={() => setChosenSipat(item.id)} type="button">
-            <strong>{yearOf(item) !== null && sipats.filter(other => yearOf(other) === yearOf(item)).length === 1 ? yearOf(item) : item.title}</strong>
+          {orderTrainings(sipats).map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} type="button"
+            onClick={event => { setChosenSipat(item.id); event.currentTarget.scrollIntoView?.({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); }}>
+            <strong title={item.title}>{item.title}</strong>
             <span>{item.phase === 'running' ? 'Em andamento' : item.phase === 'published' ? 'Em breve' : 'Concluída'}</span>
           </button>)}
         </nav>}

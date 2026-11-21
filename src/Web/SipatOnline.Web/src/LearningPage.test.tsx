@@ -735,7 +735,7 @@ describe('learning experience', () => {
 
   it('lists the videos of the week day by day, in program order, with the date and the progress of each day', async () => {
     const day1 = { ...trackCard, id: 'a', title: 'Opção 1 · Ergonomia', lessonCount: 2, completedLessonCount: 1, progressPercentage: 50, dayTitle: 'Boa postura e movimento', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-09' };
-    const day2 = { ...trackCard, id: 'b', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 2, coursePosition: 1 };
+    const day2 = { ...trackCard, id: 'b', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 2, dayDate: '2026-11-09', coursePosition: 1 };
     listAssignedTracks.mockResolvedValue([day2, day1]);
     const watched = { ...lesson, id: 'v-1', title: 'Ginástica laboral', isCompleted: true, watchedPercentage: 100 };
     const next = { ...lesson, id: 'v-2', title: 'Trabalho sentado', position: 2 };
@@ -758,8 +758,8 @@ describe('learning experience', () => {
 
   it('lets each day of the week be collapsed and opened again', async () => {
     const user = userEvent.setup();
-    const day1 = { ...trackCard, id: 'a', title: 'Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1 };
-    const day2 = { ...trackCard, id: 'b', title: 'Higiene', dayTitle: 'Mente tranquila', dayPosition: 2, coursePosition: 1 };
+    const day1 = { ...trackCard, id: 'a', title: 'Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, dayDate: '2026-11-09', coursePosition: 1 };
+    const day2 = { ...trackCard, id: 'b', title: 'Higiene', dayTitle: 'Mente tranquila', dayPosition: 2, dayDate: '2026-11-09', coursePosition: 1 };
     listAssignedTracks.mockResolvedValue([day1, day2]);
     getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'a' ? day1 : day2, lessons: [{ ...lesson, id: trackId, title: trackId === 'a' ? 'Ginástica' : 'Respiração' }] }));
     renderAt('/learning');
@@ -781,8 +781,8 @@ describe('learning experience', () => {
   });
 
   it('shows all days and videos without a separate day-selection panel', async () => {
-    const day1 = { ...trackCard, id: 'a', title: 'Uso de EPI', lessonCount: 2, completedLessonCount: 2, progressPercentage: 100, dayTitle: 'Segurança', dayPosition: 1, coursePosition: 1 };
-    const day2 = { ...trackCard, id: 'b', title: 'Alongamento', dayTitle: 'Saúde', dayPosition: 2, coursePosition: 1 };
+    const day1 = { ...trackCard, id: 'a', title: 'Uso de EPI', lessonCount: 2, completedLessonCount: 2, progressPercentage: 100, dayTitle: 'Segurança', dayPosition: 1, dayDate: '2026-11-09', coursePosition: 1 };
+    const day2 = { ...trackCard, id: 'b', title: 'Alongamento', dayTitle: 'Saúde', dayPosition: 2, dayDate: '2026-11-09', coursePosition: 1 };
     listAssignedTracks.mockResolvedValue([day2, day1]);
     getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({
       track: trackId === 'a' ? day1 : day2,
@@ -810,8 +810,8 @@ describe('learning experience', () => {
 
   it('shows the week of the published SIPAT and keeps the earlier years one tap away', async () => {
     const user = userEvent.setup();
-    const now = { ...trackCard, id: 'n', sipatEventId: 'sipat-2026', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-11-15T00:00:00Z', sipatStatus: 'Published' as const };
-    const before = { ...trackCard, id: 'o', sipatEventId: 'sipat-2025', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 1, coursePosition: 1, lessonCount: 1, completedLessonCount: 1, progressPercentage: 100, sipatTitle: 'SIPAT 2025', sipatStartsAt: '2025-11-10T00:00:00Z', sipatEndsAt: '2025-11-15T00:00:00Z', sipatStatus: 'Published' as const };
+    const now = { ...trackCard, id: 'n', sipatEventId: 'sipat-2026', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, dayDate: '2026-11-09', coursePosition: 1, sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-11-15T00:00:00Z', sipatStatus: 'Published' as const };
+    const before = { ...trackCard, id: 'o', sipatEventId: 'sipat-2025', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 1, dayDate: '2026-11-09', coursePosition: 1, lessonCount: 1, completedLessonCount: 1, progressPercentage: 100, sipatTitle: 'SIPAT 2025', sipatStartsAt: '2025-11-10T00:00:00Z', sipatEndsAt: '2025-11-15T00:00:00Z', sipatStatus: 'Published' as const };
     listAssignedTracks.mockResolvedValue([before, now]);
     getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'n' ? now : before, lessons: [{ ...lesson, title: trackId === 'n' ? 'Ginástica laboral' : 'Respiração' }] }));
     renderAt('/learning');
@@ -827,7 +827,7 @@ describe('learning experience', () => {
   });
 
   it('opens on the SIPAT built by days when an older SIPAT of the same year is also published', async () => {
-    const byDays = { ...trackCard, id: 'd', sipatEventId: 'sipat-b', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, sipatTitle: 'SIPAT de demonstração 2026', sipatStartsAt: '2026-11-10T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    const byDays = { ...trackCard, id: 'd', sipatEventId: 'sipat-b', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, dayDate: '2026-11-09', coursePosition: 1, sipatTitle: 'SIPAT de demonstração 2026', sipatStartsAt: '2026-11-10T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
     const legacy = { ...trackCard, id: 'l', sipatEventId: 'sipat-a', title: 'Teste Novembro', sipatTitle: 'SIPAT Novembro 2026', sipatStartsAt: '2026-11-11T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
     listAssignedTracks.mockResolvedValue([legacy, byDays]);
     getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 'd' ? byDays : legacy, lessons: [lesson] }));
@@ -841,8 +841,29 @@ describe('learning experience', () => {
     expect(within(years).getByRole('button', { name: /SIPAT Novembro 2026/ })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('opens the running training that started first, with the other one a tap away', async () => {
+    const sipat = { ...trackCard, id: 's', sipatEventId: 'sipat-2026', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-09', sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    const fire = { ...trackCard, id: 'f', sipatEventId: 'fogo', title: 'Extintores', dayTitle: 'Combate ao fogo', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-20', sipatTitle: 'Treinamento contra incêndios', sipatStartsAt: '2026-11-20T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    listAssignedTracks.mockResolvedValue([fire, sipat]);
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 's' ? sipat : fire, lessons: [lesson] }));
+    renderAt('/learning');
+
+    expect(await screen.findByRole('region', { name: 'Dia 1 · Boa postura' })).toBeVisible();
+    const chips = screen.getByRole('navigation', { name: 'Formações' });
+    expect(within(chips).getByRole('button', { name: /Treinamento contra incêndios/ })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('says Módulo for a training without dates', async () => {
+    const part = { ...trackCard, id: 'm', sipatEventId: 'integracao', title: 'Boas-vindas', dayTitle: 'Conheça a empresa', dayPosition: 1, coursePosition: 1, dayDate: null, sipatTitle: 'Integração', sipatStartsAt: '2026-11-01T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    listAssignedTracks.mockResolvedValue([part]);
+    getAssignedTrack.mockResolvedValue({ track: part, lessons: [lesson] });
+    renderAt('/learning');
+
+    expect(await screen.findByRole('region', { name: 'Módulo 1 · Conheça a empresa' })).toBeVisible();
+  });
+
   it.each(['Cancelled', 'Draft'] as const)('does not show the days of a %s SIPAT', async (status) => {
-    const live = { ...trackCard, id: 'a', sipatEventId: 'sipat-live', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    const live = { ...trackCard, id: 'a', sipatEventId: 'sipat-live', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, dayDate: '2026-11-09', coursePosition: 1, sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
     const gone = { ...trackCard, id: 'b', sipatEventId: 'sipat-old', title: 'Teste antigo', sipatTitle: 'SIPAT de teste', sipatStartsAt: '2026-11-11T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: status };
     listAssignedTracks.mockResolvedValue([gone, live]);
     getAssignedTrack.mockResolvedValue({ track: live, lessons: [lesson] });
@@ -855,7 +876,7 @@ describe('learning experience', () => {
 
   it('names the day, its date and subject, and offers the next day once every video is watched', async () => {
     const day1 = { ...trackCard, id: 'track-1', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura e movimento', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-09', lessonCount: 1, completedLessonCount: 1, progressPercentage: 100 };
-    const day2 = { ...trackCard, id: 'track-2', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 2, coursePosition: 1 };
+    const day2 = { ...trackCard, id: 'track-2', title: 'Opção 1 · Higiene Mental', dayTitle: 'Mente tranquila', dayPosition: 2, dayDate: '2026-11-09', coursePosition: 1 };
     listAssignedTracks.mockResolvedValue([day1, day2]);
     getAssignedTrack.mockResolvedValue({ track: day1, lessons: [{ ...lesson, isCompleted: true, watchedPercentage: 100 }] });
     startPlayback.mockReset().mockResolvedValue({ url: 'https://media.example.test/lesson-1.mp4', sessionId: 's', expiresAt: '2099-01-01T00:00:00Z', isDevelopmentDemo: false });
@@ -1081,7 +1102,7 @@ describe('extras in the day', () => {
 
     expect(screen.getByText('2 de 2 vídeos · 100%')).toBeVisible();
     expect(screen.getByRole('progressbar', { name: 'Progresso do dia' })).toHaveAttribute('aria-valuenow', '100');
-    expect(screen.getByRole('status', { name: 'Dia concluído' })).toBeVisible();
+    expect(screen.getByRole('status', { name: 'Tudo assistido' })).toBeVisible();
   });
 
   it('goes from the house video to the extra and from the extra to the next video', async () => {
@@ -1113,7 +1134,7 @@ describe('extras in the day', () => {
     atTime(video, 5); fireEvent.ended(video);
 
     await waitFor(() => expect(screen.getByText('1 de 1 vídeos · 100%')).toBeVisible());
-    expect(screen.getByRole('status', { name: 'Dia concluído' })).toBeVisible();
+    expect(screen.getByRole('status', { name: 'Tudo assistido' })).toBeVisible();
     // after a house video ends the way forward can be the extra
     await waitFor(() => expect(container.querySelector('iframe')).toBeInTheDocument());
   });

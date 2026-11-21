@@ -40,6 +40,7 @@ import {
   type SipatVideoPlayerHandle,
   type WatchedRange,
 } from '@sipat/video-player';
+import { partWord } from '@/trainings/partWord';
 import { formatDayDate } from './WeekVideos';
 import './LearningMotion.css';
 import './DayPage.css';
@@ -516,6 +517,8 @@ export default function LearningTrackPage({
   const trackTitle = getTrackDisplayTitle(experience.track.title);
   const dayTitle = experience.track.dayTitle ?? null;
   const dayPosition = experience.track.dayPosition ?? null;
+  // "Dia" when the training has dates, "Módulo" when none of its parts has one
+  const word = partWord(assignedTracks.filter(track => track.sipatEventId === experience.track.sipatEventId).map(track => track.dayDate).concat(experience.track.dayDate));
   const dayDate = formatDayDate(experience.track.dayDate);
   const percentage = getTrackProgress(experience.track);
   const markers = activities
@@ -531,7 +534,7 @@ export default function LearningTrackPage({
         <Link className="day-back" to="/learning"><ArrowLeft aria-hidden="true" /> Sua formação</Link>
         <div className="day-heading">
           {(dayPosition !== null || dayDate) && <p className="day-kicker">
-            {dayPosition !== null && <span className="day-chip">Dia {dayPosition}</span>}
+            {dayPosition !== null && <span className="day-chip">{word} {dayPosition}</span>}
             {dayDate && <span className="day-date"><CalendarDays aria-hidden="true" />{dayDate}</span>}
           </p>}
           <h1>{dayTitle ?? trackTitle}</h1>
@@ -548,14 +551,14 @@ export default function LearningTrackPage({
       </header>
 
       {isTrackComplete && (
-        <section aria-label="Dia concluído" className="day-done" role="status">
+        <section aria-label={dayPosition !== null ? `${word} concluído` : 'Tudo assistido'} className="day-done" role="status">
           <span aria-hidden="true" className="day-done-icon"><Trophy /></span>
           <div>
-            <strong>{dayPosition !== null ? `Dia ${dayPosition} concluído!` : 'Tudo assistido!'}</strong>
+            <strong>{dayPosition !== null ? `${word} ${dayPosition} concluído!` : 'Tudo assistido!'}</strong>
             <p>Você assistiu a todos os vídeos. Pode rever qualquer um quando quiser.</p>
           </div>
           {nextDay
-            ? <Link className="day-done-action" to={getTrackPath(nextDay, assignedTracks)}>Ir para o Dia {nextDay.dayPosition} <ArrowRight aria-hidden="true" /></Link>
+            ? <Link className="day-done-action" to={getTrackPath(nextDay, assignedTracks)}>Ir para o {word} {nextDay.dayPosition} <ArrowRight aria-hidden="true" /></Link>
             : <Link className="day-done-action" to="/learning">Voltar à sua formação <ArrowRight aria-hidden="true" /></Link>}
         </section>
       )}
