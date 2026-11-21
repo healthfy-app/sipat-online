@@ -25,7 +25,7 @@ public sealed class VideoConversionSignal
         pending.WaitAsync(timeout, cancellationToken);
 }
 
-/// <summary>The single conversion worker: one video at a time, at low priority.</summary>
+/// <summary>The conversion worker of this instance: one video at a time, at low priority. Other instances may run their own.</summary>
 public sealed class VideoConversionWorker(
     IServiceScopeFactory scopes,
     VideoConversionSignal signal,
@@ -36,17 +36,15 @@ public sealed class VideoConversionWorker(
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Yield();
-        var requeued = false;
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
-                if (!requeued)
+                // Every round, not only at start: the worker that left a job behind may have been another instance.
+                await using (var scope = scopes.CreateAsyncScope())
                 {
-                    await using var scope = scopes.CreateAsyncScope();
                     var count = await scope.ServiceProvider.GetRequiredService<VideoConversionProcessor>()
                         .RequeueInterruptedAsync(stoppingToken);
-                    requeued = true;
                     if (count > 0)
                     {
                         logger.LogInformation("{Count} interrupted video conversions returned to the queue", count);

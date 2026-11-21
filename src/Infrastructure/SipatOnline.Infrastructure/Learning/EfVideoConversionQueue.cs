@@ -11,9 +11,13 @@ public sealed class EfVideoConversionQueue(
 {
     public bool IsEnabled => options.Enabled;
 
-    /// <summary>The absolute folder that holds the source and the converted files of one video.</summary>
+    /// <summary>The absolute folder that holds the uploaded source of one video until its conversion succeeds or fails.</summary>
     public static string WorkFolder(VideoConversionOptions options, Guid videoId) =>
         Path.Combine(Path.GetFullPath(options.WorkPath), videoId.ToString("N"));
+
+    /// <summary>The scratch folder of one conversion run (its outputs), <c>WorkPath/jobs/{jobId:N}/</c>; deleted when the run ends.</summary>
+    public static string JobFolder(VideoConversionOptions options, Guid jobId) =>
+        Path.Combine(Path.GetFullPath(options.WorkPath), "jobs", jobId.ToString("N"));
 
     /// <summary>The source is stored with the file storage's own rules, as <c>{videoId:N}.video</c> in the work folder.</summary>
     public static FilePlatformCourseVideoStorage SourceStorage(VideoConversionOptions options, Guid videoId) =>

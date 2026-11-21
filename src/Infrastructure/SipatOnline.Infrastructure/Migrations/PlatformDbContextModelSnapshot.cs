@@ -1124,6 +1124,13 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<DateTimeOffset?>("FinishedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<DateTimeOffset?>("LeaseUntil")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("LeasedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.Property<DateTimeOffset?>("StartedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1138,6 +1145,8 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Status", "CreatedAt");
+
+                    b.HasIndex("Status", "LeaseUntil");
 
                     b.ToTable("VideoConversionJobs", "learning");
                 });

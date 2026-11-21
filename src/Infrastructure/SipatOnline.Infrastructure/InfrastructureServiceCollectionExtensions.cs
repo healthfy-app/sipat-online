@@ -325,14 +325,21 @@ public static class InfrastructureServiceCollectionExtensions
             throw new InvalidOperationException($"Configure {VideoConversionOptions.SectionName}:WorkPath.");
         }
 
+        if (options.LeaseRenewInterval <= TimeSpan.Zero || options.LeaseRenewInterval >= options.LeaseDuration)
+        {
+            throw new InvalidOperationException(
+                $"{VideoConversionOptions.SectionName}:LeaseRenewInterval must be positive and shorter than LeaseDuration.");
+        }
+
         services.AddSingleton(options);
         services.AddSingleton<VideoConversionSignal>();
+        services.AddSingleton<VideoConversionInstance>();
         services.AddSingleton<FfmpegVideoTranscoder>();
         services.AddScoped<IVideoConversionQueue, EfVideoConversionQueue>();
         services.AddScoped<VideoConversionProcessor>();
         if (options.Enabled && options.RunInBackground)
         {
-            // A single worker: conversions run one at a time.
+            // One worker per instance, one conversion at a time; instances share the queue through leases.
             services.AddHostedService<VideoConversionWorker>();
         }
     }
