@@ -71,7 +71,6 @@ services:
       dockerfile: Dockerfile
     environment: *api-environment
     volumes:
-      - aspnet-data-protection:/root/.aspnet/DataProtection-Keys
       - platform-videos:/var/sipat/videos
       - video-work:/var/sipat/video-work
     expose:
@@ -118,7 +117,6 @@ services:
 
 volumes:
   postgres-data:
-  aspnet-data-protection:
   platform-videos:
   video-work:
 

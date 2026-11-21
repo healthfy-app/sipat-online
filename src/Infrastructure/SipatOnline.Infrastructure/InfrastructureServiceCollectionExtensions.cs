@@ -2,6 +2,7 @@ using Amazon.Runtime;
 using Amazon.S3;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using FluentValidation;
+using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
@@ -120,6 +121,11 @@ public static class InfrastructureServiceCollectionExtensions
                 builder.ConnectionString,
                 npgsql => npgsql.MigrationsAssembly(typeof(PlatformDbContext).Assembly.FullName));
         });
+
+        // Keys live in the database so every instance (and every restart) reads the same ring.
+        services.AddDataProtection()
+            .SetApplicationName(DataProtectionSetup.ApplicationName)
+            .PersistKeysToDbContext<PlatformDbContext>();
 
         services.AddIdentity<PlatformIdentityUser, IdentityRole<Guid>>(options =>
             {

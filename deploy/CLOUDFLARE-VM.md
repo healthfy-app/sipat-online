@@ -153,5 +153,7 @@ docker compose --env-file deploy/.env.production -f deploy/compose.production.ya
 
 **Nesta versão o `db-init` é obrigatório, antes de subir a API nova.** Ele cria as tabelas `PlaybackGrants` (sessões de reprodução), `PlaybackQualitySessions` (medição de qualidade do vídeo) e `VideoConversionJobs` (fila de conversão), além do estado de conversão de cada vídeo. Sem elas, toda reprodução e todo envio de vídeo falham. Depois de subir a API nova, rode `--convert-catalog-videos` (seção 5) para gerar a 480p dos vídeos antigos. Rode o `db-init` primeiro e só depois o `up --build -d api web`.
 
+As chaves de proteção de dados (que assinam os cookies de login) agora ficam no banco, e o `db-init` cria a primeira. O volume `aspnet-data-protection` não é mais usado: depois da atualização ele pode ser removido com `docker volume rm` (o nome leva o prefixo do projeto do compose). Quem estava logado precisa entrar de novo uma única vez.
+
 ## Limites desta topologia
 Uma VM, sem alta disponibilidade, banco não gerenciado e sem CDN para vídeo. Para o MVP e um cliente de 600+ pessoas é um começo razoável, desde que haja cópia externa testada e um plano para o dia do pico.
