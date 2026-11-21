@@ -1,4 +1,4 @@
-import type { PlatformCourseStatus } from '../api';
+import { isExtra, videoProvider, type PlatformCourseStatus, type VideoProvider } from '../api';
 
 export type CourseOption = '1' | '2' | '3';
 
@@ -41,4 +41,19 @@ export function formatCourseOption(option: CourseOption | null, description: str
 
 export function pluralize(count: number, singular: string, plural: string): string {
   return `${count} ${count === 1 ? singular : plural}`;
+}
+
+/** The videos that count for progress and the certificate: YouTube and Vimeo extras never do. */
+export function houseVideos<T extends { provider?: string }>(videos: T[]): T[] {
+  return videos.filter((video) => !isExtra(video));
+}
+
+/** " + 1 extra" / " + 3 extras", or nothing when there are none. */
+export function extrasSuffix(extras: number): string {
+  return extras > 0 ? ` + ${pluralize(extras, 'extra', 'extras')}` : '';
+}
+
+/** Where the duration usually goes: an extra without a known duration shows its provider instead. */
+export function durationLabel(video: { provider?: VideoProvider; durationMilliseconds: number }): string {
+  return isExtra(video) && video.durationMilliseconds <= 0 ? videoProvider(video) : formatDuration(video.durationMilliseconds);
 }

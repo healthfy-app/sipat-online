@@ -164,6 +164,11 @@
   font: 600 14px/1.2 'Geist', system-ui, sans-serif; cursor: pointer;
 }
 .sipat-player-retry:focus-visible { outline: 2px solid var(--sipat-player-signal); outline-offset: 2px; }
+/* external provider player: the provider's iframe fills the same frame */
+.sipat-player-embed { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.sipat-player-link { text-decoration: none; }
+.sipat-player-outside { margin: 6px 0 0; font: 400 13px/1.4 'Geist', system-ui, sans-serif; color: inherit; opacity: 0.75; }
+.sipat-player-outside a { color: inherit; text-decoration: underline; }
 /* the activity brings its own stage; this only keeps its place inside the frame */
 .sipat-player-activity { display: contents; }
 

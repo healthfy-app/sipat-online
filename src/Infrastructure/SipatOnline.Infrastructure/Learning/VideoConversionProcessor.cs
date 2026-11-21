@@ -21,6 +21,7 @@ public sealed class VideoConversionProcessor(
 
     private const int VideoErrorLength = 500;
     private const int JobErrorLength = 2000;
+    private const string SipatProvider = nameof(VideoProvider.Sipat);
     private const string Ready = nameof(PlatformVideoStatus.Ready);
     private const string Processing = nameof(PlatformVideoStatus.Processing);
     private const string FailedVideo = nameof(PlatformVideoStatus.Failed);
@@ -102,7 +103,7 @@ public sealed class VideoConversionProcessor(
             .Where(job => job.Status == VideoConversionJobEntity.Pending || job.Status == VideoConversionJobEntity.Running)
             .Select(job => job.VideoId);
         var videoIds = await db.PlatformCourseVideos.AsNoTracking()
-            .Where(video => video.Status == Ready && !video.HasSd480 && !queued.Contains(video.Id))
+            .Where(video => video.Provider == SipatProvider && video.Status == Ready && !video.HasSd480 && !queued.Contains(video.Id))
             .OrderBy(video => video.CreatedAt)
             .ThenBy(video => video.Id)
             .Select(video => video.Id)

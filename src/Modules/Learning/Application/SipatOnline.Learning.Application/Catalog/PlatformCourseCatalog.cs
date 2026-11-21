@@ -54,7 +54,9 @@ public sealed record PlatformCourseVideo(
     string? LibraryTitle = null,
     PlatformVideoStatus Status = PlatformVideoStatus.Ready,
     string? ProcessingError = null,
-    bool HasSd480 = false);
+    bool HasSd480 = false,
+    VideoProvider Provider = VideoProvider.Sipat,
+    string? ExternalId = null);
 
 /// <summary>A video is "Processing" while it is converted; only "Ready" videos can enter a Day.</summary>
 public enum PlatformVideoStatus

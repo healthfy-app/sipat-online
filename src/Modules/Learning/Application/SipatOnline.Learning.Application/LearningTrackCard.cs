@@ -31,7 +31,10 @@ public sealed record LearningLessonProgress(
     bool IsCompleted,
     DateTimeOffset? CompletedAt,
     string? SectionTitle = null,
-    long WatchedMilliseconds = 0);
+    long WatchedMilliseconds = 0,
+    bool IsBonus = false,
+    string? Provider = null,
+    string? ExternalId = null);
 
 public sealed record LearningExperience(
     LearningTrackCard Track,
@@ -53,7 +56,8 @@ public sealed record LearningLessonContext(
     Guid RevisionId,
     Guid LessonId,
     string ProviderAssetReference,
-    long DurationMilliseconds);
+    long DurationMilliseconds,
+    bool IsBonus = false);
 
 public sealed record LearningParticipantReport(
     Guid ParticipantId,

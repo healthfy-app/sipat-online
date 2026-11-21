@@ -169,9 +169,10 @@ export function getLearningActivities(trackId: string): Promise<{ revisionId: st
   return requestJson(`/api/learning/tracks/${trackId}/activities`);
 }
 
-export function saveLearningActivityOutcome(trackId: string, activityId: string, outcome: string): Promise<{ saved: boolean }> {
+/** A checkpoint outcome names its lesson: the server refuses it (409 `learning.activity.stale`) when the list changed. */
+export function saveLearningActivityOutcome(trackId: string, activityId: string, outcome: string, lessonId?: string): Promise<{ saved: boolean }> {
   return requestJson(`/api/learning/tracks/${trackId}/activities/${activityId}/outcome`, {
-    method: 'PUT', body: JSON.stringify({ outcome }),
+    method: 'PUT', body: JSON.stringify(lessonId ? { outcome, lessonId } : { outcome }),
   });
 }
 
@@ -293,6 +294,20 @@ export interface PlatformCourseVideo {
   checkpoints: VideoCheckpoint[];
   lessonId?: string | null;
   libraryTitle?: string | null;
+  /** Missing in payloads from before external videos: read it with `videoProvider`. */
+  provider?: VideoProvider;
+  externalId?: string | null;
+}
+
+export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo';
+
+export function videoProvider(video: { provider?: VideoProvider }): VideoProvider {
+  return video.provider ?? 'Sipat';
+}
+
+/** A YouTube or Vimeo video: an appendix of the Assunto that never counts for progress or the certificate. */
+export function isExtra(video: { provider?: string }): boolean {
+  return (video.provider ?? 'Sipat') !== 'Sipat';
 }
 
 export interface PlatformLibraryVideo {
@@ -507,6 +522,10 @@ export interface LearningLessonProgress {
   completedAt: string | null;
   sectionTitle?: string | null;
   watchedMilliseconds?: number;
+  /** An extra (YouTube or Vimeo): never counts for progress. Missing in payloads from before external videos. */
+  isBonus?: boolean;
+  provider?: 'YouTube' | 'Vimeo' | null;
+  externalId?: string | null;
 }
 
 export interface LearningExperience {
@@ -538,6 +557,7 @@ export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = 'ApiError';
@@ -557,16 +577,18 @@ export function getCompanyAdministrationId(): string | null {
 async function readError(response: Response): Promise<ApiError> {
   let message = `Não foi possível concluir a solicitação (HTTP ${response.status}).`;
 
+  let code: string | undefined;
   try {
-    const problem = (await response.json()) as { detail?: string; title?: string };
+    const problem = (await response.json()) as { detail?: string; title?: string; code?: string };
     message = problem.detail ?? problem.title ?? message;
+    code = problem.code;
   } catch (error) {
     if (!(error instanceof SyntaxError)) {
       throw error;
     }
   }
 
-  return new ApiError(message, response.status);
+  return new ApiError(message, response.status, code);
 }
 
 async function getAntiforgeryToken(): Promise<string> {
@@ -817,6 +839,18 @@ export function uploadPlatformVideo(
       : '/api/platform/catalog/videos',
     { method: 'POST', body: formData },
   );
+}
+
+export function createExternalPlatformVideo(data: {
+  provider: 'YouTube' | 'Vimeo';
+  url: string;
+  title: string;
+  durationMilliseconds: number | null;
+}): Promise<PlatformCourseVideo> {
+  return requestJson<PlatformCourseVideo>('/api/platform/catalog/videos/external', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 }
 
 export function setPlatformCourseCover(courseId: string, file: File): Promise<PlatformCourse> {

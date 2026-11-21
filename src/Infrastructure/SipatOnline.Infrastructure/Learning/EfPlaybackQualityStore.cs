@@ -15,7 +15,7 @@ public sealed class EfPlaybackQualityStore(PlatformDbContext dbContext, TimeProv
         CancellationToken cancellationToken)
     {
         var lesson = await dbContext.LearningLessons.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && item.Id == report.LessonId)
+            .Where(item => item.TenantId == tenantId && item.Id == report.LessonId && !item.IsBonus)
             .Select(item => new { item.TrackId, item.ProviderAssetReference })
             .FirstOrDefaultAsync(cancellationToken);
         if (lesson is null)

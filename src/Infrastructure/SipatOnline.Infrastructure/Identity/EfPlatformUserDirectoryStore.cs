@@ -191,7 +191,7 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
             .Select(revision => revision.Id)
             .ToArrayAsync(cancellationToken);
         var lessonCounts = await dbContext.LearningLessons.AsNoTracking()
-            .Where(lesson => lesson.TenantId == tenantId && publishedRevisionIds.Contains(lesson.RevisionId))
+            .Where(lesson => lesson.TenantId == tenantId && publishedRevisionIds.Contains(lesson.RevisionId) && !lesson.IsBonus)
             .GroupBy(lesson => lesson.RevisionId)
             .Select(group => new RevisionLessonCount(group.Key, group.Count()))
             .ToListAsync(cancellationToken);
@@ -220,7 +220,8 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
                 dbContext.LearningLessons.Any(lesson =>
                     lesson.TenantId == tenantId &&
                     lesson.RevisionId == progress.RevisionId &&
-                    lesson.Id == progress.LessonId))
+                    lesson.Id == progress.LessonId &&
+                    !lesson.IsBonus))
             .Select(progress => new CompletedLessonRow(
                 progress.ParticipantId,
                 progress.RevisionId,

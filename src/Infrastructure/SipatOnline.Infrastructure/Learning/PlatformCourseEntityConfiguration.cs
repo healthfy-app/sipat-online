@@ -50,7 +50,12 @@ public sealed class PlatformCourseVideoEntityConfiguration :
         builder.Property(video => video.Status).HasMaxLength(16).IsRequired().HasDefaultValue("Ready");
         builder.Property(video => video.ProcessingError).HasMaxLength(500);
         builder.Property(video => video.HasSd480).IsRequired().HasDefaultValue(false);
+        builder.Property(video => video.Provider).HasMaxLength(16).IsRequired().HasDefaultValue("Sipat");
+        builder.Property(video => video.ExternalId).HasMaxLength(32);
         builder.HasIndex(video => video.CreatedAt);
+        builder.HasIndex(video => new { video.Provider, video.ExternalId })
+            .IsUnique()
+            .HasFilter("\"ExternalId\" IS NOT NULL");
     }
 }
 

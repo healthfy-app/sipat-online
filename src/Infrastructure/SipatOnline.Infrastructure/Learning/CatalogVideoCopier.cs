@@ -31,8 +31,10 @@ public sealed class CatalogVideoCopier(
 
     public async Task<IReadOnlyList<CatalogVideoCopyLine>> CopyAllAsync(CancellationToken cancellationToken)
     {
+        var sipat = nameof(VideoProvider.Sipat);
         var videos = await db.PlatformCourseVideos
             .AsNoTracking()
+            .Where(video => video.Provider == sipat)
             .OrderBy(video => video.CreatedAt)
             .ThenBy(video => video.Id)
             .ToListAsync(cancellationToken);

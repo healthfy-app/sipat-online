@@ -56,7 +56,7 @@ public sealed class LearningLessonEntityConfiguration : IEntityTypeConfiguration
         {
             table.HasCheckConstraint(
                 "CK_LearningLessons_Duration",
-                "\"DurationMilliseconds\" > 0");
+                "\"DurationMilliseconds\" > 0 OR (\"IsBonus\" AND \"DurationMilliseconds\" = 0)");
             table.HasCheckConstraint(
                 "CK_LearningLessons_Position",
                 "\"Position\" > 0");

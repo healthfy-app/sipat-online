@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Infrastructure.Identity;
 using SipatOnline.Learning.Application;
+using SipatOnline.Learning.Application.Catalog;
 using SipatOnline.Learning.Domain.Assignments;
 using SipatOnline.Learning.Domain.Progress;
 using SipatOnline.Learning.Domain.Tracks;
@@ -82,7 +83,8 @@ public sealed class EfLearningStore(
                 dbContext.LearningLessons.Count(lesson =>
                     lesson.TenantId == tenantId.Value &&
                     lesson.TrackId == track.Id &&
-                    lesson.RevisionId == track.CurrentRevisionId),
+                    lesson.RevisionId == track.CurrentRevisionId &&
+                    !lesson.IsBonus),
                 track.CurrentRevisionId != null))
             .ToListAsync(cancellationToken);
 
@@ -276,15 +278,19 @@ public sealed class EfLearningStore(
                 revision.Status == nameof(LearningTrackRevisionStatus.Published))
             .Select(revision => revision.Id)
             .ToArrayAsync(cancellationToken);
+        // extras are left out of every number: only house lessons and their progress count
         var lessons = await dbContext.LearningLessons.AsNoTracking()
-            .Where(lesson => lesson.TenantId == tenantId.Value && publishedRevisionIds.Contains(lesson.RevisionId))
+            .Where(lesson => lesson.TenantId == tenantId.Value && publishedRevisionIds.Contains(lesson.RevisionId) && !lesson.IsBonus)
             .ToListAsync(cancellationToken);
-        var progress = await dbContext.LearningProgress.AsNoTracking()
+        var countedLessonIds = lessons.Select(lesson => lesson.Id).ToHashSet();
+        var progress = (await dbContext.LearningProgress.AsNoTracking()
             .Where(item =>
                 item.TenantId == tenantId.Value &&
                 participantIds.Contains(item.ParticipantId) &&
                 publishedRevisionIds.Contains(item.RevisionId))
-            .ToListAsync(cancellationToken);
+            .ToListAsync(cancellationToken))
+            .Where(item => countedLessonIds.Contains(item.LessonId))
+            .ToList();
 
         var lessonsByRevision = lessons.GroupBy(lesson => lesson.RevisionId)
             .ToDictionary(group => group.Key, group => group.ToArray());
@@ -388,6 +394,7 @@ public sealed class EfLearningStore(
         {
             progressEntities.TryGetValue(entity.Id, out var progress);
             var domainProgress = progress is null ? null : ToDomain(progress);
+            var external = LessonReference.TryParseExternal(entity.ProviderAssetReference, out var provider, out var externalId);
             return new LearningLessonProgress(
                 entity.Id,
                 entity.Title,
@@ -399,14 +406,17 @@ public sealed class EfLearningStore(
                 domainProgress?.IsCompleted ?? false,
                 domainProgress?.CompletedAt,
                 entity.SectionTitle,
-                domainProgress?.WatchedMilliseconds ?? 0);
+                domainProgress?.WatchedMilliseconds ?? 0,
+                entity.IsBonus,
+                external ? provider.ToString() : null,
+                external ? externalId : null);
         }).ToArray();
 
-        var totalDuration = lessonEntities.Sum(lesson => lesson.DurationMilliseconds);
-        var watchedDuration = progressEntities.Values
-            .Select(ToDomain)
-            .Sum(progress => progress.WatchedMilliseconds);
-        var completed = lessons.Count(lesson => lesson.IsCompleted);
+        // extras are listed in their place but never counted
+        var counted = lessons.Where(lesson => !lesson.IsBonus).ToArray();
+        var totalDuration = counted.Sum(lesson => lesson.DurationMilliseconds);
+        var watchedDuration = counted.Sum(lesson => lesson.WatchedMilliseconds);
+        var completed = counted.Count(lesson => lesson.IsCompleted);
         var hasCover = await dbContext.LearningContentSnapshots.AsNoTracking().AnyAsync(
             item => item.TenantId == tenantId.Value && item.RevisionId == revision.Id && item.CoverData != null, cancellationToken);
         var sipat = await dbContext.SipatEvents.AsNoTracking()
@@ -419,9 +429,9 @@ public sealed class EfLearningStore(
             trackEntity.Title,
             trackEntity.Description,
             revision.RevisionNumber,
-            lessons.Length,
+            counted.Length,
             completed,
-            lessons.Length > 0 && completed == lessons.Length
+            counted.Length > 0 && completed == counted.Length
                 ? 100
                 : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
             hasCover ? $"/api/learning/tracks/{trackId:D}/cover" : null,
@@ -472,7 +482,8 @@ public sealed class EfLearningStore(
                 lesson.RevisionId,
                 lesson.Id,
                 lesson.ProviderAssetReference,
-                lesson.DurationMilliseconds);
+                lesson.DurationMilliseconds,
+                lesson.IsBonus);
     }
 
     public async Task<LearningProgress?> FindProgressAsync(
@@ -565,7 +576,8 @@ public sealed class EfLearningStore(
             entity.Description,
             entity.ProviderAssetReference,
             entity.DurationMilliseconds,
-            entity.Position);
+            entity.Position,
+            entity.IsBonus);
         if (!result.IsSuccess)
         {
             throw new InvalidOperationException(
@@ -640,7 +652,8 @@ public sealed class EfLearningStore(
             Description = lesson.Description,
             ProviderAssetReference = lesson.ProviderAssetReference,
             DurationMilliseconds = lesson.DurationMilliseconds,
-            Position = lesson.Position
+            Position = lesson.Position,
+            IsBonus = lesson.IsBonus
         };
 
     private static LearningAssignmentEntity ToEntity(LearningAssignment assignment) =>
