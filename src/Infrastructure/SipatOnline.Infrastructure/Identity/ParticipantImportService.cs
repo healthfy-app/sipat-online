@@ -81,6 +81,7 @@ public sealed class ParticipantImportService(
             }
         }
 
+        db.ChangeTracker.Clear();
         // people who arrive while a training is live start with its days already there
         if (result.Created > 0) await distribution.EnsureAssignmentsAsync(tenant.Value, null, token);
         return Result<ImportResult>.Success(result);
@@ -228,6 +229,9 @@ public sealed class ParticipantImportService(
             if (name is not null && !user.DisplayNameLocked && user.DisplayName != name) { user.DisplayName = name; changed = true; }
             if (newRegistration is not null && user.RegistrationNumber != newRegistration)
             {
+                // the number it leaves is free again for a later line of the sheet
+                if (user.RegistrationNumber is { } previous && registrations.TryGetValue(previous, out var previousHolder) && previousHolder.Person?.User.Id == user.Id)
+                    registrations.Remove(previous);
                 user.RegistrationNumber = newRegistration;
                 registrations[newRegistration] = new RegistrationOwner(person, row.Row);
                 changed = true;
@@ -237,6 +241,7 @@ public sealed class ParticipantImportService(
             if (phone.Value.Value is { } newPhone && user.Phone != newPhone) { user.Phone = newPhone; changed = true; }
             if (unitId is not null && user.UnitId != unitId) { user.UnitId = unitId; changed = true; }
             if (sectorId is not null && user.SectorId != sectorId) { user.SectorId = sectorId; changed = true; }
+            if (changed) user.ConcurrencyStamp = Guid.NewGuid().ToString();
             return new Updated(changed) { SheetKey = sheetKey };
         }
 

@@ -354,6 +354,72 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
         await SignInAsync(participant, "M601", Password);
     }
 
+    [DockerFact]
+    public async Task Import_UpdatesUnlockedNameButKeepsLockedName()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await ProvisionAsync(admin, token, "livre", "Nome Antigo");
+        await ProvisionAsync(admin, token, "travado", "Outro Antigo");
+        var locked = await FindUserAsync(factory, "travado");
+        using (var rename = await SendJsonAsync(admin, HttpMethod.Put, $"/api/admin/users/{locked.Id:D}/display-name", new ChangeDisplayNameRequest("Corrigido À Mão"), token))
+            Assert.Equal(HttpStatusCode.OK, rename.StatusCode);
+
+        var result = await ImportOkAsync(admin, token, false,
+            new ImportRow(2, "NOVO NOME DA SILVA", "livre", null, null, null, null, null, null),
+            new ImportRow(3, "NOME NOVO TRAVADO", "travado", null, null, null, null, null, null));
+
+        Assert.Equal(1, result.Updated);
+        Assert.Equal(1, result.Unchanged);
+        Assert.Equal("Novo Nome da Silva", (await FindUserAsync(factory, "livre")).DisplayName);
+        Assert.Equal("Corrigido À Mão", (await FindUserAsync(factory, "travado")).DisplayName);
+    }
+
+    [DockerFact]
+    public async Task DryRun_UpdateChangesNothing()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await AddSectorsAsync(admin, token, "Produção");
+        await ProvisionAsync(admin, token, "joao", "Joao Existente");
+        var before = await FindUserAsync(factory, "joao");
+
+        var result = await ImportOkAsync(admin, token, true,
+            new ImportRow(2, "JOAO NOVO", "joao", "77", "j@x.com", "11987654321", null, "Produção", null));
+
+        Assert.Equal(1, result.Updated);
+        var after = await FindUserAsync(factory, "joao");
+        Assert.Equal(before.DisplayName, after.DisplayName);
+        Assert.Null(after.RegistrationNumber);
+        Assert.Null(after.Email);
+        Assert.Null(after.Phone);
+        Assert.Null(after.SectorId);
+        Assert.Equal(before.ConcurrencyStamp, after.ConcurrencyStamp);
+    }
+
+    [DockerFact]
+    public async Task Import_UpdateRotatesStampAndFreesReplacedRegistration()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await ProvisionAsync(admin, token, "joao", "Joao Existente");
+        await SetRegistrationAsync(factory, "joao", "R0");
+        var before = await FindUserAsync(factory, "joao");
+
+        var result = await ImportOkAsync(admin, token, false,
+            new ImportRow(2, null, "joao", "R1", null, null, null, null, null),
+            Row(3, "Maria Nova") with { RegistrationNumber = "R0" });
+
+        Assert.Equal((1, 1), (result.Updated, result.Created));
+        Assert.Empty(result.Rejected);
+        var after = await FindUserAsync(factory, "joao");
+        Assert.Equal("R1", after.RegistrationNumber);
+        Assert.NotEqual(before.ConcurrencyStamp, after.ConcurrencyStamp);
+    }
+
     private static ImportRow Row(int row, string name) => new(row, name, null, null, null, null, null, null, Password);
 
     private static async Task<ImportResult> ImportOkAsync(HttpClient client, string token, bool dryRun, params ImportRow[] rows)
