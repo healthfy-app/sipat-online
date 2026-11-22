@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using SipatOnline.BuildingBlocks.Domain;
 
 namespace SipatOnline.Identity.Domain.Users;
@@ -11,7 +12,16 @@ public static class ProfileText
 {
     private const int MaximumRegistrationLength = 64;
 
+    public const string ScientificNotationMessage =
+        "A matrícula veio em notação científica (ex.: 1,23E+10). No Excel, formate a coluna como Texto e exporte de novo.";
+
     private static readonly HashSet<string> Particles = ["da", "de", "do", "das", "dos", "e"];
+
+    private static readonly Regex ScientificNotation = new(@"^\d+([.,]\d+)?[eE][+-]?\d+$", RegexOptions.CultureInvariant);
+
+    /// <summary>A number Excel wrote as <c>1,23E+10</c>: the digits it stood for are already lost, so it must be exported again as text.</summary>
+    public static bool IsScientificNotation(string? value) =>
+        !string.IsNullOrWhiteSpace(value) && ScientificNotation.IsMatch(value.Trim());
 
     public static string PersonName(string value)
     {
@@ -30,6 +40,12 @@ public static class ProfileText
         if (string.IsNullOrWhiteSpace(value))
         {
             return Result<OptionalText>.Success(new OptionalText(null));
+        }
+
+        if (IsScientificNotation(value))
+        {
+            return Result<OptionalText>.Failure(
+                new DomainError("profile.registration.invalid", ScientificNotationMessage));
         }
 
         var cleaned = new string(value.Where(char.IsLetterOrDigit).ToArray()).ToUpperInvariant();

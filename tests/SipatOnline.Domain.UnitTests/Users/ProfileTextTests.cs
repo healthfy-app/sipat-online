@@ -22,6 +22,25 @@ public sealed class ProfileTextTests
     [Fact]
     public void RegistrationNumber_OnlySymbols_Fails() => Assert.Equal("profile.registration.invalid", ProfileText.RegistrationNumber(".-").Error.Code);
 
+    [Theory]
+    [InlineData("1,23E+10")]
+    [InlineData("1.23e10")]
+    [InlineData("123E-5")]
+    [InlineData(" 4,5E+11 ")]
+    public void RegistrationNumber_ScientificNotation_FailsWithExcelHint(string input)
+    {
+        var error = ProfileText.RegistrationNumber(input).Error;
+        Assert.Equal("profile.registration.invalid", error.Code);
+        Assert.Equal("A matrícula veio em notação científica (ex.: 1,23E+10). No Excel, formate a coluna como Texto e exporte de novo.", error.Message);
+    }
+
+    [Theory]
+    [InlineData("12E")]
+    [InlineData("A1E5")]
+    [InlineData("E10")]
+    [InlineData("12.345-6")]
+    public void IsScientificNotation_IgnoresOtherCodes(string input) => Assert.False(ProfileText.IsScientificNotation(input));
+
     [Fact]
     public void RegistrationNumber_TooLong_Fails() => Assert.Equal("profile.registration.invalid", ProfileText.RegistrationNumber(new string('1', 65)).Error.Code);
 

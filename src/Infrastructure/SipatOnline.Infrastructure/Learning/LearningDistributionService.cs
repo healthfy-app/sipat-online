@@ -222,7 +222,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
 
         await db.SaveChangesAsync(token);
         // people who joined after the SIPAT was first delivered get its days now
-        await EnsureAssignmentsAsync(tenantId, null, token);
+        await EnsureAssignmentsAsync(tenantId, onlyParticipantId: null, token);
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(tenantId), auditAction,
             auditSubjectType, auditSubjectId.ToString("D"), clock.GetUtcNow()), token);
         await db.SaveChangesAsync(token);
@@ -237,11 +237,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
     public async Task<int> EnsureAssignmentsAsync(Guid tenantId, Guid? onlyParticipantId, CancellationToken token)
     {
         var now = clock.GetUtcNow();
-        var trackIds = await (
-            from track in db.LearningTracks.AsNoTracking()
-            join sipat in db.SipatEvents.AsNoTracking() on track.SipatEventId equals sipat.Id
-            where track.TenantId == tenantId && sipat.TenantId == tenantId && sipat.Status == SipatEventStatus.Published && sipat.EndsAt > now
-            select track.Id).ToArrayAsync(token);
+        var trackIds = await LiveTrackIdsAsync(tenantId, now, token);
         if (trackIds.Length == 0) return 0;
 
         var people = db.Users.AsNoTracking().Where(item => item.TenantId == tenantId && item.IsActive);
@@ -268,6 +264,52 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         if (added > 0) await db.SaveChangesAsync(token);
         return added;
     }
+
+    /// <summary>
+    /// The same, for the people just created (an import): only they are looked at, and whether each is an active
+    /// participant comes from one query for all of them instead of one per person.
+    /// </summary>
+    public async Task<int> EnsureAssignmentsAsync(Guid tenantId, IReadOnlyCollection<Guid> participantIds, CancellationToken token)
+    {
+        if (participantIds.Count == 0) return 0;
+        var now = clock.GetUtcNow();
+        var trackIds = await LiveTrackIdsAsync(tenantId, now, token);
+        if (trackIds.Length == 0) return 0;
+
+        var ids = participantIds.Distinct().ToArray();
+        var participantRole = PlatformRoles.Participant.ToUpperInvariant();
+        var active = await db.Users.AsNoTracking()
+            .Where(user => user.TenantId == tenantId && user.IsActive && ids.Contains(user.Id) && db.UserRoles.Any(link =>
+                link.UserId == user.Id && db.Roles.Any(role => role.Id == link.RoleId && role.NormalizedName == participantRole)))
+            .Select(user => user.Id).ToArrayAsync(token);
+        if (active.Length == 0) return 0;
+
+        var known = (await db.LearningAssignments.AsNoTracking()
+            .Where(item => item.TenantId == tenantId && trackIds.Contains(item.TrackId) && active.Contains(item.ParticipantId))
+            .Select(item => new { item.TrackId, item.ParticipantId }).ToArrayAsync(token))
+            .Select(item => (item.TrackId, item.ParticipantId)).ToHashSet();
+
+        var tenant = new TenantId(tenantId);
+        var added = 0;
+        foreach (var participantId in active)
+        {
+            foreach (var trackId in trackIds.Where(id => !known.Contains((id, participantId))))
+            {
+                await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, trackId, participantId, now).Value, token);
+                added++;
+            }
+        }
+
+        if (added > 0) await db.SaveChangesAsync(token);
+        return added;
+    }
+
+    /// <summary>The tracks of the company's SIPATs that are published and not over yet.</summary>
+    private Task<Guid[]> LiveTrackIdsAsync(Guid tenantId, DateTimeOffset now, CancellationToken token) => (
+        from track in db.LearningTracks.AsNoTracking()
+        join sipat in db.SipatEvents.AsNoTracking() on track.SipatEventId equals sipat.Id
+        where track.TenantId == tenantId && sipat.TenantId == tenantId && sipat.Status == SipatEventStatus.Published && sipat.EndsAt > now
+        select track.Id).ToArrayAsync(token);
 
     /// <summary>
     /// Replaces the lessons and activities of a day's track. Once some participant has progress in it, only extras

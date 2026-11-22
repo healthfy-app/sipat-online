@@ -10,7 +10,8 @@ namespace SipatOnline.Infrastructure.Identity;
 /// <summary>A line of the HR sheet. <c>Row</c> is its number in the sheet; a blank or missing cell means "not informed".</summary>
 public sealed record ImportRow(int Row, string? Name, string? Login, string? RegistrationNumber, string? Email, string? Phone, string? Unit, string? Sector, string? Password);
 
-public sealed record ImportRequest(bool DryRun, IReadOnlyList<ImportRow> Rows);
+/// <summary><c>CreateOnly</c> is the form of one person: a line that names someone who already exists is refused instead of updating them.</summary>
+public sealed record ImportRequest(bool DryRun, IReadOnlyList<ImportRow> Rows, bool CreateOnly = false);
 
 public sealed record ImportRejection(int Row, string? Login, string Message);
 
@@ -22,7 +23,7 @@ public sealed record ImportResult(int Created, int Updated, int Unchanged, IRead
 /// <summary>
 /// The HR sheet of participants: each line updates the participant it names (by login, or registration when there is no login)
 /// or creates a new one. A blank cell never erases what is there, the login of whoever exists never changes, and administrators
-/// are never touched. The preview runs the same rules and saves nothing; the save is one transaction.
+/// are never touched. The preview runs the same rules and saves nothing; each save call is one transaction (the front sends a big sheet in chunks of 100 lines, to fit the request timeout).
 /// </summary>
 public sealed class ParticipantImportService(
     PlatformDbContext db,
@@ -39,6 +40,10 @@ public sealed class ParticipantImportService(
     private const string LoginFallback = "participante";
     private const string InvalidEmailMessage = "O e-mail informado não é válido.";
     private const string RegistrationOfAnotherMessage = "A matrícula pertence a outro colaborador.";
+    /// <summary>U+FFFD, what a decoder leaves where a byte did not make sense (a Windows-1252 "í" read as UTF-8).</summary>
+    private const char ReplacementCharacter = (char)0xFFFD;
+    private const string UnreadableMessage = "A linha tem caracteres ilegíveis. Salve a planilha como .xlsx ou CSV UTF-8 e envie de novo.";
+    private const string AlreadyExistsMessage = "Já existe um colaborador com esse login ou matrícula.";
 
     public async Task<Result<ImportResult>> ImportAsync(ImportRequest request, CancellationToken token)
     {
@@ -51,7 +56,7 @@ public sealed class ParticipantImportService(
             return Failure("import.too_many_rows", $"A carga aceita no máximo {MaximumRows} linhas.");
 
         var company = await LoadAsync(tenant.Value, request.DryRun, token);
-        var plan = await PlanAsync(rows, company, token);
+        var plan = await PlanAsync(rows, company, request.CreateOnly, token);
         var result = new ImportResult(plan.Creates.Count, plan.Updated, plan.Unchanged, plan.Rejected,
             plan.Creates.Select(item => item.Credential).ToArray());
         if (request.DryRun) return Result<ImportResult>.Success(result);
@@ -83,7 +88,7 @@ public sealed class ParticipantImportService(
 
         db.ChangeTracker.Clear();
         // people who arrive while a training is live start with its days already there
-        if (result.Created > 0) await distribution.EnsureAssignmentsAsync(tenant.Value, null, token);
+        if (result.Created > 0) await distribution.EnsureAssignmentsAsync(tenant.Value, plan.Creates.Select(item => item.User.Id).ToArray(), token);
         return Result<ImportResult>.Success(result);
     }
 
@@ -112,7 +117,7 @@ public sealed class ParticipantImportService(
         }
     }
 
-    private async Task<Plan> PlanAsync(IReadOnlyList<ImportRow> rows, Company company, CancellationToken token)
+    private async Task<Plan> PlanAsync(IReadOnlyList<ImportRow> rows, Company company, bool createOnly, CancellationToken token)
     {
         var plan = new Plan();
         var now = clock.GetUtcNow();
@@ -129,7 +134,7 @@ public sealed class ParticipantImportService(
         var registrations = new Dictionary<string, RegistrationOwner>(company.Registrations, StringComparer.Ordinal);
         foreach (var row in rows)
         {
-            var outcome = await EvaluateAsync(row, company, takenLogins, firstRowOf, registrations, now, token);
+            var outcome = await EvaluateAsync(row, company, createOnly, takenLogins, firstRowOf, registrations, now, token);
             switch (outcome)
             {
                 case Rejected rejected:
@@ -150,10 +155,14 @@ public sealed class ParticipantImportService(
         return plan;
     }
 
-    private async Task<Outcome> EvaluateAsync(ImportRow row, Company company, HashSet<string> takenLogins,
+    private async Task<Outcome> EvaluateAsync(ImportRow row, Company company, bool createOnly, HashSet<string> takenLogins,
         Dictionary<string, int> firstRowOf, Dictionary<string, RegistrationOwner> registrations, DateTimeOffset now, CancellationToken token)
     {
-        // 1. standardize
+        // 1. standardize: a sheet read in the wrong encoding, or numbers Excel turned into 1,23E+10, would be saved wrong
+        if (new[] { row.Name, row.Login, row.RegistrationNumber, row.Email, row.Phone, row.Unit, row.Sector, row.Password }
+            .Any(value => value?.Contains(ReplacementCharacter) == true))
+            return new Rejected(Trimmed(row.Login), UnreadableMessage);
+        if (ProfileText.IsScientificNotation(row.Login)) return new Rejected(Trimmed(row.Login), ProfileText.ScientificNotationMessage);
         var registration = ProfileText.RegistrationNumber(row.RegistrationNumber);
         if (!registration.IsSuccess) return new Rejected(Trimmed(row.Login), registration.Error.Message);
         var phone = ProfileText.Phone(row.Phone);
@@ -178,6 +187,10 @@ public sealed class ParticipantImportService(
         var shownLogin = login?.Value;
         var newRegistration = registration.Value.Value;
         company.People.TryGetValue(login?.NormalizedValue ?? string.Empty, out var byLogin);
+        // older logins are the registration as it was typed ("12.345-6"), before registrations were standardized
+        if (byLogin is null && IsBlank(row.Login) && !IsBlank(row.RegistrationNumber)
+            && LoginIdentifier.Create(row.RegistrationNumber) is { IsSuccess: true } typed)
+            company.People.TryGetValue(typed.Value.NormalizedValue, out byLogin);
         Person? person = null;
         if (IsBlank(row.Login) && newRegistration is not null && registrations.TryGetValue(newRegistration, out var owner))
         {
@@ -193,6 +206,9 @@ public sealed class ParticipantImportService(
             if (!byLogin.IsParticipant) return new Rejected(shownLogin, "Esse login é de um administrador.");
             person = byLogin;
         }
+
+        // the form of one person creates; it never overwrites someone who already exists
+        if (createOnly && person is not null) return new Rejected(shownLogin, AlreadyExistsMessage);
 
         // 6. the same person twice in the sheet
         var sheetKey = person is not null ? "login:" + person.User.NormalizedEmployeeIdentifier
@@ -255,7 +271,8 @@ public sealed class ParticipantImportService(
         if (rules.RequireSector && sectorId is null) return new Rejected(shownLogin, "Falta o setor, obrigatório nesta empresa.");
         if (newRegistration is not null && registrations.ContainsKey(newRegistration))
             return new Rejected(shownLogin, RegistrationOfAnotherMessage);
-        if (login is null && company.ParticipantNameKeys.Contains(ProfileText.CatalogKey(name)))
+        // without a login, a name already in the company is most likely that person under an older login or registration
+        if (IsBlank(row.Login) && company.ParticipantNameKeys.Contains(ProfileText.CatalogKey(name)))
             return new Rejected(null, "Já existe um colaborador com esse nome. Informe o login para atualizar.");
 
         if (login is null)

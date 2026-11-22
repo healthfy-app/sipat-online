@@ -342,13 +342,29 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
         var (admin, token) = await SignInAdminAsync(factory);
         var rows = Enumerable.Range(2, 600).Select(index => Row(index, $"Pessoa {index}") with { RegistrationNumber = $"M{index}" }).ToArray();
 
+        // the preview reads the whole sheet; the save goes in chunks of 100, as the front sends it
+        var preview = System.Diagnostics.Stopwatch.StartNew();
+        Assert.Equal(600, (await ImportOkAsync(admin, token, true, rows)).Created);
+        preview.Stop();
+        output.WriteLine($"processors={Environment.ProcessorCount}; preview of 600 in {preview.Elapsed.TotalSeconds:F1} s");
+
+        var created = 0;
+        var slowest = TimeSpan.Zero;
         var watch = System.Diagnostics.Stopwatch.StartNew();
-        var result = await ImportOkAsync(admin, token, false, rows);
+        foreach (var chunk in rows.Chunk(100))
+        {
+            var chunkWatch = System.Diagnostics.Stopwatch.StartNew();
+            var result = await ImportOkAsync(admin, token, false, chunk);
+            chunkWatch.Stop();
+            output.WriteLine($"chunk of {chunk.Length} saved in {chunkWatch.Elapsed.TotalSeconds:F1} s");
+            Assert.Empty(result.Rejected);
+            created += result.Created;
+            if (chunkWatch.Elapsed > slowest) slowest = chunkWatch.Elapsed;
+        }
         watch.Stop();
 
-        output.WriteLine($"600 new people imported in {watch.Elapsed.TotalSeconds:F1} s");
-        Assert.Equal(600, result.Created);
-        Assert.Empty(result.Rejected);
+        output.WriteLine($"600 new people saved in {watch.Elapsed.TotalSeconds:F1} s; slowest chunk {slowest.TotalSeconds:F1} s");
+        Assert.Equal(600, created);
         Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), $"took {watch.Elapsed.TotalSeconds:F1} s");
         using var participant = CreateClient(factory);
         await SignInAsync(participant, "M601", Password);
@@ -420,11 +436,133 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
         Assert.NotEqual(before.ConcurrencyStamp, after.ConcurrencyStamp);
     }
 
+    [DockerFact]
+    public async Task Import_UnreadableCharacters_RejectsTheLine()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await AddSectorsAsync(admin, token, "Produção");
+        const char Unreadable = (char)0xFFFD;
+        const string message = "A linha tem caracteres ilegíveis. Salve a planilha como .xlsx ou CSV UTF-8 e envie de novo.";
+
+        var result = await ImportOkAsync(admin, token, false,
+            Row(2, $"Jo{Unreadable}o Silva"),
+            Row(3, "Ana Boa") with { Sector = $"Produ{Unreadable}{Unreadable}o" },
+            Row(4, "Carla Reis") with { Sector = "Produção" });
+
+        Assert.Equal(1, result.Created);
+        Assert.Equal([new ImportRejection(2, null, message), new ImportRejection(3, null, message)], result.Rejected.ToArray());
+        Assert.Equal("carla.reis", Assert.Single(result.Credentials).Login);
+    }
+
+    [DockerFact]
+    public async Task Import_LegacyLoginTypedAsTheRegistration_UpdatesThatPerson()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await ProvisionAsync(admin, token, "12.345-6", "Joao Legado");
+        await ProvisionAsync(admin, token, "maria.antiga", "Maria Antiga");
+        var before = await CountUsersAsync(factory);
+
+        var result = await ImportOkAsync(admin, token, false,
+            new ImportRow(2, "JOAO LEGADO", null, "12.345-6", "joao@empresa.com", null, null, null, Password),
+            Row(3, "MARIA ANTIGA") with { RegistrationNumber = "999" });
+
+        Assert.Equal((0, 1), (result.Created, result.Updated));
+        Assert.Equal(new ImportRejection(3, null, "Já existe um colaborador com esse nome. Informe o login para atualizar."), Assert.Single(result.Rejected));
+        Assert.Equal(before, await CountUsersAsync(factory));
+        var joao = await FindUserAsync(factory, "12.345-6");
+        Assert.Equal("joao@empresa.com", joao.Email);
+        Assert.Equal("123456", joao.RegistrationNumber);
+    }
+
+    [DockerFact]
+    public async Task Import_CreateOnly_RefusesSomeoneWhoExists()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await ProvisionAsync(admin, token, "joao", "Joao Existente");
+        await ProvisionAsync(admin, token, "pedro", "Pedro Existente");
+        await SetRegistrationAsync(factory, "pedro", "55");
+        var before = await CountUsersAsync(factory);
+        const string message = "Já existe um colaborador com esse login ou matrícula.";
+
+        var byLogin = await ImportOkAsync(admin, token, new ImportRequest(false,
+            [new ImportRow(1, "Outro Nome", "joao", null, "outro@empresa.com", null, null, null, Password)], CreateOnly: true));
+        var byRegistration = await ImportOkAsync(admin, token, new ImportRequest(false,
+            [new ImportRow(1, "Mais Outro", null, "5.5", "mais@empresa.com", null, null, null, Password)], CreateOnly: true));
+        var someoneNew = await ImportOkAsync(admin, token, new ImportRequest(false, [Row(1, "Gente Nova")], CreateOnly: true));
+
+        Assert.Equal(new ImportRejection(1, "joao", message), Assert.Single(byLogin.Rejected));
+        Assert.Equal(message, Assert.Single(byRegistration.Rejected).Message);
+        Assert.Equal((0, 0, 0), (byLogin.Created + byRegistration.Created, byLogin.Updated + byRegistration.Updated, byLogin.Unchanged + byRegistration.Unchanged));
+        Assert.Equal("gente.nova", Assert.Single(someoneNew.Credentials).Login);
+        Assert.Equal(before + 1, await CountUsersAsync(factory));
+        var joao = await FindUserAsync(factory, "joao");
+        Assert.Equal("Joao Existente", joao.DisplayName);
+        Assert.Null(joao.Email);
+        Assert.Null((await FindUserAsync(factory, "pedro")).Email);
+    }
+
+    [DockerFact]
+    public async Task Import_ScientificNotation_RejectsTheLine()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        const string message = "A matrícula veio em notação científica (ex.: 1,23E+10). No Excel, formate a coluna como Texto e exporte de novo.";
+
+        var result = await ImportOkAsync(admin, token, false,
+            Row(2, "Ana Lima") with { RegistrationNumber = "1,23E+10" },
+            Row(3, "Bia Lima") with { Login = "4.5E+11" },
+            Row(4, "Cris Lima") with { RegistrationNumber = "12345678901" });
+
+        Assert.Equal(1, result.Created);
+        Assert.Equal([new ImportRejection(2, null, message), new ImportRejection(3, "4.5E+11", message)], result.Rejected.ToArray());
+    }
+
+    [DockerFact]
+    public async Task Import_NewPeopleOfAChunk_GetTheDaysAndNobodyElseIsTouched()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres, developmentSampleEnabled: true);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            // someone who had a day taken away on purpose must not get it back because others were imported
+            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            var demo = await db.Users.SingleAsync(user => user.EmployeeIdentifier == "participant-demo");
+            var assignment = await db.LearningAssignments.FirstAsync(item => item.ParticipantId == demo.Id);
+            db.LearningAssignments.Remove(assignment);
+            await db.SaveChangesAsync();
+        }
+
+        var result = await ImportOkAsync(admin, token, false, Row(2, "Rita Gomes"), Row(3, "Davi Gomes"));
+
+        Assert.Equal(2, result.Created);
+        await using var check = factory.Services.CreateAsyncScope();
+        var context = check.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var demoId = (await context.Users.SingleAsync(user => user.EmployeeIdentifier == "participant-demo")).Id;
+        var ritaId = (await context.Users.SingleAsync(user => user.EmployeeIdentifier == "rita.gomes")).Id;
+        var davi = (await context.Users.SingleAsync(user => user.EmployeeIdentifier == "davi.gomes")).Id;
+        var demoCount = await context.LearningAssignments.CountAsync(item => item.ParticipantId == demoId);
+        var ritaCount = await context.LearningAssignments.CountAsync(item => item.ParticipantId == ritaId);
+        Assert.True(ritaCount > 0);
+        Assert.Equal(ritaCount, await context.LearningAssignments.CountAsync(item => item.ParticipantId == davi));
+        Assert.Equal(ritaCount - 1, demoCount);
+    }
+
     private static ImportRow Row(int row, string name) => new(row, name, null, null, null, null, null, null, Password);
 
-    private static async Task<ImportResult> ImportOkAsync(HttpClient client, string token, bool dryRun, params ImportRow[] rows)
+    private static Task<ImportResult> ImportOkAsync(HttpClient client, string token, bool dryRun, params ImportRow[] rows) =>
+        ImportOkAsync(client, token, new ImportRequest(dryRun, rows));
+
+    private static async Task<ImportResult> ImportOkAsync(HttpClient client, string token, ImportRequest request)
     {
-        using var response = await SendJsonAsync(client, HttpMethod.Post, "/api/admin/users/import", new ImportRequest(dryRun, rows), token);
+        using var response = await SendJsonAsync(client, HttpMethod.Post, "/api/admin/users/import", request, token);
         Assert.True(response.StatusCode == HttpStatusCode.OK, $"{(int)response.StatusCode}: {await response.Content.ReadAsStringAsync()}");
         var result = await response.Content.ReadFromJsonAsync<ImportResult>();
         Assert.NotNull(result);

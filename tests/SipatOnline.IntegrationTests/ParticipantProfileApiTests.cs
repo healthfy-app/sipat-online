@@ -224,6 +224,48 @@ public sealed class ParticipantProfileApiTests
     }
 
     [DockerFact]
+    public async Task Profile_ScientificNotationRegistration_IsRefused()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await ProvisionAsync(admin, token, "ana", "Ana Souza");
+        var ana = await FindUserAsync(factory, "ana");
+
+        using var response = await SendJsonAsync(admin, HttpMethod.Put, $"/api/admin/users/{ana.Id:D}/profile",
+            new ChangeProfileRequest("1,23E+10", null, null, null, null), token);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problem = await response.Content.ReadFromJsonAsync<Microsoft.AspNetCore.Mvc.ProblemDetails>();
+        Assert.Equal("profile.registration.invalid", problem?.Title);
+        Assert.Equal("A matrícula veio em notação científica (ex.: 1,23E+10). No Excel, formate a coluna como Texto e exporte de novo.", problem?.Detail);
+        Assert.Null((await FindUserAsync(factory, "ana")).RegistrationNumber);
+    }
+
+    [DockerFact]
+    public async Task LoginChangeAndPasswordReset_LeaveAnAuditRow()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await ProvisionAsync(admin, token, "ana", "Ana Souza");
+        var ana = await FindUserAsync(factory, "ana");
+
+        using (var login = await SendJsonAsync(admin, HttpMethod.Put, $"/api/admin/users/{ana.Id:D}/login", new ChangeLoginRequest("ana.souza"), token))
+            Assert.Equal(HttpStatusCode.OK, login.StatusCode);
+        using (var sameLogin = await SendJsonAsync(admin, HttpMethod.Put, $"/api/admin/users/{ana.Id:D}/login", new ChangeLoginRequest("ANA.SOUZA"), token))
+            Assert.Equal(HttpStatusCode.OK, sameLogin.StatusCode);
+        using (var password = await SendJsonAsync(admin, HttpMethod.Put, $"/api/admin/users/{ana.Id:D}/password", new ResetPasswordRequest("NovaSenha456"), token))
+            Assert.Equal(HttpStatusCode.NoContent, password.StatusCode);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var subject = ana.Id.ToString("D");
+        Assert.Equal(1, await db.AuditEntries.CountAsync(entry => entry.Action == "identity.user.login_changed" && entry.SubjectId == subject));
+        Assert.Equal(1, await db.AuditEntries.CountAsync(entry => entry.Action == "identity.user.password_reset" && entry.SubjectId == subject));
+    }
+
+    [DockerFact]
     public async Task ManualRename_IsNotOverwrittenByImport()
     {
         await using var postgres = await StartPostgresAsync();
