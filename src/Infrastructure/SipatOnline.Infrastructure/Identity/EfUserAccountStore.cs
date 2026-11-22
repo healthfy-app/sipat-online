@@ -147,7 +147,12 @@ public sealed class EfUserAccountStore(
                 new DomainError("user.not_found", "O usuário não foi encontrado."));
         }
 
-        identityUser.DisplayName = user.DisplayName.Value;
+        if (!string.Equals(identityUser.DisplayName, user.DisplayName.Value, StringComparison.Ordinal))
+        {
+            identityUser.DisplayName = user.DisplayName.Value;
+            identityUser.DisplayNameLocked = true;
+        }
+
         identityUser.IsActive = user.IsActive;
         var updateResult = await userManager.UpdateAsync(identityUser);
         return updateResult.Succeeded

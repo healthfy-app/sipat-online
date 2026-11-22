@@ -15,6 +15,21 @@ public sealed class PlatformIdentityUserConfiguration : IEntityTypeConfiguration
         builder.Property(user => user.DisplayName).HasMaxLength(150).IsRequired();
         builder.Property(user => user.CreatedAt).IsRequired();
         builder.Property(user => user.IsActive).IsRequired();
+        builder.Property(user => user.RegistrationNumber).HasMaxLength(64);
+        builder.Property(user => user.Phone).HasMaxLength(16);
+        builder.Property(user => user.DisplayNameLocked).HasDefaultValue(false).IsRequired();
+        builder.HasOne<CompanyUnitEntity>()
+            .WithMany()
+            .HasForeignKey(user => user.UnitId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+        builder.HasOne<CompanySectorEntity>()
+            .WithMany()
+            .HasForeignKey(user => user.SectorId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+        builder.HasIndex(user => new { user.TenantId, user.UnitId });
+        builder.HasIndex(user => new { user.TenantId, user.SectorId });
         builder.HasOne<TenantEntity>()
             .WithMany()
             .HasForeignKey(user => user.TenantId)
