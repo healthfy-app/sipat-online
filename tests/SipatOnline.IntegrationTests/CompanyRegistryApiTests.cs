@@ -6,6 +6,7 @@ using SipatOnline.Api.Endpoints;
 using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.Identity.Application.Users;
 using SipatOnline.Infrastructure;
+using SipatOnline.Infrastructure.Identity;
 using Testcontainers.PostgreSql;
 
 namespace SipatOnline.IntegrationTests;
@@ -42,6 +43,199 @@ public sealed class CompanyRegistryApiTests
         Assert.Null(user.UnitId);
         Assert.Null(user.SectorId);
         Assert.False(user.DisplayNameLocked);
+    }
+
+    [DockerFact]
+    public async Task Admin_PastesSectors_DuplicatesByAccentAreIgnored()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+        using var admin = CreateClient(factory);
+        await SignInAdminAsync(admin);
+        var token = await GetAntiforgeryTokenAsync(admin);
+
+        using var response = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Post, "/api/admin/registry/sectors",
+            new AddRegistryItemsRequest(["Tecnologia da Informação", "tecnologia da informacao", "", "Produção"]), token);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var registry = await response.Content.ReadFromJsonAsync<CompanyRegistry>();
+        Assert.NotNull(registry);
+        Assert.Equal(["Produção", "Tecnologia da Informação"], registry.Sectors.Select(item => item.Name).ToArray());
+        Assert.Empty(registry.Units);
+    }
+
+    [DockerFact]
+    public async Task Admin_RenamesToAnExistingName_GetsConflict()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+        using var admin = CreateClient(factory);
+        await SignInAdminAsync(admin);
+        var token = await GetAntiforgeryTokenAsync(admin);
+        using var added = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Post, "/api/admin/registry/units",
+            new AddRegistryItemsRequest(["Matriz", "Filial Sul"]), token);
+        var registry = await added.Content.ReadFromJsonAsync<CompanyRegistry>();
+        Assert.NotNull(registry);
+        var filial = registry.Units.Single(item => item.Name == "Filial Sul");
+
+        using var conflict = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, $"/api/admin/registry/units/{filial.Id:D}",
+            new UpdateRegistryItemRequest("MATRIZ", null), token);
+        Assert.Equal(HttpStatusCode.Conflict, conflict.StatusCode);
+        Assert.Contains("registry.name.duplicate", await conflict.Content.ReadAsStringAsync());
+
+        using var tooLong = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, $"/api/admin/registry/units/{filial.Id:D}",
+            new UpdateRegistryItemRequest(new string('x', 101), null), token);
+        Assert.Equal(HttpStatusCode.BadRequest, tooLong.StatusCode);
+        Assert.Contains("registry.name.invalid", await tooLong.Content.ReadAsStringAsync());
+
+        using var renamed = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, $"/api/admin/registry/units/{filial.Id:D}",
+            new UpdateRegistryItemRequest("Filial Norte", null), token);
+        Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+    }
+
+    [DockerFact]
+    public async Task Admin_DeactivatesSector_PeopleKeepIt()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+        using var admin = CreateClient(factory);
+        await SignInAdminAsync(admin);
+        var token = await GetAntiforgeryTokenAsync(admin);
+        using var added = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Post, "/api/admin/registry/sectors",
+            new AddRegistryItemsRequest(["Produção"]), token);
+        var sector = (await added.Content.ReadFromJsonAsync<CompanyRegistry>())!.Sectors.Single();
+        using var created = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Post, "/api/admin/users",
+            new ProvisionUserRequest("Joao-Setor", "Joao Setor", "ParticipantPass123", PlatformRoles.Participant), token);
+        var user = await created.Content.ReadFromJsonAsync<UserResponse>();
+        Assert.NotNull(user);
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            var account = await db.Users.SingleAsync(item => item.Id == user.Id);
+            account.SectorId = sector.Id;
+            await db.SaveChangesAsync();
+        }
+
+        using var deactivated = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, $"/api/admin/registry/sectors/{sector.Id:D}",
+            new UpdateRegistryItemRequest(null, false), token);
+
+        Assert.Equal(HttpStatusCode.OK, deactivated.StatusCode);
+        var item = await deactivated.Content.ReadFromJsonAsync<RegistryItem>();
+        Assert.NotNull(item);
+        Assert.False(item.IsActive);
+        Assert.Equal(1, item.PeopleCount);
+        await using var verify = factory.Services.CreateAsyncScope();
+        var verifyDb = verify.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        Assert.Equal(sector.Id, (await verifyDb.Users.SingleAsync(account => account.Id == user.Id)).SectorId);
+        Assert.False((await verifyDb.CompanySectors.SingleAsync(row => row.Id == sector.Id)).IsActive);
+    }
+
+    [DockerFact]
+    public async Task Rules_StartAllOff_AndSave()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+        using var admin = CreateClient(factory);
+        await SignInAdminAsync(admin);
+        var token = await GetAntiforgeryTokenAsync(admin);
+
+        var initial = await admin.GetFromJsonAsync<CompanyRegistry>("/api/admin/registry");
+        Assert.NotNull(initial);
+        Assert.Equal(new ProfileRules(false, false, false, false, false), initial.Rules);
+
+        using var saved = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, "/api/admin/registry/rules",
+            new ProfileRules(false, false, false, false, true), token);
+        Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
+
+        var after = await admin.GetFromJsonAsync<CompanyRegistry>("/api/admin/registry");
+        Assert.NotNull(after);
+        Assert.True(after.Rules.RequireSector);
+        Assert.False(after.Rules.RequireEmail);
+    }
+
+    [DockerFact]
+    public async Task Registry_IsTenantScoped()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+        var otherTenantId = Guid.NewGuid();
+        var foreignSectorId = Guid.NewGuid();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            db.Tenants.Add(new SipatOnline.Infrastructure.Tenancy.TenantEntity
+            {
+                Id = otherTenantId,
+                Key = "other-company",
+                Name = "Other company",
+                PrimaryColor = SipatOnline.Tenancy.Domain.Tenants.TenantBranding.DefaultPrimaryColor,
+                SecondaryColor = SipatOnline.Tenancy.Domain.Tenants.TenantBranding.DefaultSecondaryColor,
+                CreatedAt = DateTimeOffset.UtcNow,
+                IsActive = true
+            });
+            db.CompanySectors.Add(new CompanySectorEntity
+            {
+                Id = foreignSectorId, TenantId = otherTenantId, Name = "Alheio", NameKey = "ALHEIO", IsActive = true, CreatedAt = DateTimeOffset.UtcNow
+            });
+            await db.SaveChangesAsync();
+        }
+
+        using var admin = CreateClient(factory);
+        await SignInAdminAsync(admin);
+        var token = await GetAntiforgeryTokenAsync(admin);
+
+        var registry = await admin.GetFromJsonAsync<CompanyRegistry>("/api/admin/registry");
+        Assert.NotNull(registry);
+        Assert.DoesNotContain(registry.Sectors, item => item.Id == foreignSectorId);
+
+        using var put = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, $"/api/admin/registry/sectors/{foreignSectorId:D}",
+            new UpdateRegistryItemRequest("Invadido", false), token);
+        Assert.Equal(HttpStatusCode.NotFound, put.StatusCode);
+
+        // the same name is free in this company: uniqueness is per company
+        using var added = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Post, "/api/admin/registry/sectors",
+            new AddRegistryItemsRequest(["Alheio"]), token);
+        Assert.Equal(HttpStatusCode.OK, added.StatusCode);
+        await using var verify = factory.Services.CreateAsyncScope();
+        var foreign = await verify.ServiceProvider.GetRequiredService<PlatformDbContext>().CompanySectors.SingleAsync(row => row.Id == foreignSectorId);
+        Assert.Equal("Alheio", foreign.Name);
+        Assert.True(foreign.IsActive);
+    }
+
+    [DockerFact]
+    public async Task Participant_CannotChangeRegistry()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+        using var admin = CreateClient(factory);
+        await SignInAdminAsync(admin);
+        var adminToken = await GetAntiforgeryTokenAsync(admin);
+        using var created = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Post, "/api/admin/users",
+            new ProvisionUserRequest("Maria-Colab", "Maria Colab", "ParticipantPass123", PlatformRoles.Participant), adminToken);
+        Assert.True(created.IsSuccessStatusCode);
+
+        using var participant = CreateClient(factory);
+        await SignInAsync(participant, "Maria-Colab", "ParticipantPass123");
+        var token = await GetAntiforgeryTokenAsync(participant);
+
+        using var add = await SendJsonWithAntiforgeryAsync(participant, HttpMethod.Post, "/api/admin/registry/sectors",
+            new AddRegistryItemsRequest(["Qualquer"]), token);
+        Assert.Equal(HttpStatusCode.Forbidden, add.StatusCode);
+        using var rules = await SendJsonWithAntiforgeryAsync(participant, HttpMethod.Put, "/api/admin/registry/rules",
+            new ProfileRules(true, true, true, true, true), token);
+        Assert.Equal(HttpStatusCode.Forbidden, rules.StatusCode);
     }
 
     private static HttpClient CreateClient(SipatOnlineApiFactory factory) =>
