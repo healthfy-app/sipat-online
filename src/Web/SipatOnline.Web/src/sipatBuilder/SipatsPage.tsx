@@ -11,6 +11,16 @@ import { cn } from '@/lib/utils';
 import { phaseLabel, sipatPhase } from './sipatPhase';
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
+const fullDateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
+
+/** "09/11 a 13/11"; one date when it starts and ends the same day; the years when they differ. */
+function periodLabel(startsAt: string, endsAt: string): string {
+  const start = new Date(startsAt);
+  const end = new Date(new Date(endsAt).getTime() - 1);
+  const format = start.getUTCFullYear() === end.getUTCFullYear() ? dateFormat : fullDateFormat;
+  const [from, to] = [format.format(start), format.format(end)];
+  return from === to ? from : `${from} a ${to}`;
+}
 
 /** The trainings of a company, newest year first. Several can be published at the same time. */
 export default function SipatsPage({ basePath }: { basePath: string }) {
@@ -69,7 +79,7 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
               </div>
               <p className="m-0 flex items-center gap-1.5 text-sm text-muted-foreground">
                 <CalendarDays aria-hidden="true" className="size-4" />
-                {dateFormat.format(new Date(event.startsAt))} a {dateFormat.format(new Date(new Date(event.endsAt).getTime() - 1))}
+                {periodLabel(event.startsAt, event.endsAt)}
               </p>
               <p className="m-0 flex items-center gap-1.5 text-sm text-muted-foreground">
                 <Film aria-hidden="true" className="size-4" />
