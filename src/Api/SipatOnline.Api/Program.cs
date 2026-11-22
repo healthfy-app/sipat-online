@@ -207,6 +207,7 @@ app.MapPlatformEndpoints();
 app.MapPlatformCourseCatalogEndpoints();
 app.MapCourseCategoryEndpoints();
 app.MapUserManagementEndpoints();
+app.MapCompanyRegistryEndpoints();
 app.MapTenantEndpoints();
 app.MapTenantAppearanceEndpoints();
 app.MapSipatEventEndpoints();

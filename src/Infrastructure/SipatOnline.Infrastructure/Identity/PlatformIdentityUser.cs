@@ -15,4 +15,15 @@ public sealed class PlatformIdentityUser : IdentityUser<Guid>
     public DateTimeOffset CreatedAt { get; set; }
 
     public bool IsActive { get; set; } = true;
+
+    public string? RegistrationNumber { get; set; }
+
+    public string? Phone { get; set; }
+
+    public Guid? UnitId { get; set; }
+
+    public Guid? SectorId { get; set; }
+
+    /// <summary>True once an administrator corrected the name by hand; the HR import then leaves it alone.</summary>
+    public bool DisplayNameLocked { get; set; }
 }

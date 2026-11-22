@@ -1356,3 +1356,64 @@ export function getPlaybackQualityComparison(period: { from?: string; to?: strin
   const text = query.toString();
   return requestJson<PlaybackQualityComparison>(`/api/platform/playback-quality${text ? `?${text}` : ''}`);
 }
+
+export interface RegistryItem { id: string; name: string; isActive: boolean; peopleCount: number }
+export interface ProfileRules {
+  requireRegistration: boolean; requireEmail: boolean; requirePhone: boolean; requireUnit: boolean; requireSector: boolean;
+}
+export interface CompanyRegistry { units: RegistryItem[]; sectors: RegistryItem[]; rules: ProfileRules }
+export type RegistryKind = 'units' | 'sectors';
+
+export function getCompanyRegistry(): Promise<CompanyRegistry> {
+  return requestJson<CompanyRegistry>('/api/admin/registry');
+}
+
+export function addRegistryItems(kind: RegistryKind, names: string[]): Promise<CompanyRegistry> {
+  return requestJson<CompanyRegistry>(`/api/admin/registry/${kind}`, { method: 'POST', body: JSON.stringify({ names }) });
+}
+
+export function updateRegistryItem(kind: RegistryKind, id: string, change: { name?: string; isActive?: boolean }): Promise<RegistryItem> {
+  return requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) });
+}
+
+export function saveProfileRules(rules: ProfileRules): Promise<ProfileRules> {
+  return requestJson<ProfileRules>('/api/admin/registry/rules', { method: 'PUT', body: JSON.stringify(rules) });
+}
+
+export interface ParticipantProfile {
+  id: string; registrationNumber: string | null; email: string | null; phone: string | null; unitId: string | null; sectorId: string | null;
+}
+export type ProfileChange = Omit<ParticipantProfile, 'id'>;
+
+export function listParticipantProfiles(): Promise<ParticipantProfile[]> {
+  return requestJson<ParticipantProfile[]>('/api/admin/users/participants/profiles');
+}
+
+export function saveParticipantProfile(userId: string, data: ProfileChange): Promise<ParticipantProfile> {
+  return requestJson<ParticipantProfile>(`/api/admin/users/${userId}/profile`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+/** Moves many collaborators to one unit or sector at once; a null `valueId` takes them out of it. */
+export function changePlacement(userIds: string[], field: 'unit' | 'sector', valueId: string | null): Promise<{ changed: number }> {
+  return requestJson<{ changed: number }>('/api/admin/users/placement', { method: 'PUT', body: JSON.stringify({ userIds, field, valueId }) });
+}
+
+export interface ImportRow {
+  row: number; name?: string | null; login?: string | null; registrationNumber?: string | null; email?: string | null;
+  phone?: string | null; unit?: string | null; sector?: string | null; password?: string | null;
+}
+export interface ImportResult {
+  created: number; updated: number; unchanged: number;
+  rejected: { row: number; login: string | null; message: string }[];
+  credentials: { row: number; name: string; login: string }[];
+}
+
+/**
+ * Reads the HR sheet on the server; with `dryRun` nothing is written. With `createOnly` (the form of one person) a line that
+ * names someone who already exists is refused instead of updating them.
+ */
+export function importParticipants(dryRun: boolean, rows: ImportRow[], options?: { createOnly?: boolean }): Promise<ImportResult> {
+  return requestJson<ImportResult>('/api/admin/users/import', {
+    method: 'POST', body: JSON.stringify({ dryRun, rows, createOnly: options?.createOnly ?? false }),
+  });
+}

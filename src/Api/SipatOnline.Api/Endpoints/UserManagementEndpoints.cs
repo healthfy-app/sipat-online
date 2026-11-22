@@ -59,6 +59,37 @@ public static class UserManagementEndpoints
         .RequireAuthorization("ViewTenantLearning")
         .WithName("ListParticipants");
 
+        endpoints.MapGet("/api/admin/users/participants/profiles", async (
+            SipatOnline.Infrastructure.Identity.ParticipantProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await profiles.ListAsync(cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .RequireAuthorization("ViewTenantLearning")
+        .WithName("ListParticipantProfiles");
+
+        group.MapPut("/{userId:guid}/profile", async (
+            Guid userId,
+            SipatOnline.Infrastructure.Identity.ChangeProfileRequest request,
+            SipatOnline.Infrastructure.Identity.ParticipantProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await profiles.ChangeAsync(userId, request, cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .WithName("ChangeParticipantProfile");
+
+        group.MapPut("/placement", async (
+            SipatOnline.Infrastructure.Identity.ChangePlacementRequest request,
+            SipatOnline.Infrastructure.Identity.ParticipantProfileService profiles,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await profiles.ChangePlacementAsync(request, cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .WithName("ChangeParticipantsPlacement");
+
         group.MapPost("/", async (
             ProvisionUserRequest request,
             HttpContext context,
@@ -143,6 +174,16 @@ public static class UserManagementEndpoints
         })
         .WithName("ResetEmployeePassword");
 
+        group.MapPost("/import", async (
+            SipatOnline.Infrastructure.Identity.ImportRequest request,
+            SipatOnline.Infrastructure.Identity.ParticipantImportService import,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await import.ImportAsync(request, cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .WithName("ImportParticipants");
+
         return endpoints;
     }
 
@@ -159,7 +200,7 @@ public static class UserManagementEndpoints
         {
             "identity.forbidden" or "identity.role.assignment_forbidden" => StatusCodes.Status403Forbidden,
             "user.not_found" => StatusCodes.Status404NotFound,
-            "identity.login_identifier.duplicate" => StatusCodes.Status409Conflict,
+            "identity.login_identifier.duplicate" or "profile.registration.duplicate" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 

@@ -18,6 +18,12 @@ public sealed class PlatformDbContext(
 
     public DbSet<LoginAttemptWindowEntity> LoginAttemptWindows => Set<LoginAttemptWindowEntity>();
 
+    public DbSet<CompanyUnitEntity> CompanyUnits => Set<CompanyUnitEntity>();
+
+    public DbSet<CompanySectorEntity> CompanySectors => Set<CompanySectorEntity>();
+
+    public DbSet<CompanyProfileRulesEntity> CompanyProfileRules => Set<CompanyProfileRulesEntity>();
+
     public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
 
     public DbSet<AuditEntryEntity> AuditEntries => Set<AuditEntryEntity>();

@@ -212,6 +212,95 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("AuditEntries", "audit");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.CompanyProfileRulesEntity", b =>
+                {
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("RequireEmail")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequirePhone")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequireRegistration")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequireSector")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("RequireUnit")
+                        .HasColumnType("boolean");
+
+                    b.HasKey("TenantId");
+
+                    b.ToTable("CompanyProfileRules", "identity");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.CompanySectorEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "NameKey")
+                        .IsUnique();
+
+                    b.ToTable("CompanySectors", "identity");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.CompanyUnitEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("NameKey")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId", "NameKey")
+                        .IsUnique();
+
+                    b.ToTable("CompanyUnits", "identity");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Identity.LoginAttemptWindowEntity", b =>
                 {
                     b.Property<string>("Key")
@@ -252,6 +341,11 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasMaxLength(150)
                         .HasColumnType("character varying(150)");
 
+                    b.Property<bool>("DisplayNameLocked")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
@@ -289,11 +383,22 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Property<string>("PasswordHash")
                         .HasColumnType("text");
 
+                    b.Property<string>("Phone")
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)");
+
                     b.Property<string>("PhoneNumber")
                         .HasColumnType("text");
 
                     b.Property<bool>("PhoneNumberConfirmed")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("RegistrationNumber")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<Guid?>("SectorId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("SecurityStamp")
                         .HasColumnType("text");
@@ -303,6 +408,9 @@ namespace SipatOnline.Infrastructure.Migrations
 
                     b.Property<bool>("TwoFactorEnabled")
                         .HasColumnType("boolean");
+
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid");
 
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
@@ -322,10 +430,18 @@ namespace SipatOnline.Infrastructure.Migrations
                         .IsUnique()
                         .HasDatabaseName("UserNameIndex");
 
+                    b.HasIndex("SectorId");
+
+                    b.HasIndex("UnitId");
+
                     b.HasIndex("TenantId", "NormalizedEmployeeIdentifier")
                         .IsUnique()
                         .HasDatabaseName("UX_Users_Tenant_LoginIdentifier")
                         .HasFilter("\"TenantId\" IS NOT NULL");
+
+                    b.HasIndex("TenantId", "SectorId");
+
+                    b.HasIndex("TenantId", "UnitId");
 
                     b.ToTable("Users", "identity");
                 });
@@ -1341,11 +1457,48 @@ namespace SipatOnline.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.PlatformIdentityUser", b =>
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.CompanyProfileRulesEntity", b =>
                 {
                     b.HasOne("SipatOnline.Infrastructure.Tenancy.TenantEntity", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.CompanySectorEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Tenancy.TenantEntity", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.CompanyUnitEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Tenancy.TenantEntity", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.PlatformIdentityUser", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Identity.CompanySectorEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SectorId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SipatOnline.Infrastructure.Tenancy.TenantEntity", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("SipatOnline.Infrastructure.Identity.CompanyUnitEntity", null)
+                        .WithMany()
+                        .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict);
                 });
 
