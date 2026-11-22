@@ -1,5 +1,5 @@
-import { ArrowRight, ChevronLeft, ChevronRight, FileSpreadsheet, Search } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { listAllParticipants, listLearningParticipation, type LearningParticipantProgress } from './api';
 import {
@@ -25,6 +25,8 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { cn } from '@/lib/utils';
+import { activeParticipantsByDay, totalWatchedMilliseconds } from './dashboard/activity';
+import { ColumnChart, Donut, type ColumnPoint } from './dashboard/charts';
 import LoadingState from './LoadingState';
 import { TrainingSelect } from './trainings/TrainingSelect';
 import { filterByTraining, useTrainingFilter } from './trainings/useTrainingFilter';
@@ -32,6 +34,8 @@ import { filterByTraining, useTrainingFilter } from './trainings/useTrainingFilt
 const PAGE_SIZE = 8;
 /** Série única "concluído": mesma cor do status Concluiu, para as duas leituras baterem. */
 const COMPLETION_COLOR = statusColors.completed;
+// people coming in: the blue of the reference palette, validated against the status green (it is not a status)
+const ACTIVITY_COLOR = '#2a78d6';
 
 const progressBar = cn(
   'h-1.5 w-full appearance-none overflow-hidden rounded-full border-0 bg-muted',
@@ -105,6 +109,7 @@ export default function TenantLearningDashboardPage({
   const notStartedCount = overview?.participantDistribution.find(({ status }) => status === 'not-started')?.count ?? 0;
   const nextStepStatus = noTracksCount > 0 ? 'no-tracks' : 'not-started';
   const nextStepCount = noTracksCount > 0 ? noTracksCount : notStartedCount;
+  const completedCount = overview?.participantDistribution.find(({ status }) => status === 'completed')?.count ?? 0;
 
   return (
     <div className="page-content">
@@ -142,19 +147,22 @@ export default function TenantLearningDashboardPage({
           <LoadingState className="list-state">Carregando o progresso da empresa...</LoadingState>
         ) : data && overview && (
           <>
-            <section aria-label="Indicadores de aprendizagem da empresa" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))] gap-4">
-              <SummaryCard label="Participantes ativos" value={overview.activeParticipantCount.toLocaleString('pt-BR')} />
+            <section aria-label="Indicadores de aprendizagem da empresa" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,13.5rem),1fr))] gap-4">
+              <SummaryCard icon={Users} label="Participantes ativos" note={pluralize(overview.participantCount, 'colaborador cadastrado', 'colaboradores cadastrados')} value={overview.activeParticipantCount.toLocaleString('pt-BR')} />
               <SummaryCard
-                label="Dias entregues"
-                note={`${pluralize(overview.trackProgress.length, 'dia distinto', 'dias distintos')} · ${pluralize(overview.completedTrackCount, 'dia concluído', 'dias concluídos')}`}
-                value={overview.assignedTrackCount.toLocaleString('pt-BR')}
+                icon={CheckCircle2}
+                label="Concluíram tudo"
+                note={`${completedCount} de ${overview.participantCount} · ${pluralize(overview.completedTrackCount, 'dia concluído', 'dias concluídos')}`}
+                value={`${overview.participantCount > 0 ? Math.round((completedCount / overview.participantCount) * 100) : 0}%`}
               />
               <SummaryCard
-                label="Aulas concluídas"
-                note={`${overview.overallProgressPercentage}% do total atribuído`}
+                icon={PlayCircle}
+                label="Vídeos concluídos"
+                note={`${overview.overallProgressPercentage}% do total entregue`}
                 progress={overview.overallProgressPercentage}
                 value={`${overview.completedLessonCount.toLocaleString('pt-BR')} / ${overview.lessonCount.toLocaleString('pt-BR')}`}
               />
+              <SummaryCard icon={Clock3} label="Tempo assistido" note="Somando todos os participantes" value={formatDuration(totalWatchedMilliseconds(data.participation))} />
             </section>
 
             {nextStepCount > 0 && (
@@ -184,18 +192,6 @@ export default function TenantLearningDashboardPage({
               </section>
             )}
 
-            <Panel count={pluralize(overview.participantCount, 'colaborador', 'colaboradores')} id="company-participants-title" title={`Colaboradores da ${companyName}`}>
-              {overview.participantCount === 0 ? (
-                <EmptyState
-                  action={<Link className={buttonVariants({ variant: 'outline' })} to="/admin/learning">{readOnly ? 'Ver acompanhamento' : 'Adicionar participantes'}</Link>}
-                  description="Cadastre ou importe participantes para acompanhar o progresso da empresa."
-                  title="Ainda não há participantes"
-                />
-              ) : (
-                <ParticipantsTable overview={overview} rows={data.rows} />
-              )}
-            </Panel>
-
             <section aria-label="Progresso de todos os participantes" className="grid items-start gap-4 lg:grid-cols-2">
               <Panel count={pluralize(overview.participantCount, 'participante', 'participantes')} id="participant-distribution-title" title="Situação dos participantes">
                 {overview.participantCount === 0 ? (
@@ -210,11 +206,29 @@ export default function TenantLearningDashboardPage({
               </Panel>
             </section>
 
-            <Panel count={pluralize(overview.trackProgress.length, 'dia', 'dias')} id="track-progress-title" title="Conclusão média por dia">
-              {overview.trackProgress.length === 0 ? (
-                <EmptyState description="Quando um treinamento for publicado, a evolução média de cada dia aparecerá aqui." title="Nenhum dia entregue" />
+            <section aria-label="Engajamento e conclusão por dia" className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+              <Panel count="Últimos 14 dias" id="recent-activity-title" title="Engajamento">
+                <RecentActivity participation={data.participation} />
+              </Panel>
+
+              <Panel count={pluralize(overview.trackProgress.length, 'dia', 'dias')} id="track-progress-title" title="Conclusão média por dia">
+                {overview.trackProgress.length === 0 ? (
+                  <EmptyState description="Quando um treinamento for publicado, a evolução média de cada dia aparecerá aqui." title="Nenhum dia entregue" />
+                ) : (
+                  <TrackMeterList overview={overview} />
+                )}
+              </Panel>
+            </section>
+
+            <Panel count={pluralize(overview.participantCount, 'colaborador', 'colaboradores')} id="company-participants-title" title={`Colaboradores da ${companyName}`}>
+              {overview.participantCount === 0 ? (
+                <EmptyState
+                  action={<Link className={buttonVariants({ variant: 'outline' })} to="/admin/learning">{readOnly ? 'Ver acompanhamento' : 'Adicionar participantes'}</Link>}
+                  description="Cadastre ou importe participantes para acompanhar o progresso da empresa."
+                  title="Ainda não há participantes"
+                />
               ) : (
-                <TrackMeterList overview={overview} />
+                <ParticipantsTable overview={overview} rows={data.rows} />
               )}
             </Panel>
           </>
@@ -374,57 +388,28 @@ function ParticipantsTable({ rows, overview }: { rows: readonly ParticipantRow[]
   );
 }
 
-// ── Situação: barra segmentada alta ─────────────────────────────────────────
+// ── Situação: rosca com o percentual de quem concluiu no centro ─────────────
 
 function StatusBreakdown({ overview }: { overview: CompanyLearningOverview }) {
   const total = overview.participantCount;
   const parts = overview.participantDistribution.filter(({ count }) => count > 0);
   const percent = (count: number) => (total > 0 ? Math.round((count / total) * 100) : 0);
   const completed = overview.participantDistribution.find(({ status }) => status === 'completed')?.count ?? 0;
-  const tooltip = useHoverTooltip();
 
   return (
-    <div className="grid gap-5">
-      <div className="grid gap-1">
-        <strong className="text-4xl font-semibold tracking-tight">{percent(completed)}%</strong>
-        <span className="text-sm text-muted-foreground">concluíram todos os dias · {completed} de {total}</span>
-      </div>
-
-      <div className="relative" ref={tooltip.containerRef}>
-        <div
-          aria-label={`Distribuição do progresso de ${total} participantes: ${parts.map(({ status, count }) => `${statusLabels[status]} ${count} (${percent(count)}%)`).join(', ')}`}
-          className="flex h-7 w-full gap-0.5"
-          role="img"
-        >
-          {parts.map(({ status, count }) => {
-            const share = percent(count);
-            const dark = status === 'completed';
-            return (
-              <div
-                className="flex h-full min-w-1 items-center overflow-hidden rounded-[4px] px-2 text-xs font-semibold tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                data-progress-status={status}
-                key={status}
-                onBlur={tooltip.hide}
-                onFocus={(event) => tooltip.show(event.currentTarget, `${statusLabels[status]}`, `${count} · ${share}%`)}
-                onMouseEnter={(event) => tooltip.show(event.currentTarget, `${statusLabels[status]}`, `${count} · ${share}%`)}
-                onMouseLeave={tooltip.hide}
-                style={{ backgroundColor: statusColors[status], color: dark ? '#ffffff' : '#0b0b0b', flexGrow: count, flexBasis: 0 }}
-                tabIndex={0}
-              >
-                {share >= 12 ? `${share}%` : null}
-              </div>
-            );
-          })}
-        </div>
-        {tooltip.node}
-      </div>
-
-      <ul aria-label="Legenda do progresso" className="m-0 grid list-none gap-2.5 p-0">
+    <div className="grid items-center gap-6 sm:grid-cols-[minmax(0,13rem)_minmax(0,1fr)]">
+      <Donut
+        ariaLabel={`Distribuição do progresso de ${total} participantes: ${parts.map(({ status, count }) => `${statusLabels[status]} ${count} (${percent(count)}%)`).join(', ')}`}
+        caption={`concluíram · ${completed} de ${total}`}
+        center={`${percent(completed)}%`}
+        slices={parts.map(({ status, count }) => ({ key: status, label: statusLabels[status], count, color: statusColors[status] }))}
+      />
+      <ul aria-label="Legenda do progresso" className="m-0 grid list-none gap-3 p-0">
         {parts.map(({ status, count }) => (
           <li className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2.5 text-sm" key={status}>
-            <span aria-hidden="true" className="size-2.5 rounded-sm" style={{ backgroundColor: statusColors[status] }} />
+            <span aria-hidden="true" className="size-2.5 rounded-full" style={{ backgroundColor: statusColors[status] }} />
             <span>{statusLabels[status]}</span>
-            <strong className="tabular-nums">{count} ({percent(count)}%)</strong>
+            <strong className="tabular-nums">{count} <span className="font-normal text-muted-foreground">({percent(count)}%)</span></strong>
           </li>
         ))}
       </ul>
@@ -434,9 +419,15 @@ function StatusBreakdown({ overview }: { overview: CompanyLearningOverview }) {
 
 // ── Ritmo de conclusão: colunas por data ────────────────────────────────────
 
+const dateLabel = (key: string, options: Intl.DateTimeFormatOptions) => parseDateKey(key).toLocaleDateString('pt-BR', options);
+const columnPoints = (series: readonly { date: string; count: number }[]): ColumnPoint[] => series.map((point) => ({
+  key: point.date, count: point.count,
+  label: dateLabel(point.date, { day: '2-digit', month: '2-digit' }),
+  longLabel: dateLabel(point.date, { weekday: 'long', day: '2-digit', month: '2-digit' }),
+}));
+
 function CompletionTimeline({ participation }: { participation: readonly LearningParticipantProgress[] }) {
   const series = useMemo(() => completionsByDate(participation), [participation]);
-  const tooltip = useHoverTooltip();
 
   if (series.length === 0) {
     return (
@@ -448,13 +439,8 @@ function CompletionTimeline({ participation }: { participation: readonly Learnin
     );
   }
 
-  const max = Math.max(...series.map((point) => point.count));
-  const top = niceMax(max);
-  const ticks = [top, top / 2, 0];
   const total = series.reduce((sum, point) => sum + point.count, 0);
   const peak = series.reduce((best, point) => (point.count > best.count ? point : best), series[0]);
-  const labelEvery = Math.ceil(series.length / 7);
-  const dateLabel = (key: string, options: Intl.DateTimeFormatOptions) => parseDateKey(key).toLocaleDateString('pt-BR', options);
 
   return (
     <div className="grid gap-4">
@@ -464,48 +450,44 @@ function CompletionTimeline({ participation }: { participation: readonly Learnin
           dias concluídos · pico em {dateLabel(peak.date, { weekday: 'short', day: '2-digit', month: '2-digit' })} ({peak.count})
         </span>
       </div>
+      <ColumnChart
+        ariaLabel={`Dias concluídos por data: ${series.map((point) => `${dateLabel(point.date, { day: '2-digit', month: '2-digit' })} ${point.count}`).join(', ')}`}
+        color={COMPLETION_COLOR}
+        points={columnPoints(series)}
+        unit={(count) => `${count} ${count === 1 ? 'dia concluído' : 'dias concluídos'}`}
+      />
+    </div>
+  );
+}
 
-      <div className="relative grid grid-cols-[auto_minmax(0,1fr)] gap-x-2" ref={tooltip.containerRef}>
-        <div aria-hidden="true" className="grid h-40 content-between text-right text-[0.6875rem] tabular-nums text-muted-foreground">
-          {ticks.map((tick) => <span className="-my-1.5 leading-3" key={tick}>{tick}</span>)}
+// ── Engajamento: quem entrou em cada um dos últimos 14 dias ─────────────────
+
+function RecentActivity({ participation }: { participation: readonly LearningParticipantProgress[] }) {
+  const series = useMemo(() => activeParticipantsByDay(participation, 14), [participation]);
+  const today = series.at(-1)?.count ?? 0;
+  const week = new Set(participation
+    .filter((row) => row.lastAccessedAt && Date.now() - new Date(row.lastAccessedAt).getTime() < 7 * 86_400_000)
+    .map((row) => row.participantId)).size;
+
+  return (
+    <div className="grid gap-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-1">
+          <strong className="text-4xl font-semibold tracking-tight tabular-nums">{today}</strong>
+          <span className="text-sm text-muted-foreground">{today === 1 ? 'pessoa entrou hoje' : 'pessoas entraram hoje'}</span>
         </div>
-        <div className="relative h-40">
-          <div aria-hidden="true" className="absolute inset-0 grid content-between">
-            {ticks.map((tick) => <div className={cn('h-px', tick === 0 ? 'bg-border' : 'bg-border/50')} key={tick} />)}
-          </div>
-          <div
-            aria-label={`Dias concluídos por data: ${series.map((point) => `${dateLabel(point.date, { day: '2-digit', month: '2-digit' })} ${point.count}`).join(', ')}`}
-            className="absolute inset-0 flex items-end gap-0.5"
-            role="img"
-          >
-            {series.map((point) => (
-              <div
-                className="group flex h-full min-w-0 flex-1 items-end justify-center outline-none"
-                key={point.date}
-                onBlur={tooltip.hide}
-                onFocus={(event) => tooltip.show(event.currentTarget, dateLabel(point.date, { weekday: 'long', day: '2-digit', month: '2-digit' }), `${point.count} ${point.count === 1 ? 'dia concluído' : 'dias concluídos'}`)}
-                onMouseEnter={(event) => tooltip.show(event.currentTarget, dateLabel(point.date, { weekday: 'long', day: '2-digit', month: '2-digit' }), `${point.count} ${point.count === 1 ? 'dia concluído' : 'dias concluídos'}`)}
-                onMouseLeave={tooltip.hide}
-                tabIndex={0}
-              >
-                <div
-                  className="w-full max-w-7 rounded-t-[4px] transition-opacity group-hover:opacity-80 group-focus-visible:ring-2 group-focus-visible:ring-ring"
-                  style={{ backgroundColor: COMPLETION_COLOR, height: point.count === 0 ? 0 : `${Math.max(2, (point.count / top) * 100)}%` }}
-                />
-              </div>
-            ))}
-          </div>
+        <div className="grid gap-1">
+          <strong className="text-4xl font-semibold tracking-tight tabular-nums">{week}</strong>
+          <span className="text-sm text-muted-foreground">nos últimos 7 dias</span>
         </div>
-        <span />
-        <div aria-hidden="true" className="mt-1.5 flex gap-0.5 text-[0.6875rem] tabular-nums text-muted-foreground">
-          {series.map((point, index) => (
-            <span className="min-w-0 flex-1 text-center" key={point.date}>
-              {index % labelEvery === 0 ? dateLabel(point.date, { day: '2-digit', month: '2-digit' }) : ''}
-            </span>
-          ))}
-        </div>
-        {tooltip.node}
       </div>
+      <ColumnChart
+        ariaLabel={`Pessoas que entraram por dia, últimos 14 dias: ${series.map((point) => `${dateLabel(point.date, { day: '2-digit', month: '2-digit' })} ${point.count}`).join(', ')}`}
+        color={ACTIVITY_COLOR}
+        height="h-28"
+        points={columnPoints(series)}
+        unit={(count) => `${count} ${count === 1 ? 'pessoa entrou' : 'pessoas entraram'}`}
+      />
     </div>
   );
 }
@@ -542,11 +524,14 @@ function TrackMeterList({ overview }: { overview: CompanyLearningOverview }) {
   );
 }
 
-function SummaryCard({ label, value, note, progress }: { label: string; value: string; note?: string; progress?: number }) {
+function SummaryCard({ icon: Icon, label, value, note, progress }: { icon: LucideIcon; label: string; value: string; note?: string; progress?: number }) {
   return (
-    <article className="grid content-start gap-2 rounded-lg bg-card px-5 py-4 shadow-card">
-      <span className="text-[0.8125rem] font-medium text-muted-foreground">{label}</span>
-      <strong className="text-3xl font-semibold tracking-tight">{value}</strong>
+    <article className="grid content-start gap-2 rounded-xl bg-card px-5 py-4 shadow-card">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[0.8125rem] font-medium text-muted-foreground">{label}</span>
+        <span aria-hidden="true" className="grid size-8 place-items-center rounded-full bg-muted text-foreground"><Icon className="size-4" /></span>
+      </div>
+      <strong className="text-3xl font-semibold tracking-tight tabular-nums">{value}</strong>
       {progress !== undefined && (
         <progress
           aria-label={`${label}: ${progress}%`}
@@ -559,45 +544,6 @@ function SummaryCard({ label, value, note, progress }: { label: string; value: s
       {note && <small className="text-xs text-muted-foreground">{note}</small>}
     </article>
   );
-}
-
-// ── Tooltip de hover/foco compartilhado ─────────────────────────────────────
-
-function useHoverTooltip() {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [tip, setTip] = useState<{ x: number; y: number; title: string; value: string } | null>(null);
-
-  const show = useCallback((target: HTMLElement, title: string, value: string) => {
-    const container = containerRef.current;
-    if (!container) return;
-    const box = container.getBoundingClientRect();
-    const mark = target.getBoundingClientRect();
-    const x = Math.min(Math.max(mark.left + mark.width / 2 - box.left, 70), Math.max(70, box.width - 70));
-    setTip({ x, y: mark.top - box.top, title, value });
-  }, []);
-  const hide = useCallback(() => setTip(null), []);
-
-  const node = tip ? (
-    <div
-      className="pointer-events-none absolute z-10 grid -translate-x-1/2 -translate-y-full gap-0.5 whitespace-nowrap rounded-md bg-foreground px-2.5 py-1.5 text-xs text-background shadow-lg"
-      role="tooltip"
-      style={{ left: tip.x, top: tip.y - 6 }}
-    >
-      <span className="font-medium opacity-80 first-letter:uppercase">{tip.title}</span>
-      <strong className="tabular-nums">{tip.value}</strong>
-    </div>
-  ) : null;
-
-  return { containerRef, show, hide, node };
-}
-
-function niceMax(value: number): number {
-  if (value <= 2) return 2;
-  if (value <= 4) return 4;
-  const magnitude = 10 ** Math.floor(Math.log10(value));
-  const steps = [1, 2, 2.5, 5, 10].map((step) => step * magnitude);
-  const nice = steps.find((step) => step >= value) ?? 10 * magnitude;
-  return nice % 2 === 0 ? nice : nice * 2;
 }
 
 function normalize(value: string): string {
