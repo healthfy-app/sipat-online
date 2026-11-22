@@ -1351,3 +1351,26 @@ export function getPlaybackQualityComparison(period: { from?: string; to?: strin
   const text = query.toString();
   return requestJson<PlaybackQualityComparison>(`/api/platform/playback-quality${text ? `?${text}` : ''}`);
 }
+
+export interface RegistryItem { id: string; name: string; isActive: boolean; peopleCount: number }
+export interface ProfileRules {
+  requireRegistration: boolean; requireEmail: boolean; requirePhone: boolean; requireUnit: boolean; requireSector: boolean;
+}
+export interface CompanyRegistry { units: RegistryItem[]; sectors: RegistryItem[]; rules: ProfileRules }
+export type RegistryKind = 'units' | 'sectors';
+
+export function getCompanyRegistry(): Promise<CompanyRegistry> {
+  return requestJson<CompanyRegistry>('/api/admin/registry');
+}
+
+export function addRegistryItems(kind: RegistryKind, names: string[]): Promise<CompanyRegistry> {
+  return requestJson<CompanyRegistry>(`/api/admin/registry/${kind}`, { method: 'POST', body: JSON.stringify({ names }) });
+}
+
+export function updateRegistryItem(kind: RegistryKind, id: string, change: { name?: string; isActive?: boolean }): Promise<RegistryItem> {
+  return requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) });
+}
+
+export function saveProfileRules(rules: ProfileRules): Promise<ProfileRules> {
+  return requestJson<ProfileRules>('/api/admin/registry/rules', { method: 'PUT', body: JSON.stringify(rules) });
+}

@@ -29,6 +29,7 @@ import CompanyContext from './companies/CompanyContext';
 import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
 import CollaboratorsPage from './collaborators/CollaboratorsPage';
+import RegistryPage from './registry/RegistryPage';
 import TenantLearningDashboardPage from './TenantLearningDashboardPage';
 import { isCompanyPanelMode } from './companies/companyContextMode';
 import PlatformCompaniesPage from './PlatformCompaniesPage';
@@ -233,6 +234,10 @@ export default function App() {
                   <AccessDenied />
                 )
               }
+            />
+            <Route
+              path="/admin/cadastro"
+              element={state.session && hasAdminRole(state.session) ? <RegistryPage /> : <AccessDenied />}
             />
             <Route
               path="/admin/appearance"
@@ -677,6 +682,7 @@ function ProtectedPortal({
               <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
                 {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}
               </NavLink>
+              {hasAdminRole(session) && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/cadastro">Cadastro</NavLink>}
             </>
           )}
           {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}
