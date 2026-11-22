@@ -9,7 +9,7 @@ import { maxDays } from './model';
 export default function BuilderSetup({ name, dayCount, startDate, onName, onDayCount, onStartDate, onStart, onImport, onTemplate, onCopy }: {
   name: string; dayCount: number; startDate: string;
   onName: (value: string) => void; onDayCount: (value: number) => void; onStartDate: (value: string) => void;
-  onStart: () => void; onImport: () => void; onTemplate: () => void; onCopy?: () => void;
+  onStart: () => void; onImport?: () => void; onTemplate: () => void; onCopy?: () => void;
 }) {
   const clamp = (value: number) => onDayCount(Math.min(maxDays, Math.max(1, value)));
   return <section aria-labelledby="builder-setup-title" className="mx-auto grid w-full max-w-2xl gap-6 rounded-3xl border border-border bg-card p-6 shadow-card sm:p-9">
@@ -53,7 +53,7 @@ export default function BuilderSetup({ name, dayCount, startDate, onName, onDayC
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
       <div className="flex flex-wrap gap-2">
         {onCopy && <Button onClick={onCopy} variant="outline"><Copy /> Duplicar de outro treinamento</Button>}
-        <Button onClick={onImport} variant="outline"><FileSpreadsheet /> Importar de um CSV</Button>
+        {onImport && <Button onClick={onImport} variant="outline"><FileSpreadsheet /> Importar de um CSV</Button>}
         <Button onClick={onTemplate} variant="ghost">Baixar modelo</Button>
       </div>
       <Button disabled={!name.trim() || !startDate} onClick={onStart} size="lg">Montar a grade</Button>

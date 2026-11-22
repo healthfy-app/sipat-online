@@ -39,6 +39,21 @@ public static class TenantEndpoints
             var result = await brandingService.GetAsync(cancellationToken);
             if (!result.IsSuccess) return ToProblem(result.Error);
 
+            // logo e cores da empresa são do plano Ouro em diante: nos outros planos o portal usa a identidade padrão
+            var plan = await db.Tenants.AsNoTracking().Where(item => item.Key == result.Value.TenantKey)
+                .Select(item => (int?)item.Plan).SingleOrDefaultAsync(cancellationToken);
+            if (plan is { } value && Enum.IsDefined(typeof(CompanyPlan), value) && !CompanyCapabilities.For((CompanyPlan)value).CustomBranding)
+            {
+                var standard = TenantBranding.Default;
+                return Results.Ok(result.Value with
+                {
+                    LogoReference = null,
+                    PrimaryColor = standard.PrimaryColor.Value,
+                    SecondaryColor = standard.SecondaryColor.Value,
+                    BannerReference = null
+                });
+            }
+
             // o banner de entrada fica fora do domínio: só informamos o endereço quando existe
             var banner = await db.Tenants.AsNoTracking()
                 .Where(item => item.Key == result.Value.TenantKey && item.PortalBannerData != null)
@@ -55,8 +70,11 @@ public static class TenantEndpoints
             UpdateTenantBrandingRequest request,
             HttpContext context,
             TenantBrandingService brandingService,
+            TenantPlanService plans,
             CancellationToken cancellationToken) =>
         {
+            if (!(await plans.CapabilitiesAsync(cancellationToken)).CustomBranding)
+                return Results.Problem(statusCode: 403, title: "tenant.branding.unavailable", detail: "A personalização da identidade visual não está disponível para a sua empresa.");
             var result = await brandingService.UpdateAsync(request, cancellationToken);
             return result.IsSuccess
                 ? Results.Ok(result.Value)

@@ -1001,7 +1001,8 @@ export interface CompanyCapabilities {
 }
 /** Which assuntos each plan cannot use (everything not listed is available). */
 export interface PlanSubjects {
-  courses: { id: string; title: string; description: string | null; videoCount: number; categoryId?: string | null }[];
+  /** companyId is set on an assunto with one company's internal videos: only that company sees it, and only on Diamante. */
+  courses: { id: string; title: string; description: string | null; videoCount: number; categoryId?: string | null; companyId?: string | null }[];
   excluded: Record<string, string[]>;
 }
 export function getPlanSubjects(): Promise<PlanSubjects> {
@@ -1009,6 +1010,10 @@ export function getPlanSubjects(): Promise<PlanSubjects> {
 }
 export async function setPlanSubjects(plan: CompanyPlan, excludedCourseIds: string[]): Promise<void> {
   await request(`/api/platform/catalog/plan-subjects/${plan}`, { method: 'PUT', body: JSON.stringify({ excludedCourseIds }) });
+}
+/** Makes an assunto the internal videos of one company (Diamante), or gives it back to every company (null). */
+export async function setSubjectCompany(courseId: string, companyId: string | null): Promise<void> {
+  await request(`/api/platform/catalog/plan-subjects/courses/${courseId}/company`, { method: 'PUT', body: JSON.stringify({ companyId }) });
 }
 
 export function getCompanyCapabilities(): Promise<CompanyCapabilities> {

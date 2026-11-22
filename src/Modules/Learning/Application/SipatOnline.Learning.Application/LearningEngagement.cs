@@ -93,8 +93,6 @@ public sealed class LearningEngagementService(
         if (candidate is null)
             return Failure<ParticipationCertificate>("learning.sipat_not_found", "O treinamento não foi encontrado para este participante.");
         if (candidate.Snapshot.IssuedAt != default) return Result<ParticipationCertificate>.Success(candidate.Snapshot);
-        if (candidate.Snapshot.CompanyLogo is null)
-            return Failure<ParticipationCertificate>("learning.certificate_logo_pending", "A empresa precisa cadastrar sua logo para liberar a emissão do certificado.");
         if (!candidate.IsEligible)
             return Failure<ParticipationCertificate>("learning.certificate_pending", "Conclua todos os cursos atribuídos a este treinamento para emitir o certificado.");
         var issued = await store.IssueAsync(candidate.Snapshot with { Id = Guid.NewGuid(), IssuedAt = timeProvider.GetUtcNow() }, token);

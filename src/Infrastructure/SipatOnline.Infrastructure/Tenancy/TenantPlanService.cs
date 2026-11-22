@@ -22,6 +22,49 @@ public sealed class TenantPlanService(PlatformDbContext db, ITenantContext tenan
     public async Task<IReadOnlySet<Guid>> ExcludedSubjectsAsync(CompanyPlan plan, CancellationToken token) =>
         (await db.PlanSubjectExclusions.AsNoTracking().Where(item => item.Plan == (int)plan).Select(item => item.CourseId).ToListAsync(token)).ToHashSet();
 
+    /// <summary>The assuntos that belong to one company (its internal videos), with the company of each.</summary>
+    public async Task<IReadOnlyDictionary<Guid, Guid>> CompanySubjectsAsync(CancellationToken token) =>
+        await db.CompanySubjects.AsNoTracking().ToDictionaryAsync(item => item.CourseId, item => item.TenantId, token);
+
+    /// <summary>
+    /// The assuntos a company cannot use: the ones its plan leaves out, the ones of other companies, and its own when its
+    /// plan does not include internal videos. Its own assuntos are not subject to the plan's list: only to Diamante.
+    /// </summary>
+    public async Task<IReadOnlySet<Guid>> HiddenSubjectsAsync(Guid tenantId, CompanyPlan plan, CancellationToken token)
+    {
+        var owned = await CompanySubjectsAsync(token);
+        var internalVideos = CompanyCapabilities.For(plan).InternalVideos;
+        var hidden = (await ExcludedSubjectsAsync(plan, token)).Where(id => !owned.TryGetValue(id, out var owner) || owner != tenantId).ToHashSet();
+        foreach (var (courseId, owner) in owned)
+            if (owner != tenantId || !internalVideos) hidden.Add(courseId);
+        return hidden;
+    }
+
+    /// <summary>What the company of the request cannot use (nothing when there is no company).</summary>
+    public async Task<IReadOnlySet<Guid>> HiddenSubjectsAsync(CancellationToken token) =>
+        tenantContext.CurrentTenantId is { IsEmpty: false } tenant
+            ? await HiddenSubjectsAsync(tenant.Value, await GetAsync(tenant.Value, token), token)
+            : new HashSet<Guid>();
+
+    /// <summary>The operator makes an assunto belong to one company (its internal videos), or gives it back to everyone.</summary>
+    public async Task<Result<bool>> SetSubjectCompanyAsync(Guid courseId, Guid? tenantId, CancellationToken token)
+    {
+        if (!actor.IsInRole(PlatformRoles.PlatformOperator) || tenantContext.CurrentTenantId is not null)
+            return Result<bool>.Failure(new DomainError("tenant.plan.forbidden", "Somente a operação pode decidir de qual empresa é um assunto."));
+        if (!await db.PlatformCourses.AnyAsync(item => item.Id == courseId, token))
+            return Result<bool>.Failure(new DomainError("tenant.subject.not_found", "O assunto não foi encontrado."));
+        if (tenantId is { } company && !await db.Tenants.AnyAsync(item => item.Id == company, token))
+            return Result<bool>.Failure(new DomainError("tenant.plan.not_found", "A empresa não foi encontrada."));
+        var current = await db.CompanySubjects.SingleOrDefaultAsync(item => item.CourseId == courseId, token);
+        if (tenantId is null && current is not null) db.CompanySubjects.Remove(current);
+        else if (tenantId is { } owner && current is null) db.CompanySubjects.Add(new CompanySubjectEntity { CourseId = courseId, TenantId = owner });
+        else if (tenantId is { } other && current is not null) current.TenantId = other;
+        await db.SaveChangesAsync(token);
+        await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantId is { } id ? new TenantId(id) : null, "plan.subject.company.changed", "course",
+            courseId.ToString("D"), clock.GetUtcNow()), token);
+        return Result<bool>.Success(true);
+    }
+
     /// <summary>The operator decides which assuntos of the catalog a plan cannot use.</summary>
     public async Task<Result<bool>> SetExcludedSubjectsAsync(CompanyPlan plan, IReadOnlyCollection<Guid> courseIds, CancellationToken token)
     {

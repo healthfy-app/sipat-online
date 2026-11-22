@@ -2,8 +2,8 @@ import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2,
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  cancelSipatEvent, copySipatPlan, createSipatEvent, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, saveSipatPlan, updateSipatEvent,
-  type SipatEvent, type SipatPlanSummary,
+  cancelSipatEvent, copySipatPlan, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, saveSipatPlan, updateSipatEvent,
+  type CompanyCapabilities, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -57,6 +57,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [others, setOthers] = useState<SipatEvent[]>([]);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
+  // what the company's plan allows; unknown (null) leaves everything open and the server decides
+  const [capabilities, setCapabilities] = useState<CompanyCapabilities | null>(null);
   const [sipat, setSipat] = useState<SipatEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -85,6 +87,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     setLoading(true); setError('');
     try {
       const [content, events, summaries] = await Promise.all([getSipatCatalog(), listSipatEvents(0, 100), listSipatPlans()]);
+      getCompanyCapabilities().then(setCapabilities).catch(() => setCapabilities(null));
       setCatalog(buildCatalog(content.courses, content.videos, content.games, content.categories ?? []));
       setPlans(summaries);
       setOthers(events.items);
@@ -267,6 +270,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   }
 
   const template = () => download('modelo-sipat.csv', sampleCsv(catalog));
+  // Bronze takes the ready modules as they are: a CSV with a grid of its own is a personalization (Prata and above)
+  const canCustomizeGrid = capabilities?.customizeGrid !== false;
   const sources = others.filter(item => item.id !== sipat?.id && (plans.find(plan => plan.sipatEventId === item.id)?.days ?? 0) > 0);
   const label = sipat ? phaseLabel[sipatPhase(sipat, days.filter(day => day.videos.some(Boolean)).length)] : null;
   // the name is edited in the title itself, while the SIPAT is a draft; after publishing it stays as it is
@@ -306,7 +311,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
           <DropdownMenuTrigger asChild><Button disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
           <DropdownMenuContent>
             {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
-            <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>
+            {canCustomizeGrid && <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>}
             <DropdownMenuItem disabled={days.length === 0} onSelect={exportCsv}><FileDown /> Exportar CSV</DropdownMenuItem>
             {sipat && <>
               <DropdownMenuSeparator />
@@ -325,10 +330,13 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       {issues.name ? 'Dê um nome ao treinamento. ' : ''}
       {Object.keys(issues.days).length > 0 && `${pluralize(Object.keys(issues.days).length, 'dia precisa', 'dias precisam')} de ajuste antes de salvar. Eles estão marcados em vermelho na grade.`}
     </p>}
+    {!canCustomizeGrid && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">
+      No plano {capabilities?.plan ?? 'Bronze'} cada dia recebe um módulo pronto, com todos os seus vídeos. A personalização da grade de vídeos começa no plano Prata.
+    </p>}
     {catalog.subjects.length === 0 && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">O acervo ainda não tem assuntos publicados. Peça à operação para publicar os assuntos.</p>}
 
     {stage === 'setup'
-      ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={() => setImporting(true)} onName={setName} onStart={start}
+      ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={canCustomizeGrid ? () => setImporting(true) : undefined} onName={setName} onStart={start}
         onStartDate={setStartDate} onTemplate={template} startDate={startDate}
         onCopy={sources.length > 0 ? () => setCopying(true) : undefined} />
       : <BuilderGrid canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined}

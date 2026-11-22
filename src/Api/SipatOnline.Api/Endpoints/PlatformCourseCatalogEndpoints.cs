@@ -482,9 +482,10 @@ public static class PlatformCourseCatalogEndpoints
             SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             CancellationToken cancellationToken) =>
         {
+            var owners = await plans.CompanySubjectsAsync(cancellationToken);
             var published = (await courses.ListAsync(cancellationToken))
                 .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
-                .Select(course => new PlanSubjectCourse(course.Id, course.Title, course.Description, course.Videos.Count, course.CategoryId))
+                .Select(course => new PlanSubjectCourse(course.Id, course.Title, course.Description, course.Videos.Count, course.CategoryId, owners.TryGetValue(course.Id, out var owner) ? owner : null))
                 .ToArray();
             var excluded = new Dictionary<string, IReadOnlyList<Guid>>();
             foreach (var plan in Enum.GetValues<SipatOnline.Infrastructure.Tenancy.CompanyPlan>())
@@ -515,6 +516,20 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("SetPlanSubjects");
 
+        // an assunto with a company's internal videos: only that company sees it, and only on Diamante
+        group.MapPut("/courses/{courseId:guid}/company", async (
+            Guid courseId,
+            SetSubjectCompanyRequest request,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await plans.SetSubjectCompanyAsync(courseId, request.CompanyId, cancellationToken);
+            return result.IsSuccess
+                ? Results.NoContent()
+                : Results.Problem(statusCode: result.Error.Code.EndsWith("not_found", StringComparison.Ordinal) ? 404 : 403, title: result.Error.Code, detail: result.Error.Message);
+        })
+        .WithName("SetSubjectCompany");
+
         return endpoints;
     }
 
@@ -533,7 +548,8 @@ public static class PlatformCourseCatalogEndpoints
             CancellationToken cancellationToken) =>
         {
             var capabilities = await plans.CapabilitiesAsync(cancellationToken);
-            var excluded = await plans.ExcludedSubjectsAsync(await plans.CurrentAsync(cancellationToken), cancellationToken);
+            // the assuntos of its plan, without other companies' own ones; its own (internal videos) only on Diamante
+            var excluded = await plans.HiddenSubjectsAsync(cancellationToken);
             var themes = (await courses.ListAsync(cancellationToken))
                 .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
                 .Where(course => !excluded.Contains(course.Id))
@@ -758,7 +774,10 @@ public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Vi
 
 public sealed record PlanSubjectsResponse(IReadOnlyList<PlanSubjectCourse> Courses, IReadOnlyDictionary<string, IReadOnlyList<Guid>> Excluded);
 
-public sealed record PlanSubjectCourse(Guid Id, string Title, string? Description, int VideoCount, Guid? CategoryId = null);
+/// <summary>An assunto of the catalog; CompanyId is set when it belongs to one company (its internal videos).</summary>
+public sealed record PlanSubjectCourse(Guid Id, string Title, string? Description, int VideoCount, Guid? CategoryId = null, Guid? CompanyId = null);
+
+public sealed record SetSubjectCompanyRequest(Guid? CompanyId);
 
 public sealed record SetPlanSubjectsRequest(IReadOnlyList<Guid>? ExcludedCourseIds);
 

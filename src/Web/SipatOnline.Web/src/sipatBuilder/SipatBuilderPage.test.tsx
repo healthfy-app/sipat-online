@@ -7,7 +7,7 @@ import SipatBuilderPage, { findIssues } from './SipatBuilderPage';
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api')>()),
-  getSipatCatalog: vi.fn(), listSipatEvents: vi.fn(), listSipatPlans: vi.fn(), getSipatPlan: vi.fn(), saveSipatPlan: vi.fn(), cancelSipatEvent: vi.fn(),
+  getSipatCatalog: vi.fn(), listSipatEvents: vi.fn(), listSipatPlans: vi.fn(), getSipatPlan: vi.fn(), saveSipatPlan: vi.fn(), cancelSipatEvent: vi.fn(), getCompanyCapabilities: vi.fn(),
 }));
 afterEach(cleanup);
 
@@ -23,6 +23,7 @@ beforeEach(() => {
     { id: 'd2', title: '', date: '2026-11-10', subject: null, videoIds: [], gameIds: [] },
   ]);
   vi.mocked(api.saveSipatPlan).mockClear();
+  vi.mocked(api.getCompanyCapabilities).mockResolvedValue({ customizeGrid: true, customBranding: true, customCertificate: true, quizzes: true, internalVideos: true, plan: 'Diamante' });
 });
 
 function renderBuilder() {
@@ -35,6 +36,15 @@ function renderBuilder() {
 }
 
 describe('SIPAT builder', () => {
+  it('on Bronze takes the ready modules as they are: no CSV with a grid of its own', async () => {
+    vi.mocked(api.getCompanyCapabilities).mockResolvedValue({ customizeGrid: false, customBranding: false, customCertificate: false, quizzes: false, internalVideos: false, plan: 'Bronze' });
+    renderBuilder();
+    expect(await screen.findByText(/No plano Bronze cada dia recebe um módulo pronto/)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Mais/ }));
+    expect(await screen.findByRole('menuitem', { name: /Exportar CSV/ })).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: /Importar CSV/ })).not.toBeInTheDocument();
+  });
+
   it('lists what is missing on each day, by position', () => {
     const issues = findIssues('', [
       { key: 'a', title: 'Abertura', date: '2026-11-09', subject: '', videos: ['v1'], games: [] },

@@ -25,13 +25,12 @@ describe('certificates', () => {
     expect(screen.getByText('10/11/2025 a 14/11/2025')).toBeVisible();
     expect(screen.getAllByRole('button', { name: 'Emitir certificado' })).toHaveLength(1);
   });
-  it('explains a missing company logo without asking a completed participant to watch again', async () => {
-    vi.mocked(api.listCertificates).mockResolvedValue([{ ...pending, completedCourses: 2, hasCompanyLogo: false }]);
+  it('lets a participant who finished issue the standard certificate even when the company has no logo on it', async () => {
+    vi.mocked(api.listCertificates).mockResolvedValue([{ ...pending, completedCourses: 2, isEligible: true, hasCompanyLogo: false }]);
     render(<CertificatesPage />);
-    expect(await screen.findByText(/A empresa precisa cadastrar a logo/)).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Emitir certificado' })).toBeDisabled();
-    expect(screen.queryByText(/Conclua os dias pendentes/)).not.toBeInTheDocument();
-    expect(api.issueCertificate).not.toHaveBeenCalled();
+    expect(await screen.findByText('Tudo pronto para emitir seu certificado.')).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Emitir certificado' })).toBeEnabled();
+    expect(screen.queryByText(/logo/)).not.toBeInTheDocument();
   });
   it('shows actual missing courses and prevents premature issuance', async () => {
     vi.mocked(api.listCertificates).mockResolvedValue([pending]);

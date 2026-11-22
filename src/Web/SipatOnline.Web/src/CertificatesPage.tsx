@@ -57,10 +57,8 @@ export default function CertificatesPage() {
         <a className="button button-primary" href={`/api/learning/certificates/${item.certificate.id}/pdf`}>Baixar certificado PDF</a>
         <small>Identificador: {item.certificate.id}</small>
       </div> : <>
-        <p className="muted-copy">{item.isEligible ? 'Tudo pronto para emitir seu certificado com a logo da sua empresa.'
-          : item.completedCourses === item.totalCourses && !item.hasCompanyLogo
-            ? 'Todos os dias estão concluídos. A empresa precisa cadastrar a logo para liberar a emissão.'
-            : 'Conclua os dias pendentes. Cada vídeo exige pelo menos 90% de cobertura reproduzida.'}</p>
+        <p className="muted-copy">{item.isEligible ? 'Tudo pronto para emitir seu certificado.'
+          : 'Conclua os dias pendentes. Cada vídeo exige pelo menos 90% de cobertura reproduzida.'}</p>
         <button className="button button-primary" aria-busy={busy === item.sipatEventId} disabled={!item.isEligible || !!busy} onClick={() => void issue(item)} type="button">
           {busy === item.sipatEventId ? 'Emitindo...' : 'Emitir certificado'}
         </button>

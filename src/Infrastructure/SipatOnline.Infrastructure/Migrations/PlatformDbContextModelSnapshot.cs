@@ -1192,6 +1192,21 @@ namespace SipatOnline.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity", b =>
+                {
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("CourseId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("CompanySubjects", "tenancy");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity", b =>
                 {
                     b.Property<int>("Plan")

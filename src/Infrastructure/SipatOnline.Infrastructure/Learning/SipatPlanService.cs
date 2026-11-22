@@ -81,24 +81,8 @@ public sealed class SipatPlanService(
         if (sipat.Status == SipatEventStatus.Cancelled)
             return Failure<IReadOnlyList<ProgramDay>>("sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado.");
 
-        var capabilities = await plans.CapabilitiesAsync(token);
-        // the quiz at the end of each module is part of the top plan only
-        if (!capabilities.Quizzes && days is not null)
-            days = days.Select(day => day with { GameIds = [] }).ToArray();
-
-        var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token);
+        var cleaned = await ApplyPlanAsync(days, token);
         if (!cleaned.IsSuccess) return cleaned;
-
-        // the videos of a day come from the assuntos the company's plan can use
-        var excluded = await plans.ExcludedSubjectsAsync(await plans.CurrentAsync(token), token);
-        if (excluded.Count > 0)
-        {
-            var blocked = (await catalog.ListAsync(token)).Where(course => excluded.Contains(course.Id)).SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
-            var allowed = (await catalog.ListAsync(token)).Where(course => !excluded.Contains(course.Id)).SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
-            var outside = cleaned.Value.FirstOrDefault(day => day.VideoIds.Any(id => blocked.Contains(id) && !allowed.Contains(id)));
-            if (outside is not null)
-                return Failure<IReadOnlyList<ProgramDay>>("sipat.subject_not_allowed", $"O dia \"{outside.Title}\" usa um assunto que não está disponível para a sua empresa.");
-        }
 
         var now = clock.GetUtcNow();
         var plan = await db.SipatPlans.SingleOrDefaultAsync(item => item.SipatEventId == sipatId, token);
@@ -147,9 +131,13 @@ public sealed class SipatPlanService(
             return Failure<ProgramApplication>("sipat.cancelled", "Este treinamento foi cancelado e não pode ser publicado.");
 
         var plan = await db.SipatPlans.AsNoTracking().SingleOrDefaultAsync(item => item.SipatEventId == sipatId, token);
-        var days = plan is null ? [] : Read(plan);
-        if (days.Count == 0)
+        var saved = plan is null ? [] : Read(plan);
+        if (saved.Count == 0)
             return Failure<ProgramApplication>("sipat.plan_empty", "Monte os dias do treinamento antes de publicar.");
+        // the plan may have changed since the days were saved: what goes live is what the plan allows today
+        var allowed = await ApplyPlanAsync(saved, token);
+        if (!allowed.IsSuccess) return Result<ProgramApplication>.Failure(allowed.Error);
+        var days = allowed.Value;
 
         if (sipat.Status != SipatEventStatus.Published)
         {
@@ -160,6 +148,52 @@ public sealed class SipatPlanService(
         }
 
         return await distribution.ApplyDaysAsync(sipat.TenantId, sipatId, days, sipatId, "learning.sipat.launched", "sipat_event", token);
+    }
+
+    /// <summary>
+    /// The rules of the company's plan (sipatonline.com.br/plans.html) applied to the days:
+    /// every plan picks among the ready modules (the assuntos its plan can use); Bronze takes each assunto whole, one per day,
+    /// and Prata and above personalize the grid of videos; the quiz at the end of each module is Diamante only, and so are
+    /// the company's internal videos (the assuntos that belong to it).
+    /// </summary>
+    private async Task<Result<IReadOnlyList<ProgramDay>>> ApplyPlanAsync(IReadOnlyList<ProgramDay>? days, CancellationToken token)
+    {
+        var capabilities = await plans.CapabilitiesAsync(token);
+        if (!capabilities.Quizzes && days is not null)
+            days = days.Select(day => day with { GameIds = [] }).ToArray();
+
+        var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token);
+        if (!cleaned.IsSuccess) return cleaned;
+
+        var hidden = await plans.HiddenSubjectsAsync(token);
+        var courses = (await catalog.ListAsync(token))
+            .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
+            .ToArray();
+        var available = courses.Where(course => !hidden.Contains(course.Id)).ToArray();
+        // a video is blocked when it lives only in assuntos the company cannot use (a video outside any assunto is not)
+        var allowedVideos = available.SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
+        var blockedVideos = (await catalog.ListAsync(token)).Where(course => hidden.Contains(course.Id))
+            .SelectMany(course => course.Videos.Select(video => video.Id)).Where(id => !allowedVideos.Contains(id)).ToHashSet();
+        var outside = cleaned.Value.FirstOrDefault(day => day.VideoIds.Any(blockedVideos.Contains));
+        if (outside is not null)
+            return Failure<IReadOnlyList<ProgramDay>>("sipat.subject_not_allowed", $"O dia \"{outside.Title}\" usa um assunto que não está disponível para a sua empresa.");
+
+        if (capabilities.CustomizeGrid) return cleaned;
+
+        // Bronze: a day is one ready module as it is, all of its videos in its order
+        var result = new List<ProgramDay>(cleaned.Value.Count);
+        foreach (var day in cleaned.Value)
+        {
+            var picked = day.VideoIds.ToHashSet();
+            var module = available
+                .Select(course => course.Videos.Where(video => video.Status == PlatformVideoStatus.Ready).Select(video => video.Id).ToArray())
+                .FirstOrDefault(videos => videos.Length == picked.Count && videos.All(picked.Contains));
+            if (module is null)
+                return Failure<IReadOnlyList<ProgramDay>>("sipat.grid_not_customizable",
+                    $"No seu plano cada dia é um módulo pronto, com todos os seus vídeos. O dia \"{day.Title}\" mistura ou deixa vídeos de fora; a personalização da grade começa no plano Prata.");
+            result.Add(day with { VideoIds = module });
+        }
+        return Result<IReadOnlyList<ProgramDay>>.Success(result);
     }
 
     private Result<Guid> Tenant() =>
