@@ -192,7 +192,7 @@ export default function TenantLearningDashboardPage({
               </section>
             )}
 
-            <section aria-label="Progresso de todos os participantes" className="grid items-start gap-4 lg:grid-cols-2">
+            <section aria-label="Progresso de todos os participantes" className="grid gap-4 lg:grid-cols-2">
               <Panel count={pluralize(overview.participantCount, 'participante', 'participantes')} id="participant-distribution-title" title="Situação dos participantes">
                 {overview.participantCount === 0 ? (
                   <p className="m-0 text-sm text-muted-foreground">Sem participantes para distribuir.</p>
@@ -206,7 +206,7 @@ export default function TenantLearningDashboardPage({
               </Panel>
             </section>
 
-            <section aria-label="Engajamento e conclusão por dia" className="grid items-start gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+            <section aria-label="Engajamento e conclusão por dia" className="grid gap-4 lg:grid-cols-2">
               <Panel count="Últimos 14 dias" id="recent-activity-title" title="Engajamento">
                 <RecentActivity participation={data.participation} />
               </Panel>
@@ -501,7 +501,7 @@ function TrackMeterList({ overview }: { overview: CompanyLearningOverview }) {
   return (
     <div className="grid gap-3">
       <p className="m-0 text-xs text-muted-foreground">Do menor para o maior progresso médio: os primeiros pedem atenção.</p>
-      <ul className="m-0 grid list-none gap-x-8 gap-y-4 p-0 lg:grid-cols-2">
+      <ul className="m-0 grid list-none gap-x-8 gap-y-4 p-0">
         {tracks.map((track) => (
           <li className="grid gap-1.5" key={track.trackId}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">

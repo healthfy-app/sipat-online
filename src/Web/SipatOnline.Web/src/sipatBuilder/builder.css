@@ -5,6 +5,8 @@
   .builder-add-day { animation: builder-fade 300ms ease both; }
 }
 @keyframes builder-col-in { from { opacity: 0; transform: translateX(14px); } }
+/* on the phone, where the days are stacked, the cells rise instead (set with `[animation-name:builder-col-up]` in BuilderGrid) */
+@keyframes builder-col-up { from { opacity: 0; transform: translateY(10px); } }
 @keyframes builder-pop { from { opacity: 0.4; transform: scale(0.96); } }
 @keyframes builder-fade { from { opacity: 0; } }
 

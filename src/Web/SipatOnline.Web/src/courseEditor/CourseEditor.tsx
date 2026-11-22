@@ -69,7 +69,7 @@ export default function CourseEditor({
   const [activeDialog, setActiveDialog] = useState<'video' | 'games' | null>(null);
   const [addTarget, setAddTarget] = useState<string | null>(null);
   const [activityPosition, setActivityPosition] = useState<number | null>(null);
-  const [previewSize, setPreviewSize] = useState<PreviewSize>('phone');
+  const [previewSize, setPreviewSize] = useState<PreviewSize>('desktop');
   const [selectedKey, setSelectedKey] = useState<string | null>(
     () => (course.videos[0] ? `video-${course.videos[0].id}` : null),
   );

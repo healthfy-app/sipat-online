@@ -244,6 +244,10 @@ describe('learning experience', () => {
     atTime(video, 5);
     fireEvent.ended(video);
 
+    // the finished video shows the countdown to the next one; "Assistir agora" skips the wait
+    const upNext = await screen.findByRole('dialog', { name: 'Próximo vídeo' });
+    expect(within(upNext).getByText('Próximos passos')).toBeVisible();
+    fireEvent.click(within(upNext).getByRole('button', { name: 'Assistir agora' }));
     await waitFor(() => expect(container.querySelector('video'))
       .toHaveAttribute('src', 'https://media.example.test/lesson-2.mp4'));
     expect(screen.getByRole('heading', { name: 'Próximos passos' })).toBeVisible();
@@ -1151,6 +1155,7 @@ describe('extras in the day', () => {
     await waitFor(() => expect(screen.getByText('1 de 1 vídeos · 100%')).toBeVisible());
     expect(screen.getByRole('status', { name: 'Tudo assistido' })).toBeVisible();
     // after a house video ends the way forward can be the extra
+    fireEvent.click(await screen.findByRole('button', { name: 'Assistir agora' }));
     await waitFor(() => expect(container.querySelector('iframe')).toBeInTheDocument());
   });
 
