@@ -7,6 +7,7 @@ using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.Infrastructure;
 using SipatOnline.Infrastructure.Identity;
 using SipatOnline.Infrastructure.Learning;
+using SipatOnline.Sipats.Domain.Sipats;
 using Testcontainers.PostgreSql;
 
 namespace SipatOnline.IntegrationTests;
@@ -57,21 +58,28 @@ public sealed class DevelopmentDemoPresentationTests
         var tracks = await db.LearningTracks.AsNoTracking().ToListAsync();
         var assignments = await db.LearningAssignments.AsNoTracking().ToListAsync();
         Assert.Equal(20, participants.Count);
-        Assert.Equal(180, tracks.Count);
-        // each participant receives the week of the company: the six days of option 1
-        Assert.Equal(120, assignments.Count);
+        Assert.Equal(190, tracks.Count);
+        // each participant receives the week of the company (the six days of option 1) and the fire training beside it
+        Assert.Equal(140, assignments.Count);
 
         foreach (var tenant in tenants)
         {
             var tenantParticipants = participants.Where(user => user.TenantId == tenant.Id).ToArray();
-            Assert.Equal(18, tracks.Count(track => track.TenantId == tenant.Id));
-            var days = tracks.Where(track => track.TenantId == tenant.Id && track.DayPosition != null)
+            Assert.Equal(19, tracks.Count(track => track.TenantId == tenant.Id));
+            var days = tracks.Where(track => track.TenantId == tenant.Id && track.DayPosition != null && track.DayDate != null)
                 .OrderBy(track => track.DayPosition).ToArray();
             Assert.Equal([1, 2, 3, 4, 5, 6], days.Select(track => track.DayPosition!.Value));
             Assert.Equal("Boa postura e movimento, mais saúde em cada momento!", days[0].DayTitle);
             Assert.Equal(new DateOnly(2026, 11, 9), days[0].DayDate);
             Assert.All(days, day => Assert.StartsWith("Opção 1 · ", day.Title));
-            var tenantTracks = days.Select(track => track.Id).OrderBy(id => id).ToArray();
+            // two trainings run at once: the SIPAT and a fire training of one module without a date
+            var trainings = await db.SipatEvents.AsNoTracking().Where(item => item.TenantId == tenant.Id && item.Status == SipatEventStatus.Published).ToListAsync();
+            Assert.Equal(2, trainings.Count);
+            var fire = Assert.Single(trainings, item => item.Title == "Treinamento contra incêndios");
+            var fireModule = Assert.Single(tracks, track => track.SipatEventId == fire.Id);
+            Assert.Equal(1, fireModule.DayPosition);
+            Assert.Null(fireModule.DayDate);
+            var tenantTracks = days.Select(track => track.Id).Append(fireModule.Id).OrderBy(id => id).ToArray();
             Assert.Equal(2, tenantParticipants.Length);
             foreach (var participant in tenantParticipants)
             {
@@ -90,15 +98,15 @@ public sealed class DevelopmentDemoPresentationTests
         Assert.True(await userManager.IsInRoleAsync(sampleParticipant, PlatformRoles.Participant));
 
         var revisions = await db.LearningTrackRevisions.AsNoTracking().ToListAsync();
-        Assert.Equal(180, revisions.Count);
+        Assert.Equal(190, revisions.Count);
         Assert.All(tracks, track => Assert.Contains(revisions, revision =>
             revision.Id == track.CurrentRevisionId && revision.TrackId == track.Id &&
             revision.TenantId == track.TenantId && revision.Status == "Published"));
-        Assert.Equal(1050, await db.LearningLessons.CountAsync());
+        Assert.Equal(1070, await db.LearningLessons.CountAsync());
         Assert.Equal(
             new[] { "development:mdn-flower-demo" },
             await db.LearningLessons.Select(lesson => lesson.ProviderAssetReference).Distinct().ToArrayAsync());
-        Assert.Equal(10, await db.SipatEvents.CountAsync());
+        Assert.Equal(20, await db.SipatEvents.CountAsync()); // the SIPAT and the fire training of each company
         Assert.Equal(18, await db.PlatformCourses.CountAsync());
         var video = Assert.Single(await db.PlatformCourseVideos.AsNoTracking().ToListAsync());
         Assert.Equal(Guid.Parse(DevelopmentDemoPresentationInitializer.SharedVideoId), video.Id);
