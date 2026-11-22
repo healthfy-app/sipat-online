@@ -64,6 +64,8 @@ public sealed class CompanyRegistryService(
 
         if (added > 0)
         {
+            // the audit goes in the same save as the change: written after it, it would never be saved
+            await WriteAuditAsync(kind == RegistryKind.Unit ? "identity.registry.unit_added" : "identity.registry.sector_added", kind, tenant.ToString("D"), token);
             try
             {
                 await db.SaveChangesAsync(token);
@@ -74,8 +76,6 @@ public sealed class CompanyRegistryService(
                 db.ChangeTracker.Clear();
                 return Failure<CompanyRegistry>("registry.name.duplicate", "Já existe um item com esse nome.");
             }
-
-            await WriteAuditAsync(kind == RegistryKind.Unit ? "identity.registry.unit_added" : "identity.registry.sector_added", kind, tenant.ToString("D"), token);
         }
 
         return Result<CompanyRegistry>.Success(await LoadAsync(tenant, token));
@@ -99,9 +99,8 @@ public sealed class CompanyRegistryService(
                 return Duplicate();
             if (newName is not null) { unit.Name = newName; unit.NameKey = newKey!; }
             if (isActive is not null) unit.IsActive = isActive.Value;
-            var failed = await SaveAsync(unit, token);
+            var failed = await SaveAsync(unit, "identity.registry.unit_updated", kind, id, token);
             if (failed is not null) return failed;
-            await WriteAuditAsync("identity.registry.unit_updated", kind, id.ToString("D"), token);
             return Result<RegistryItem>.Success(new RegistryItem(unit.Id, unit.Name, unit.IsActive,
                 await Participants(tenant).CountAsync(user => user.UnitId == id, token)));
         }
@@ -112,9 +111,8 @@ public sealed class CompanyRegistryService(
             return Duplicate();
         if (newName is not null) { sector.Name = newName; sector.NameKey = newKey!; }
         if (isActive is not null) sector.IsActive = isActive.Value;
-        var sectorFailed = await SaveAsync(sector, token);
+        var sectorFailed = await SaveAsync(sector, "identity.registry.sector_updated", kind, id, token);
         if (sectorFailed is not null) return sectorFailed;
-        await WriteAuditAsync("identity.registry.sector_updated", kind, id.ToString("D"), token);
         return Result<RegistryItem>.Success(new RegistryItem(sector.Id, sector.Name, sector.IsActive,
             await Participants(tenant).CountAsync(user => user.SectorId == id, token)));
     }
@@ -136,8 +134,12 @@ public sealed class CompanyRegistryService(
         row.RequirePhone = rules.RequirePhone;
         row.RequireUnit = rules.RequireUnit;
         row.RequireSector = rules.RequireSector;
-        await db.SaveChangesAsync(token);
-        await WriteAuditAsync("identity.registry.rules_changed", null, tenant.ToString("D"), token);
+        if (db.ChangeTracker.HasChanges())
+        {
+            await WriteAuditAsync("identity.registry.rules_changed", null, tenant.ToString("D"), token);
+            await db.SaveChangesAsync(token);
+        }
+
         return Result<ProfileRules>.Success(rules);
     }
 
@@ -174,8 +176,11 @@ public sealed class CompanyRegistryService(
             ? await db.CompanyUnits.Where(item => item.TenantId == tenant).Select(item => item.NameKey).ToListAsync(token)
             : await db.CompanySectors.Where(item => item.TenantId == tenant).Select(item => item.NameKey).ToListAsync(token);
 
-    private async Task<Result<RegistryItem>?> SaveAsync(object tracked, CancellationToken token)
+    /// <summary>Saves an item with its audit in the same save; an update that changed nothing saves and audits nothing.</summary>
+    private async Task<Result<RegistryItem>?> SaveAsync(object tracked, string auditAction, RegistryKind kind, Guid id, CancellationToken token)
     {
+        if (db.Entry(tracked).State != EntityState.Modified) return null;
+        await WriteAuditAsync(auditAction, kind, id.ToString("D"), token);
         try
         {
             await db.SaveChangesAsync(token);
@@ -183,7 +188,8 @@ public sealed class CompanyRegistryService(
         }
         catch (DbUpdateException exception) when (IsUniqueViolation(exception))
         {
-            db.Entry(tracked).State = EntityState.Detached;
+            // neither the item nor its audit stays tracked
+            db.ChangeTracker.Clear();
             return Duplicate();
         }
     }

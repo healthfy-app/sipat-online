@@ -238,6 +238,40 @@ public sealed class CompanyRegistryApiTests
         Assert.Equal(HttpStatusCode.Forbidden, rules.StatusCode);
     }
 
+    [DockerFact]
+    public async Task RegistryChanges_LeaveAnAuditRow_ButNoChangeLeavesNone()
+    {
+        await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
+        await postgres.StartAsync();
+        await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        await InitializeDatabaseAsync(factory);
+        using var admin = CreateClient(factory);
+        await SignInAdminAsync(admin);
+        var token = await GetAntiforgeryTokenAsync(admin);
+
+        using var added = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Post, "/api/admin/registry/sectors",
+            new AddRegistryItemsRequest(["Produção"]), token);
+        var sector = (await added.Content.ReadFromJsonAsync<CompanyRegistry>())!.Sectors.Single();
+        using (var renamed = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, $"/api/admin/registry/sectors/{sector.Id:D}",
+            new UpdateRegistryItemRequest("Produção Sul", null), token))
+            Assert.Equal(HttpStatusCode.OK, renamed.StatusCode);
+        using (var same = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, $"/api/admin/registry/sectors/{sector.Id:D}",
+            new UpdateRegistryItemRequest("Produção Sul", true), token))
+            Assert.Equal(HttpStatusCode.OK, same.StatusCode);
+        using (var rules = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, "/api/admin/registry/rules",
+            new ProfileRules(false, true, false, false, false), token))
+            Assert.Equal(HttpStatusCode.OK, rules.StatusCode);
+        using (var sameRules = await SendJsonWithAntiforgeryAsync(admin, HttpMethod.Put, "/api/admin/registry/rules",
+            new ProfileRules(false, true, false, false, false), token))
+            Assert.Equal(HttpStatusCode.OK, sameRules.StatusCode);
+
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        Assert.Equal(1, await db.AuditEntries.CountAsync(entry => entry.Action == "identity.registry.sector_added"));
+        Assert.Equal(1, await db.AuditEntries.CountAsync(entry => entry.Action == "identity.registry.sector_updated" && entry.SubjectId == sector.Id.ToString("D")));
+        Assert.Equal(1, await db.AuditEntries.CountAsync(entry => entry.Action == "identity.registry.rules_changed"));
+    }
+
     private static HttpClient CreateClient(SipatOnlineApiFactory factory) =>
         factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {

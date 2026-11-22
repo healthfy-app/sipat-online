@@ -34,17 +34,19 @@ public sealed class EmployeeCredentialService(
 
         user.EmployeeIdentifier = login.Value.Value;
         user.NormalizedEmployeeIdentifier = login.Value.NormalizedValue;
+        // the audit goes in the same save as the change: written after it, it would never be saved
+        await WriteAuditAsync("identity.user.login_changed", userId, token);
         try
         {
             await db.SaveChangesAsync(token);
         }
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
-            db.Entry(user).State = EntityState.Detached;
+            // neither the change nor its audit stays tracked
+            db.ChangeTracker.Clear();
             return Failure<string>("identity.login_identifier.duplicate", "Já existe uma conta com esse login nesta empresa.");
         }
 
-        await WriteAuditAsync("identity.user.login_changed", userId, token);
         return Result<string>.Success(user.EmployeeIdentifier);
     }
 
@@ -61,12 +63,13 @@ public sealed class EmployeeCredentialService(
         if (!result.Succeeded)
             return Failure<bool>("identity.password.invalid", "A senha não atende aos requisitos de segurança.");
 
+        // the audit is saved with the next update of the account (UserManager saves the same context)
+        await WriteAuditAsync("identity.user.password_reset", userId, token);
         // the old sessions of that person stop being valid with the old password
         await users.UpdateSecurityStampAsync(user);
         // a new password is how the administrator gets a locked-out collaborator back in on the day
         await users.SetLockoutEndDateAsync(user, null);
         await users.ResetAccessFailedCountAsync(user);
-        await WriteAuditAsync("identity.user.password_reset", userId, token);
         return Result<bool>.Success(true);
     }
 
