@@ -27,24 +27,36 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         page.Height = XUnit.FromPoint(595);
         using var graphics = XGraphics.FromPdfPage(page);
         PdfAccentGlyphs.Embed(graphics, "SipatCertificate");
-        var ink = new XSolidBrush(XColor.FromArgb(16, 45, 38));
-        graphics.DrawRectangle(new XSolidBrush(XColor.FromArgb(247, 249, 246)), 0, 0, page.Width.Point, page.Height.Point);
-        graphics.DrawRectangle(new XPen(XColor.FromArgb(16, 45, 38), 2), 24, 24, 794, 547);
-        graphics.DrawRectangle(ink, 48, 48, 74, 74);
+        var inkColor = XColor.FromArgb(16, 45, 38);
+        var greenColor = XColor.FromArgb(20, 105, 75);
+        var goldColor = XColor.FromArgb(201, 162, 39);
+        var ink = new XSolidBrush(inkColor);
+        var muted = new XSolidBrush(XColor.FromArgb(96, 112, 104));
+        var green = new XSolidBrush(greenColor);
+
+        // paper, a double frame and a band of the product's colors on the left
+        graphics.DrawRectangle(XBrushes.White, 0, 0, page.Width.Point, page.Height.Point);
+        graphics.DrawRectangle(green, 0, 0, 14, page.Height.Point);
+        graphics.DrawRectangle(new XSolidBrush(goldColor), 14, 0, 4, page.Height.Point);
+        graphics.DrawRectangle(new XPen(greenColor, 1.6), 34, 22, 786, 551);
+        graphics.DrawRectangle(new XPen(XColor.FromArgb(200, 214, 206), 0.6), 40, 28, 774, 539);
+
+        graphics.DrawRectangle(new XSolidBrush(inkColor), 64, 50, 58, 58);
         using var logoStream = Asset("sipat-online-logo.png");
         using var logo = XImage.FromStream(logoStream);
-        graphics.DrawImage(logo, 54, 54, 62, 62);
+        graphics.DrawImage(logo, 69, 55, 48, 48);
+        graphics.DrawString("SIPAT Online", new XFont("SipatCertificate", 11), ink, new XRect(132, 66, 200, 16), XStringFormats.TopLeft);
         if (certificate.CompanyLogo is { } companyLogo)
         {
             using var companyStream = new MemoryStream(companyLogo.Data);
             using var companyImage = XImage.FromStream(companyStream);
-            var scale = Math.Min(210d / companyImage.PixelWidth, 68d / companyImage.PixelHeight);
+            var scale = Math.Min(200d / companyImage.PixelWidth, 58d / companyImage.PixelHeight);
             var width = companyImage.PixelWidth * scale;
             var height = companyImage.PixelHeight * scale;
-            graphics.DrawImage(companyImage, 784 - width, 54 + (68 - height) / 2, width, height);
+            graphics.DrawImage(companyImage, 790 - width, 50 + (58 - height) / 2, width, height);
         }
-        var small = new XFont("SipatCertificate", 10);
-        void Block(string text, double top, double height, double preferredSize)
+        var small = new XFont("SipatCertificate", 9);
+        void Block(string text, double top, double height, double preferredSize, XBrush? brush = null)
         {
             for (var size = preferredSize; size >= 8; size--)
             {
@@ -69,29 +81,59 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
                 if (line.Length > 0) lines.Add(line);
                 if (lines.Count * lineHeight > height) continue;
                 for (var index = 0; index < lines.Count; index++)
-                    graphics.DrawString(lines[index], font, ink,
+                    graphics.DrawString(lines[index], font, brush ?? ink,
                         new XRect(76, top + index * lineHeight, 690, lineHeight), XStringFormats.TopCenter);
                 return;
             }
             throw new InvalidOperationException("Certificate text exceeds its bounded layout.");
         }
-        Block(certificate.IsDemonstration ? "CERTIFICADO DEMONSTRATIVO" : "CERTIFICADO DE PARTICIPAÇÃO", 145, 44, 26);
-        Block("Certificamos a participação de", 197, 24, 13);
-        Block(certificate.ParticipantName, 224, 56, 22);
-        Block($"da empresa {certificate.CompanyName}", 285, 43, 14);
-        Block($"na programação {certificate.EventTitle}.", 333, 55, 14);
-        Block($"Período: {certificate.StartsAt:dd/MM/yyyy} a {certificate.EndsAt:dd/MM/yyyy}.", 391, 24, 12);
-        var duration = TimeSpan.FromMilliseconds(certificate.DurationMilliseconds);
-        Block($"Duração dos conteúdos cadastrados: {(long)duration.TotalHours:00}h {duration.Minutes:00}min {duration.Seconds:00}s.", 419, 24, 12);
-        Block($"Emitido em {certificate.IssuedAt:dd/MM/yyyy} (UTC).", 447, 20, 12);
+
+        Block(certificate.IsDemonstration ? "CERTIFICADO DEMONSTRATIVO" : "CERTIFICADO", 128, 22, 13, green);
+        Block("de participação", 150, 44, 32);
+        graphics.DrawLine(new XPen(goldColor, 2), 391, 200, 451, 200);
+        Block("Certificamos que", 216, 22, 13, muted);
+        Block(certificate.ParticipantName, 240, 60, 28);
+        graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.8), 231, 304, 611, 304);
+        Block($"da empresa {certificate.CompanyName}, participou do treinamento", 316, 40, 14);
+        Block(certificate.EventTitle, 358, 50, 18, green);
+        var period = Period(certificate.StartsAt, certificate.EndsAt);
+        Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", 412, 24, 13, muted);
+
+        // footer: issue date on the left, the code on the right, the notice in the middle
+        graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.6), 64, 478, 790, 478);
+        var label = new XFont("SipatCertificate", 8);
+        var value = new XFont("SipatCertificate", 12);
+        graphics.DrawString("EMITIDO EM", label, muted, new XRect(64, 490, 220, 12), XStringFormats.TopLeft);
+        graphics.DrawString(certificate.IssuedAt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), value, ink, new XRect(64, 503, 220, 18), XStringFormats.TopLeft);
+        graphics.DrawString("IDENTIFICADOR", label, muted, new XRect(540, 490, 250, 12), XStringFormats.TopRight);
+        graphics.DrawString(certificate.Id.ToString("D"), small, ink, new XRect(540, 506, 250, 14), XStringFormats.TopRight);
         if (certificate.IsDemonstration)
-            Block("Demonstração de software. Não comprova participação oficial ou capacitação regulamentada.", 473, 32, 10);
-        graphics.DrawString($"Identificador: {certificate.Id:D}", small, ink, new XRect(60, 516, 722, 22), XStringFormats.TopCenter);
+        {
+            graphics.DrawString("Demonstração de software.", small, muted, new XRect(270, 494, 302, 14), XStringFormats.TopCenter);
+            graphics.DrawString("Não comprova participação oficial ou capacitação regulamentada.", small, muted, new XRect(270, 507, 302, 14), XStringFormats.TopCenter);
+        }
         graphics.DrawString("SIPAT Online · Documento de participação, sem assinatura ou habilitação profissional presumida.",
-            small, ink, new XRect(60, 540, 722, 22), XStringFormats.TopCenter);
+            small, muted, new XRect(60, 545, 722, 14), XStringFormats.TopCenter);
         using var output = new MemoryStream();
         document.Save(output, false);
         return output.ToArray();
+    }
+
+    /// <summary>"Realizado em 10/11/2026" or "Realizado de 09/11/2026 a 13/11/2026", the dates as the certificate page shows them.</summary>
+    internal static string Period(DateTimeOffset startsAt, DateTimeOffset endsAt)
+    {
+        var from = startsAt.UtcDateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        var to = endsAt.UtcDateTime.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+        return from == to ? $"Realizado em {from}" : $"Realizado de {from} a {to}";
+    }
+
+    /// <summary>"8 min 50 s", "1 h 05 min", "45 s".</summary>
+    internal static string Duration(long milliseconds)
+    {
+        var duration = TimeSpan.FromMilliseconds(Math.Max(0, milliseconds));
+        if (duration.TotalHours >= 1) return $"{(long)duration.TotalHours} h {duration.Minutes:00} min";
+        if (duration.TotalMinutes >= 1) return duration.Seconds == 0 ? $"{duration.Minutes} min" : $"{duration.Minutes} min {duration.Seconds} s";
+        return $"{Math.Max(1, (int)Math.Round(duration.TotalSeconds))} s";
     }
 
     internal static Stream Asset(string name) =>

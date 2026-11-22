@@ -111,8 +111,8 @@ function addSummarySheet(workbook: Workbook, input: CompanyExcelReportInput, bra
     { label: 'Participantes', value: overview.participantCount, format: '#,##0', note: `${overview.activeParticipantCount} ativos` },
     { label: 'Dias entregues', value: overview.assignedTrackCount, format: '#,##0', note: `${overview.trackProgress.length} dias distintos` },
     { label: 'Dias concluídos', value: overview.completedTrackCount, format: '#,##0', note: `de ${overview.assignedTrackCount} entregues` },
-    { label: 'Aulas concluídas', value: overview.completedLessonCount, format: '#,##0', note: `de ${overview.lessonCount} atribuídas` },
-    { label: 'Progresso geral', value: overview.overallProgressPercentage / 100, format: '0%', note: 'aulas concluídas / atribuídas' },
+    { label: 'Vídeos concluídos', value: overview.completedLessonCount, format: '#,##0', note: `de ${overview.lessonCount} entregues` },
+    { label: 'Progresso geral', value: overview.overallProgressPercentage / 100, format: '0%', note: 'vídeos concluídos / entregues' },
   ];
   // B5:F7 — um cartão por coluna (B..F)
   kpis.forEach((kpi, index) => {
@@ -231,8 +231,8 @@ function addParticipantsSheet(workbook: Workbook, input: CompanyExcelReportInput
     { header: 'Situação', width: 16 },
     { header: 'Dias entregues', width: 10 },
     { header: 'Dias concluídos', width: 11 },
-    { header: 'Aulas', width: 9 },
-    { header: 'Aulas concluídas', width: 11 },
+    { header: 'Vídeos', width: 9 },
+    { header: 'Vídeos concluídos', width: 11 },
     { header: 'Progresso', width: 14 },
     { header: 'Tempo assistido', width: 12 },
     { header: 'Último acesso', width: 18 },
@@ -368,8 +368,8 @@ function addDetailSheet(workbook: Workbook, input: CompanyExcelReportInput, bran
     { header: 'Nome', width: 30 },
     { header: 'Login', width: 18 },
     { header: 'Dia', width: 40 },
-    { header: 'Aulas', width: 8 },
-    { header: 'Aulas concluídas', width: 11 },
+    { header: 'Vídeos', width: 8 },
+    { header: 'Vídeos concluídos', width: 11 },
     { header: 'Progresso', width: 13 },
     { header: 'Situação', width: 14 },
     { header: 'Tempo assistido', width: 12 },

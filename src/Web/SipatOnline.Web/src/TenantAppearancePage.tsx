@@ -122,7 +122,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
     <div className="page-content">
       <Page>
         <PageHeader
-          description={`Personalize a experiência de aprendizagem de ${tenant.tenantName}.`}
+          description="Personalize o portal que os colaboradores da sua empresa veem."
           eyebrow="PORTAL DA EMPRESA"
           title="Identidade visual"
         />
@@ -280,10 +280,10 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
                 <div className="grid gap-2 p-4">
                   <span className="text-xs font-semibold text-primary">Meus treinamentos</span>
                   <h3 className="m-0 text-xl font-semibold leading-tight">Aprender também faz parte de cuidar.</h3>
-                  <p className="m-0 text-sm text-muted-foreground">Os cursos e conteúdos da sua empresa, em um só lugar.</p>
+                  <p className="m-0 text-sm text-muted-foreground">Os vídeos dos treinamentos da sua empresa, em um só lugar.</p>
                   <span className="mt-1 inline-flex w-fit items-center gap-2 rounded-md px-3.5 py-2 text-sm font-semibold"
                     style={{ background: 'var(--brand-primary)', color: 'var(--brand-secondary)' }}>
-                    Continuar curso <span aria-hidden="true">→</span>
+                    Continuar treinamento <span aria-hidden="true">→</span>
                   </span>
                 </div>
               </PreviewFrame>

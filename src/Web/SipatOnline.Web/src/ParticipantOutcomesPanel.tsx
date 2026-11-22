@@ -3,7 +3,7 @@ import { getCompanyAdministrationId, getParticipantOutcomes, type ParticipantOut
 import CourseDialog from './CourseDialog';
 
 /** `quiet` draws the trigger as a light link ("Histórico →") for lists where every row has one. */
-export default function ParticipantOutcomesPanel({ participantId, companyId, quiet = false }: { participantId: string; companyId?: string; quiet?: boolean }) {
+export default function ParticipantOutcomesPanel({ participantId, participantName, companyId, quiet = false }: { participantId: string; participantName?: string; companyId?: string; quiet?: boolean }) {
   const [open, setOpen] = useState(false);
   const [data, setData] = useState<ParticipantOutcomes | null>(null);
   const [error, setError] = useState('');
@@ -26,11 +26,11 @@ export default function ParticipantOutcomesPanel({ participantId, companyId, qui
       </button>
       : <button className="button button-quiet participant-outcomes-trigger" disabled={!participantId}
         onClick={() => void load()} type="button">Ver histórico</button>}
-    {open && <CourseDialog busy={busy} onClose={() => setOpen(false)} title="Atividades e certificados">
+    {open && <CourseDialog busy={busy} onClose={() => setOpen(false)} title={participantName ? `Histórico de ${participantName}` : 'Atividades e certificados'}>
       {busy && <LoadingState className="loading-state-compact">Carregando resultados...</LoadingState>}
       {error && <div role="alert"><p>{error}</p><button className="button button-secondary" onClick={() => void load()} type="button">Tentar novamente</button></div>}
       {data && <>
-        <p>{data.completedActivities} atividades concluídas · {data.skippedActivities} puladas</p>
+        <p>{data.completedActivities} {data.completedActivities === 1 ? 'atividade concluída' : 'atividades concluídas'} · {data.skippedActivities} {data.skippedActivities === 1 ? 'pulada' : 'puladas'}</p>
         <p className="muted-copy">Jogos são opcionais e não alteram a elegibilidade do certificado.</p>
         <h3>Certificados emitidos</h3>
         {!data.certificates.length && <p>Nenhum certificado emitido. A conclusão dos dias continua no acompanhamento dos colaboradores.</p>}

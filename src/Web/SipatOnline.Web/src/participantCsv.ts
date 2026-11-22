@@ -26,13 +26,15 @@ export function generateInitialPassword(): string {
   return password.join('');
 }
 
-export function serializeCredentialCsv(credentials: readonly IssuedCredential[]): string {
+/** The sheet the company hands out: who, the login, the first password and, when known, where to sign in. */
+export function serializeCredentialCsv(credentials: readonly IssuedCredential[], portalUrl?: string): string {
   const rows = [
-    ['nome', 'login', 'senha_inicial'],
+    ['Nome', 'Login', 'Senha inicial', ...(portalUrl ? ['Endereço de acesso'] : [])],
     ...credentials.map((credential) => [
       credential.displayName,
       credential.loginIdentifier,
       credential.initialPassword,
+      ...(portalUrl ? [portalUrl] : []),
     ]),
   ];
   return `﻿${rows.map((row) => row.map(escapeCsvCell).join(';')).join('\r\n')}\r\n`;

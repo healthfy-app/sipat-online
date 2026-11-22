@@ -93,7 +93,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
           const video = catalog.videos.get(id);
           return <li className="flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5" key={id}>
             <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[0.6875rem] font-bold text-primary-foreground">{index + 1}</span>
-            <span className="min-w-0 flex-1 text-xs leading-snug font-medium [overflow-wrap:anywhere]">{video?.title ?? 'Vídeo removido do catálogo'}{video && isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</span>
+            <span className="min-w-0 flex-1 text-xs leading-snug font-medium break-words">{video?.title ?? 'Vídeo removido do catálogo'}{video && isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</span>
             {video && <span className="shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground">{isExtra(video) && video.durationMs <= 0 ? videoProvider(video) : formatClock(video.durationMs)}</span>}
           </li>;
         })}
@@ -101,7 +101,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       {gameIds.length > 0 && <ul aria-label="Jogos do dia" className="m-0 mt-1 grid list-none gap-1 p-0">
         {gameIds.map(id => <li className="flex items-center gap-2 rounded-lg border border-warning/50 bg-warning-soft px-2 py-1.5 text-warning" key={id}>
           <Gamepad2 aria-hidden="true" className="size-4 shrink-0" />
-          <span className="min-w-0 flex-1 text-xs leading-snug font-semibold [overflow-wrap:anywhere]">{catalog.games.get(id)?.title ?? 'Jogo removido'}</span>
+          <span className="min-w-0 flex-1 text-xs leading-snug font-semibold break-words">{catalog.games.get(id)?.title ?? 'Jogo removido'}</span>
           <span className="shrink-0 rounded bg-warning/15 px-1.5 text-[0.625rem] font-bold tracking-wide uppercase">Jogo</span>
         </li>)}
       </ul>}

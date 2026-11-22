@@ -50,7 +50,7 @@ describe('company identity settings', () => {
     const picker = screen.getByLabelText('Selecionar cor principal');
     fireEvent.change(picker, { target: { value: '#234567' } });
     expect(screen.getByLabelText('Cor principal (HEX)')).toHaveValue('#234567');
-    expect(screen.getByText('Continuar curso').closest('.appearance-preview')).toHaveStyle('--brand-primary: #234567');
+    expect(screen.getByText('Continuar treinamento').closest('.appearance-preview')).toHaveStyle('--brand-primary: #234567');
     expect(screen.getByText('Alterações não publicadas')).toBeVisible();
     const hex = screen.getByLabelText('Cor principal (HEX)');
     await user.clear(hex); await user.type(hex, '#345678');
