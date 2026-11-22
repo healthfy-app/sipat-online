@@ -185,7 +185,12 @@ public sealed class CompanyRegistryApiTests
             });
             db.CompanySectors.Add(new CompanySectorEntity
             {
-                Id = foreignSectorId, TenantId = otherTenantId, Name = "Alheio", NameKey = "ALHEIO", IsActive = true, CreatedAt = DateTimeOffset.UtcNow
+                Id = foreignSectorId,
+                TenantId = otherTenantId,
+                Name = "Alheio",
+                NameKey = "ALHEIO",
+                IsActive = true,
+                CreatedAt = DateTimeOffset.UtcNow
             });
             await db.SaveChangesAsync();
         }
