@@ -8,10 +8,11 @@ using SipatOnline.Identity.Application.Users;
 using SipatOnline.Infrastructure;
 using SipatOnline.Infrastructure.Identity;
 using Testcontainers.PostgreSql;
+using Xunit.Abstractions;
 
 namespace SipatOnline.IntegrationTests;
 
-public sealed class ParticipantImportApiTests
+public sealed class ParticipantImportApiTests(ITestOutputHelper output)
 {
     private const string Password = "Senha123!";
 
@@ -276,6 +277,83 @@ public sealed class ParticipantImportApiTests
         Assert.Contains("import.too_many_rows", await response.Content.ReadAsStringAsync());
     }
 
+    [DockerFact]
+    public async Task Import_RegistrationOnly_FindsPersonWithOtherLogin()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        var sector = (await AddSectorsAsync(admin, token, "Produção")).Single();
+        await ProvisionAsync(admin, token, "Joao-Existente", "Joao Existente");
+        await SetRegistrationAsync(factory, "Joao-Existente", "4455");
+        var before = await CountUsersAsync(factory);
+
+        var result = await ImportOkAsync(admin, token, false,
+            new ImportRow(2, null, null, "44.55", null, null, null, "Produção", null),
+            new ImportRow(3, null, "joao-existente", null, null, "(11) 98765-4321", null, null, null));
+
+        Assert.Equal((0, 1, 0), (result.Created, result.Updated, result.Unchanged));
+        Assert.Equal(new ImportRejection(3, "joao-existente", "Linha repetida: a mesma pessoa já está na linha 2."), Assert.Single(result.Rejected));
+        Assert.Equal(before, await CountUsersAsync(factory));
+        var user = await FindUserAsync(factory, "Joao-Existente");
+        Assert.Equal(sector.Id, user.SectorId);
+        Assert.Equal("4455", user.RegistrationNumber);
+    }
+
+    [DockerFact]
+    public async Task Import_RegistrationOfAnotherPerson_IsRejected()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await ProvisionAsync(admin, token, "Joao-Existente", "Joao Existente");
+        await SetRegistrationAsync(factory, "Joao-Existente", "9999");
+        await ProvisionAsync(admin, token, "9999", "Pedro Login Numerico");
+        var before = await CountUsersAsync(factory);
+        const string message = "A matrícula pertence a outro colaborador.";
+
+        var result = await ImportOkAsync(admin, token, false,
+            new ImportRow(2, "Quem Sera", null, "9999", null, null, null, null, null),
+            Row(3, "Nova Pessoa") with { Login = "nova.pessoa", RegistrationNumber = "99-99" },
+            Row(4, "Outra Nova") with { Login = "outra.nova", RegistrationNumber = "123" },
+            Row(5, "Mais Uma") with { Login = "mais.uma", RegistrationNumber = "1.2.3" },
+            new ImportRow(6, null, "9999", "123", null, null, null, null, null));
+
+        Assert.Equal(1, result.Created);
+        Assert.Equal(0, result.Updated);
+        Assert.Equal(
+            [
+                new ImportRejection(2, "9999", message),
+                new ImportRejection(3, "nova.pessoa", message),
+                new ImportRejection(5, "mais.uma", message),
+                new ImportRejection(6, "9999", message)
+            ],
+            result.Rejected.ToArray());
+        Assert.Equal(before + 1, await CountUsersAsync(factory));
+        Assert.Equal("9999", (await FindUserAsync(factory, "Joao-Existente")).RegistrationNumber);
+        Assert.Null((await FindUserAsync(factory, "9999")).RegistrationNumber);
+    }
+
+    [DockerFact]
+    public async Task Import_600NewPeople_FinishesWellUnderTheTimeout()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        var rows = Enumerable.Range(2, 600).Select(index => Row(index, $"Pessoa {index}") with { RegistrationNumber = $"M{index}" }).ToArray();
+
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        var result = await ImportOkAsync(admin, token, false, rows);
+        watch.Stop();
+
+        output.WriteLine($"600 new people imported in {watch.Elapsed.TotalSeconds:F1} s");
+        Assert.Equal(600, result.Created);
+        Assert.Empty(result.Rejected);
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(30), $"took {watch.Elapsed.TotalSeconds:F1} s");
+        using var participant = CreateClient(factory);
+        await SignInAsync(participant, "M601", Password);
+    }
+
     private static ImportRow Row(int row, string name) => new(row, name, null, null, null, null, null, null, Password);
 
     private static async Task<ImportResult> ImportOkAsync(HttpClient client, string token, bool dryRun, params ImportRow[] rows)
@@ -308,6 +386,15 @@ public sealed class ParticipantImportApiTests
         await using var scope = factory.Services.CreateAsyncScope();
         var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
         return await db.Users.AsNoTracking().SingleAsync(user => user.EmployeeIdentifier == login);
+    }
+
+    private static async Task SetRegistrationAsync(SipatOnlineApiFactory factory, string login, string registration)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+        var account = await db.Users.SingleAsync(item => item.EmployeeIdentifier == login);
+        account.RegistrationNumber = registration;
+        await db.SaveChangesAsync();
     }
 
     private static async Task<int> CountUsersAsync(SipatOnlineApiFactory factory)

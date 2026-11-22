@@ -38,6 +38,7 @@ public sealed class ParticipantImportService(
     private const int MaximumEmailLength = 256;
     private const string LoginFallback = "participante";
     private const string InvalidEmailMessage = "O e-mail informado não é válido.";
+    private const string RegistrationOfAnotherMessage = "A matrícula pertence a outro colaborador.";
 
     public async Task<Result<ImportResult>> ImportAsync(ImportRequest request, CancellationToken token)
     {
@@ -55,16 +56,17 @@ public sealed class ParticipantImportService(
             plan.Creates.Select(item => item.Credential).ToArray());
         if (request.DryRun) return Result<ImportResult>.Success(result);
 
+        if (plan.Creates.Count > 0 && company.ParticipantRoleId is null) return Failed();
+        PrepareAccounts(plan.Creates);
+
         await using (var transaction = await db.Database.BeginTransactionAsync(token))
         {
             try
             {
                 foreach (var create in plan.Creates)
                 {
-                    var created = await users.CreateAsync(create.User, create.Password);
-                    if (!created.Succeeded) return Failed();
-                    var role = await users.AddToRoleAsync(create.User, PlatformRoles.Participant);
-                    if (!role.Succeeded) return Failed();
+                    db.Users.Add(create.User);
+                    db.UserRoles.Add(new IdentityUserRole<Guid> { UserId = create.User.Id, RoleId = company.ParticipantRoleId!.Value });
                 }
 
                 await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenant, "identity.users.imported", "user",
@@ -84,6 +86,31 @@ public sealed class ParticipantImportService(
         return Result<ImportResult>.Success(result);
     }
 
+    /// <summary>
+    /// Fills in what <c>UserManager.CreateAsync</c> would (password hash, stamps, normalized names, lockout), hashing the
+    /// passwords in parallel: one by one, the hashing alone makes a sheet of hundreds of people outlast the request.
+    /// The passwords were already checked by the same validators in the plan.
+    /// </summary>
+    private void PrepareAccounts(IReadOnlyList<Created> creates)
+    {
+        var hasher = users.PasswordHasher;
+        var hashes = new string[creates.Count];
+        Parallel.For(0, creates.Count, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount },
+            index => hashes[index] = hasher.HashPassword(creates[index].User, creates[index].Password));
+
+        var lockoutEnabled = users.SupportsUserLockout && users.Options.Lockout.AllowedForNewUsers;
+        for (var index = 0; index < creates.Count; index++)
+        {
+            var user = creates[index].User;
+            user.PasswordHash = hashes[index];
+            user.SecurityStamp = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(20));
+            user.ConcurrencyStamp = Guid.NewGuid().ToString();
+            user.NormalizedUserName = users.NormalizeName(user.UserName);
+            user.NormalizedEmail = users.NormalizeEmail(user.Email);
+            user.LockoutEnabled = lockoutEnabled;
+        }
+    }
+
     private async Task<Plan> PlanAsync(IReadOnlyList<ImportRow> rows, Company company, CancellationToken token)
     {
         var plan = new Plan();
@@ -98,9 +125,10 @@ public sealed class ParticipantImportService(
         }
 
         var firstRowOf = new Dictionary<string, int>(StringComparer.Ordinal);
+        var registrations = new Dictionary<string, RegistrationOwner>(company.Registrations, StringComparer.Ordinal);
         foreach (var row in rows)
         {
-            var outcome = await EvaluateAsync(row, company, takenLogins, firstRowOf, now, token);
+            var outcome = await EvaluateAsync(row, company, takenLogins, firstRowOf, registrations, now, token);
             switch (outcome)
             {
                 case Rejected rejected:
@@ -122,7 +150,7 @@ public sealed class ParticipantImportService(
     }
 
     private async Task<Outcome> EvaluateAsync(ImportRow row, Company company, HashSet<string> takenLogins,
-        Dictionary<string, int> firstRowOf, DateTimeOffset now, CancellationToken token)
+        Dictionary<string, int> firstRowOf, Dictionary<string, RegistrationOwner> registrations, DateTimeOffset now, CancellationToken token)
     {
         // 1. standardize
         var registration = ProfileText.RegistrationNumber(row.RegistrationNumber);
@@ -147,15 +175,28 @@ public sealed class ParticipantImportService(
         }
 
         var shownLogin = login?.Value;
+        var newRegistration = registration.Value.Value;
+        company.People.TryGetValue(login?.NormalizedValue ?? string.Empty, out var byLogin);
         Person? person = null;
-        if (login is not null && company.People.TryGetValue(login.NormalizedValue, out var found))
+        if (IsBlank(row.Login) && newRegistration is not null && registrations.TryGetValue(newRegistration, out var owner))
         {
-            if (!found.IsParticipant) return new Rejected(shownLogin, "Esse login é de um administrador.");
-            person = found;
+            // only the registration came: it is whoever has it stored, or whoever has it as the login — and they must be the same
+            if (owner.Person is null && owner.Row is { } ownerRow)
+                return new Rejected(shownLogin, $"Linha repetida: a mesma pessoa já está na linha {ownerRow}.");
+            if (owner.Person is null || (byLogin is not null && byLogin.User.Id != owner.Person.User.Id))
+                return new Rejected(shownLogin, RegistrationOfAnotherMessage);
+            person = owner.Person;
+        }
+        else if (byLogin is not null)
+        {
+            if (!byLogin.IsParticipant) return new Rejected(shownLogin, "Esse login é de um administrador.");
+            person = byLogin;
         }
 
         // 6. the same person twice in the sheet
-        var sheetKey = login is not null ? "login:" + login.NormalizedValue : name is not null ? "name:" + ProfileText.CatalogKey(name) : null;
+        var sheetKey = person is not null ? "login:" + person.User.NormalizedEmployeeIdentifier
+            : login is not null ? "login:" + login.NormalizedValue
+            : name is not null ? "name:" + ProfileText.CatalogKey(name) : null;
         if (sheetKey is not null && firstRowOf.TryGetValue(sheetKey, out var firstRow))
             return new Rejected(shownLogin, $"Linha repetida: a mesma pessoa já está na linha {firstRow}.");
 
@@ -180,9 +221,18 @@ public sealed class ParticipantImportService(
         if (person is not null)
         {
             var user = person.User;
+            if (newRegistration is not null && registrations.TryGetValue(newRegistration, out var holder) && holder.Person?.User.Id != user.Id)
+                return new Rejected(shownLogin, RegistrationOfAnotherMessage);
+
             var changed = false;
             if (name is not null && !user.DisplayNameLocked && user.DisplayName != name) { user.DisplayName = name; changed = true; }
-            if (registration.Value.Value is { } newRegistration && user.RegistrationNumber != newRegistration) { user.RegistrationNumber = newRegistration; changed = true; }
+            if (newRegistration is not null && user.RegistrationNumber != newRegistration)
+            {
+                user.RegistrationNumber = newRegistration;
+                registrations[newRegistration] = new RegistrationOwner(person, row.Row);
+                changed = true;
+            }
+
             if (email.Value.Value is { } newEmail && user.Email != newEmail) { user.Email = newEmail; user.NormalizedEmail = users.NormalizeEmail(newEmail); changed = true; }
             if (phone.Value.Value is { } newPhone && user.Phone != newPhone) { user.Phone = newPhone; changed = true; }
             if (unitId is not null && user.UnitId != unitId) { user.UnitId = unitId; changed = true; }
@@ -198,6 +248,8 @@ public sealed class ParticipantImportService(
         if (rules.RequirePhone && phone.Value.Value is null) return new Rejected(shownLogin, "Falta o telefone, obrigatório nesta empresa.");
         if (rules.RequireUnit && unitId is null) return new Rejected(shownLogin, "Falta a unidade, obrigatória nesta empresa.");
         if (rules.RequireSector && sectorId is null) return new Rejected(shownLogin, "Falta o setor, obrigatório nesta empresa.");
+        if (newRegistration is not null && registrations.ContainsKey(newRegistration))
+            return new Rejected(shownLogin, RegistrationOfAnotherMessage);
         if (login is null && company.ParticipantNameKeys.Contains(ProfileText.CatalogKey(name)))
             return new Rejected(null, "Já existe um colaborador com esse nome. Informe o login para atualizar.");
 
@@ -229,6 +281,7 @@ public sealed class ParticipantImportService(
             return new Rejected(login.Value, "A senha inicial não atende aos requisitos.");
 
         takenLogins.Add(login.NormalizedValue);
+        if (newRegistration is not null) registrations[newRegistration] = new RegistrationOwner(null, row.Row);
         return new Created(account, row.Password, new ImportCredential(row.Row, name, login.Value)) { SheetKey = sheetKey };
     }
 
@@ -277,7 +330,11 @@ public sealed class ParticipantImportService(
             .ToDictionaryAsync(item => item.NameKey, item => item.Id, StringComparer.Ordinal, token);
         var sectors = await db.CompanySectors.AsNoTracking().Where(item => item.TenantId == tenant && item.IsActive)
             .ToDictionaryAsync(item => item.NameKey, item => item.Id, StringComparer.Ordinal, token);
-        return new Company(tenant, byLogin, nameKeys, units, sectors, await registry.GetRulesAsync(tenant, token));
+        // a registration number stored on two people (data from before the import existed) belongs to no one in particular
+        var registrations = byLogin.Values.Where(person => person.IsParticipant && person.User.RegistrationNumber is not null)
+            .GroupBy(person => person.User.RegistrationNumber!, StringComparer.Ordinal)
+            .ToDictionary(group => group.Key, group => new RegistrationOwner(group.Count() == 1 ? group.Single() : null, null), StringComparer.Ordinal);
+        return new Company(tenant, participantRole, byLogin, nameKeys, registrations, units, sectors, await registry.GetRulesAsync(tenant, token));
     }
 
     private static string? LookupText(string? login, string? registration) => IsBlank(login) ? registration : login;
@@ -297,10 +354,15 @@ public sealed class ParticipantImportService(
 
     private sealed record Person(PlatformIdentityUser User, bool IsParticipant);
 
+    /// <summary>Who has a registration number: an existing participant, or (<c>Person</c> null) a new one of line <c>Row</c>; both null when two people share it.</summary>
+    private sealed record RegistrationOwner(Person? Person, int? Row);
+
     private sealed record Company(
         Guid TenantId,
+        Guid? ParticipantRoleId,
         IReadOnlyDictionary<string, Person> People,
         IReadOnlySet<string> ParticipantNameKeys,
+        IReadOnlyDictionary<string, RegistrationOwner> Registrations,
         IReadOnlyDictionary<string, Guid> Units,
         IReadOnlyDictionary<string, Guid> Sectors,
         ProfileRules Rules);
