@@ -1403,7 +1403,12 @@ export interface ImportResult {
   credentials: { row: number; name: string; login: string }[];
 }
 
-/** Reads the HR sheet on the server; with `dryRun` nothing is written. */
-export function importParticipants(dryRun: boolean, rows: ImportRow[]): Promise<ImportResult> {
-  return requestJson<ImportResult>('/api/admin/users/import', { method: 'POST', body: JSON.stringify({ dryRun, rows }) });
+/**
+ * Reads the HR sheet on the server; with `dryRun` nothing is written. With `createOnly` (the form of one person) a line that
+ * names someone who already exists is refused instead of updating them.
+ */
+export function importParticipants(dryRun: boolean, rows: ImportRow[], options?: { createOnly?: boolean }): Promise<ImportResult> {
+  return requestJson<ImportResult>('/api/admin/users/import', {
+    method: 'POST', body: JSON.stringify({ dryRun, rows, createOnly: options?.createOnly ?? false }),
+  });
 }

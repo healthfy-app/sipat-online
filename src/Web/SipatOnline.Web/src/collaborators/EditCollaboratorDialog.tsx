@@ -15,16 +15,16 @@ import { generateInitialPassword } from '@/participantCsv';
 const requiredMark = ' (obrigatório nesta empresa)';
 const mark = (required?: boolean) => (required ? requiredMark : '');
 
-/** The active items plus the current one, even deactivated: whoever is in it stays in it until moved. */
-const choices = (items: RegistryItem[], current: string) => items.filter(item => item.isActive || item.id === current);
+/** The active items plus the person's own (as it was when the dialog opened), even deactivated: whoever is in it stays in it until moved, and can be put back. */
+const choices = (items: RegistryItem[], initial: string) => items.filter(item => item.isActive || item.id === initial);
 
-function PlacementSelect({ id, label, empty, items, value, onChange }: {
-  id: string; label: string; empty: string; items: RegistryItem[]; value: string; onChange: (value: string) => void;
+function PlacementSelect({ id, label, empty, items, initial, value, onChange }: {
+  id: string; label: string; empty: string; items: RegistryItem[]; initial: string; value: string; onChange: (value: string) => void;
 }) {
   return <Field htmlFor={id} label={label}>
     <NativeSelect id={id} onChange={event => onChange(event.target.value)} value={value}>
       <option value="">{empty}</option>
-      {choices(items, value).map(item => <option key={item.id} value={item.id}>{item.name}{item.isActive ? '' : ' (desativado)'}</option>)}
+      {choices(items, initial).map(item => <option key={item.id} value={item.id}>{item.name}{item.isActive ? '' : ' (desativado)'}</option>)}
     </NativeSelect>
   </Field>;
 }
@@ -105,9 +105,9 @@ export default function EditCollaboratorDialog({ person, profile, registry, onCl
           <Input autoComplete="off" id="edit-phone" inputMode="tel" maxLength={32} onChange={event => setPhone(event.target.value)} type="tel" value={phone} />
         </Field>
         {registry && registry.units.length > 0
-          && <PlacementSelect empty="Sem unidade" id="edit-unit" items={registry.units} label={`Unidade${mark(rules?.requireUnit)}`} onChange={setUnitId} value={unitId} />}
+          && <PlacementSelect empty="Sem unidade" id="edit-unit" initial={profile.unitId ?? ''} items={registry.units} label={`Unidade${mark(rules?.requireUnit)}`} onChange={setUnitId} value={unitId} />}
         {registry && registry.sectors.length > 0
-          && <PlacementSelect empty="Sem setor" id="edit-sector" items={registry.sectors} label={`Setor${mark(rules?.requireSector)}`} onChange={setSectorId} value={sectorId} />}
+          && <PlacementSelect empty="Sem setor" id="edit-sector" initial={profile.sectorId ?? ''} items={registry.sectors} label={`Setor${mark(rules?.requireSector)}`} onChange={setSectorId} value={sectorId} />}
       </>}
       <Field hint={`${passwordRulesHint} Entregue a nova senha por um canal seguro: ela não aparece de novo.`} htmlFor="edit-password" label="Nova senha (opcional)">
         <div className="flex gap-2">

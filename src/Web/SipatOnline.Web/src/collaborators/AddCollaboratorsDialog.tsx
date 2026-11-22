@@ -10,11 +10,26 @@ import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { generateInitialPassword, serializeCredentialCsv } from '@/participantCsv';
 import { cn } from '@/lib/utils';
 import { downloadCsv } from './csvFile';
-import { downloadTemplate, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, readSheet } from './importSheet';
+import { downloadTemplate, IMPORT_SAVE_CHUNK, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, readSheet } from './importSheet';
 
 const emptyForm = { name: '', registrationNumber: '', login: '', email: '', phone: '', unit: '', sector: '', password: '' };
 type Mode = 'single' | 'sheet';
-type Preview = { rows: ImportRow[]; result: ImportResult };
+type Preview = { rows: ImportRow[]; columns: (keyof ImportRow)[]; result: ImportResult };
+
+const columnLabels: Partial<Record<keyof ImportRow, string>> = {
+  name: 'Nome', login: 'Login', registrationNumber: 'Matrícula', email: 'E-mail', phone: 'Telefone', unit: 'Unidade', sector: 'Setor',
+};
+
+const chunksOf = (rows: ImportRow[]) =>
+  Array.from({ length: Math.ceil(rows.length / IMPORT_SAVE_CHUNK) }, (_, index) => rows.slice(index * IMPORT_SAVE_CHUNK, (index + 1) * IMPORT_SAVE_CHUNK));
+
+const stopMessage = (row: number) =>
+  `A carga parou na linha ${row}. As pessoas já gravadas estão no arquivo de acessos. Tente de novo para gravar o restante.`;
+
+const sum = (total: ImportResult | null, part: ImportResult): ImportResult => total === null ? part : {
+  created: total.created + part.created, updated: total.updated + part.updated, unchanged: total.unchanged + part.unchanged,
+  rejected: [...total.rejected, ...part.rejected], credentials: [...total.credentials, ...part.credentials],
+};
 
 /** Adds collaborators: one at a time, or many from the HR sheet (CSV or Excel) with a preview before saving. */
 export default function AddCollaboratorsDialog({ onClose, onCreated }: {
@@ -28,7 +43,11 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
   const [fileName, setFileName] = useState('');
   const [fileError, setFileError] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
+  // one person: the outcome; the sheet: what the chunks confirmed so far (all of it once `savedChunks` reaches the end)
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [savedChunks, setSavedChunks] = useState(0);
+  const [stoppedAt, setStoppedAt] = useState<number | null>(null);
+  const [saving, setSaving] = useState<{ saved: number; total: number } | null>(null);
   const [passwords, setPasswords] = useState<Map<number, string>>(new Map());
   const [singleMessage, setSingleMessage] = useState('');
   const [downloaded, setDownloaded] = useState(false);
@@ -51,12 +70,12 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
       if (value) row[key] = value;
     });
     try {
-      const outcome = await importParticipants(false, [row]);
+      // the form creates: someone who already exists is refused, never overwritten
+      const outcome = await importParticipants(false, [row], { createOnly: true });
       if (outcome.rejected.length) { setError(outcome.rejected[0].message); return; }
       const created = outcome.credentials[0];
-      setSingleMessage(created
-        ? `${created.name} foi adicionada. Login: ${created.login}.`
-        : 'Este colaborador já estava cadastrado; os dados foram atualizados.');
+      if (!created) { setError('Não foi possível adicionar o colaborador. Tente de novo.'); return; }
+      setSingleMessage(`${created.name} foi adicionada. Login: ${created.login}.`);
       setResult(outcome);
     } catch (failure) {
       setError(getErrorMessage(failure));
@@ -75,20 +94,41 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
       const issued = new Map(sheet.rows.map(row => [row.row, generateInitialPassword()] as const));
       const rows = sheet.rows.map(row => ({ ...row, password: issued.get(row.row) }));
       setPasswords(issued);
-      setPreview({ rows, result: await importParticipants(true, rows) });
+      setPreview({ rows, columns: sheet.columns, result: await importParticipants(true, rows) });
     } catch (failure) {
       setFileError(getErrorMessage(failure));
     } finally { setBusy(false); }
   }
 
-  async function confirm() {
+  /**
+   * Saves the sheet in chunks, one after the other, so each call fits the server's timeout. A chunk that fails stops the
+   * load: what was saved stays (and its accesses can be downloaded), and trying again sends only the chunks not confirmed.
+   */
+  async function save() {
     if (!preview) return;
-    setBusy(true); setError('');
+    const chunks = chunksOf(preview.rows);
+    setBusy(true); setError(''); setStoppedAt(null);
+    let total = result;
+    let index = savedChunks;
     try {
-      setResult(await importParticipants(false, preview.rows));
+      for (; index < chunks.length; index++) {
+        setSaving({ saved: index * IMPORT_SAVE_CHUNK, total: preview.rows.length });
+        const part = await importParticipants(false, chunks[index]);
+        total = sum(total, part);
+        setResult(total);
+        setSavedChunks(index + 1);
+        // a file downloaded before these people were saved does not have their passwords
+        if (part.credentials.length > 0) setDownloaded(false);
+      }
     } catch (failure) {
-      setError(getErrorMessage(failure));
-    } finally { setBusy(false); }
+      // nothing saved yet: the same as a single call failing, and "Confirmar carga" tries again
+      if (index === 0) setError(getErrorMessage(failure));
+      else {
+        const row = chunks[index][0].row;
+        setStoppedAt(row);
+        setError(stopMessage(row));
+      }
+    } finally { setBusy(false); setSaving(null); }
   }
 
   function downloadCredentials() {
@@ -97,7 +137,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
       displayName: credential.name, loginIdentifier: credential.login, initialPassword: passwords.get(credential.row) ?? '',
     }));
     downloadCsv(`acessos-colaboradores-${new Date().toISOString().slice(0, 10)}.csv`, serializeCredentialCsv(entries));
-    setDownloaded(true); setError('');
+    setDownloaded(true); setError(stoppedAt === null ? '' : stopMessage(stoppedAt));
   }
 
   async function finish() {
@@ -113,6 +153,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
 
   const counts = preview?.result;
   const rejected = counts?.rejected ?? [];
+  const complete = mode === 'single' || (preview !== null && savedChunks === chunksOf(preview.rows).length);
 
   return <Dialog busy={busy} description="Cada colaborador entra com o login e a senha que você definir aqui." onClose={result ? () => void finish() : onClose} size="lg" title="Adicionar colaboradores">
     <div className="grid gap-4">
@@ -175,6 +216,8 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
           {fileName && !result && <p className="m-0 text-sm text-muted-foreground">{fileName}</p>}
           {fileError && <p className="m-0 text-sm font-medium text-destructive" role="alert">{fileError}</p>}
           {counts && !result && <div aria-live="polite" className="grid gap-2">
+            {/* a column the sheet has but we did not recognize (a header saved in another encoding, a new name) shows by its absence */}
+            <p className="m-0 text-xs text-muted-foreground">Colunas reconhecidas: {preview.columns.map(column => columnLabels[column]).join(', ')}</p>
             <p className="m-0 text-sm">
               <strong>{counts.created}</strong> serão criados · <strong>{counts.updated}</strong> atualizados · <strong>{counts.unchanged}</strong> sem mudança · <strong>{rejected.length}</strong> recusados
             </p>
@@ -183,20 +226,22 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
               {rejected.length > 8 && <li>e mais {rejected.length - 8}</li>}
             </ul>}
           </div>}
+          {saving && <p aria-live="polite" className="m-0 text-sm font-medium">Gravando… {saving.saved} de {saving.total}</p>}
           {result && <div className="grid gap-3" role="status">
-            <p className="m-0 text-sm font-medium text-success">
-              {result.created} criados · {result.updated} atualizados · {result.unchanged} sem mudança · {result.rejected.length} recusados.
+            <p className={cn('m-0 text-sm font-medium', complete ? 'text-success' : 'text-foreground')}>
+              {complete ? '' : 'Gravados até agora: '}{result.created} criados · {result.updated} atualizados · {result.unchanged} sem mudança · {result.rejected.length} recusados.
             </p>
             {result.credentials.length > 0 && <div className="grid gap-2 rounded-lg bg-warning-soft p-3 text-sm">
               <p className="m-0">Baixe agora as senhas iniciais. Elas não ficam salvas no portal e não dá para recuperar depois que você fechar esta janela.</p>
-              <Button className="justify-self-start" onClick={downloadCredentials}>{downloaded ? 'Baixar o arquivo de acessos novamente' : 'Baixar o arquivo de acessos'}</Button>
+              <Button className="justify-self-start" disabled={busy} onClick={downloadCredentials}>{downloaded ? 'Baixar o arquivo de acessos novamente' : 'Baixar o arquivo de acessos'}</Button>
             </div>}
           </div>}
           <DialogActions>
             <Button disabled={busy} onClick={result ? () => void finish() : onClose} variant="outline">{result ? 'Concluir' : 'Cancelar'}</Button>
-            {!result && <Button disabled={busy || !counts || counts.created + counts.updated === 0} onClick={() => void confirm()}>
+            {!result && <Button disabled={busy || !counts || counts.created + counts.updated === 0} onClick={() => void save()}>
               {busy ? 'Aguarde...' : 'Confirmar carga'}
             </Button>}
+            {stoppedAt !== null && <Button disabled={busy} onClick={() => void save()}>Tentar de novo</Button>}
           </DialogActions>
         </div>}
     </div>
