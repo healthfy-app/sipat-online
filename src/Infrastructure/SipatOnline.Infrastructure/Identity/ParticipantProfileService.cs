@@ -73,6 +73,7 @@ public sealed class ParticipantProfileService(
         user.UnitId = request.UnitId;
         user.SectorId = request.SectorId;
         user.ConcurrencyStamp = Guid.NewGuid().ToString();
+
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId, "identity.user.profile_changed", "user",
             user.Id.ToString("D"), clock.GetUtcNow()), token);
         await db.SaveChangesAsync(token);
@@ -121,6 +122,8 @@ public sealed class ParticipantProfileService(
             user.ConcurrencyStamp = Guid.NewGuid().ToString();
             changed++;
         }
+
+        if (changed == 0) return Result<PlacementResult>.Success(new PlacementResult(0));
 
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId, "identity.users.placement_changed", "user",
             $"{(isUnit ? "unit" : "sector")}:{changed}", clock.GetUtcNow()), token);

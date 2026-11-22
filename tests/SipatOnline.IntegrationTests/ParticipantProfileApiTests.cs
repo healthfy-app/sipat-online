@@ -182,6 +182,48 @@ public sealed class ParticipantProfileApiTests
     }
 
     [DockerFact]
+    public async Task Administrators_AreNeverTouchedByProfileOrPlacement()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        var sector = (await AddSectorsAsync(admin, token, "Produção")).Single();
+        await ProvisionAsync(admin, token, "ana", "Ana Souza");
+        var ana = await FindUserAsync(factory, "ana");
+        var root = await FindUserAsync(factory, "admin-root");
+
+        var result = await PlaceAsync(admin, token, new ChangePlacementRequest([root.Id, ana.Id], "sector", sector.Id));
+
+        Assert.Equal(1, result.Changed);
+        Assert.Null((await FindUserAsync(factory, "admin-root")).SectorId);
+        using var response = await SendJsonAsync(admin, HttpMethod.Put, $"/api/admin/users/{root.Id:D}/profile",
+            new ChangeProfileRequest("999", "a@x.com", null, null, null), token);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+        Assert.Contains("user.not_found", await response.Content.ReadAsStringAsync());
+        Assert.Null((await FindUserAsync(factory, "admin-root")).RegistrationNumber);
+    }
+
+    [DockerFact]
+    public async Task Profile_InvalidEmail_IsRefused()
+    {
+        await using var postgres = await StartPostgresAsync();
+        await using var factory = await CreateFactoryAsync(postgres);
+        var (admin, token) = await SignInAdminAsync(factory);
+        await ProvisionAsync(admin, token, "ana", "Ana Souza");
+        var ana = await FindUserAsync(factory, "ana");
+
+        foreach (var email in new[] { new string('a', 252) + "@x.com", "sem-arroba" })
+        {
+            using var response = await SendJsonAsync(admin, HttpMethod.Put, $"/api/admin/users/{ana.Id:D}/profile",
+                new ChangeProfileRequest(null, email, null, null, null), token);
+            Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+            Assert.Contains("profile.email.invalid", await response.Content.ReadAsStringAsync());
+        }
+
+        Assert.Null((await FindUserAsync(factory, "ana")).Email);
+    }
+
+    [DockerFact]
     public async Task ManualRename_IsNotOverwrittenByImport()
     {
         await using var postgres = await StartPostgresAsync();
