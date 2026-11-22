@@ -65,7 +65,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   }, []);
   useEffect(() => { void load(); }, [load]);
 
-  const training = useTrainingFilter();
+  const training = useTrainingFilter(rows);
   const trainingRows = useMemo(() => filterByTraining(rows, training.selectedId), [training.selectedId, rows]);
   const summaries = useMemo(() => summarizeParticipants(people ?? [], trainingRows), [people, trainingRows]);
   const visible = useMemo(

@@ -41,7 +41,8 @@ describe('collaborators', () => {
       items: [training('sipat', 'SIPAT 2026', '2026-11-09T00:00:00Z'), training('fogo', 'Treinamento contra incêndios', '2026-11-20T00:00:00Z')] });
     vi.mocked(api.listSipatPlans).mockResolvedValue([{ sipatEventId: 'sipat', days: 1, videos: 2 }, { sipatEventId: 'fogo', days: 1, videos: 2 }]);
     vi.mocked(api.listLearningParticipation).mockResolvedValue([
-      { ...row('p-1', 2), sipatEventId: 'sipat' }, { ...row('p-1', 0), trackId: 't-fogo', sipatEventId: 'fogo' },
+      { ...row('p-1', 2), sipatEventId: 'sipat', sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' },
+      { ...row('p-1', 0), trackId: 't-fogo', sipatEventId: 'fogo', sipatTitle: 'Treinamento contra incêndios', sipatStartsAt: '2026-11-20T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' },
     ]);
     renderPage();
     const table = await screen.findByRole('table', { name: 'Colaboradores da empresa' });

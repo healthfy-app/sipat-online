@@ -511,6 +511,10 @@ export interface LearningParticipantProgress {
   lastAccessedAt?: string | null;
   /** The training the day belongs to. */
   sipatEventId?: string | null;
+  sipatTitle?: string | null;
+  sipatStartsAt?: string | null;
+  sipatEndsAt?: string | null;
+  sipatStatus?: string | null;
 }
 
 export interface LearningLessonProgress {

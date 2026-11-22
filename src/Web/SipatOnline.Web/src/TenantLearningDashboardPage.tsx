@@ -41,6 +41,8 @@ const progressBar = cn(
 
 const pluralize = (count: number, one: string, many: string) => `${count.toLocaleString('pt-BR')} ${count === 1 ? one : many}`;
 
+const noRows: LearningParticipantProgress[] = [];
+
 interface DashboardData {
   overview: CompanyLearningOverview;
   rows: ParticipantRow[];
@@ -53,7 +55,7 @@ export default function TenantLearningDashboardPage({
   brandColor,
 }: { readOnly?: boolean; companyName?: string; brandColor?: string }) {
   const [loaded, setLoaded] = useState<{ participants: Awaited<ReturnType<typeof listAllParticipants>>; participation: LearningParticipantProgress[] } | null>(null);
-  const training = useTrainingFilter();
+  const training = useTrainingFilter(loaded?.participation ?? noRows);
   // every number of the page is about the training chosen, so one person's finished SIPAT does not hide a fire drill not started
   const data = useMemo<DashboardData | null>(() => {
     if (!loaded) return null;

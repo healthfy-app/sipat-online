@@ -39,6 +39,8 @@ import './CourseCards.css';
 import './LearningHero.css';
 
 const firstArrivalKey = 'sipat:learning-arrived';
+// the training the participant picked stays picked for the session, also after opening a day and coming back
+const chosenTrainingKey = 'sipat:learning-training';
 
 function readSessionFlag(key: string): string | null {
   try { return sessionStorage.getItem(key); } catch { return null; }
@@ -53,7 +55,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
   setSummary?: (summary: LearningSummary | null) => void;
 }) {
   const [allTracks, setTracks] = useState<LearningTrackCard[]>([]);
-  const [chosenSipat, setChosenSipat] = useState<string | null>(null);
+  const [chosenSipat, setChosenSipatState] = useState<string | null>(() => readSessionFlag(chosenTrainingKey));
+  const setChosenSipat = (id: string) => { setChosenSipatState(id); writeSessionFlag(chosenTrainingKey, id); };
   const [resumeExperience, setResumeExperience] = useState<LearningExperience | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingResume, setIsLoadingResume] = useState(false);

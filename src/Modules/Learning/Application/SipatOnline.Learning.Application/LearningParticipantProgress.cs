@@ -14,4 +14,8 @@ public sealed record LearningParticipantProgress(
     long WatchedMilliseconds = 0,
     DateTimeOffset? CompletedAt = null,
     DateTimeOffset? LastAccessedAt = null,
-    Guid? SipatEventId = null);
+    Guid? SipatEventId = null,
+    string? SipatTitle = null,
+    DateTimeOffset? SipatStartsAt = null,
+    DateTimeOffset? SipatEndsAt = null,
+    string? SipatStatus = null);

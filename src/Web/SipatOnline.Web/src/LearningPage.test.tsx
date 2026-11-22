@@ -853,6 +853,21 @@ describe('learning experience', () => {
     expect(within(chips).getByRole('button', { name: /Treinamento contra incêndios/ })).toHaveAttribute('aria-pressed', 'false');
   });
 
+  it('keeps the training the participant picked when they come back from a day', async () => {
+    const user = userEvent.setup();
+    const sipat = { ...trackCard, id: 's', sipatEventId: 'sipat-2026', title: 'Opção 1 · Ergonomia', dayTitle: 'Boa postura', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-09', sipatTitle: 'SIPAT 2026', sipatStartsAt: '2026-11-09T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    const fire = { ...trackCard, id: 'f', sipatEventId: 'fogo', title: 'Extintores', dayTitle: 'Combate ao fogo', dayPosition: 1, coursePosition: 1, dayDate: '2026-11-20', sipatTitle: 'Treinamento contra incêndios', sipatStartsAt: '2026-11-20T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
+    listAssignedTracks.mockResolvedValue([fire, sipat]);
+    getAssignedTrack.mockImplementation((trackId: string) => Promise.resolve({ track: trackId === 's' ? sipat : fire, lessons: [lesson] }));
+    const first = renderAt('/learning');
+    await user.click(within(await screen.findByRole('navigation', { name: 'Treinamentos' })).getByRole('button', { name: /Treinamento contra incêndios/ }));
+    first.unmount();
+
+    // the home opens again (back from the day): still on the fire training
+    renderAt('/learning');
+    expect(await screen.findByRole('region', { name: 'Dia 1 · Combate ao fogo' })).toBeVisible();
+  });
+
   it('says Módulo for a training without dates', async () => {
     const part = { ...trackCard, id: 'm', sipatEventId: 'integracao', title: 'Boas-vindas', dayTitle: 'Conheça a empresa', dayPosition: 1, coursePosition: 1, dayDate: null, sipatTitle: 'Integração', sipatStartsAt: '2026-11-01T00:00:00Z', sipatEndsAt: '2099-01-01T00:00:00Z', sipatStatus: 'Published' as const };
     listAssignedTracks.mockResolvedValue([part]);

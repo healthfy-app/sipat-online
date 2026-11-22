@@ -54,6 +54,13 @@ public sealed class LearningApiTests
         var trainingOfTrack = tenantTracks.ToDictionary(track => track.GetProperty("id").GetGuid(), track => track.GetProperty("sipatEventId").GetGuid());
         Assert.All(participationJson.RootElement.EnumerateArray(), row =>
             Assert.Equal(trainingOfTrack[row.GetProperty("trackId").GetGuid()], row.GetProperty("sipatEventId").GetGuid()));
+        // and enough of the training to pick it, for viewers who cannot list trainings (a Supervisor)
+        Assert.All(participationJson.RootElement.EnumerateArray(), row =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(row.GetProperty("sipatTitle").GetString()));
+            Assert.Equal("Published", row.GetProperty("sipatStatus").GetString());
+            Assert.True(row.GetProperty("sipatEndsAt").GetDateTimeOffset() > row.GetProperty("sipatStartsAt").GetDateTimeOffset());
+        });
 
         var sipatEventId = tenantTracks[0].GetProperty("sipatEventId").GetGuid();
         var token = await GetAntiforgeryTokenAsync(client);

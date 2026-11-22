@@ -7,8 +7,9 @@ export interface TrainingTiming {
   hasDays: boolean;
 }
 
-const time = (value: string) => new Date(value).getTime();
-const byStart = (a: TrainingTiming, b: TrainingTiming) => time(a.startsAt) - time(b.startsAt);
+// a training without a date sorts as the oldest, so a missing date never breaks the order
+const time = (value: string) => { const at = new Date(value).getTime(); return Number.isNaN(at) ? -Infinity : at; };
+const byStart = (a: TrainingTiming, b: TrainingTiming) => (time(a.startsAt) - time(b.startsAt)) || 0;
 
 /** The order of the training chips: running (started first first), then the next to start, then the finished (newest first). */
 export function orderTrainings<T extends TrainingTiming>(items: readonly T[], now: Date = new Date()): T[] {
