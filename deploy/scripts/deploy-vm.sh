@@ -99,7 +99,7 @@ remote "umask 077 && cat > '$DEPLOY_APP_PATH/deploy/.env.production'" < "$env_fi
 remote "cat > /tmp/sipat-online-images.tar.gz" < "$work/images.tar.gz"
 
 echo "==> Start the stack"
-remote "bash -s -- '$DEPLOY_APP_PATH'" <<'REMOTE'
+remote "bash -s -- '$DEPLOY_APP_PATH'" <<'REMOTE' | tee "$work/remote.log"
 set -euo pipefail
 cd "$1"
 chmod 0755 deploy/scripts/*.sh
@@ -108,7 +108,8 @@ rm -f /tmp/sipat-online-images.tar.gz
 
 compose=(docker compose --env-file deploy/.env.production --file deploy/compose.production.yaml)
 "${compose[@]}" up -d --no-build postgres
-"${compose[@]}" --profile tools run --rm db-init
+# -T and </dev/null: this script itself arrives on stdin, and "run" would swallow the rest of it
+"${compose[@]}" --profile tools run --rm -T db-init < /dev/null
 "${compose[@]}" up -d --no-build --remove-orphans api web
 
 # HTTPS by HTTP-01 (no wildcard zone): issue now and keep the company hosts in the certificate
@@ -118,14 +119,20 @@ sudo systemctl daemon-reload
 if grep -q '^CERTIFICATE_MODE=http01$' deploy/.env.production; then
   sudo systemctl enable sipat-certificates.timer
   sudo systemctl start sipat-certificates.timer
-  sudo deploy/scripts/issue-certificates.sh
+  sudo deploy/scripts/issue-certificates.sh < /dev/null
 else
   sudo systemctl disable --now sipat-certificates.timer 2>/dev/null || true
 fi
 
 docker image prune --all --force > /dev/null
 "${compose[@]}" ps
+echo "REMOTE-DONE"
 REMOTE
+# a remote command that reads stdin would end the script early with success: require the last line
+if ! grep -q '^REMOTE-DONE$' "$work/remote.log"; then
+  echo "The remote steps did not run to the end." >&2
+  exit 1
+fi
 
 echo "==> Health check"
 curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "https://$PLATFORM_HOST/health"

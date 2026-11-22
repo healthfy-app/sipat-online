@@ -67,10 +67,27 @@ Em *Settings → Environments*, crie o ambiente (`dev` ou `production`) com:
 
 Com `VIDEO_STORAGE_PROVIDER=R2` e alguma configuração do R2 faltando, o deploy avisa e usa `File`. Assim a API nunca sobe quebrada.
 
+Criar ambientes e segredos exige permissão de **admin** no repositório. Quem só tem permissão de push recebe 403.
+
+O workflow `deploy-dev.yml` também precisa da variável `DEPLOY_PLATFORM=linux/arm64` no ambiente `dev`, porque a VM de dev é ARM.
+
 ## 3. Subir
 
 - dev: `git push origin dev`. Também dá para rodar *Actions → Deploy dev → Run workflow*.
 - produção: *Actions → Deploy production → Run workflow* na `main`.
+
+### Sem o GitHub (da sua máquina)
+
+O mesmo script roda no Git Bash, com Docker Desktop. As variáveis são as mesmas da tabela acima, exportadas num arquivo **fora do repositório**:
+
+```bash
+source ~/.sipat-online/dev.env      # export DEPLOY_HOST=..., POSTGRES_PASSWORD=..., etc.
+bash deploy/scripts/deploy-vm.sh
+```
+
+`DEPLOY_SSH_KEY_FILE` e `DEPLOY_KNOWN_HOSTS_FILE` apontam para a chave da pipeline e para o resultado de `ssh-keyscan -t ed25519 <IP>`.
+
+**Nunca troque a `POSTGRES_PASSWORD` de um ambiente que já subiu.** O banco guarda a senha do primeiro deploy, e com outra senha a API não conecta.
 
 ## HTTPS por HTTP-01 (dev e produção sem coringa)
 
