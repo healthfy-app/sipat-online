@@ -117,9 +117,10 @@ sudo install -m 0644 deploy/systemd/sipat-certificates.service deploy/systemd/si
 sudo sed -i "s#/opt/sipat-online/app#$1#" /etc/systemd/system/sipat-certificates.service
 sudo systemctl daemon-reload
 if grep -q '^CERTIFICATE_MODE=http01$' deploy/.env.production; then
-  sudo systemctl enable sipat-certificates.timer
-  sudo systemctl start sipat-certificates.timer
-  sudo deploy/scripts/issue-certificates.sh < /dev/null
+  # through systemd, so a run started by the timer and this one never call certbot at the same time;
+  # "start" of a oneshot waits until it ends and fails the deploy when the certificate fails
+  sudo systemctl start sipat-certificates.service
+  sudo systemctl enable --now sipat-certificates.timer
 else
   sudo systemctl disable --now sipat-certificates.timer 2>/dev/null || true
 fi
