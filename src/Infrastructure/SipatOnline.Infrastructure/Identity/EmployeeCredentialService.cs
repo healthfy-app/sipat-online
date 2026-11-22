@@ -70,18 +70,32 @@ public sealed class EmployeeCredentialService(
         return Result<bool>.Success(true);
     }
 
-    private async Task<Result<PlatformIdentityUser>> FindEmployeeAsync(Guid userId, CancellationToken token)
+    private Task<Result<PlatformIdentityUser>> FindEmployeeAsync(Guid userId, CancellationToken token) =>
+        FindParticipantAsync(db, tenantContext, actor, userId, token);
+
+    /// <summary>The company's administrator (or operator inside it) acting; gives the company id.</summary>
+    internal static Result<Guid> CheckManager(ITenantContext tenantContext, ICurrentActor actor)
     {
         if (!(actor.IsInRole(PlatformRoles.SuperAdmin) || actor.IsInRole(PlatformRoles.ClientAdmin) || actor.IsInRole(PlatformRoles.PlatformOperator)))
-            return Failure<PlatformIdentityUser>("identity.forbidden", "Você não tem permissão para alterar usuários.");
+            return Failure<Guid>("identity.forbidden", "Você não tem permissão para alterar usuários.");
         if (tenantContext.CurrentTenantId is not { IsEmpty: false } tenant)
-            return Failure<PlatformIdentityUser>("tenant.context.required", "Não foi possível identificar a empresa.");
+            return Failure<Guid>("tenant.context.required", "Não foi possível identificar a empresa.");
+        return Result<Guid>.Success(tenant.Value);
+    }
+
+    /// <summary>A collaborator (Participant profile) of the current company, tracked for update; never an administrator.</summary>
+    internal static async Task<Result<PlatformIdentityUser>> FindParticipantAsync(
+        PlatformDbContext db, ITenantContext tenantContext, ICurrentActor actor, Guid userId, CancellationToken token)
+    {
+        var guard = CheckManager(tenantContext, actor);
+        if (!guard.IsSuccess) return Result<PlatformIdentityUser>.Failure(guard.Error);
+        var tenant = guard.Value;
 
         var participantRole = await db.Roles.AsNoTracking()
             .Where(role => role.NormalizedName == PlatformRoles.Participant.ToUpperInvariant())
             .Select(role => (Guid?)role.Id).SingleOrDefaultAsync(token);
         var user = await db.Users.SingleOrDefaultAsync(item =>
-            item.Id == userId && item.TenantId == tenant.Value &&
+            item.Id == userId && item.TenantId == tenant &&
             participantRole != null && db.UserRoles.Any(role => role.UserId == item.Id && role.RoleId == participantRole), token);
         return user is null
             ? Failure<PlatformIdentityUser>("user.not_found", "O colaborador não foi encontrado.")
