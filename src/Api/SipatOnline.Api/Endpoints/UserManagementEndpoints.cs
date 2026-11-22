@@ -143,6 +143,16 @@ public static class UserManagementEndpoints
         })
         .WithName("ResetEmployeePassword");
 
+        group.MapPost("/import", async (
+            SipatOnline.Infrastructure.Identity.ImportRequest request,
+            SipatOnline.Infrastructure.Identity.ParticipantImportService import,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await import.ImportAsync(request, cancellationToken);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .WithName("ImportParticipants");
+
         return endpoints;
     }
 
