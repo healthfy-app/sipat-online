@@ -90,8 +90,8 @@ describe('collaborators', () => {
     expect(within(dialog).getByRole('button', { name: 'Salvar alterações' })).toBeDisabled();
     await user.clear(within(dialog).getByLabelText('Nome'));
     await user.type(within(dialog).getByLabelText('Nome'), 'José Santos');
-    await user.clear(within(dialog).getByLabelText('Matrícula (login)'));
-    await user.type(within(dialog).getByLabelText('Matrícula (login)'), 'jose.santos');
+    await user.clear(within(dialog).getByLabelText('Login'));
+    await user.type(within(dialog).getByLabelText('Login'), 'jose.santos');
     await user.type(within(dialog).getByLabelText('Nova senha (opcional)'), 'SenhaNova123');
     await user.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }));
 
@@ -99,23 +99,23 @@ describe('collaborators', () => {
     expect(api.changeEmployeeLogin).toHaveBeenCalledWith('p-2', 'jose.santos');
     expect(api.resetEmployeePassword).toHaveBeenCalledWith('p-2', 'SenhaNova123');
     expect(api.changeUserStatus).not.toHaveBeenCalled();
-    expect(await screen.findByRole('status')).toHaveTextContent('Dados de José Santos atualizados (nome, matrícula, senha).');
+    expect(await screen.findByRole('status')).toHaveTextContent('Dados de José Santos atualizados (nome, login, senha).');
   });
 
   it('says what was already saved when a later change fails', async () => {
     const user = userEvent.setup();
     vi.mocked(api.renameUser).mockResolvedValue(people[0]);
-    vi.mocked(api.changeEmployeeLogin).mockRejectedValue(new Error('Já existe uma conta com essa matrícula nesta empresa.'));
+    vi.mocked(api.changeEmployeeLogin).mockRejectedValue(new Error('Já existe uma conta com esse login nesta empresa.'));
     renderPage();
 
     await user.click(await screen.findByRole('button', { name: 'Editar Maria José Oliveira' }));
     const dialog = await screen.findByRole('dialog', { name: 'Editar colaborador' });
     await user.type(within(dialog).getByLabelText('Nome'), ' Silva');
-    await user.clear(within(dialog).getByLabelText('Matrícula (login)'));
-    await user.type(within(dialog).getByLabelText('Matrícula (login)'), 'jose.maria');
+    await user.clear(within(dialog).getByLabelText('Login'));
+    await user.type(within(dialog).getByLabelText('Login'), 'jose.maria');
     await user.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }));
 
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Já existe uma conta com essa matrícula nesta empresa. Já foi salvo: nome.');
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Já existe uma conta com esse login nesta empresa. Já foi salvo: nome.');
   });
 
   it('deactivates the chosen collaborators after asking', async () => {

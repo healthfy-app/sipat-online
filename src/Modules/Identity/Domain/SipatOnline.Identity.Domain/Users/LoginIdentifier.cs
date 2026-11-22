@@ -22,7 +22,7 @@ public sealed record LoginIdentifier
         if (string.IsNullOrWhiteSpace(value))
         {
             return Result<LoginIdentifier>.Failure(
-                new DomainError("user.login_identifier.required", "A matrícula/login é obrigatória."));
+                new DomainError("user.login_identifier.required", "O login é obrigatório."));
         }
 
         var trimmedValue = value.Trim();
@@ -31,7 +31,7 @@ public sealed record LoginIdentifier
             return Result<LoginIdentifier>.Failure(
                 new DomainError(
                     "user.login_identifier.invalid",
-                    "A matrícula/login contém caracteres inválidos."));
+                    "O login contém caracteres inválidos."));
         }
 
         var normalizedValue = trimmedValue.Normalize(NormalizationForm.FormKC).ToUpperInvariant();
@@ -40,7 +40,7 @@ public sealed record LoginIdentifier
             return Result<LoginIdentifier>.Failure(
                 new DomainError(
                     "user.login_identifier.maximum_length",
-                    $"A matrícula/login deve ter no máximo {MaximumLength} caracteres."));
+                    $"O login deve ter no máximo {MaximumLength} caracteres."));
         }
 
         return Result<LoginIdentifier>.Success(

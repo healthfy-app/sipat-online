@@ -26,7 +26,7 @@ public sealed class EmployeeCredentialService(
         var login = LoginIdentifier.Create(loginIdentifier);
         if (!login.IsSuccess) return Result<string>.Failure(login.Error);
         if (login.Value.Value.Length > LoginIdentifier.MaximumLength)
-            return Failure<string>("user.login_identifier.invalid", "A matrícula/login é longa demais.");
+            return Failure<string>("user.login_identifier.invalid", "O login é longo demais.");
 
         var user = found.Value;
         if (user.NormalizedEmployeeIdentifier == login.Value.NormalizedValue)
@@ -41,7 +41,7 @@ public sealed class EmployeeCredentialService(
         catch (DbUpdateException exception) when (exception.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
         {
             db.Entry(user).State = EntityState.Detached;
-            return Failure<string>("identity.login_identifier.duplicate", "Já existe uma conta com essa matrícula nesta empresa.");
+            return Failure<string>("identity.login_identifier.duplicate", "Já existe uma conta com esse login nesta empresa.");
         }
 
         await WriteAuditAsync("identity.user.login_changed", userId, token);

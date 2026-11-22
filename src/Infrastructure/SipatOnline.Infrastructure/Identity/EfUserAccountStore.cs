@@ -58,7 +58,7 @@ public sealed class EfUserAccountStore(
             return Result<User>.Failure(
                 new DomainError(
                     "identity.login_identifier.duplicate",
-                    "Já existe uma conta com essa matrícula nesta empresa."));
+                    "Já existe uma conta com esse login nesta empresa."));
         }
 
         return Result<User>.Success(user);
@@ -163,7 +163,7 @@ public sealed class EfUserAccountStore(
         {
             return new DomainError(
                 "identity.login_identifier.duplicate",
-                "Já existe uma conta com essa matrícula nesta empresa.");
+                "Já existe uma conta com esse login nesta empresa.");
         }
 
         if (result.Errors.Any(error => error.Code.StartsWith("Password", StringComparison.Ordinal)))

@@ -79,7 +79,7 @@ export default function AddCollaboratorsDialog({ existingLogins, onClose, onCrea
     className={cn('min-h-9 rounded-md border-0 px-3 text-sm font-semibold', mode === value ? 'bg-card shadow-sm' : 'bg-transparent text-muted-foreground')}
     disabled={busy || result !== null} onClick={() => { setMode(value); setError(''); }} type="button">{label}</button>;
 
-  return <Dialog busy={busy} description="Cada colaborador entra com a matrícula e a senha que você definir aqui." onClose={result ? () => void finish() : onClose} size="lg" title="Adicionar colaboradores">
+  return <Dialog busy={busy} description="Cada colaborador entra com o login e a senha que você definir aqui." onClose={result ? () => void finish() : onClose} size="lg" title="Adicionar colaboradores">
     <div className="grid gap-4">
       <div className="inline-flex gap-1 justify-self-start rounded-lg bg-muted p-1" role="group">{tab('single', 'Um colaborador')}{tab('csv', 'Importar de um CSV')}</div>
       {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
@@ -89,7 +89,7 @@ export default function AddCollaboratorsDialog({ existingLogins, onClose, onCrea
           <Field htmlFor="add-name" label="Nome">
             <Input autoComplete="off" data-autofocus id="add-name" maxLength={200} onChange={event => setForm(current => ({ ...current, displayName: event.target.value }))} required value={form.displayName} />
           </Field>
-          <Field hint="É o que o colaborador digita para entrar." htmlFor="add-login" label="Matrícula (login)">
+          <Field hint="É o que o colaborador digita para entrar." htmlFor="add-login" label="Login">
             <Input autoCapitalize="none" autoComplete="off" id="add-login" maxLength={128} onChange={event => setForm(current => ({ ...current, loginIdentifier: event.target.value }))} required value={form.loginIdentifier} />
           </Field>
           <Field hint={passwordRulesHint} htmlFor="add-password" label="Senha inicial">
@@ -108,7 +108,7 @@ export default function AddCollaboratorsDialog({ existingLogins, onClose, onCrea
             </p>
             <Button onClick={() => downloadCsv('modelo-importacao-colaboradores.csv', '﻿nome;login\r\nMaria Silva;maria.silva\r\n')} size="sm" variant="outline"><FileSpreadsheet /> Baixar modelo</Button>
           </div>
-          {!result && <Field hint="Matrículas que já existem, ou repetidas no arquivo, são ignoradas." htmlFor="add-csv" label="Arquivo CSV">
+          {!result && <Field hint="Logins que já existem, ou repetidas no arquivo, são ignoradas." htmlFor="add-csv" label="Arquivo CSV">
             <input accept=".csv,text/csv" disabled={busy} id="add-csv" onChange={event => void readFile(event)} type="file" />
           </Field>}
           {fileName && !result && <p className="m-0 text-sm text-muted-foreground">{fileName}</p>}

@@ -127,7 +127,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
     <section aria-label="Filtros" className="flex flex-wrap items-center gap-3">
       <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-sm">
         <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4" />
-        <Input aria-label="Buscar por nome ou matrícula" className="pl-9" onChange={event => setSearch(event.target.value)} placeholder="Buscar por nome ou matrícula" type="search" value={search} />
+        <Input aria-label="Buscar por nome ou login" className="pl-9" onChange={event => setSearch(event.target.value)} placeholder="Buscar por nome ou login" type="search" value={search} />
       </label>
       <NativeSelect aria-label="Situação" className="w-auto min-w-44" onChange={event => setFilter(event.target.value as ParticipantProgressFilter)} value={filter}>
         {filters.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
@@ -143,7 +143,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
 
     {!people && <LoadingState>Carregando os colaboradores...</LoadingState>}
     {people && people.length === 0 && !error && <EmptyState action={!readOnly && <Button onClick={() => setAdding(true)}>Adicionar colaboradores</Button>} description="Adicione um a um ou importe uma planilha." title="Nenhum colaborador ainda." />}
-    {people && people.length > 0 && visible.length === 0 && <EmptyState description="Tente outro nome ou matrícula, ou mude o filtro." title="Nenhum colaborador encontrado." />}
+    {people && people.length > 0 && visible.length === 0 && <EmptyState description="Tente outro nome ou login, ou mude o filtro." title="Nenhum colaborador encontrado." />}
     {visible.length > 0 && <>
       <Table aria-label="Colaboradores da empresa">
         <TableHeader>

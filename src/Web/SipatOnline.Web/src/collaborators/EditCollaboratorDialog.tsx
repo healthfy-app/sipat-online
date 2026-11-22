@@ -31,12 +31,12 @@ export default function EditCollaboratorDialog({ person, onClose, onSaved }: {
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!name.trim() || !login.trim()) { setError('Informe o nome e a matrícula do colaborador.'); return; }
+    if (!name.trim() || !login.trim()) { setError('Informe o nome e o login do colaborador.'); return; }
     setBusy(true); setError('');
     const done: string[] = [];
     try {
       if (nameChanged) { await renameUser(person.id, name.trim()); done.push('nome'); }
-      if (loginChanged) { await changeEmployeeLogin(person.id, login.trim()); done.push('matrícula'); }
+      if (loginChanged) { await changeEmployeeLogin(person.id, login.trim()); done.push('login'); }
       if (password !== '') { await resetEmployeePassword(person.id, password); done.push('senha'); }
       if (statusChanged) { await changeUserStatus(person.id, active); done.push(active ? 'acesso reativado' : 'acesso inativado'); }
       await onSaved(`Dados de ${name.trim()} atualizados (${done.join(', ')}).`);
@@ -53,7 +53,7 @@ export default function EditCollaboratorDialog({ person, onClose, onSaved }: {
       <Field htmlFor="edit-name" label="Nome">
         <Input autoComplete="off" data-autofocus id="edit-name" maxLength={200} onChange={event => setName(event.target.value)} value={name} />
       </Field>
-      <Field hint="É o que o colaborador digita para entrar." htmlFor="edit-login" label="Matrícula (login)">
+      <Field hint="É o que o colaborador digita para entrar." htmlFor="edit-login" label="Login">
         <Input autoCapitalize="none" autoComplete="off" id="edit-login" maxLength={128} onChange={event => setLogin(event.target.value)} value={login} />
       </Field>
       <Field hint={`${passwordRulesHint} Entregue a nova senha por um canal seguro: ela não aparece de novo.`} htmlFor="edit-password" label="Nova senha (opcional)">

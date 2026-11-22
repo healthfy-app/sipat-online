@@ -48,7 +48,7 @@ public sealed class EfInitialClientAdminProvisioner(
         {
             return Failure(
                 "identity.login_identifier.duplicate",
-                "Já existe uma conta com essa matrícula nesta empresa.");
+                "Já existe uma conta com esse login nesta empresa.");
         }
 
         var account = new PlatformIdentityUser
@@ -95,7 +95,7 @@ public sealed class EfInitialClientAdminProvisioner(
             dbContext.Entry(account).State = EntityState.Detached;
             return Failure(
                 "identity.login_identifier.duplicate",
-                "Já existe uma conta com essa matrícula nesta empresa.");
+                "Já existe uma conta com esse login nesta empresa.");
         }
 
         return Result<Guid>.Success(account.Id);

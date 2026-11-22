@@ -21,7 +21,7 @@ export default function ProgressDialog({ person, onClose }: { person: Participan
     return () => { current = false; };
   }, [person.id]);
 
-  return <Dialog description={`Matrícula ${person.loginIdentifier}`} onClose={onClose} size="lg" title={`Andamento de ${person.displayName}`}>
+  return <Dialog description={`Login ${person.loginIdentifier}`} onClose={onClose} size="lg" title={`Andamento de ${person.displayName}`}>
     <div className="grid gap-4">
       {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
       {!report && !error && <p className="m-0 text-sm text-muted-foreground" role="status">Carregando o andamento...</p>}
