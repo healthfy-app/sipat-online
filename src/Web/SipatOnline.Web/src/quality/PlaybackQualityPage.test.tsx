@@ -64,14 +64,14 @@ describe('playback quality page', () => {
     renderPage();
 
     expect(await screen.findByRole('heading', { name: 'Ainda não há dados de vídeo' })).toBeVisible();
-    expect(screen.getByRole('combobox', { name: 'SIPAT' })).toBeVisible();
+    expect(screen.getByRole('combobox', { name: 'Treinamento' })).toBeVisible();
     expect(screen.getByRole('combobox', { name: 'Dia' })).toBeVisible();
   });
 
   it('reloads for the chosen SIPAT and day', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'SIPAT' }), 's2');
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Treinamento' }), 's2');
     await user.selectOptions(screen.getByRole('combobox', { name: 'Dia' }), '2');
 
     await waitFor(() => expect(api.getCompanyPlaybackQuality).toHaveBeenLastCalledWith('c1', { sipatId: 's2', day: 2 }));

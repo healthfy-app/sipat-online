@@ -9,7 +9,7 @@ public sealed class PlaybackQualityConclusionTests
     {
         var text = PlaybackQualityConclusion.For(Indicators(0, null, null, null, null), Hours());
 
-        Assert.Equal("Ainda não há sessões de vídeo registradas nesta SIPAT.", text);
+        Assert.Equal("Ainda não há sessões de vídeo registradas neste treinamento.", text);
     }
 
     [Fact]

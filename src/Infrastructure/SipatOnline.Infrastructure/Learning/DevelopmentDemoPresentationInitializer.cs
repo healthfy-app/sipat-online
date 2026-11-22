@@ -140,6 +140,12 @@ public sealed class DevelopmentDemoPresentationInitializer(
         new("Liderança", 6, "Liderar é cuidar de quem está ao lado", new DateOnly(2026, 11, 16))
     ];
 
+    // a second training running beside the SIPAT: several trainings can be published at once, and a part without a date is a module
+    private static readonly CourseDefinition FireCourse = new(1, "Prevenção e combate a incêndios",
+        ["Como usar o extintor", "Rotas de fuga e ponto de encontro"]);
+
+    private static readonly DayDefinition FireModule = new(FireCourse.Title, 1, "Saber agir salva vidas", null);
+
     public async Task InitializeAsync(CancellationToken cancellationToken)
     {
         if (!environment.IsDevelopment() ||
@@ -174,7 +180,19 @@ public sealed class DevelopmentDemoPresentationInitializer(
         foreach (var tenant in tenants)
         {
             var sipatId = StableId($"demo-sipat:{tenant.Id:N}");
-            await EnsureSipatAsync(tenant, sipatId, now, cancellationToken);
+            await EnsureSipatAsync(tenant, sipatId, "SIPAT de demonstração 2026",
+                "Ambiente de demonstração com as três grades da página pública.", now, cancellationToken);
+
+            var fireId = StableId($"demo-fire:{tenant.Id:N}");
+            await EnsureSipatAsync(tenant, fireId, "Treinamento contra incêndios",
+                "Um módulo, sem data, publicado ao mesmo tempo que a SIPAT.", now, cancellationToken);
+            var fireTrackId = await EnsureTrackAsync(tenant, fireId, FireCourse, now, cancellationToken);
+            await EnsureDayAsync(fireTrackId, FireModule, cancellationToken);
+            foreach (var participant in participants[tenant.Id])
+            {
+                await EnsureAssignmentAsync(tenant.Id, fireTrackId, participant.Id, now, cancellationToken);
+            }
+
             foreach (var course in Courses)
             {
                 var trackId = await EnsureTrackAsync(tenant, sipatId, course, now, cancellationToken);
@@ -350,6 +368,8 @@ public sealed class DevelopmentDemoPresentationInitializer(
     private async Task EnsureSipatAsync(
         TenantEntity tenant,
         Guid sipatId,
+        string title,
+        string description,
         DateTimeOffset now,
         CancellationToken cancellationToken)
     {
@@ -362,8 +382,8 @@ public sealed class DevelopmentDemoPresentationInitializer(
         {
             Id = sipatId,
             TenantId = tenant.Id,
-            Title = "SIPAT de demonstração 2026",
-            Description = "Ambiente de demonstração com as três grades da página pública.",
+            Title = title,
+            Description = description,
             StartsAt = now,
             EndsAt = now.AddYears(1),
             CreatedAt = now,
@@ -559,5 +579,5 @@ public sealed class DevelopmentDemoPresentationInitializer(
 
     private sealed record CourseDefinition(int Option, string Title, string[] Lessons);
 
-    private sealed record DayDefinition(string Subject, int Position, string Slogan, DateOnly Date);
+    private sealed record DayDefinition(string Subject, int Position, string Slogan, DateOnly? Date);
 }

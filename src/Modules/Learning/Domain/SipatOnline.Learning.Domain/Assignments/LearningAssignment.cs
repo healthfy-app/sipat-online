@@ -44,7 +44,7 @@ public sealed class LearningAssignment
         {
             return Failure(
                 "learning.assignment.identities_required",
-                "A empresa, formação e participante da atribuição são obrigatórios.");
+                "A empresa, o conteúdo e o participante da atribuição são obrigatórios.");
         }
 
         if (assignedAt == default)

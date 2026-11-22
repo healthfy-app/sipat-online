@@ -3,7 +3,7 @@ import type { PlatformCourseVideo } from '@/api';
 
 type ExternalVideo = Pick<PlatformCourseVideo, 'provider' | 'externalId'>;
 
-const providerOf = (video: ExternalVideo) => (video.provider === 'Vimeo' ? 'Vimeo' : 'YouTube');
+const providerOf = (video: ExternalVideo) => (video.provider === 'Vimeo' || video.provider === 'Smartplayer' ? video.provider : 'YouTube');
 
 /** The provider frame in the same sized box as the house preview. */
 export function ExternalVideoFrame({ video, title }: { video: ExternalVideo; title: string }) {

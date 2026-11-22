@@ -27,7 +27,7 @@ public sealed class PlatformCourseCatalogService(
     public const long MaximumVideoSizeBytes = 250 * 1024 * 1024;
     public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
-    private const int MaximumExternalIdLength = 32;
+    private const int MaximumExternalIdLength = ExternalVideoLink.MaximumSmartplayerLength;
 
     public async Task<Result<IReadOnlyList<PlatformCourse>>> ListAsync(
         CancellationToken cancellationToken)
@@ -230,8 +230,8 @@ public sealed class PlatformCourseCatalogService(
         {
             var where = new List<string>();
             if (usage.Themes > 0) where.Add(usage.Themes == 1 ? "1 tema" : $"{usage.Themes} temas");
-            if (usage.Programs > 0) where.Add(usage.Programs == 1 ? "1 SIPAT pronta" : $"{usage.Programs} SIPATs prontas");
-            if (usage.DeliveredLessons > 0) where.Add("SIPATs já entregues a empresas");
+            if (usage.Programs > 0) where.Add(usage.Programs == 1 ? "1 treinamento pronto" : $"{usage.Programs} treinamentos prontos");
+            if (usage.DeliveredLessons > 0) where.Add("treinamentos já entregues a empresas");
             return Failure<bool>(
                 "learning.platform_course.video_in_use",
                 $"Este vídeo ainda está em uso ({string.Join(", ", where)}). Tire-o de lá antes de excluir.");
@@ -722,7 +722,7 @@ public sealed class PlatformCourseCatalogService(
             "learning.platform_course.upload_not_found",
             "O envio não foi encontrado. Envie o vídeo de novo.");
 
-    /// <summary>Registers a YouTube or Vimeo link as a library item; the same link twice returns the first one.</summary>
+    /// <summary>Registers a YouTube, Vimeo or Smartplayer link as a library item; the same link twice returns the first one.</summary>
     public async Task<Result<PlatformCourseVideo>> CreateExternalVideoAsync(
         string? provider,
         string? url,
@@ -742,14 +742,14 @@ public sealed class PlatformCourseCatalogService(
         {
             return Failure<PlatformCourseVideo>(
                 "learning.catalog.external_provider_invalid",
-                "Escolha YouTube ou Vimeo.");
+                "Escolha YouTube, Vimeo ou Smartplayer.");
         }
 
         if (!ExternalVideoLink.TryParse(parsedProvider, url, out var externalId) || externalId.Length > MaximumExternalIdLength)
         {
             return Failure<PlatformCourseVideo>(
                 "learning.catalog.external_link_invalid",
-                "Não reconhecemos este link. Cole o endereço do vídeo no YouTube ou no Vimeo.");
+                "Não reconhecemos este link. Cole o endereço do vídeo no YouTube ou no Vimeo, ou o código embed do Smartplayer.");
         }
 
         var normalizedTitle = title?.Trim();

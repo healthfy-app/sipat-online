@@ -21,11 +21,11 @@ export default function ProgressDialog({ person, onClose }: { person: Participan
     return () => { current = false; };
   }, [person.id]);
 
-  return <Dialog description={`Matrícula ${person.loginIdentifier}`} onClose={onClose} size="lg" title={`Andamento de ${person.displayName}`}>
+  return <Dialog description={`Login ${person.loginIdentifier}`} onClose={onClose} size="lg" title={`Andamento de ${person.displayName}`}>
     <div className="grid gap-4">
       {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
       {!report && !error && <p className="m-0 text-sm text-muted-foreground" role="status">Carregando o andamento...</p>}
-      {report && report.tracks.length === 0 && <p className="m-0 text-sm text-muted-foreground">Este colaborador ainda não recebeu nenhum dia de SIPAT.</p>}
+      {report && report.tracks.length === 0 && <p className="m-0 text-sm text-muted-foreground">Este colaborador ainda não recebeu nenhum dia de treinamento.</p>}
       {report?.tracks.map(({ track, lessons }) => <section aria-label={track.dayTitle ?? track.title} className="grid gap-2 rounded-xl border border-border p-3" key={track.id}>
         <header className="flex flex-wrap items-baseline justify-between gap-2">
           <strong className="text-sm">{track.dayTitle ?? track.title}</strong>

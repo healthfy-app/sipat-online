@@ -32,7 +32,7 @@ public sealed class PlaybackQualityDashboardService(
         if (sipatId is not null && scope.Sipats.All(item => item.Id != sipatId))
         {
             return Failure<CompanyPlaybackQuality>("learning.playback_quality.sipat_not_found",
-                "A SIPAT não foi encontrada nesta empresa.");
+                "O treinamento não foi encontrado nesta empresa.");
         }
 
         var chosen = sipatId ?? scope.DefaultSipatId;
@@ -70,7 +70,7 @@ public sealed class PlaybackQualityDashboardService(
         }
 
         var quality = result.Value;
-        var sipatTitle = quality.Sipats.FirstOrDefault(item => item.Id == quality.SipatId)?.Title ?? "Nenhuma SIPAT";
+        var sipatTitle = quality.Sipats.FirstOrDefault(item => item.Id == quality.SipatId)?.Title ?? "Nenhum treinamento";
         var pdf = pdfRenderer.Render(new PlaybackQualityPdfContent(
             quality.CompanyName,
             sipatTitle,

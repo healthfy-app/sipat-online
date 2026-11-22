@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as api from '@/api';
 import PlanSubjectsPanel from './PlanSubjectsPanel';
 
-vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api')>()), getPlanSubjects: vi.fn(), setPlanSubjects: vi.fn(), listCourseCategories: vi.fn() }));
+vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api')>()), getPlanSubjects: vi.fn(), setPlanSubjects: vi.fn(), setSubjectCompany: vi.fn(), listPlatformCompanies: vi.fn(), listCourseCategories: vi.fn() }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe('assuntos of each plan', () => {
@@ -18,6 +18,7 @@ describe('assuntos of each plan', () => {
       excluded: { Bronze: [], Prata: [], Ouro: [], Diamante: [] },
     });
     vi.mocked(api.setPlanSubjects).mockResolvedValue(undefined);
+    vi.mocked(api.listPlatformCompanies).mockResolvedValue([]);
     vi.mocked(api.listCourseCategories).mockResolvedValue([{ id: 'cat-post', name: 'Postura', courseCount: 1 }]);
     render(<PlanSubjectsPanel />);
 
@@ -33,5 +34,26 @@ describe('assuntos of each plan', () => {
 
     await user.click(bronze);
     expect(api.setPlanSubjects).toHaveBeenLastCalledWith('Bronze', []);
+  });
+
+  it('gives an assunto to one company as its internal videos, outside the plans', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getPlanSubjects).mockResolvedValue({
+      courses: [
+        { id: 'c-1', title: 'Ergonomia', description: null, videoCount: 4 },
+        { id: 'c-2', title: 'Vídeos da Acme', description: null, videoCount: 2 },
+      ],
+      excluded: { Bronze: [], Prata: [], Ouro: [], Diamante: [] },
+    });
+    vi.mocked(api.listPlatformCompanies).mockResolvedValue([{ id: 'acme', key: 'acme', name: 'Acme', createdAt: '2026-01-01T00:00:00Z', isActive: true }]);
+    vi.mocked(api.setSubjectCompany).mockResolvedValue(undefined);
+    vi.mocked(api.listCourseCategories).mockResolvedValue([]);
+    render(<PlanSubjectsPanel />);
+
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Empresa do assunto Vídeos da Acme' }), 'acme');
+    expect(api.setSubjectCompany).toHaveBeenCalledWith('c-2', 'acme');
+    expect(screen.getByText(/Só Acme, no plano/)).toBeVisible();
+    expect(screen.queryByRole('checkbox', { name: 'Vídeos da Acme no plano Bronze' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('1 de 1').length).toBeGreaterThan(0);
   });
 });

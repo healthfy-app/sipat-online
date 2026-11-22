@@ -10,7 +10,7 @@ public static class PlaybackQualityConclusion
 
         if (indicators.Sessions == 0)
         {
-            return "Ainda não há sessões de vídeo registradas nesta SIPAT.";
+            return "Ainda não há sessões de vídeo registradas neste treinamento.";
         }
 
         var named = new (string Name, QualityLevel? Level)[]

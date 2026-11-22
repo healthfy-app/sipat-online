@@ -7,7 +7,7 @@ import SipatBuilderPage, { findIssues } from './SipatBuilderPage';
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api')>()),
-  getSipatCatalog: vi.fn(), listSipatEvents: vi.fn(), listSipatPlans: vi.fn(), getSipatPlan: vi.fn(), saveSipatPlan: vi.fn(), cancelSipatEvent: vi.fn(),
+  getSipatCatalog: vi.fn(), listSipatEvents: vi.fn(), listSipatPlans: vi.fn(), getSipatPlan: vi.fn(), saveSipatPlan: vi.fn(), cancelSipatEvent: vi.fn(), getCompanyCapabilities: vi.fn(),
 }));
 afterEach(cleanup);
 
@@ -23,6 +23,7 @@ beforeEach(() => {
     { id: 'd2', title: '', date: '2026-11-10', subject: null, videoIds: [], gameIds: [] },
   ]);
   vi.mocked(api.saveSipatPlan).mockClear();
+  vi.mocked(api.getCompanyCapabilities).mockResolvedValue({ customizeGrid: true, customBranding: true, customCertificate: true, quizzes: true, internalVideos: true, plan: 'Diamante' });
 });
 
 function renderBuilder() {
@@ -35,12 +36,21 @@ function renderBuilder() {
 }
 
 describe('SIPAT builder', () => {
+  it('on Bronze takes the ready modules as they are: no CSV with a grid of its own', async () => {
+    vi.mocked(api.getCompanyCapabilities).mockResolvedValue({ customizeGrid: false, customBranding: false, customCertificate: false, quizzes: false, internalVideos: false, plan: 'Bronze' });
+    renderBuilder();
+    expect(await screen.findByText(/No plano Bronze cada dia recebe um módulo pronto/)).toBeVisible();
+    await userEvent.click(screen.getByRole('button', { name: /Mais/ }));
+    expect(await screen.findByRole('menuitem', { name: /Exportar CSV/ })).toBeVisible();
+    expect(screen.queryByRole('menuitem', { name: /Importar CSV/ })).not.toBeInTheDocument();
+  });
+
   it('lists what is missing on each day, by position', () => {
     const issues = findIssues('', [
       { key: 'a', title: 'Abertura', date: '2026-11-09', subject: '', videos: ['v1'], games: [] },
       { key: 'b', title: ' ', date: '', subject: '', videos: [null], games: [] },
     ]);
-    expect(issues.name).toBe('Dê um nome à formação.');
+    expect(issues.name).toBe('Dê um nome ao treinamento.');
     expect(issues.days).toEqual({ 1: ['Falta o slogan do dia.', 'Falta um assunto com vídeos.'] });
   });
 
@@ -76,16 +86,22 @@ describe('SIPAT builder', () => {
     expect(screen.queryByRole('button', { name: /Importar CSV/ })).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole('button', { name: /Mais/ }));
-    await userEvent.click(await screen.findByRole('menuitem', { name: /Encerrar esta formação/ }));
+    await userEvent.click(await screen.findByRole('menuitem', { name: /Encerrar este treinamento/ }));
     expect(await screen.findByRole('dialog', { name: 'Encerrar "SIPAT 2026"?' })).toBeVisible();
     expect(api.cancelSipatEvent).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole('button', { name: /Encerrar formação/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Encerrar treinamento/ }));
     expect(api.cancelSipatEvent).toHaveBeenCalledWith('s1');
-    expect(await screen.findByText('Formação encerrada.')).toBeVisible();
+    expect(await screen.findByText('Treinamento encerrado.')).toBeVisible();
   });
 
-  it('names the SIPAT that leaves the air when another is published', async () => {
+  it('calls the parts Módulo when no day has a date', async () => {
+    vi.mocked(api.getSipatPlan).mockResolvedValue([{ id: 'd1', title: 'Abertura', date: null, subject: null, videoIds: ['v1'], gameIds: [] }]);
+    renderBuilder();
+    expect(await screen.findByRole('textbox', { name: 'Título do módulo 1' })).toBeVisible();
+  });
+
+  it('publishes beside another published training without warning', async () => {
     vi.mocked(api.listSipatEvents).mockResolvedValue({
       offset: 0, limit: 100, totalCount: 2,
       items: [
@@ -96,19 +112,21 @@ describe('SIPAT builder', () => {
     vi.mocked(api.getSipatPlan).mockResolvedValue([{ id: 'd1', title: 'Abertura', date: '2026-11-09', subject: null, videoIds: ['v1'], gameIds: [] }]);
     renderBuilder();
     await userEvent.click(await screen.findByRole('button', { name: /Publicar/ }));
-    expect(await screen.findByRole('dialog', { name: 'Publicar a formação?' })).toHaveTextContent('"SIPAT 2025" deixa de aparecer para os participantes.');
+    const dialog = await screen.findByRole('dialog', { name: 'Publicar o treinamento?' });
+    expect(dialog).toHaveTextContent('Ao publicar, cada dia é entregue aos participantes ativos da empresa.');
+    expect(dialog).not.toHaveTextContent('deixa de aparecer');
   });
 
   it('asks before leaving through a link with unsaved changes', async () => {
     renderBuilder();
     await userEvent.type(await screen.findByRole('textbox', { name: 'Título do dia 2' }), 'Mãos seguras');
-    await userEvent.click(screen.getByRole('link', { name: /Todas as formações/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Todos os treinamentos/ }));
 
     expect(await screen.findByRole('dialog', { name: 'Sair sem salvar?' })).toBeVisible();
     await userEvent.click(screen.getByRole('button', { name: 'Continuar editando' }));
     expect(screen.queryByText('Lista de SIPATs')).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole('link', { name: /Todas as formações/ }));
+    await userEvent.click(screen.getByRole('link', { name: /Todos os treinamentos/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Sair sem salvar' }));
     expect(await screen.findByText('Lista de SIPATs')).toBeVisible();
   });

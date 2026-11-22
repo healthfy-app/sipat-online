@@ -2,8 +2,8 @@ import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2,
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  cancelSipatEvent, copySipatPlan, createSipatEvent, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, saveSipatPlan, updateSipatEvent,
-  type SipatEvent, type SipatPlanSummary,
+  cancelSipatEvent, copySipatPlan, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, saveSipatPlan, updateSipatEvent,
+  type CompanyCapabilities, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import { Page } from '@/components/ui/page';
 import { extrasSuffix, getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import '@/OpsIdentity.css';
+import { partWord } from '@/trainings/partWord';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
@@ -42,7 +43,7 @@ export function findIssues(name: string, days: DaySlots[]): { name: string | nul
     if (day.date && !isValidDate(day.date)) list.push('A data é inválida.');
     if (list.length > 0) byDay[index] = list;
   });
-  return { name: name.trim() ? null : 'Dê um nome à formação.', days: byDay };
+  return { name: name.trim() ? null : 'Dê um nome ao treinamento.', days: byDay };
 }
 
 /**
@@ -56,6 +57,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [others, setOthers] = useState<SipatEvent[]>([]);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
+  // what the company's plan allows; unknown (null) leaves everything open and the server decides
+  const [capabilities, setCapabilities] = useState<CompanyCapabilities | null>(null);
   const [sipat, setSipat] = useState<SipatEvent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -84,12 +87,13 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     setLoading(true); setError('');
     try {
       const [content, events, summaries] = await Promise.all([getSipatCatalog(), listSipatEvents(0, 100), listSipatPlans()]);
+      getCompanyCapabilities().then(setCapabilities).catch(() => setCapabilities(null));
       setCatalog(buildCatalog(content.courses, content.videos, content.games, content.categories ?? []));
       setPlans(summaries);
       setOthers(events.items);
       if (!isNew && params.sipatId) {
         const found = events.items.find(item => item.id === params.sipatId);
-        if (!found) { setError('Não encontrei esta formação.'); return; }
+        if (!found) { setError('Não encontrei este treinamento.'); return; }
         setSipat(found); setName(found.title);
         setDays((await getSipatPlan(found.id)).map(fromProgramDay));
       } else {
@@ -151,7 +155,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const edit = (next: DaySlots[]) => { setDays(next); setDirty(true); setNotice(''); };
 
   function start() {
-    if (!isValidDate(startDate)) { setError('Escolha a data de início da formação.'); return; }
+    if (!isValidDate(startDate)) { setError('Escolha a data de início do treinamento.'); return; }
     setError('');
     setDays(Array.from({ length: dayCount }, (_, index) => newDay(index, addDays(startDate, index))));
     setStage('grid'); setDirty(true);
@@ -217,7 +221,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       const events = await listSipatEvents(0, 100);
       setOthers(events.items);
       setSipat(events.items.find(item => item.id === id) ?? null);
-      setNotice(result.created > 0 ? `Formação publicada: ${pluralize(result.created, 'dia entregue', 'dias entregues')} aos participantes.` : 'Formação atualizada. Os dias que já tinham progresso ficaram como estavam.');
+      setNotice(result.created > 0 ? `Treinamento publicado: ${pluralize(result.created, 'dia entregue', 'dias entregues')} aos participantes.` : 'Treinamento atualizado. Os dias que já tinham progresso ficaram como estavam.');
     } catch (failure) {
       setError(getErrorMessage(failure));
     } finally { setBusy(false); }
@@ -230,7 +234,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     try {
       const cancelled = await cancelSipatEvent(sipat.id);
       setSipat(cancelled); setDirty(false);
-      setNotice('Formação encerrada.');
+      setNotice('Treinamento encerrado.');
     } catch (failure) {
       setError(getErrorMessage(failure));
     } finally { setBusy(false); }
@@ -257,7 +261,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     } finally { setBusy(false); }
   }
 
-  if (loading) return <LoadingState>Carregando a formação...</LoadingState>;
+  if (loading) return <LoadingState>Carregando o treinamento...</LoadingState>;
   if (!catalog) {
     return <Page><div className="grid justify-items-start gap-3">
       <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error || 'Não foi possível carregar o catálogo.'}</p>
@@ -266,35 +270,36 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   }
 
   const template = () => download('modelo-sipat.csv', sampleCsv(catalog));
+  // Bronze takes the ready modules as they are: a CSV with a grid of its own is a personalization (Prata and above)
+  const canCustomizeGrid = capabilities?.customizeGrid !== false;
   const sources = others.filter(item => item.id !== sipat?.id && (plans.find(plan => plan.sipatEventId === item.id)?.days ?? 0) > 0);
   const label = sipat ? phaseLabel[sipatPhase(sipat, days.filter(day => day.videos.some(Boolean)).length)] : null;
   // the name is edited in the title itself, while the SIPAT is a draft; after publishing it stays as it is
   const canRename = stage === 'grid' && !cancelled && (sipat === null || sipat.status === 'Draft');
   const nameMissing = showIssues && !!issues.name;
   const showNameInput = canRename && (editingName || nameMissing);
-  const live = others.find(item => item.status === 'Published' && item.id !== sipat?.id);
   const exportCsv = () => download(`${(name || 'sipat').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.csv`, planToCsv(days, catalog));
 
   return <Page className="builder-page">
     <header className="ops-hero" data-slot="page-header">
       <div className="ops-hero-copy">
-        <Link className="ops-hero-back" to={basePath}><ArrowLeft aria-hidden="true" /> Todas as formações</Link>
-        <p className="ops-hero-eyebrow">Formação</p>
+        <Link className="ops-hero-back" to={basePath}><ArrowLeft aria-hidden="true" /> Todos os treinamentos</Link>
+        <p className="ops-hero-eyebrow">Treinamento</p>
         <div className="flex flex-wrap items-center gap-3">
           {showNameInput
-            ? <Input aria-invalid={nameMissing} aria-label="Nome da formação" autoFocus className="ops-hero-title h-auto w-[min(100%,28rem)] border-dashed bg-transparent px-2 py-1"
+            ? <Input aria-invalid={nameMissing} aria-label="Nome do treinamento" autoFocus className="ops-hero-title h-auto w-[min(100%,28rem)] border-dashed bg-transparent px-2 py-1"
               data-name-issue={nameMissing ? true : undefined} maxLength={200} onBlur={() => setEditingName(false)}
               onChange={event => { setName(event.target.value); setDirty(true); }}
               onKeyDown={event => { if (event.key === 'Enter' || event.key === 'Escape') event.currentTarget.blur(); }}
               placeholder="Ex.: SIPAT 2026" value={name} />
-            : <h1 className="ops-hero-title">{isNew && stage === 'setup' ? 'Nova formação' : name || 'Formação'}</h1>}
-          {canRename && !showNameInput && <Button aria-label="Renomear a formação" onClick={() => setEditingName(true)} size="icon-sm" variant="ghost"><Pencil /></Button>}
+            : <h1 className="ops-hero-title">{isNew && stage === 'setup' ? 'Novo treinamento' : name || 'Treinamento'}</h1>}
+          {canRename && !showNameInput && <Button aria-label="Renomear o treinamento" onClick={() => setEditingName(true)} size="icon-sm" variant="ghost"><Pencil /></Button>}
           {label && <Badge variant={label.variant}>{label.text}</Badge>}
           {dirty && <Badge variant="outline">Alterações não salvas</Badge>}
-          {stage === 'grid' && sipat && sipat.status === 'Published' && <span className="text-xs text-muted-foreground">O nome fica fixo depois de publicada.</span>}
+          {stage === 'grid' && sipat && sipat.status === 'Published' && <span className="text-xs text-muted-foreground">O nome fica fixo depois de publicado.</span>}
         </div>
         <p className="ops-hero-lead is-keep">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</p>
-        {stage === 'grid' && <ul aria-label="Resumo da formação" className="ops-hero-stats">
+        {stage === 'grid' && <ul aria-label="Resumo do treinamento" className="ops-hero-stats">
           <li><strong>{days.length}</strong> {days.length === 1 ? 'dia' : 'dias'}</li>
           <li><Film aria-hidden="true" /><strong>{totals.videos}</strong> {totals.videos === 1 ? 'vídeo' : 'vídeos'}{extrasSuffix(totals.extras)}</li>
           <li><Gamepad2 aria-hidden="true" /><strong>{totals.games}</strong> {totals.games === 1 ? 'jogo' : 'jogos'}</li>
@@ -305,12 +310,12 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild><Button disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
           <DropdownMenuContent>
-            {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outra formação</DropdownMenuItem>}
-            <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>
+            {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
+            {canCustomizeGrid && <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>}
             <DropdownMenuItem disabled={days.length === 0} onSelect={exportCsv}><FileDown /> Exportar CSV</DropdownMenuItem>
             {sipat && <>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => setConfirmingEnd(true)} variant="destructive"><Ban /> Encerrar esta formação</DropdownMenuItem>
+              <DropdownMenuItem onSelect={() => setConfirmingEnd(true)} variant="destructive"><Ban /> Encerrar este treinamento</DropdownMenuItem>
             </>}
           </DropdownMenuContent>
         </DropdownMenu>
@@ -319,16 +324,19 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       </div>}
     </header>
 
-    {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Esta formação foi encerrada e não pode ser alterada. Para usá-la de novo, reative-a na lista de formações, ou use "Duplicar" em uma nova formação.</p>}
+    {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Este treinamento foi encerrado e não pode ser alterado. Para usá-lo de novo, reative-o na lista de treinamentos, ou use "Duplicar" em um novo treinamento.</p>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {showIssues && issueCount > 0 && stage === 'grid' && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">
-      {issues.name ? 'Dê um nome à formação. ' : ''}
+      {issues.name ? 'Dê um nome ao treinamento. ' : ''}
       {Object.keys(issues.days).length > 0 && `${pluralize(Object.keys(issues.days).length, 'dia precisa', 'dias precisam')} de ajuste antes de salvar. Eles estão marcados em vermelho na grade.`}
+    </p>}
+    {!canCustomizeGrid && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">
+      No plano {capabilities?.plan ?? 'Bronze'} cada dia recebe um módulo pronto, com todos os seus vídeos. A personalização da grade de vídeos começa no plano Prata.
     </p>}
     {catalog.subjects.length === 0 && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">O acervo ainda não tem assuntos publicados. Peça à operação para publicar os assuntos.</p>}
 
     {stage === 'setup'
-      ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={() => setImporting(true)} onName={setName} onStart={start}
+      ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={canCustomizeGrid ? () => setImporting(true) : undefined} onName={setName} onStart={start}
         onStartDate={setStartDate} onTemplate={template} startDate={startDate}
         onCopy={sources.length > 0 ? () => setCopying(true) : undefined} />
       : <BuilderGrid canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined}
@@ -338,7 +346,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${pluralize(imported.length, 'dia importado', 'dias importados')}. Revise e salve.`); }}
       onTemplate={template} />}
 
-    {copying && <Dialog description="Escolha a formação de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outra formação">
+    {copying && <Dialog description="Escolha o treinamento de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outro treinamento">
       <ul className="m-0 grid max-h-72 list-none gap-2 overflow-auto p-0">
         {sources.map(item => {
           const plan = plans.find(entry => entry.sipatEventId === item.id);
@@ -360,21 +368,21 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setNotice('')} size="icon-sm" variant="ghost"><X /></Button>
       </div>}
       {removed && <div className="builder-undo pointer-events-auto flex items-center gap-3 rounded-xl bg-foreground py-2 pr-2 pl-4 text-sm text-background shadow-overlay" role="status">
-        <span>{removed.day.title.trim() ? `"${removed.day.title.trim()}" removido.` : `Dia ${removed.index + 1} removido.`}</span>
+        <span>{removed.day.title.trim() ? `"${removed.day.title.trim()}" removido.` : `${partWord(days.map(day => day.date))} ${removed.index + 1} removido.`}</span>
         <Button className="bg-background/15 text-background hover:bg-background/25 hover:text-background" onClick={undoRemove} size="sm" variant="ghost"><Undo2 /> Desfazer</Button>
         <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setRemoved(null)} size="icon-sm" variant="ghost"><X /></Button>
       </div>}
     </div>}
 
-    {confirmingEnd && sipat && <Dialog description="Ela deixa de aparecer para os participantes e fica bloqueada para edição. Dá para reativá-la depois na lista de formações."
+    {confirmingEnd && sipat && <Dialog description="Ele deixa de aparecer para os participantes e fica bloqueado para edição. Dá para reativá-lo depois na lista de treinamentos."
       onClose={() => setConfirmingEnd(false)} title={`Encerrar "${sipat.title}"?`}>
       <DialogActions>
         <Button onClick={() => setConfirmingEnd(false)} variant="outline">Voltar</Button>
-        <Button onClick={() => void endThis()} variant="destructive"><Ban /> Encerrar formação</Button>
+        <Button onClick={() => void endThis()} variant="destructive"><Ban /> Encerrar treinamento</Button>
       </DialogActions>
     </Dialog>}
 
-    {leavingTo && <Dialog description="As alterações desta formação ainda não foram salvas. Se sair agora, elas se perdem." onClose={() => setLeavingTo(null)} title="Sair sem salvar?">
+    {leavingTo && <Dialog description="As alterações deste treinamento ainda não foram salvas. Se sair agora, elas se perdem." onClose={() => setLeavingTo(null)} title="Sair sem salvar?">
       <DialogActions>
         <Button onClick={() => setLeavingTo(null)} variant="outline">Continuar editando</Button>
         <Button onClick={() => { const to = leavingTo; setDirty(false); setLeavingTo(null); navigate(to); }} variant="destructive">Sair sem salvar</Button>
@@ -384,8 +392,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
 
     {confirmingLaunch && <Dialog description={published
       ? 'Os dias que ninguém começou são atualizados com os assuntos atuais. Os que já têm progresso ficam como estão.'
-      : `Ao publicar, cada dia é entregue aos participantes ativos da empresa.${live ? ` Só uma formação fica publicada por vez: "${live.title}" deixa de aparecer para os participantes.` : ''}`}
-      onClose={() => setConfirmingLaunch(false)} title={published ? 'Atualizar os dias da formação?' : 'Publicar a formação?'}>
+      : 'Ao publicar, cada dia é entregue aos participantes ativos da empresa.'}
+      onClose={() => setConfirmingLaunch(false)} title={published ? 'Atualizar os dias do treinamento?' : 'Publicar o treinamento?'}>
       <DialogActions>
         <Button onClick={() => setConfirmingLaunch(false)} variant="outline">Voltar</Button>
         <Button onClick={() => void publish()}><Rocket /> {published ? 'Atualizar' : 'Publicar agora'}</Button>

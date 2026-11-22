@@ -64,7 +64,7 @@ export default function CreateCompanyDialog({
   }
 
   return (
-    <Dialog busy={isSaving} description="A empresa já nasce com o administrador que vai cuidar da SIPAT dela." onClose={onClose} size="lg" title="Nova empresa">
+    <Dialog busy={isSaving} description="A empresa já nasce com o administrador que vai cuidar dos treinamentos dela." onClose={onClose} size="lg" title="Nova empresa">
       <form className="grid gap-5" onSubmit={handleSubmit}>
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
         <fieldset className="m-0 grid gap-4 border-0 p-0 sm:grid-cols-2">

@@ -33,11 +33,24 @@ function vimeo(url: URL): string | null {
   return id && vimeoId.test(id) ? id : null;
 }
 
+const iframeSource = /<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i;
+
+/** A Smartplayer link or the iframe code copied from it: any https address on smartplayer.ai or a subdomain, kept without the scheme. */
+function smartplayer(link: string): string | null {
+  const source = iframeSource.exec(link)?.[1] ?? link;
+  const url = parse(source.replace(/&amp;/g, '&'));
+  if (!url || url.protocol !== 'https:' || url.username || url.pathname === '/') return null;
+  if (url.hostname !== 'smartplayer.ai' && !url.hostname.endsWith('.smartplayer.ai')) return null;
+  const kept = `${url.hostname}${url.pathname}${url.search}`;
+  return kept.length <= 240 ? kept : null;
+}
+
 /**
- * The video id of a YouTube or Vimeo link, only to enable the button and show the preview.
+ * The video id of a YouTube, Vimeo or Smartplayer link, only to enable the button and show the preview.
  * The server is the authority: it decides what is accepted and writes the message when it refuses.
  */
 export function externalIdFromLink(provider: ExternalProvider, link: string): string | null {
+  if (provider === 'Smartplayer') return smartplayer(link.trim());
   const url = parse(link);
   if (!url) return null;
   return provider === 'YouTube' ? youtube(url) : vimeo(url);

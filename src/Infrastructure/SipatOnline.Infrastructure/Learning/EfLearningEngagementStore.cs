@@ -81,8 +81,14 @@ public sealed class EfLearningEngagementStore(PlatformDbContext db, ILearningSto
         var user = await db.Users.AsNoTracking().SingleAsync(item => item.TenantId == tenantId && item.Id == participantId, token);
         // only the name and the certificate logo: the portal logo and banner are not needed here
         var tenant = await db.Tenants.AsNoTracking().Where(item => item.Id == tenantId)
-            .Select(item => new { item.Name, item.CertificateLogoData, item.CertificateLogoContentType })
+            .Select(item => new { item.Name, item.Plan, item.CertificateLogoData, item.CertificateLogoContentType })
             .SingleAsync(token);
+        // every plan gets the standard certificate; the company's logo on it (the personalized certificate) is Ouro and above
+        var companyLogo = Enum.IsDefined(typeof(SipatOnline.Infrastructure.Tenancy.CompanyPlan), tenant.Plan) &&
+            SipatOnline.Infrastructure.Tenancy.CompanyCapabilities.For((SipatOnline.Infrastructure.Tenancy.CompanyPlan)tenant.Plan).CustomCertificate &&
+            tenant.CertificateLogoData is not null && tenant.CertificateLogoContentType is not null
+                ? new CertificateLogo(tenant.CertificateLogoData, tenant.CertificateLogoContentType)
+                : null;
         // everything the loop needs, loaded once instead of once per Day
         var experiences = (await learning.ListAssignedExperiencesAsync(new TenantId(tenantId), participantId, token))
             .GroupBy(item => item.Track.Id)
@@ -123,12 +129,10 @@ public sealed class EfLearningEngagementStore(PlatformDbContext db, ILearningSto
             var certificate = existing is null
                 ? new ParticipationCertificate(Guid.Empty, tenantId, participantId, sipat.Id, user.DisplayName,
                     tenant.Name, sipat.Title, sipat.StartsAt, sipat.EndsAt, duration, default, demonstration, string.Join(";", basis.Order()),
-                    tenant.CertificateLogoData is null || tenant.CertificateLogoContentType is null ? null :
-                        new CertificateLogo(tenant.CertificateLogoData, tenant.CertificateLogoContentType))
+                    companyLogo)
                 : Deserialize(existing);
             result.Add(new CertificateCandidate(certificate, group.Count(), completed,
-                group.Any() && completed == group.Count() && duration > 0 && sipat.Status == SipatEventStatus.Published &&
-                    certificate.CompanyLogo is not null));
+                group.Any() && completed == group.Count() && duration > 0 && sipat.Status == SipatEventStatus.Published));
         }
         foreach (var historical in issued.Where(item => result.All(candidate => candidate.Snapshot.SipatEventId != item.SipatEventId)))
             result.Add(new CertificateCandidate(Deserialize(historical), 0, 0, false));

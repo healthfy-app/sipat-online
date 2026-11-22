@@ -5,28 +5,28 @@ import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { maxDays } from './model';
 
-/** First step of "Construção SIPAT": name it and say how many days it has. The grid comes next. */
+/** First step of "Novo treinamento": name it and say how many days it has. The grid comes next. */
 export default function BuilderSetup({ name, dayCount, startDate, onName, onDayCount, onStartDate, onStart, onImport, onTemplate, onCopy }: {
   name: string; dayCount: number; startDate: string;
   onName: (value: string) => void; onDayCount: (value: number) => void; onStartDate: (value: string) => void;
-  onStart: () => void; onImport: () => void; onTemplate: () => void; onCopy?: () => void;
+  onStart: () => void; onImport?: () => void; onTemplate: () => void; onCopy?: () => void;
 }) {
   const clamp = (value: number) => onDayCount(Math.min(maxDays, Math.max(1, value)));
   return <section aria-labelledby="builder-setup-title" className="mx-auto grid w-full max-w-2xl gap-6 rounded-3xl border border-border bg-card p-6 shadow-card sm:p-9">
     <header className="grid gap-1.5">
-      <p className="m-0 text-[0.6875rem] font-bold tracking-[0.08em] text-primary uppercase">Nova formação</p>
-      <h2 className="m-0 text-2xl font-semibold tracking-tight" id="builder-setup-title">Vamos montar a formação</h2>
+      <p className="m-0 text-[0.6875rem] font-bold tracking-[0.08em] text-primary uppercase">Novo treinamento</p>
+      <h2 className="m-0 text-2xl font-semibold tracking-tight" id="builder-setup-title">Vamos montar o treinamento</h2>
       <p className="m-0 text-sm text-muted-foreground">
-        Uma formação é um período de treinamento. Diga quando começa e quantos dias tem; depois você escolhe o assunto de cada dia.
+        Um treinamento é um conjunto de dias ou módulos. Diga quando começa e quantos dias tem; depois você escolhe o assunto de cada dia.
       </p>
     </header>
 
-    <Field htmlFor="builder-name" label="Nome desta formação">
+    <Field htmlFor="builder-name" label="Nome deste treinamento">
       <Input data-autofocus id="builder-name" maxLength={200} onChange={event => onName(event.target.value)} placeholder="Ex.: SIPAT 2026" value={name} />
     </Field>
 
     <fieldset className="m-0 grid gap-3 border-0 p-0">
-      <legend className="p-0 text-lg font-semibold">Quantos dias terá a sua formação?</legend>
+      <legend className="p-0 text-lg font-semibold">Quantos dias terá o seu treinamento?</legend>
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
           <Button aria-label="Menos um dia" disabled={dayCount <= 1} onClick={() => clamp(dayCount - 1)} size="icon" variant="outline"><Minus /></Button>
@@ -52,8 +52,8 @@ export default function BuilderSetup({ name, dayCount, startDate, onName, onDayC
 
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
       <div className="flex flex-wrap gap-2">
-        {onCopy && <Button onClick={onCopy} variant="outline"><Copy /> Duplicar de outra formação</Button>}
-        <Button onClick={onImport} variant="outline"><FileSpreadsheet /> Importar de um CSV</Button>
+        {onCopy && <Button onClick={onCopy} variant="outline"><Copy /> Duplicar de outro treinamento</Button>}
+        {onImport && <Button onClick={onImport} variant="outline"><FileSpreadsheet /> Importar de um CSV</Button>}
         <Button onClick={onTemplate} variant="ghost">Baixar modelo</Button>
       </div>
       <Button disabled={!name.trim() || !startDate} onClick={onStart} size="lg">Montar a grade</Button>

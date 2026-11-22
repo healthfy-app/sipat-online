@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { extrasSuffix } from '@/courseEditor/courseFormat';
 import { cn } from '@/lib/utils';
+import { partWord } from '@/trainings/partWord';
 import {
   addDays, dayDuration, dayVideoCounts, formatClock, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay,
   type Catalog, type DaySlots,
@@ -33,6 +34,9 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   const addedAtEnd = useRef(false);
   const themes = catalog.subjects.filter(subject => subject.id !== 'none');
   const canAddDay = days.length < maxDays;
+  // "Dia" when the training has dates, "Módulo" when none of its parts has one
+  const word = partWord(days.map(day => day.date));
+  const lower = word.toLowerCase();
   // up to 7 days always fit the width of the page, however many there are; beyond that the days keep a minimum width and scroll
   const fits = days.length <= 7;
   const layout = { '--columns': `repeat(${days.length}, ${fits ? 'minmax(0, 1fr)' : 'minmax(11rem, 1fr)'})${canAddDay ? ' 4.5rem' : ''}` } as CSSProperties;
@@ -84,15 +88,15 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
                 data-day-issue={dayIssues ? true : undefined} key={`head-${day.key}`} role="columnheader"
                 style={{ ...column(index), borderTop: `4px solid ${dayIssues ? 'var(--color-destructive)' : color}`, gridColumn: index + 1, gridRow: 1 }}>
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                  <span className="rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wide text-white" style={{ backgroundColor: color }}>DIA {index + 1}</span>
+                  <span className="rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wide text-white" style={{ backgroundColor: color }}>{word.toUpperCase()} {index + 1}</span>
                   {/* the date field shows day/month; only the weekday is added here. The time of the day lives in the column footer. */}
                   <span className="mr-auto text-xs font-semibold text-muted-foreground capitalize">{shortDate(day.date).split(' ')[0]}</span>
-                  <Button aria-label={`Remover o dia ${index + 1}`} disabled={days.length === 1} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
+                  <Button aria-label={`Remover o ${lower} ${index + 1}`} disabled={days.length === 1} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </div>
-                <Input aria-label={`Data do dia ${index + 1}`} className="h-9 min-w-0 px-2 text-sm" onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
+                <Input aria-label={`Data do ${lower} ${index + 1}`} className="h-9 min-w-0 px-2 text-sm" onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
                 <Input aria-describedby={dayIssues ? `day-issues-${day.key}` : undefined} aria-invalid={!!dayIssues && !day.title.trim()}
-                  aria-label={`Título do dia ${index + 1}`} className="font-medium" maxLength={160}
-                  onChange={event => patchDay(index, { title: event.target.value })} placeholder="Slogan do dia" value={day.title} />
+                  aria-label={`Título do ${lower} ${index + 1}`} className="font-medium" maxLength={160}
+                  onChange={event => patchDay(index, { title: event.target.value })} placeholder={`Slogan do ${lower}`} value={day.title} />
                 {dayIssues && <ul className="m-0 grid list-none gap-0.5 p-0 text-xs font-semibold text-destructive" id={`day-issues-${day.key}`}>
                   {dayIssues.map(text => <li key={text}>{text}</li>)}
                 </ul>}

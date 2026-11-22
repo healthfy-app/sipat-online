@@ -263,6 +263,12 @@ public sealed class EfLearningStore(
         var tracks = await dbContext.LearningTracks.AsNoTracking()
             .Where(track => track.TenantId == tenantId.Value && trackIds.Contains(track.Id))
             .ToDictionaryAsync(track => track.Id, cancellationToken);
+        // the training of each row, so a viewer who cannot list trainings (a Supervisor) can still pick one
+        var rowSipatIds = tracks.Values.Select(track => track.SipatEventId).Distinct().ToArray();
+        var rowSipats = await dbContext.SipatEvents.AsNoTracking()
+            .Where(item => item.TenantId == tenantId.Value && rowSipatIds.Contains(item.Id))
+            .Select(item => new { item.Id, item.Title, item.StartsAt, item.EndsAt, item.Status })
+            .ToDictionaryAsync(item => item.Id, cancellationToken);
         var revisionIds = tracks.Values
             .Where(track => track.CurrentRevisionId is not null)
             .Select(track => track.CurrentRevisionId!.Value)
@@ -342,7 +348,12 @@ public sealed class EfLearningStore(
                 completedLessonCount == revisionLessons.Length ? participantProgress.Max(item => item.CompletedAt) : null,
                 participantProgress.Length == 0
                     ? null
-                    : lastAccessByParticipantAndRevision[(assignment.ParticipantId, revisionId)]));
+                    : lastAccessByParticipantAndRevision[(assignment.ParticipantId, revisionId)],
+                track.SipatEventId,
+                rowSipats.TryGetValue(track.SipatEventId, out var rowSipat) ? rowSipat.Title : null,
+                rowSipat?.StartsAt,
+                rowSipat?.EndsAt,
+                rowSipat?.Status.ToString()));
         }
 
         return rows

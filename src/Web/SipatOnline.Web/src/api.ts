@@ -300,7 +300,7 @@ export interface PlatformCourseVideo {
   externalId?: string | null;
 }
 
-export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo';
+export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo' | 'Smartplayer';
 
 export function videoProvider(video: { provider?: VideoProvider }): VideoProvider {
   return video.provider ?? 'Sipat';
@@ -509,6 +509,12 @@ export interface LearningParticipantProgress {
   watchedMilliseconds?: number;
   completedAt?: string | null;
   lastAccessedAt?: string | null;
+  /** The training the day belongs to. */
+  sipatEventId?: string | null;
+  sipatTitle?: string | null;
+  sipatStartsAt?: string | null;
+  sipatEndsAt?: string | null;
+  sipatStatus?: string | null;
 }
 
 export interface LearningLessonProgress {
@@ -525,7 +531,7 @@ export interface LearningLessonProgress {
   watchedMilliseconds?: number;
   /** An extra (YouTube or Vimeo): never counts for progress. Missing in payloads from before external videos. */
   isBonus?: boolean;
-  provider?: 'YouTube' | 'Vimeo' | null;
+  provider?: 'YouTube' | 'Vimeo' | 'Smartplayer' | null;
   externalId?: string | null;
 }
 
@@ -917,7 +923,7 @@ export async function uploadPlatformVideo(
 }
 
 export function createExternalPlatformVideo(data: {
-  provider: 'YouTube' | 'Vimeo';
+  provider: 'YouTube' | 'Vimeo' | 'Smartplayer';
   url: string;
   title: string;
   durationMilliseconds: number | null;
@@ -995,7 +1001,8 @@ export interface CompanyCapabilities {
 }
 /** Which assuntos each plan cannot use (everything not listed is available). */
 export interface PlanSubjects {
-  courses: { id: string; title: string; description: string | null; videoCount: number; categoryId?: string | null }[];
+  /** companyId is set on an assunto with one company's internal videos: only that company sees it, and only on Diamante. */
+  courses: { id: string; title: string; description: string | null; videoCount: number; categoryId?: string | null; companyId?: string | null }[];
   excluded: Record<string, string[]>;
 }
 export function getPlanSubjects(): Promise<PlanSubjects> {
@@ -1003,6 +1010,10 @@ export function getPlanSubjects(): Promise<PlanSubjects> {
 }
 export async function setPlanSubjects(plan: CompanyPlan, excludedCourseIds: string[]): Promise<void> {
   await request(`/api/platform/catalog/plan-subjects/${plan}`, { method: 'PUT', body: JSON.stringify({ excludedCourseIds }) });
+}
+/** Makes an assunto the internal videos of one company (Diamante), or gives it back to every company (null). */
+export async function setSubjectCompany(courseId: string, companyId: string | null): Promise<void> {
+  await request(`/api/platform/catalog/plan-subjects/courses/${courseId}/company`, { method: 'PUT', body: JSON.stringify({ companyId }) });
 }
 
 export function getCompanyCapabilities(): Promise<CompanyCapabilities> {
@@ -1344,4 +1355,65 @@ export function getPlaybackQualityComparison(period: { from?: string; to?: strin
   if (period.to) query.set('to', period.to);
   const text = query.toString();
   return requestJson<PlaybackQualityComparison>(`/api/platform/playback-quality${text ? `?${text}` : ''}`);
+}
+
+export interface RegistryItem { id: string; name: string; isActive: boolean; peopleCount: number }
+export interface ProfileRules {
+  requireRegistration: boolean; requireEmail: boolean; requirePhone: boolean; requireUnit: boolean; requireSector: boolean;
+}
+export interface CompanyRegistry { units: RegistryItem[]; sectors: RegistryItem[]; rules: ProfileRules }
+export type RegistryKind = 'units' | 'sectors';
+
+export function getCompanyRegistry(): Promise<CompanyRegistry> {
+  return requestJson<CompanyRegistry>('/api/admin/registry');
+}
+
+export function addRegistryItems(kind: RegistryKind, names: string[]): Promise<CompanyRegistry> {
+  return requestJson<CompanyRegistry>(`/api/admin/registry/${kind}`, { method: 'POST', body: JSON.stringify({ names }) });
+}
+
+export function updateRegistryItem(kind: RegistryKind, id: string, change: { name?: string; isActive?: boolean }): Promise<RegistryItem> {
+  return requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) });
+}
+
+export function saveProfileRules(rules: ProfileRules): Promise<ProfileRules> {
+  return requestJson<ProfileRules>('/api/admin/registry/rules', { method: 'PUT', body: JSON.stringify(rules) });
+}
+
+export interface ParticipantProfile {
+  id: string; registrationNumber: string | null; email: string | null; phone: string | null; unitId: string | null; sectorId: string | null;
+}
+export type ProfileChange = Omit<ParticipantProfile, 'id'>;
+
+export function listParticipantProfiles(): Promise<ParticipantProfile[]> {
+  return requestJson<ParticipantProfile[]>('/api/admin/users/participants/profiles');
+}
+
+export function saveParticipantProfile(userId: string, data: ProfileChange): Promise<ParticipantProfile> {
+  return requestJson<ParticipantProfile>(`/api/admin/users/${userId}/profile`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+/** Moves many collaborators to one unit or sector at once; a null `valueId` takes them out of it. */
+export function changePlacement(userIds: string[], field: 'unit' | 'sector', valueId: string | null): Promise<{ changed: number }> {
+  return requestJson<{ changed: number }>('/api/admin/users/placement', { method: 'PUT', body: JSON.stringify({ userIds, field, valueId }) });
+}
+
+export interface ImportRow {
+  row: number; name?: string | null; login?: string | null; registrationNumber?: string | null; email?: string | null;
+  phone?: string | null; unit?: string | null; sector?: string | null; password?: string | null;
+}
+export interface ImportResult {
+  created: number; updated: number; unchanged: number;
+  rejected: { row: number; login: string | null; message: string }[];
+  credentials: { row: number; name: string; login: string }[];
+}
+
+/**
+ * Reads the HR sheet on the server; with `dryRun` nothing is written. With `createOnly` (the form of one person) a line that
+ * names someone who already exists is refused instead of updating them.
+ */
+export function importParticipants(dryRun: boolean, rows: ImportRow[], options?: { createOnly?: boolean }): Promise<ImportResult> {
+  return requestJson<ImportResult>('/api/admin/users/import', {
+    method: 'POST', body: JSON.stringify({ dryRun, rows, createOnly: options?.createOnly ?? false }),
+  });
 }

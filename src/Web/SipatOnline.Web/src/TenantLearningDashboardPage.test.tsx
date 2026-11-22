@@ -47,7 +47,12 @@ describe('tenant learning dashboard', () => {
     expect(await screen.findByRole('img', { name: /^Distribuição do progresso de 3 participantes/ })).toBeVisible();
     expect(screen.getByText('Participantes ativos')).toBeVisible();
     expect(screen.queryByText(/contas no total/)).not.toBeInTheDocument();
-    expect(screen.getByText('1 dia distinto · 1 dia concluído')).toBeVisible();
+    expect(screen.getByText('Concluíram tudo')).toBeVisible();
+    expect(screen.getByRole('img', { name: /Distribuição do progresso de/ })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Engajamento' })).toBeVisible();
+    // the people come last: the picture of the company first
+    const headings = screen.getAllByRole('heading', { level: 2 }).map((heading) => heading.textContent);
+    expect(headings.at(-1)).toMatch(/^Colaboradores da /);
     const legend = within(screen.getByRole('list', { name: 'Legenda do progresso' }));
     expect(legend.getByText('Concluíram todos os dias')).toBeVisible();
     expect(legend.getByText('Em andamento')).toBeVisible();
@@ -81,7 +86,7 @@ describe('tenant learning dashboard', () => {
 
     expect(await screen.findByText('Participantes ativos')).toBeVisible();
     expect(within(screen.getByRole('list', { name: 'Legenda do progresso' }))
-      .getByText('Sem dias da SIPAT')).toBeVisible();
+      .getByText('Sem dias')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Escolher participantes' }))
       .toHaveAttribute('href', '/admin/learning?status=no-tracks');
   });

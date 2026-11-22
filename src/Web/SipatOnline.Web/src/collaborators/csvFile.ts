@@ -8,15 +8,3 @@ export function downloadCsv(filename: string, content: string): void {
   link.remove();
   URL.revokeObjectURL(objectUrl);
 }
-
-export function readCsvFile(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('Não foi possível ler o arquivo CSV.'));
-    reader.onload = () => {
-      if (typeof reader.result === 'string') resolve(reader.result);
-      else reject(new Error('O arquivo CSV não pôde ser convertido em texto.'));
-    };
-    reader.readAsText(file, 'UTF-8');
-  });
-}

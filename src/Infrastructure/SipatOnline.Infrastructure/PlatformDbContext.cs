@@ -18,6 +18,12 @@ public sealed class PlatformDbContext(
 
     public DbSet<LoginAttemptWindowEntity> LoginAttemptWindows => Set<LoginAttemptWindowEntity>();
 
+    public DbSet<CompanyUnitEntity> CompanyUnits => Set<CompanyUnitEntity>();
+
+    public DbSet<CompanySectorEntity> CompanySectors => Set<CompanySectorEntity>();
+
+    public DbSet<CompanyProfileRulesEntity> CompanyProfileRules => Set<CompanyProfileRulesEntity>();
+
     public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
 
     public DbSet<AuditEntryEntity> AuditEntries => Set<AuditEntryEntity>();
@@ -56,6 +62,7 @@ public sealed class PlatformDbContext(
     public DbSet<SipatPlanEntity> SipatPlans => Set<SipatPlanEntity>();
 
     public DbSet<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity> PlanSubjectExclusions => Set<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity>();
+    public DbSet<SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity> CompanySubjects => Set<SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity>();
     public DbSet<PlatformCourseModuleLinkEntity> PlatformCourseModuleLinks => Set<PlatformCourseModuleLinkEntity>();
     public DbSet<PlatformVideoCheckpointEntity> PlatformVideoCheckpoints => Set<PlatformVideoCheckpointEntity>();
     public DbSet<LearningContentSnapshotEntity> LearningContentSnapshots => Set<LearningContentSnapshotEntity>();

@@ -159,7 +159,7 @@ export default function CourseCatalog({
   }
 
   async function removeCourse(course: PlatformCourse) {
-    if (!window.confirm(`Excluir o assunto "${course.title}"? As empresas que já receberam esta SIPAT continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
+    if (!window.confirm(`Excluir o assunto "${course.title}"? As empresas que já receberam este conteúdo continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
     onError('');
     setIsDeleting(true);
     try {

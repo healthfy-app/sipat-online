@@ -62,7 +62,7 @@ export default function PlaybackQualityPage() {
       <Page>
         <PageHeader
           actions={<>
-            <select aria-label="SIPAT" className={selectClass} onChange={event => { setSipatId(event.target.value); setDay(null); }} value={effectiveSipat ?? ''}>
+            <select aria-label="Treinamento" className={selectClass} onChange={event => { setSipatId(event.target.value); setDay(null); }} value={effectiveSipat ?? ''}>
               {data.sipats.map(sipat => <option key={sipat.id} value={sipat.id}>{sipat.title}</option>)}
             </select>
             <select aria-label="Dia" className={selectClass} onChange={event => setDay(event.target.value === '' ? null : Number(event.target.value))} value={day ?? ''}>
@@ -76,7 +76,7 @@ export default function PlaybackQualityPage() {
         {error && <p role="alert">{error}</p>}
         {indicators.sessions === 0
           ? <EmptyState
-              description="Quando a SIPAT começar, aqui aparecem os vídeos assistidos, onde o vídeo trava e quem teve problema para assistir, por hora, conexão, aparelho e Dia."
+              description="Quando um treinamento começar, aqui aparecem os vídeos assistidos, onde o vídeo trava e quem teve problema para assistir, por hora, conexão, aparelho e Dia."
               title="Ainda não há dados de vídeo" />
           : <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

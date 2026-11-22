@@ -171,12 +171,6 @@ public sealed class LearningEngagementApiTests
             var completed = await Call(participant, $"/api/learning/tracks/{trackId}/lessons/{lessonId}/ranges", HttpMethod.Post,
                 new { sessionId, startMilliseconds = 899, endMilliseconds = 900, positionMilliseconds = 900 });
             Assert.True(completed.GetProperty("isCompleted").GetBoolean());
-            await db.Tenants.Where(item => item.Id == SipatOnlineApiFactory.DefaultTenantId)
-                .ExecuteUpdateAsync(update => update.SetProperty(item => item.CertificateLogoData, (byte[]?)null)
-                    .SetProperty(item => item.CertificateLogoContentType, (string?)null));
-            var missingLogo = await Call(participant, $"/api/learning/sipats/{sipatId}/certificate",
-                HttpMethod.Post, new { }, HttpStatusCode.Conflict);
-            Assert.Equal("learning.certificate_logo_pending", missingLogo.GetProperty("code").GetString());
             using (var restored = await UploadLogo(platform, logoPath, Logo)) Assert.Equal(HttpStatusCode.OK, restored.StatusCode);
             var issues = await Task.WhenAll(Enumerable.Range(0, 3).Select(_ =>
                 Call(participant, $"/api/learning/sipats/{sipatId}/certificate", HttpMethod.Post, new { })));

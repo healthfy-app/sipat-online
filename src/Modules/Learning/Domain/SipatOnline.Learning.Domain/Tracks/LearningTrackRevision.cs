@@ -62,7 +62,7 @@ public sealed class LearningTrackRevision
     {
         if (trackId == Guid.Empty || tenantId.IsEmpty)
         {
-            return Failure("learning.revision.owner_required", "A formação e a empresa da revisão são obrigatórias.");
+            return Failure("learning.revision.owner_required", "O conteúdo e a empresa da revisão são obrigatórios.");
         }
 
         if (revisionNumber < 1)
@@ -166,7 +166,7 @@ public sealed class LearningTrackRevision
 
         if (lessons.Count == 0)
         {
-            return Failure("learning.revision.empty", "Adicione ao menos um vídeo antes de publicar a formação.");
+            return Failure("learning.revision.empty", "Adicione ao menos um vídeo antes de publicar o conteúdo.");
         }
 
         if (publishedAt == default)

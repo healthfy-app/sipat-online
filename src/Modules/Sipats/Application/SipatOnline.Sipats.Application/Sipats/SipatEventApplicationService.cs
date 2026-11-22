@@ -62,7 +62,7 @@ public sealed class SipatEventApplicationService(
         var sipatEvent = await sipatEventStore.FindAsync(tenantId.Value, id, cancellationToken);
         return sipatEvent is null
             ? Result<SipatEvent>.Failure(
-                new DomainError("sipat.not_found", "A SIPAT não foi encontrada."))
+                new DomainError("sipat.not_found", "O treinamento não foi encontrado."))
             : Result<SipatEvent>.Success(sipatEvent);
     }
 
@@ -254,7 +254,7 @@ public sealed class SipatEventApplicationService(
         currentActor.IsInRole(PlatformRoles.ClientAdmin)
             ? Result<bool>.Success(true)
             : Result<bool>.Failure(
-                new DomainError("sipat.forbidden", "Você não tem permissão para gerenciar SIPATs."));
+                new DomainError("sipat.forbidden", "Você não tem permissão para gerenciar treinamentos."));
 
     private Result<TenantId> GetCurrentTenantId()
     {

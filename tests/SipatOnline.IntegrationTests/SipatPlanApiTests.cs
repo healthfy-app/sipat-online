@@ -14,7 +14,7 @@ namespace SipatOnline.IntegrationTests;
 public sealed class SipatPlanApiTests
 {
     [DockerFact]
-    public async Task Administrator_BuildsADraftWeek_LaunchesItOnePublishedAtATime_AndReusesAnotherSipat()
+    public async Task Administrator_BuildsADraftWeek_LaunchesItBesideAnotherPublished_AndReusesAnotherSipat()
     {
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
@@ -62,16 +62,20 @@ public sealed class SipatPlanApiTests
         await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan",
             new { days = new[] { Day("Vídeo fantasma", "2026-11-09", Guid.NewGuid()) } }, HttpStatusCode.BadRequest);
 
-        // the sample company already has a published SIPAT: only one at a time
-        var conflict = await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.Conflict);
-        Assert.Equal("sipat.already_published", conflict.GetProperty("code").GetString());
-
+        // the sample company already has a published SIPAT: another training goes live beside it
         var sipats = await Get(admin, "/api/admin/sipats");
-        var published = Assert.Single(sipats.GetProperty("items").EnumerateArray(), item => item.GetProperty("status").GetString() == "Published");
-        await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{published.GetProperty("id").GetGuid()}/cancel", new { });
+        var other = Assert.Single(sipats.GetProperty("items").EnumerateArray(), item => item.GetProperty("status").GetString() == "Published");
+        var otherId = other.GetProperty("id").GetGuid();
+        int otherTracksBefore;
+        await using (var scope = factory.Services.CreateAsyncScope())
+            otherTracksBefore = await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().LearningTracks.CountAsync(track => track.SipatEventId == otherId);
 
         var launched = await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { });
         Assert.Equal(2, launched.GetProperty("created").GetInt32());
+        sipats = await Get(admin, "/api/admin/sipats");
+        Assert.Equal(2, sipats.GetProperty("items").EnumerateArray().Count(item => item.GetProperty("status").GetString() == "Published"));
+        await using (var scope = factory.Services.CreateAsyncScope())
+            Assert.Equal(otherTracksBefore, await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().LearningTracks.CountAsync(track => track.SipatEventId == otherId));
         var launchedAgain = await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { });
         Assert.Equal(0, launchedAgain.GetProperty("created").GetInt32());
 

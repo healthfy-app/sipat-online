@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { getPlanSubjects, setPlanSubjects, type CompanyPlan, type PlanSubjects } from '@/api';
+import { getPlanSubjects, listPlatformCompanies, setPlanSubjects, setSubjectCompany, type CompanyPlan, type PlanSubjects, type PlatformCompany } from '@/api';
 import PlanSelect, { planInfo, planOptions } from '@/companies/PlanSelect';
 import { Badge } from '@/components/ui/badge';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
@@ -16,10 +16,13 @@ export default function PlanSubjectsPanel() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [plan, setPlan] = useState<CompanyPlan>('Bronze');
+  const [companies, setCompanies] = useState<PlatformCompany[]>([]);
 
   useEffect(() => {
     let current = true;
     getPlanSubjects().then(result => { if (current) setData(result); }).catch((failure: unknown) => { if (current) setError(getErrorMessage(failure)); });
+    // the companies are only needed to give an assunto to one of them; without them the panel still works
+    listPlatformCompanies().then(result => { if (current) setCompanies(result ?? []); }).catch(() => undefined);
     return () => { current = false; };
   }, []);
 
@@ -36,6 +39,20 @@ export default function PlanSubjectsPanel() {
     } finally { setBusy(''); }
   }
 
+  /** An assunto with the internal videos of one company: only it sees the assunto, and only while on Diamante. */
+  async function giveTo(courseId: string, companyId: string | null) {
+    if (!data) return;
+    const before = data;
+    setData({ ...data, courses: data.courses.map(course => (course.id === courseId ? { ...course, companyId } : course)) });
+    setBusy(courseId); setError('');
+    try {
+      await setSubjectCompany(courseId, companyId);
+    } catch (failure) {
+      setData(before);
+      setError(getErrorMessage(failure));
+    } finally { setBusy(''); }
+  }
+
   if (!data) return error
     ? <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>
     : <p className="m-0 text-sm text-muted-foreground" role="status">Carregando os planos...</p>;
@@ -46,11 +63,13 @@ export default function PlanSubjectsPanel() {
     if (!set.delete(courseId)) set.add(courseId);
     void save(target, [...set]);
   };
-  const offered = (target: CompanyPlan) => data.courses.length - excludedOf(target).size;
+  // an assunto of one company is not part of any plan's list
+  const shared = data.courses.filter(course => !course.companyId);
+  const offered = (target: CompanyPlan) => shared.filter(course => !excludedOf(target).has(course.id)).length;
 
   return <section aria-label="Assuntos por plano" className="grid min-w-0 gap-4">
     <p className="m-0 text-sm text-muted-foreground">
-      Marque os assuntos que cada plano pode usar na grade da SIPAT. Todos começam liberados; ao desmarcar, as empresas daquele plano deixam de ver o assunto.
+      Marque os assuntos que cada plano pode usar na grade dos treinamentos. Todos começam liberados; ao desmarcar, as empresas daquele plano deixam de ver o assunto. Um assunto com os vídeos internos de uma empresa fica só para ela, e só no plano Diamante.
     </p>
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
 
@@ -68,7 +87,7 @@ export default function PlanSubjectsPanel() {
                 <span className="inline-flex flex-col items-center gap-1">
                   <span aria-hidden="true" className="grid size-8 place-items-center rounded-lg" style={{ backgroundColor: option.tint, color: option.ink }}><Icon className="size-4" /></span>
                   <strong className="text-xs">{option.label}</strong>
-                  <span className="text-[0.6875rem] font-normal text-muted-foreground">{offered(option.id)} de {data.courses.length}</span>
+                  <span className="text-[0.6875rem] font-normal text-muted-foreground">{offered(option.id)} de {shared.length}</span>
                 </span>
               </th>;
             })}
@@ -77,6 +96,7 @@ export default function PlanSubjectsPanel() {
         <tbody>
           {data.courses.map(course => {
             const categoryName = course.categoryId ? categories.find((item) => item.id === course.categoryId)?.name : undefined;
+            const owner = course.companyId ? companies.find(item => item.id === course.companyId) : undefined;
             return <tr className="border-b border-border last:border-0" key={course.id}>
               <th className="px-4 py-2.5 text-left font-medium" scope="row">
                 <span className="grid gap-0.5">
@@ -84,9 +104,18 @@ export default function PlanSubjectsPanel() {
                   <span className="flex items-center gap-1.5 text-xs font-normal text-muted-foreground">
                     {categoryName && <Badge variant="neutral">{categoryName}</Badge>}{pluralize(course.videoCount, 'vídeo', 'vídeos')}
                   </span>
+                  {companies.length > 0 && <select aria-label={`Empresa do assunto ${course.title}`} className="h-8 max-w-60 rounded-md border border-input bg-background px-2 text-xs font-normal"
+                    disabled={busy === course.id} onChange={event => void giveTo(course.id, event.target.value || null)} value={course.companyId ?? ''}>
+                    <option value="">Para todas as empresas</option>
+                    {companies.map(company => <option key={company.id} value={company.id}>Vídeos internos de {company.name}</option>)}
+                  </select>}
                 </span>
               </th>
-              {planOptions.map(entry => <td className={cn('px-3 py-2.5 text-center', entry.id !== plan && 'max-md:hidden')} key={entry.id}>
+              {course.companyId
+                ? <td className="px-3 py-2.5 text-center text-xs text-muted-foreground" colSpan={planOptions.length}>
+                  Só {owner ? owner.name : 'a empresa escolhida'}, no plano <strong className="text-foreground">Diamante</strong>
+                </td>
+                : planOptions.map(entry => <td className={cn('px-3 py-2.5 text-center', entry.id !== plan && 'max-md:hidden')} key={entry.id}>
                 <input aria-label={`${course.title} no plano ${planInfo(entry.id).label}`} checked={!excludedOf(entry.id).has(course.id)} className="size-5 cursor-pointer accent-[var(--brand-primary)]"
                   disabled={busy === entry.id} onChange={() => toggle(entry.id, course.id)} type="checkbox" />
               </td>)}

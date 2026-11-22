@@ -142,7 +142,7 @@ public static class ProgramDayRules
         IReadOnlyList<ProgramDay>? days, IPlatformCourseCatalogStore catalogStore, IGameModuleStore gameStore, CancellationToken cancellationToken)
     {
         if (days is null || days.Count is 0 or > SipatProgramService.MaximumDays)
-            return Fail("learning.program.days_invalid", $"A SIPAT precisa ter de 1 a {SipatProgramService.MaximumDays} dias.");
+            return Fail("learning.program.days_invalid", $"O treinamento precisa ter de 1 a {SipatProgramService.MaximumDays} dias.");
 
         var cleaned = new List<ProgramDay>(days.Count);
         foreach (var day in days)

@@ -31,6 +31,7 @@ import {
 } from './learningHelpers';
 import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
+import { orderTrainings, pickDefaultTraining } from '@/trainings/defaultTraining';
 import WeekVideos from './WeekVideos';
 import { sipatPhase } from '@/sipatBuilder/sipatPhase';
 import ProgressBar from './ProgressBar';
@@ -38,6 +39,8 @@ import './CourseCards.css';
 import './LearningHero.css';
 
 const firstArrivalKey = 'sipat:learning-arrived';
+// the training the participant picked stays picked for the session, also after opening a day and coming back
+const chosenTrainingKey = 'sipat:learning-training';
 
 function readSessionFlag(key: string): string | null {
   try { return sessionStorage.getItem(key); } catch { return null; }
@@ -52,7 +55,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
   setSummary?: (summary: LearningSummary | null) => void;
 }) {
   const [allTracks, setTracks] = useState<LearningTrackCard[]>([]);
-  const [chosenSipat, setChosenSipat] = useState<string | null>(null);
+  const [chosenSipat, setChosenSipatState] = useState<string | null>(() => readSessionFlag(chosenTrainingKey));
+  const setChosenSipat = (id: string) => { setChosenSipatState(id); writeSessionFlag(chosenTrainingKey, id); };
   const [resumeExperience, setResumeExperience] = useState<LearningExperience | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingResume, setIsLoadingResume] = useState(false);
@@ -71,21 +75,18 @@ export default function LearningHomePage({ participantName, setSummary }: {
     if (isArriving) writeSessionFlag(firstArrivalKey, '1');
   }, [isArriving]);
 
-  // a participant can have several SIPATs (one a year): the published one is shown, earlier ones are one tap away
+  // a participant can have several trainings, some at the same time: one is shown, the others are one tap away
   const sipats = Array.from(new Map(allTracks.map(track => [track.sipatEventId, track])).values())
     .map(track => {
       const event = { status: track.sipatStatus ?? 'Published', startsAt: track.sipatStartsAt ?? '', endsAt: track.sipatEndsAt ?? track.sipatStartsAt ?? '' };
       return {
-        id: track.sipatEventId, title: track.sipatTitle ?? 'Formação', startsAt: event.startsAt,
+        id: track.sipatEventId, title: track.sipatTitle ?? 'Treinamento', startsAt: event.startsAt, endsAt: event.endsAt, status: event.status,
         phase: sipatPhase(event, 1), hasDays: allTracks.some(item => item.sipatEventId === track.sipatEventId && !!item.dayTitle),
       };
     })
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
-  // the one shown first: the week that is happening (or about to), built by days; then the most recent
-  const live = (item: (typeof sipats)[number]) => item.phase === 'running' || item.phase === 'published';
-  const currentSipat = sipats.find(item => item.id === chosenSipat)
-    ?? sipats.find(item => live(item) && item.hasDays) ?? sipats.find(live) ?? sipats[0];
-  const yearOf = (item: (typeof sipats)[number]) => (item.startsAt ? new Date(item.startsAt).getUTCFullYear() : null);
+  // the one shown first: among those running, the one that started first; then the next to start; then the most recent
+  const currentSipat = sipats.find(item => item.id === chosenSipat) ?? pickDefaultTraining(sipats);
   const tracks = sipats.length > 1 && currentSipat ? allTracks.filter(track => track.sipatEventId === currentSipat.id) : allTracks;
   const overallProgress = getOverallProgress(tracks);
   const isFormationComplete = overallProgress >= 100;
@@ -313,17 +314,17 @@ export default function LearningHomePage({ participantName, setSummary }: {
     <main className={`learning-page learning-catalog${startedAnyCourse ? ' is-returning' : ''}${isArriving ? ' is-arriving' : ''}`}>
       {!heroGreets && <header className="learning-page-heading">
         {firstName && <p className="learning-catalog-greeting">Olá, {firstName}.</p>}
-        <h1>{startedAnyCourse ? 'Bom te ver de volta.' : dayMode ? 'Sua formação. Seu próximo passo.' : 'Seus cursos. Seu próximo passo.'}</h1>
+        <h1>{startedAnyCourse ? 'Bom te ver de volta.' : dayMode ? 'Seus treinamentos. Seu próximo passo.' : 'Seus cursos. Seu próximo passo.'}</h1>
         <p className="muted-copy">
           {startedAnyCourse
             ? 'Continue de onde parou e avance no seu ritmo.'
             : dayMode
-              ? 'Explore os vídeos da sua formação e acompanhe seu progresso, no seu ritmo.'
-              : 'Explore os cursos da sua formação e acompanhe cada conquista, no seu ritmo.'}
+              ? 'Explore os vídeos do seu treinamento e acompanhe seu progresso, no seu ritmo.'
+              : 'Explore os cursos do seu treinamento e acompanhe cada conquista, no seu ritmo.'}
         </p>
       </header>}
 
-      {isLoading && <LoadingState className="learning-state">Carregando a sua formação...</LoadingState>}
+      {isLoading && <LoadingState className="learning-state">Carregando o seu treinamento...</LoadingState>}
       {error && (
         <div className="learning-state learning-error" role="alert">
           <p>{error}</p>
@@ -335,18 +336,18 @@ export default function LearningHomePage({ participantName, setSummary }: {
       {!isLoading && !error && tracks.length === 0 && (
         <section className="learning-empty">
           <span aria-hidden="true" className="learning-empty-mark">✓</span>
-          <h2>Você ainda não tem uma formação disponível</h2>
+          <h2>Você ainda não tem um treinamento disponível</h2>
           <p>
-            Sua empresa ainda não abriu a próxima formação. Assim que ela começar, os dias aparecem aqui — é só voltar a esta página.
+            Sua empresa ainda não abriu o próximo treinamento. Assim que ele começar, os dias aparecem aqui — é só voltar a esta página.
           </p>
         </section>
       )}
       {!isLoading && !error && tracks.length > 0 && <>
         {!startedAnyCourse && recommendedTrack && (
-          <section aria-label="Comece sua formação" className="learning-catalog-first-hero">
+          <section aria-label="Comece seu treinamento" className="learning-catalog-first-hero">
             <div className="learning-catalog-first-progress">
               <div
-                aria-label={`Progresso da formação: ${overallProgress}% concluído`}
+                aria-label={`Progresso do treinamento: ${overallProgress}% concluído`}
                 aria-valuemax={100}
                 aria-valuemin={0}
                 aria-valuenow={overallProgress}
@@ -358,7 +359,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                 <span>{overallProgress}%</span>
               </div>
               <div className="learning-catalog-progress">
-                <h2>Sua formação</h2>
+                <h2>Seu treinamento</h2>
                 <p>{dayMode
                   ? `${completedDays} de ${programDays.length} ${programDays.length === 1 ? 'dia concluído' : 'dias concluídos'}`
                   : `${completedCourses} de ${tracks.length} cursos concluídos`} · {totalLessons} vídeos</p>
@@ -378,26 +379,26 @@ export default function LearningHomePage({ participantName, setSummary }: {
 
         {startedAnyCourse && (
           <section
-            aria-label={isFormationComplete ? 'Formação concluída' : 'Formação em andamento'}
+            aria-label={isFormationComplete ? 'Treinamento concluído' : 'Treinamento em andamento'}
             className={`learning-resume-hero learning-formation-hero${isFormationComplete ? '' : ' is-in-progress'}`}
           >
             <div className="learning-resume-content">
               <div className="learning-hero-greeting">
                 {firstName && <p className="learning-hero-hello">Olá, {firstName}.</p>}
-                <h1>{isFormationComplete ? 'Formação concluída. Parabéns!' : 'Bom te ver de volta.'}</h1>
+                <h1>{isFormationComplete ? 'Treinamento concluído. Parabéns!' : 'Bom te ver de volta.'}</h1>
                 <p className="learning-hero-lead">
                   {isFormationComplete
-                    ? 'Você terminou todos os cursos da sua formação. Seus certificados estão disponíveis.'
+                    ? 'Você terminou todos os cursos do seu treinamento. Seus certificados estão disponíveis.'
                     : 'Continue de onde parou e avance no seu ritmo.'}
                 </p>
               </div>
               <div className="learning-completion-progress">
                 <div className="learning-completion-progress-heading">
                   <span>{dayMode ? `${completedDays} de ${programDays.length} ${programDays.length === 1 ? 'dia concluído' : 'dias concluídos'}` : `Passo ${currentStepNumber} de ${tracks.length}`}</span>
-                  <strong>{overallProgress}% da formação</strong>
+                  <strong>{overallProgress}% do treinamento</strong>
                 </div>
                 <ProgressBar
-                  label={`Progresso da formação: ${completedCourses} de ${tracks.length} cursos concluídos`}
+                  label={`Progresso do treinamento: ${completedCourses} de ${tracks.length} cursos concluídos`}
                   value={overallProgress}
                 />
                 <p className="learning-completion-motivation">{getMotivation(overallProgress)}</p>
@@ -418,7 +419,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                       ? <p role="status">Carregando o ponto em que você parou...</p>
                       : resumeTrack && resumeError
                         ? <p role="status">{resumeError} Abra o curso para continuar.</p>
-                        : <p>{resumeTrack ? 'Continue seu curso no seu ritmo.' : 'Comece por este curso para avançar na formação.'}</p>}
+                        : <p>{resumeTrack ? 'Continue seu curso no seu ritmo.' : 'Comece por este curso para avançar no treinamento.'}</p>}
                   <Link className="learning-catalog-feature-action" to={continuePath}>
                     {resumeTrack ? 'Continuar vídeo' : dayMode ? 'Começar o dia' : 'Começar curso'} <span aria-hidden="true">→</span>
                   </Link>
@@ -448,10 +449,11 @@ export default function LearningHomePage({ participantName, setSummary }: {
           </section>
         )}
 
-        {sipats.length > 1 && currentSipat && <nav aria-label="Formações" className="sipat-years">
-          {sipats.map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} onClick={() => setChosenSipat(item.id)} type="button">
-            <strong>{yearOf(item) !== null && sipats.filter(other => yearOf(other) === yearOf(item)).length === 1 ? yearOf(item) : item.title}</strong>
-            <span>{item.phase === 'running' ? 'Em andamento' : item.phase === 'published' ? 'Em breve' : 'Concluída'}</span>
+        {sipats.length > 1 && currentSipat && <nav aria-label="Treinamentos" className="sipat-years">
+          {orderTrainings(sipats).map(item => <button aria-pressed={item.id === currentSipat.id} className="sipat-year" key={item.id} type="button"
+            onClick={event => { setChosenSipat(item.id); event.currentTarget.scrollIntoView?.({ behavior: 'smooth', block: 'nearest', inline: 'nearest' }); }}>
+            <strong title={item.title}>{item.title}</strong>
+            <span>{item.phase === 'running' ? 'Em andamento' : item.phase === 'published' ? 'Em breve' : 'Concluído'}</span>
           </button>)}
         </nav>}
 
@@ -459,9 +461,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
           <p className="learning-milestone" role="status">
             {shownMilestone === 25
               ? completedCourses > 0
-                ? `Você concluiu ${completedCourses} ${completedCourses === 1 ? 'curso' : 'cursos'}. Falta pouco para a metade da formação.`
-                : 'Você já avançou na formação. Continue no seu ritmo.'
-              : 'Você chegou à metade da formação. Continue no seu ritmo.'}
+                ? `Você concluiu ${completedCourses} ${completedCourses === 1 ? 'curso' : 'cursos'}. Falta pouco para a metade do treinamento.`
+                : 'Você já avançou no treinamento. Continue no seu ritmo.'
+              : 'Você chegou à metade do treinamento. Continue no seu ritmo.'}
           </p>
         )}
 
