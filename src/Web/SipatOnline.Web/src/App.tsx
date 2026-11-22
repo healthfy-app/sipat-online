@@ -10,6 +10,7 @@ import {
   Routes,
   useNavigate,
   useLocation,
+  useNavigationType,
 } from 'react-router-dom';
 import {
   ApiError,
@@ -160,6 +161,7 @@ export default function App() {
     <main className="app-root" style={theme}>
       <a className="skip-link" href="#app-content">Ir para o conteúdo</a>
       <BrowserRouter>
+        <ScrollToTopOnNavigate />
         <Routes>
           <Route
             path="/"
@@ -433,7 +435,7 @@ function LoginPage({
             </>
           ) : (
             <>
-              <p className="eyebrow">CONTEÚDOS DA SUA FORMAÇÃO</p>
+              <p className="eyebrow">CONTEÚDOS DO SEU TREINAMENTO</p>
               <h1>Aprender também faz parte de cuidar.</h1>
               <p>
                 Acesse os vídeos e demais conteúdos que sua empresa preparou para
@@ -841,4 +843,14 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error
     ? error.message
     : 'Ocorreu um erro inesperado. Tente novamente.';
+}
+
+/** A new screen opens at its top; going back (POP) keeps the browser's own scroll restore. */
+function ScrollToTopOnNavigate() {
+  const { pathname } = useLocation();
+  const navigationType = useNavigationType();
+  useEffect(() => {
+    if (navigationType !== 'POP') window.scrollTo(0, 0);
+  }, [pathname, navigationType]);
+  return null;
 }

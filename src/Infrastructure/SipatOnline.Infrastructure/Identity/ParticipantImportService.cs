@@ -196,7 +196,7 @@ public sealed class ParticipantImportService(
         {
             // only the registration came: it is whoever has it stored, or whoever has it as the login — and they must be the same
             if (owner.Person is null && owner.Row is { } ownerRow)
-                return new Rejected(shownLogin, $"Linha repetida: a mesma pessoa já está na linha {ownerRow}.");
+                return new Rejected(shownLogin, $"Matrícula repetida: a linha {ownerRow} já tem essa matrícula.");
             if (owner.Person is null || (byLogin is not null && byLogin.User.Id != owner.Person.User.Id))
                 return new Rejected(shownLogin, RegistrationOfAnotherMessage);
             person = owner.Person;
@@ -215,7 +215,11 @@ public sealed class ParticipantImportService(
             : login is not null ? "login:" + login.NormalizedValue
             : name is not null ? "name:" + ProfileText.CatalogKey(name) : null;
         if (sheetKey is not null && firstRowOf.TryGetValue(sheetKey, out var firstRow))
-            return new Rejected(shownLogin, $"Linha repetida: a mesma pessoa já está na linha {firstRow}.");
+            return new Rejected(shownLogin, person is not null
+                ? $"Linha repetida: essa pessoa já está na linha {firstRow}."
+                : login is not null
+                    ? $"Login repetido: a linha {firstRow} já usa esse login."
+                    : $"Nome repetido: a linha {firstRow} já tem esse nome. Informe o login para diferenciar.");
 
         // 3. unit and sector, only from the active lists of this company
         Guid? unitId = null;

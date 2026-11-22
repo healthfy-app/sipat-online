@@ -127,7 +127,7 @@ export default function CompaniesPage() {
             <Input aria-label="Buscar empresa" className="pl-9" placeholder="Buscar por nome ou identificador" type="search" value={search}
               onChange={(event) => { setSearch(event.target.value); setCurrentPage(1); }} />
           </label>
-          <NativeSelect aria-label="Status" className="w-auto max-sm:flex-1" value={statusFilter}
+          <NativeSelect aria-label="Status" className="w-auto max-sm:w-full max-sm:basis-full" value={statusFilter}
             onChange={(event) => { setStatusFilter(event.target.value as StatusFilter); setCurrentPage(1); }}>
             <option value="all">Todos os status</option>
             <option value="active">Ativas</option>

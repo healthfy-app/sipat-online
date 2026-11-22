@@ -112,8 +112,9 @@ export function formatClock(milliseconds: number): string {
   return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-/** "22 min" or "1 h 28 min", for sentences. */
+/** "22 min" or "1 h 28 min", for sentences; under half a minute, the seconds ("5 s"), never "0 min". */
 export function formatSpan(milliseconds: number): string {
+  if (milliseconds > 0 && milliseconds < 30_000) return `${Math.max(1, Math.round(milliseconds / 1000))} s`;
   const minutes = Math.round(milliseconds / 60000);
   if (minutes < 60) return `${minutes} min`;
   const hours = Math.floor(minutes / 60);

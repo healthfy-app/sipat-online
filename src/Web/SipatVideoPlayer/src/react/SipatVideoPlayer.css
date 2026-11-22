@@ -175,6 +175,8 @@
 
 @media (max-width: 480px) {
   .sipat-player-bar media-volume-range, .sipat-player-bar media-seek-backward-button { display: none; }
+  /* a 16:9 video is ~190px tall on a phone: a smaller button, lifted above the bar, so a tap on it plays instead of seeking */
+  .sipat-player-bigplay { --media-button-icon-height: 26px; width: 58px; height: 58px; margin-bottom: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
   .sipat-player-bigplay, .sipat-scrubber-track, .sipat-scrubber-thumb, .sipat-scrubber-marker, .sipat-scrubber-unlocked { transition: none; }

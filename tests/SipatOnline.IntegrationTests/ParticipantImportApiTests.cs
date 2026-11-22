@@ -216,9 +216,9 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
         Assert.Equal(4, result.Created);
         Assert.Equal(
             [
-                new ImportRejection(3, "ANA.X", "Linha repetida: a mesma pessoa já está na linha 2."),
-                new ImportRejection(5, null, "Linha repetida: a mesma pessoa já está na linha 4."),
-                new ImportRejection(8, "77", "Linha repetida: a mesma pessoa já está na linha 7.")
+                new ImportRejection(3, "ANA.X", "Login repetido: a linha 2 já usa esse login."),
+                new ImportRejection(5, null, "Nome repetido: a linha 4 já tem esse nome. Informe o login para diferenciar."),
+                new ImportRejection(8, "77", "Matrícula repetida: a linha 7 já tem essa matrícula.")
             ],
             result.Rejected.ToArray());
         Assert.Equal(["ana.x", "pedro.alves", "maria.lima", "77"], result.Credentials.Select(item => item.Login).ToArray());
@@ -293,7 +293,7 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
             new ImportRow(3, null, "joao-existente", null, null, "(11) 98765-4321", null, null, null));
 
         Assert.Equal((0, 1, 0), (result.Created, result.Updated, result.Unchanged));
-        Assert.Equal(new ImportRejection(3, "joao-existente", "Linha repetida: a mesma pessoa já está na linha 2."), Assert.Single(result.Rejected));
+        Assert.Equal(new ImportRejection(3, "joao-existente", "Linha repetida: essa pessoa já está na linha 2."), Assert.Single(result.Rejected));
         Assert.Equal(before, await CountUsersAsync(factory));
         var user = await FindUserAsync(factory, "Joao-Existente");
         Assert.Equal(sector.Id, user.SectorId);
