@@ -26,3 +26,17 @@ describe('externalWatchUrl', () => {
     expect(() => externalWatchUrl('Vimeo', 'x?y')).toThrow(Error);
   });
 });
+
+describe('Smartplayer', () => {
+  it('plays the kept address over https', () => {
+    expect(externalEmbedUrl('Smartplayer', 'player.smartplayer.ai/v/AbC123?x=1')).toBe('https://player.smartplayer.ai/v/AbC123?x=1');
+    expect(externalWatchUrl('Smartplayer', 'smartplayer.ai/embed/xyz')).toBe('https://smartplayer.ai/embed/xyz');
+  });
+
+  it('never builds a url outside smartplayer.ai', () => {
+    expect(() => externalEmbedUrl('Smartplayer', 'evil.com/x')).toThrow();
+    expect(() => externalEmbedUrl('Smartplayer', 'smartplayer.ai.evil.com/x')).toThrow();
+    expect(() => externalEmbedUrl('Smartplayer', 'evilsmartplayer.ai/x')).toThrow();
+    expect(() => externalEmbedUrl('Smartplayer', 'player.smartplayer.ai/x"><script>')).toThrow();
+  });
+});

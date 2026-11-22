@@ -841,8 +841,8 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<string>("ExternalId")
-                        .HasMaxLength(32)
-                        .HasColumnType("character varying(32)");
+                        .HasMaxLength(240)
+                        .HasColumnType("character varying(240)");
 
                     b.Property<bool>("HasSd480")
                         .ValueGeneratedOnAdd()

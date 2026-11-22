@@ -300,7 +300,7 @@ export interface PlatformCourseVideo {
   externalId?: string | null;
 }
 
-export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo';
+export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo' | 'Smartplayer';
 
 export function videoProvider(video: { provider?: VideoProvider }): VideoProvider {
   return video.provider ?? 'Sipat';
@@ -531,7 +531,7 @@ export interface LearningLessonProgress {
   watchedMilliseconds?: number;
   /** An extra (YouTube or Vimeo): never counts for progress. Missing in payloads from before external videos. */
   isBonus?: boolean;
-  provider?: 'YouTube' | 'Vimeo' | null;
+  provider?: 'YouTube' | 'Vimeo' | 'Smartplayer' | null;
   externalId?: string | null;
 }
 
@@ -923,7 +923,7 @@ export async function uploadPlatformVideo(
 }
 
 export function createExternalPlatformVideo(data: {
-  provider: 'YouTube' | 'Vimeo';
+  provider: 'YouTube' | 'Vimeo' | 'Smartplayer';
   url: string;
   title: string;
   durationMilliseconds: number | null;
