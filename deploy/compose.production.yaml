@@ -61,7 +61,7 @@ services:
       - data
 
   db-init:
-    image: sipat-online-api:production
+    image: ${SIPAT_API_IMAGE:-sipat-online-api:production}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -75,7 +75,7 @@ services:
       - data
 
   api:
-    image: sipat-online-api:production
+    image: ${SIPAT_API_IMAGE:-sipat-online-api:production}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -102,7 +102,7 @@ services:
         ipv4_address: 172.28.0.3
 
   web:
-    image: sipat-online-web:production
+    image: ${SIPAT_WEB_IMAGE:-sipat-online-web:production}
     build:
       context: ..
       dockerfile: deploy/nginx/Dockerfile
@@ -111,6 +111,8 @@ services:
       - "443:443"
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      # webroot of the Let's Encrypt HTTP-01 challenge (deploy/scripts/issue-certificates.sh)
+      - /var/www/certbot:/var/www/certbot:ro
     depends_on:
       api:
         condition: service_healthy

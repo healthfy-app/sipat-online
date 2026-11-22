@@ -1,0 +1,8 @@
+[Unit]
+Description=SIPAT Online HTTPS certificate for the platform and company hosts (HTTP-01)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/opt/sipat-online/app/deploy/scripts/issue-certificates.sh

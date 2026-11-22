@@ -1,4 +1,5 @@
-FROM node:24-alpine AS frontend-build
+# the static build runs on the machine that builds (no emulation); only the nginx stage is per platform
+FROM --platform=$BUILDPLATFORM node:24-alpine AS frontend-build
 WORKDIR /app
 COPY src/Web/package.json src/Web/package-lock.json ./
 COPY src/Web/SipatOnline.Web/package.json SipatOnline.Web/

@@ -1,0 +1,10 @@
+[Unit]
+Description=Check every 10 minutes whether a new company needs a host in the HTTPS certificate
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=10min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

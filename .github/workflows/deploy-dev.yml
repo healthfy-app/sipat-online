@@ -1,0 +1,27 @@
+name: Deploy dev
+
+# Every push to the dev branch is tested and goes to the dev VM (GitHub environment "dev").
+on:
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dev-deploy
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    name: Deploy
+    needs: verify
+    uses: ./.github/workflows/deploy-vm.yml
+    with:
+      environment: dev
+    secrets: inherit
