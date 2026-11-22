@@ -2,8 +2,11 @@ import type { CompanyRegistry, ImportRow } from '@/api';
 
 export const MAX_IMPORT_ROWS = 2000;
 export const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
+/** Lines per save call: each call is one transaction on the server and must fit its request timeout (100 s). */
+export const IMPORT_SAVE_CHUNK = 100;
 
-export type SheetReadResult = { rows: ImportRow[]; fatalError?: string };
+/** `columns` are the fields the header was recognized as, in the order of the sheet, so a column left out shows. */
+export type SheetReadResult = { rows: ImportRow[]; columns: (keyof ImportRow)[]; fatalError?: string };
 type Field = Exclude<keyof ImportRow, 'row' | 'password'>;
 
 const synonyms: Record<Field, string[]> = {
@@ -35,27 +38,43 @@ export async function readSheet(file: File): Promise<SheetReadResult> {
   try {
     if (/\.xlsx$/i.test(file.name)) records = await readExcelRecords(file);
     else {
-      const text = (await readText(file)).replace(/^﻿/, '');
+      const text = decodeCsv(await readBuffer(file));
       const parsed = parseRecords(text, detectDelimiter(text));
-      if (parsed.error) return { rows: [], fatalError: parsed.error };
+      if (parsed.error) return failed(parsed.error);
       records = parsed.records;
     }
   } catch {
-    return { rows: [], fatalError: 'Não foi possível ler o arquivo. Use o modelo (.xlsx) ou um CSV.' };
+    return failed('Não foi possível ler o arquivo. Use o modelo (.xlsx) ou um CSV.');
   }
   return mapRecords(records);
 }
 
+const failed = (fatalError: string): SheetReadResult => ({ rows: [], columns: [], fatalError });
+
+/**
+ * A CSV is UTF-8 when it decodes as UTF-8; otherwise it is what Excel pt-BR saves by default, Windows-1252. Reading
+ * that as UTF-8 would turn "Matrícula" and "João" into unreadable characters, losing the column and the names.
+ */
+export function decodeCsv(buffer: ArrayBuffer): string {
+  let text: string;
+  try {
+    text = new TextDecoder('utf-8', { fatal: true }).decode(buffer);
+  } catch {
+    text = new TextDecoder('windows-1252').decode(buffer);
+  }
+  return text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
+}
+
 function mapRecords(records: string[][]): SheetReadResult {
   const header = records[0];
-  if (!header || !header.some(cell => cell.trim())) return { rows: [], fatalError: unknownColumns };
+  if (!header || !header.some(cell => cell.trim())) return failed(unknownColumns);
   const columns = new Map<Field, number>();
   header.forEach((cell, index) => {
     const field = mapHeader(cell) as Field | null;
     if (field && !columns.has(field)) columns.set(field, index);
   });
-  if (columns.size === 0) return { rows: [], fatalError: unknownColumns };
-  if (!columns.has('name') && !columns.has('login') && !columns.has('registrationNumber')) return { rows: [], fatalError: missingIdentity };
+  if (columns.size === 0) return failed(unknownColumns);
+  if (!columns.has('name') && !columns.has('login') && !columns.has('registrationNumber')) return failed(missingIdentity);
 
   const rows: ImportRow[] = [];
   records.forEach((record, index) => {
@@ -64,9 +83,10 @@ function mapRecords(records: string[][]): SheetReadResult {
     columns.forEach((column, field) => { const value = (record[column] ?? '').trim(); if (value) row[field] = value; });
     rows.push(row);
   });
-  if (rows.length > MAX_IMPORT_ROWS) return { rows: [], fatalError: `O limite é ${MAX_IMPORT_ROWS} linhas por carga.` };
-  if (rows.length === 0) return { rows: [], fatalError: 'A planilha não tem linhas de dados.' };
-  return { rows };
+  if (rows.length > MAX_IMPORT_ROWS) return failed(`O limite é ${MAX_IMPORT_ROWS} linhas por carga.`);
+  if (rows.length === 0) return failed('A planilha não tem linhas de dados.');
+  // Map keeps the order of insertion, which is the order of the header
+  return { rows, columns: [...columns.keys()] };
 }
 
 async function readExcelRecords(file: File): Promise<string[][]> {
@@ -100,15 +120,6 @@ function cellText(value: unknown): string {
   return '';
 }
 
-function readText(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(reader.error ?? new Error('read'));
-    reader.onload = () => (typeof reader.result === 'string' ? resolve(reader.result) : reject(new Error('read')));
-    reader.readAsText(file, 'UTF-8');
-  });
-}
-
 function readBuffer(file: File): Promise<ArrayBuffer> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -127,7 +138,8 @@ export async function downloadTemplate(registry: CompanyRegistry): Promise<void>
 
   const people = workbook.addWorksheet('Participantes');
   people.addRow(['Nome', 'Login', 'Matrícula', 'E-mail', 'Telefone', 'Unidade', 'Setor']);
-  people.addRow(['Maria Silva', 'maria.silva', '123456', 'maria@empresa.com.br', '(11) 98888-7777', units[0] ?? '', sectors[0] ?? '']);
+  // an example left in the sheet is obvious in the preview: it would create "Exemplo (Apague Esta Linha)"
+  people.addRow(['Exemplo (apague esta linha)', 'exemplo', '123456', 'exemplo@empresa.com.br', '(11) 98888-7777', units[0] ?? '', sectors[0] ?? '']);
   people.getRow(1).font = { bold: true };
   people.columns.forEach(column => { column.width = 22; });
 
