@@ -10,6 +10,7 @@ vi.mock('@/api', async (importOriginal) => ({
   listAllParticipants: vi.fn(), listLearningParticipation: vi.fn(), changeUserStatus: vi.fn(), renameUser: vi.fn(),
   changeEmployeeLogin: vi.fn(), resetEmployeePassword: vi.fn(), createParticipant: vi.fn(),
   listSipatEvents: vi.fn(), listSipatPlans: vi.fn(),
+  listParticipantProfiles: vi.fn(), getCompanyRegistry: vi.fn(), saveParticipantProfile: vi.fn(), changePlacement: vi.fn(),
 }));
 
 const people = [
@@ -22,7 +23,15 @@ const row = (participantId: string, completed: number) => ({
   lessonCount: 2, completedLessonCount: completed, progressPercentage: completed * 50, isCompleted: completed === 2,
 });
 
+const item = (id: string, name: string, isActive = true) => ({ id, name, isActive, peopleCount: 0 });
+const noRules = { requireRegistration: false, requireEmail: false, requirePhone: false, requireUnit: false, requireSector: false };
+const registry = (rules = noRules) => ({ units: [item('u-1', 'Matriz')], sectors: [item('s-1', 'Produção'), item('s-2', 'Manutenção'), item('s-3', 'Antigo', false)], rules });
+const profile = (id: string, unitId: string | null, sectorId: string | null) =>
+  ({ id, registrationNumber: null, email: null, phone: null, unitId, sectorId });
+
 beforeEach(() => {
+  vi.mocked(api.listParticipantProfiles).mockResolvedValue([]);
+  vi.mocked(api.getCompanyRegistry).mockResolvedValue({ units: [], sectors: [], rules: noRules });
   vi.mocked(api.listAllParticipants).mockResolvedValue(people);
   vi.mocked(api.listLearningParticipation).mockResolvedValue([row('p-1', 2), row('p-2', 1)]);
   vi.mocked(api.listSipatEvents).mockResolvedValue({ offset: 0, limit: 100, totalCount: 0, items: [] });
@@ -139,5 +148,130 @@ describe('collaborators', () => {
     expect(screen.queryByRole('button', { name: /^Editar / })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Adicionar colaboradores' })).not.toBeInTheDocument();
     expect(screen.queryByRole('checkbox', { name: /Selecionar / })).not.toBeInTheDocument();
+  });
+
+  it('filters by sector and shows the unit and sector columns', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-1', 'u-1', 's-1'), profile('p-2', null, 's-2')]);
+    renderPage();
+    const table = await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    expect(within(table).getByRole('columnheader', { name: 'Unidade' })).toBeVisible();
+    expect(within(table).getByRole('columnheader', { name: 'Setor' })).toBeVisible();
+    expect(within(table).getAllByRole('row')).toHaveLength(4);
+
+    await user.selectOptions(screen.getByLabelText('Filtrar por setor'), 's-1');
+    expect(within(table).getAllByRole('row')).toHaveLength(2);
+    expect(within(table).getByText('Maria José Oliveira')).toBeVisible();
+    expect(within(table).getByText('Matriz')).toBeVisible();
+
+    await user.selectOptions(screen.getByLabelText('Filtrar por setor'), 'none');
+    expect(within(table).getByText('Ana Lima')).toBeVisible();
+    expect(within(table).queryByText('Maria José Oliveira')).not.toBeInTheDocument();
+  });
+
+  it('shows no unit filter when the company has no units', async () => {
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({ ...registry(), units: [] });
+    renderPage();
+    await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
+    expect(screen.queryByLabelText('Filtrar por unidade')).not.toBeInTheDocument();
+  });
+
+  it('moves two selected people to a sector with changePlacement', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
+    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 2 });
+    renderPage();
+
+    await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Maria José Oliveira' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar José Maria Santos' }));
+    await user.click(screen.getByRole('button', { name: 'Mudar setor' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mudar setor' });
+    expect(within(dialog).queryByRole('option', { name: 'Antigo' })).not.toBeInTheDocument();
+    await user.selectOptions(within(dialog).getByLabelText('Setor'), 's-1');
+    await user.click(within(dialog).getByRole('button', { name: 'Mudar setor' }));
+
+    await waitFor(() => expect(api.changePlacement).toHaveBeenCalledWith(['p-1', 'p-2'], 'sector', 's-1'));
+    expect(await screen.findByRole('status')).toHaveTextContent('2 colaboradores passaram para Produção.');
+  });
+
+  it('takes the sector away from the selected people', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
+    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 1 });
+    renderPage();
+    await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Maria José Oliveira' }));
+    await user.click(screen.getByRole('button', { name: 'Mudar setor' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Mudar setor' });
+    await user.selectOptions(within(dialog).getByLabelText('Setor'), 'none');
+    await user.click(within(dialog).getByRole('button', { name: 'Mudar setor' }));
+    await waitFor(() => expect(api.changePlacement).toHaveBeenCalledWith(['p-1'], 'sector', null));
+    expect(await screen.findByRole('status')).toHaveTextContent('1 colaborador ficou sem setor.');
+  });
+
+  it('warns "1 pessoa sem setor" when the rule is on, counting only active people, and the button filters them', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry({ ...noRules, requireSector: true }));
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-1', null, 's-1')]);
+    renderPage();
+    const table = await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    expect(await screen.findByText('1 pessoa sem setor')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Mostrar quem está sem setor' }));
+    expect(screen.getByLabelText('Filtrar por setor')).toHaveValue('none');
+    expect(within(table).getByText('José Maria Santos')).toBeVisible();
+  });
+
+  it('does not warn when the rule is off', async () => {
+    renderPage();
+    await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    expect(screen.queryByText(/sem setor/)).not.toBeInTheDocument();
+  });
+
+  it('edits registration and sector of a collaborator with a single save, keeping a deactivated current sector', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-3', null, 's-3')]);
+    vi.mocked(api.saveParticipantProfile).mockResolvedValue(profile('p-3', null, 's-1'));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Editar Ana Lima' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar colaborador' });
+    expect(within(dialog).getByRole('option', { name: 'Antigo (desativado)' })).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText('Matrícula'), '123');
+    await user.selectOptions(within(dialog).getByLabelText('Setor'), 's-1');
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }));
+
+    await waitFor(() => expect(api.saveParticipantProfile).toHaveBeenCalledTimes(1));
+    expect(api.saveParticipantProfile).toHaveBeenCalledWith('p-3', { registrationNumber: '123', email: null, phone: null, unitId: null, sectorId: 's-1' });
+    expect(await screen.findByRole('status')).toHaveTextContent('Dados de Ana Lima atualizados (cadastro).');
+  });
+
+  it('marks the fields the company made required in the edit dialog', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry({ ...noRules, requireEmail: true }));
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Editar Ana Lima' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar colaborador' });
+    expect(within(dialog).getByText('E-mail (obrigatório nesta empresa)')).toBeVisible();
+    expect(within(dialog).getByText('Telefone')).toBeVisible();
+  });
+
+  it('keeps the page usable without the new columns when the profiles fail to load', async () => {
+    vi.mocked(api.listParticipantProfiles).mockRejectedValue(new Error('Falha ao carregar os cadastros.'));
+    renderPage();
+    const table = await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    expect(await screen.findByRole('alert')).toHaveTextContent('Falha ao carregar os cadastros.');
+    expect(within(table).getAllByRole('row')).toHaveLength(4);
+    expect(within(table).queryByRole('columnheader', { name: 'Setor' })).not.toBeInTheDocument();
+  });
+
+  it('shows the columns but no batch buttons to someone who cannot manage', async () => {
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
+    renderPage(true);
+    const table = await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    expect(within(table).getByRole('columnheader', { name: 'Setor' })).toBeVisible();
+    expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Mudar setor' })).not.toBeInTheDocument();
   });
 });

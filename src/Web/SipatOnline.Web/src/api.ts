@@ -1374,3 +1374,21 @@ export function updateRegistryItem(kind: RegistryKind, id: string, change: { nam
 export function saveProfileRules(rules: ProfileRules): Promise<ProfileRules> {
   return requestJson<ProfileRules>('/api/admin/registry/rules', { method: 'PUT', body: JSON.stringify(rules) });
 }
+
+export interface ParticipantProfile {
+  id: string; registrationNumber: string | null; email: string | null; phone: string | null; unitId: string | null; sectorId: string | null;
+}
+export type ProfileChange = Omit<ParticipantProfile, 'id'>;
+
+export function listParticipantProfiles(): Promise<ParticipantProfile[]> {
+  return requestJson<ParticipantProfile[]>('/api/admin/users/participants/profiles');
+}
+
+export function saveParticipantProfile(userId: string, data: ProfileChange): Promise<ParticipantProfile> {
+  return requestJson<ParticipantProfile>(`/api/admin/users/${userId}/profile`, { method: 'PUT', body: JSON.stringify(data) });
+}
+
+/** Moves many collaborators to one unit or sector at once; a null `valueId` takes them out of it. */
+export function changePlacement(userIds: string[], field: 'unit' | 'sector', valueId: string | null): Promise<{ changed: number }> {
+  return requestJson<{ changed: number }>('/api/admin/users/placement', { method: 'PUT', body: JSON.stringify({ userIds, field, valueId }) });
+}
