@@ -27,7 +27,7 @@ public sealed class PlatformCourseCatalogService(
     public const long MaximumVideoSizeBytes = 250 * 1024 * 1024;
     public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
-    private const int MaximumExternalIdLength = 32;
+    private const int MaximumExternalIdLength = ExternalVideoLink.MaximumSmartplayerLength;
 
     public async Task<Result<IReadOnlyList<PlatformCourse>>> ListAsync(
         CancellationToken cancellationToken)
@@ -722,7 +722,7 @@ public sealed class PlatformCourseCatalogService(
             "learning.platform_course.upload_not_found",
             "O envio não foi encontrado. Envie o vídeo de novo.");
 
-    /// <summary>Registers a YouTube or Vimeo link as a library item; the same link twice returns the first one.</summary>
+    /// <summary>Registers a YouTube, Vimeo or Smartplayer link as a library item; the same link twice returns the first one.</summary>
     public async Task<Result<PlatformCourseVideo>> CreateExternalVideoAsync(
         string? provider,
         string? url,
@@ -742,14 +742,14 @@ public sealed class PlatformCourseCatalogService(
         {
             return Failure<PlatformCourseVideo>(
                 "learning.catalog.external_provider_invalid",
-                "Escolha YouTube ou Vimeo.");
+                "Escolha YouTube, Vimeo ou Smartplayer.");
         }
 
         if (!ExternalVideoLink.TryParse(parsedProvider, url, out var externalId) || externalId.Length > MaximumExternalIdLength)
         {
             return Failure<PlatformCourseVideo>(
                 "learning.catalog.external_link_invalid",
-                "Não reconhecemos este link. Cole o endereço do vídeo no YouTube ou no Vimeo.");
+                "Não reconhecemos este link. Cole o endereço do vídeo no YouTube ou no Vimeo, ou o código embed do Smartplayer.");
         }
 
         var normalizedTitle = title?.Trim();

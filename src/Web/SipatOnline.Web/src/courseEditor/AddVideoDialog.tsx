@@ -10,12 +10,13 @@ import { getErrorMessage } from './courseFormat';
 import { externalIdFromLink } from './externalLink';
 import { VideoUploadForm } from './CourseMediaForms';
 
-type Source = 'house' | 'YouTube' | 'Vimeo';
+type Source = 'house' | 'YouTube' | 'Vimeo' | 'Smartplayer';
 
 const sources: { value: Source; label: string }[] = [
   { value: 'house', label: 'Nosso vídeo' },
   { value: 'YouTube', label: 'YouTube' },
   { value: 'Vimeo', label: 'Vimeo' },
+  { value: 'Smartplayer', label: 'Smartplayer' },
 ];
 
 export default function AddVideoDialog({
@@ -77,7 +78,7 @@ export default function AddVideoDialog({
 }
 
 function ExternalVideoForm({ provider, busy, onBusyChange, onError, onLink }: {
-  provider: 'YouTube' | 'Vimeo';
+  provider: 'YouTube' | 'Vimeo' | 'Smartplayer';
   busy: boolean;
   onBusyChange: (busy: boolean) => void;
   onError: (message: string) => void;
@@ -119,9 +120,9 @@ function ExternalVideoForm({ provider, busy, onBusyChange, onError, onLink }: {
 
   return (
     <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
-      <Field error={linkError} htmlFor="external-video-url" label="Link do vídeo">
+      <Field error={linkError} htmlFor="external-video-url" label={provider === 'Smartplayer' ? 'Link ou código embed (iframe)' : 'Link do vídeo'}>
         <Input aria-invalid={linkError ? true : undefined} id="external-video-url" onChange={(event) => { setUrl(event.target.value); setLinkError(''); }}
-          placeholder={provider === 'YouTube' ? 'https://www.youtube.com/watch?v=…' : 'https://vimeo.com/…'} value={url} />
+          placeholder={provider === 'YouTube' ? 'https://www.youtube.com/watch?v=…' : provider === 'Vimeo' ? 'https://vimeo.com/…' : 'Cole o código embed do Smartplayer'} value={url} />
       </Field>
       {externalId && (
         <ExternalVideoPreview title={`Prévia de ${title.trim() || 'vídeo'}`} video={{ provider, externalId }} />
