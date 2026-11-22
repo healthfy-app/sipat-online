@@ -44,11 +44,11 @@
 - Test: `tests/SipatOnline.Domain.UnitTests/Users/ProfileTextTests.cs`
 
 **Interfaces:**
-- Produces (todos `public static` em `ProfileText`):
+- Produces: `public sealed record OptionalText(string? Value)` (no mesmo arquivo; `Result<T>` exige `notnull`, então o "não informado" vem como `OptionalText(null)`), e todos `public static` em `ProfileText`:
   - `string PersonName(string value)`: nome padronizado (a entrada já não está vazia).
-  - `Result<string?> RegistrationNumber(string? value)`: `null` se vazio; erro `profile.registration.invalid` se, depois de limpar, ficar vazio ou passar de 64.
-  - `Result<string?> Phone(string? value)`: `null` se vazio; erro `profile.phone.invalid` se não tiver 10 ou 11 dígitos depois de tirar o `55` inicial de 12 ou 13 dígitos.
-  - `Result<string?> Email(string? value)`: `null` se vazio; erro `profile.email.invalid`.
+  - `Result<OptionalText> RegistrationNumber(string? value)`: `OptionalText(null)` se vazio; erro `profile.registration.invalid` se, depois de limpar, ficar vazio ou passar de 64.
+  - `Result<OptionalText> Phone(string? value)`: `OptionalText(null)` se vazio; erro `profile.phone.invalid` se não tiver 10 ou 11 dígitos depois de tirar o `55` inicial de 12 ou 13 dígitos.
+  - `Result<OptionalText> Email(string? value)`: `OptionalText(null)` se vazio; erro `profile.email.invalid`.
   - `string CatalogKey(string value)`: sem acento (`NormalizationForm.FormD`, removendo `UnicodeCategory.NonSpacingMark`), `ToUpperInvariant`, espaços normalizados. É a chave usada para unidade, setor e nome repetido.
   - `string LoginCandidate(string personName)`: `"maria.silva"`, a partir do primeiro e do último nome padronizados, sem acento, minúsculo, só `[a-z0-9]`, unidos por `.`.
 
@@ -68,7 +68,7 @@ public void PersonName_Standardizes(string input, string expected) => Assert.Equ
 [InlineData(" ab 12 ", "AB12")]
 [InlineData("", null)]
 [InlineData(null, null)]
-public void RegistrationNumber_KeepsLettersAndDigits(string? input, string? expected) => Assert.Equal(expected, ProfileText.RegistrationNumber(input).Value);
+public void RegistrationNumber_KeepsLettersAndDigits(string? input, string? expected) => Assert.Equal(expected, ProfileText.RegistrationNumber(input).Value.Value);
 
 [Fact]
 public void RegistrationNumber_OnlySymbols_Fails() => Assert.Equal("profile.registration.invalid", ProfileText.RegistrationNumber(".-").Error.Code);
@@ -76,14 +76,14 @@ public void RegistrationNumber_OnlySymbols_Fails() => Assert.Equal("profile.regi
 [Theory]
 [InlineData("(27) 99999-1234", "27999991234")]
 [InlineData("+55 27 3333-1234", "2733331234")]
-public void Phone_KeepsDigits(string input, string expected) => Assert.Equal(expected, ProfileText.Phone(input).Value);
+public void Phone_KeepsDigits(string input, string expected) => Assert.Equal(expected, ProfileText.Phone(input).Value.Value);
 
 [Fact]
 public void Phone_TooShort_Fails() => Assert.Equal("profile.phone.invalid", ProfileText.Phone("9999-1234").Error.Code);
 
 [Theory]
 [InlineData(" Maria@Empresa.COM ", "maria@empresa.com")]
-public void Email_Lowercases(string input, string expected) => Assert.Equal(expected, ProfileText.Email(input).Value);
+public void Email_Lowercases(string input, string expected) => Assert.Equal(expected, ProfileText.Email(input).Value.Value);
 
 [Theory]
 [InlineData("maria")]
