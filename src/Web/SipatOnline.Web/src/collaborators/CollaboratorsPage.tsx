@@ -270,6 +270,6 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
     {placing && registry && <PlacementDialog count={selected.size} field={placing} items={placing === 'unit' ? registry.units : registry.sectors}
       onClose={() => setPlacing(null)} onConfirm={valueId => place(placing, valueId)} />}
     {viewing && <ProgressDialog onClose={() => setViewing(null)} person={viewing} />}
-    {adding && <AddCollaboratorsDialog existingLogins={(people ?? []).map(person => person.loginIdentifier)} onClose={() => setAdding(false)} onCreated={refreshWith} />}
+    {adding && <AddCollaboratorsDialog onClose={() => setAdding(false)} onCreated={refreshWith} />}
   </Page>;
 }

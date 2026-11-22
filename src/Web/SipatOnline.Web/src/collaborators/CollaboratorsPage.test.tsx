@@ -10,7 +10,7 @@ vi.mock('@/api', async (importOriginal) => ({
   listAllParticipants: vi.fn(), listLearningParticipation: vi.fn(), changeUserStatus: vi.fn(), renameUser: vi.fn(),
   changeEmployeeLogin: vi.fn(), resetEmployeePassword: vi.fn(), createParticipant: vi.fn(),
   listSipatEvents: vi.fn(), listSipatPlans: vi.fn(),
-  listParticipantProfiles: vi.fn(), getCompanyRegistry: vi.fn(), saveParticipantProfile: vi.fn(), changePlacement: vi.fn(),
+  listParticipantProfiles: vi.fn(), getCompanyRegistry: vi.fn(), saveParticipantProfile: vi.fn(), changePlacement: vi.fn(), importParticipants: vi.fn(),
 }));
 
 const people = [
@@ -273,5 +273,40 @@ describe('collaborators', () => {
     expect(within(table).getByRole('columnheader', { name: 'Setor' })).toBeVisible();
     expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
     expect(screen.queryByRole('button', { name: 'Mudar setor' })).not.toBeInTheDocument();
+  });
+
+  it('a carga mostra a prévia, confirma com as mesmas senhas e exige baixar os acessos', async () => {
+    const user = userEvent.setup();
+    const downloads: Blob[] = [];
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn((blob: Blob) => { downloads.push(blob); return 'blob:x'; }) });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    vi.mocked(api.importParticipants).mockImplementation(async (_dryRun, rows) => ({
+      created: 1, updated: 0, unchanged: 0,
+      rejected: [{ row: 3, login: 'bia', message: 'Setor "Marketing" não está na lista da empresa.' }],
+      credentials: [{ row: rows[0].row, name: 'Ana Costa', login: 'ana.costa' }],
+    }));
+    renderPage();
+    await user.click(await screen.findByRole('button', { name: 'Adicionar colaboradores' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Adicionar colaboradores' });
+    await user.click(within(dialog).getByRole('button', { name: 'Importar planilha' }));
+    await user.upload(within(dialog).getByLabelText('Planilha'), new File(['nome;setor\nAna Costa;Produção\nBia;Marketing\n'], 'carga.csv', { type: 'text/csv' }));
+
+    expect(await within(dialog).findByText(/serão criados/)).toHaveTextContent('1 serão criados · 0 atualizados · 0 sem mudança · 1 recusados');
+    expect(within(dialog).getByText('Linha 3 · bia: Setor "Marketing" não está na lista da empresa.')).toBeVisible();
+    const [, previewRows] = vi.mocked(api.importParticipants).mock.calls[0];
+    expect(vi.mocked(api.importParticipants).mock.calls[0][0]).toBe(true);
+    expect(previewRows.map(row => row.row)).toEqual([2, 3]);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar carga' }));
+    await waitFor(() => expect(api.importParticipants).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.importParticipants).mock.calls[1][0]).toBe(false);
+    expect(vi.mocked(api.importParticipants).mock.calls[1][1]).toEqual(previewRows);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Concluir' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Baixe o arquivo de acessos antes de fechar.');
+    await user.click(within(dialog).getByRole('button', { name: 'Baixar o arquivo de acessos' }));
+    const csv = await new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsText(downloads[downloads.length - 1]); });
+    expect(csv).toContain(`"Ana Costa";"ana.costa";"${previewRows[0].password}"`);
   });
 });

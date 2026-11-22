@@ -1392,3 +1392,18 @@ export function saveParticipantProfile(userId: string, data: ProfileChange): Pro
 export function changePlacement(userIds: string[], field: 'unit' | 'sector', valueId: string | null): Promise<{ changed: number }> {
   return requestJson<{ changed: number }>('/api/admin/users/placement', { method: 'PUT', body: JSON.stringify({ userIds, field, valueId }) });
 }
+
+export interface ImportRow {
+  row: number; name?: string | null; login?: string | null; registrationNumber?: string | null; email?: string | null;
+  phone?: string | null; unit?: string | null; sector?: string | null; password?: string | null;
+}
+export interface ImportResult {
+  created: number; updated: number; unchanged: number;
+  rejected: { row: number; login: string | null; message: string }[];
+  credentials: { row: number; name: string; login: string }[];
+}
+
+/** Reads the HR sheet on the server; with `dryRun` nothing is written. */
+export function importParticipants(dryRun: boolean, rows: ImportRow[]): Promise<ImportResult> {
+  return requestJson<ImportResult>('/api/admin/users/import', { method: 'POST', body: JSON.stringify({ dryRun, rows }) });
+}
