@@ -276,6 +276,8 @@ export default function VideoLibraryPage() {
 
       {associating && (
         <AssociateVideosDialog companies={companies} onClose={() => setAssociating(false)} subjects={subjects}
+          onSubjectCreated={(subject) => setSubjects(current => current.some(item => item.id === subject.id)
+            ? current : [...current, subject].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')))}
           videoCompanies={videoCompanies} videoIds={[...selected]} videoSubjects={videoSubjects}
           onSaved={async (message) => {
             setAssociating(false);

@@ -1,6 +1,6 @@
-import { Building2, Tags } from 'lucide-react';
+import { Building2, CirclePlus, Tags } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { changeVideosCompanies, changeVideosSubjects } from '@/api';
+import { changeVideosCompanies, changeVideosSubjects, createSubject } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -32,12 +32,18 @@ function MarkBox({ mark, label, onToggle }: { mark: Mark; label: string; onToggl
  * Associates the selected videos, in one go, to assuntos (a classification) and to companies (the video becomes private
  * to them). Only what the operator touches changes: a box left as it was keeps every video as it is.
  */
-export default function AssociateVideosDialog({ videoIds, subjects, companies, videoSubjects, videoCompanies, onClose, onSaved }: {
+export default function AssociateVideosDialog({ videoIds, subjects: knownSubjects, companies, videoSubjects, videoCompanies, onClose, onSaved, onSubjectCreated }: {
   videoIds: string[]; subjects: Choice[]; companies: Choice[];
   videoSubjects: Map<string, string[]>; videoCompanies: Map<string, string[]>;
   onClose: () => void; onSaved: (message: string) => Promise<void>;
+  /** A new assunto made here, so the page lists it even if the dialog is cancelled. */
+  onSubjectCreated?: (subject: Choice) => void;
 }) {
   const [tab, setTab] = useState<Tab>('subjects');
+  const [created, setCreated] = useState<Choice[]>([]);
+  const [creating, setCreating] = useState(false);
+  const subjects = useMemo(() => [...knownSubjects, ...created.filter(item => !knownSubjects.some(known => known.id === item.id))]
+    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [knownSubjects, created]);
   const initialSubjects = useMemo(() => marksOf(subjects, videoIds, videoSubjects), [subjects, videoIds, videoSubjects]);
   const initialCompanies = useMemo(() => marksOf(companies, videoIds, videoCompanies), [companies, videoIds, videoCompanies]);
   const [subjectMarks, setSubjectMarks] = useState(initialSubjects);
@@ -69,9 +75,28 @@ export default function AssociateVideosDialog({ videoIds, subjects, companies, v
     }
   }
 
+  async function addSubject(name: string) {
+    setCreating(true); setError('');
+    try {
+      const subject = await createSubject(name);
+      const choice = { id: subject.id, title: subject.name };
+      setCreated(current => current.some(item => item.id === choice.id) ? current : [...current, choice]);
+      setSubjectMarks(current => new Map(current).set(choice.id, 'all'));
+      setQuery('');
+      onSubjectCreated?.(choice);
+    } catch (failure) {
+      setError(getErrorMessage(failure));
+    } finally {
+      setCreating(false);
+    }
+  }
+
   const list = tab === 'subjects' ? subjects : companies;
   const marks = tab === 'subjects' ? subjectMarks : companyMarks;
-  const shown = list.filter(item => item.title.toLocaleLowerCase('pt-BR').includes(query.trim().toLocaleLowerCase('pt-BR')));
+  const needle = query.trim().replace(/\s+/g, ' ');
+  const shown = list.filter(item => item.title.toLocaleLowerCase('pt-BR').includes(needle.toLocaleLowerCase('pt-BR')));
+  const canCreate = tab === 'subjects' && needle.length > 0
+    && !subjects.some(item => item.title.toLocaleLowerCase('pt-BR') === needle.toLocaleLowerCase('pt-BR'));
   const privateCount = [...companyMarks.values()].filter(mark => mark !== 'none').length;
   const tabButton = (value: Tab, label: string, Icon: typeof Tags) =>
     <button aria-selected={tab === value} className={cn('inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-md border-0 px-3 text-sm font-semibold',
@@ -92,11 +117,18 @@ export default function AssociateVideosDialog({ videoIds, subjects, companies, v
             ? 'Os vídeos ficam privados: só as empresas marcadas veem e usam nos treinamentos.'
             : 'Sem empresa marcada o vídeo é público. Marque para deixá-lo privado das empresas escolhidas.'}
       </p>
-      <Input aria-label={tab === 'subjects' ? 'Buscar assunto' : 'Buscar empresa'} onChange={event => setQuery(event.target.value)}
-        placeholder={tab === 'subjects' ? 'Buscar assunto' : 'Buscar empresa'} type="search" value={query} />
+      <Input aria-label={tab === 'subjects' ? 'Buscar ou criar assunto' : 'Buscar empresa'} onChange={event => setQuery(event.target.value)}
+        onKeyDown={event => { if (event.key === 'Enter' && canCreate && shown.length === 0 && !creating) { event.preventDefault(); void addSubject(needle); } }}
+        placeholder={tab === 'subjects' ? 'Buscar ou criar assunto' : 'Buscar empresa'} type="search" value={query} />
       <div className="grid max-h-[50vh] content-start overflow-y-auto rounded-md border border-border p-1" role="tabpanel">
+        {canCreate && <button
+          className="m-0 flex min-h-10 cursor-pointer items-center gap-2.5 rounded-md border-0 bg-accent px-2 py-2 text-left text-sm font-semibold text-primary hover:bg-accent/70 disabled:cursor-default disabled:opacity-60"
+          disabled={creating || busy} onClick={() => void addSubject(needle)} type="button">
+          <CirclePlus aria-hidden="true" className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{creating ? 'Criando...' : <>Criar assunto “{needle}”</>}</span>
+        </button>}
         {shown.length === 0
-          ? <p className="m-0 p-3 text-sm text-muted-foreground">Nada encontrado.</p>
+          ? !canCreate && <p className="m-0 p-3 text-sm text-muted-foreground">Nada encontrado.</p>
           : shown.map(item => <MarkBox key={item.id} label={item.title} mark={marks.get(item.id) ?? 'none'}
             onToggle={() => toggle(tab === 'subjects' ? setSubjectMarks : setCompanyMarks, item.id)} />)}
       </div>
