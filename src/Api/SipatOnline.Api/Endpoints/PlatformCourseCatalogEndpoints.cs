@@ -628,7 +628,8 @@ public static class PlatformCourseCatalogEndpoints
             var capabilities = await plans.CapabilitiesAsync(cancellationToken);
             // the assuntos of its plan, without other companies' own ones; its own (internal videos) only on Diamante
             var excluded = await plans.HiddenSubjectsAsync(cancellationToken);
-            var themes = (await courses.ListAsync(cancellationToken))
+            var allCourses = await courses.ListAsync(cancellationToken);
+            var themes = allCourses
                 .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
                 .Where(course => !excluded.Contains(course.Id))
                 .Select(course => ToResponse(course) with
@@ -639,8 +640,11 @@ public static class PlatformCourseCatalogEndpoints
                 })
                 .ToArray();
             var offered = themes.SelectMany(theme => theme.Videos.Select(video => video.Id)).ToHashSet();
+            // the library's standalone videos are offered too; only those of an assunto the company cannot use stay out
+            var blocked = allCourses.Where(course => excluded.Contains(course.Id))
+                .SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
             var videos = (await courses.ListVideosAsync(cancellationToken))
-                .Where(item => offered.Contains(item.Video.Id))
+                .Where(item => offered.Contains(item.Video.Id) || !blocked.Contains(item.Video.Id))
                 .Select(item => new PlatformLibraryVideoResponse(ToResponse(item.Video), item.CourseCount))
                 .ToArray();
             var games = capabilities.Quizzes
