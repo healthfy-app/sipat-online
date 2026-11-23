@@ -3,8 +3,8 @@ using SipatOnline.BuildingBlocks.Domain;
 
 namespace SipatOnline.Learning.Application;
 
-/// <summary>The catalog video behind a lesson, and whether its 480p conversion exists.</summary>
-public sealed record LessonMedia(Guid VideoId, string ContentType, bool HasSd480);
+/// <summary>The catalog video behind a lesson, and which of its 480p and 1080p versions exist.</summary>
+public sealed record LessonMedia(Guid VideoId, string ContentType, bool HasSd480, bool HasFhd1080 = false);
 
 public interface ILessonMediaStore
 {

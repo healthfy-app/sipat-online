@@ -20,7 +20,7 @@ x-api-environment: &api-environment
   SipatOnline__VideoStorage__R2__Bucket: ${R2_VIDEO_BUCKET:-}
   # true = o navegador do operador envia o original direto ao R2 (precisa da regra CORS no bucket)
   SipatOnline__VideoStorage__R2__DirectUpload: ${R2_DIRECT_UPLOAD:-false}
-  # cada envio vira 720p e 480p na propria API (ffmpeg na imagem), um por vez e em prioridade baixa;
+  # cada envio vira 720p (e 1080p se o original tiver mais de 720 linhas) na propria API (ffmpeg na imagem), um por vez e em prioridade baixa;
   # a pasta guarda o original so ate a conversao terminar
   SipatOnline__VideoConversion__Enabled: "true"
   SipatOnline__VideoConversion__WorkPath: /var/sipat/video-work
@@ -61,7 +61,7 @@ services:
       - data
 
   db-init:
-    image: sipat-online-api:production
+    image: ${SIPAT_API_IMAGE:-sipat-online-api:production}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -75,7 +75,7 @@ services:
       - data
 
   api:
-    image: sipat-online-api:production
+    image: ${SIPAT_API_IMAGE:-sipat-online-api:production}
     build:
       context: ..
       dockerfile: Dockerfile
@@ -102,7 +102,7 @@ services:
         ipv4_address: 172.28.0.3
 
   web:
-    image: sipat-online-web:production
+    image: ${SIPAT_WEB_IMAGE:-sipat-online-web:production}
     build:
       context: ..
       dockerfile: deploy/nginx/Dockerfile
@@ -111,6 +111,8 @@ services:
       - "443:443"
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt:ro
+      # webroot of the Let's Encrypt HTTP-01 challenge (deploy/scripts/issue-certificates.sh)
+      - /var/www/certbot:/var/www/certbot:ro
     depends_on:
       api:
         condition: service_healthy

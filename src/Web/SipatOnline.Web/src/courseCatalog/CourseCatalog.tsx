@@ -1,25 +1,21 @@
 import { Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   deleteGameModule,
   deletePlatformCourse,
-  deletePlatformVideo,
   type GameModule,
   type PlatformCourse,
-  type PlatformCourseVideo,
-  type PlatformLibraryVideo,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Page } from '@/components/ui/page';
 import { TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { VideoUploadForm } from '@/courseEditor/CourseMediaForms';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import CatalogToolbar, { type CatalogTab } from './CatalogToolbar';
-import { filterCourses, filterModules, filterVideos, hasCourseFilters, type CatalogFilters, type StatusFilter } from './catalogFilters';
+import { filterCourses, filterModules, hasCourseFilters, type CatalogFilters, type StatusFilter } from './catalogFilters';
 import CourseStartOptions from './CourseStartOptions';
 import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
@@ -28,22 +24,20 @@ import { useCourseCategories } from './useCourseCategories';
 import GameModuleForm from './GameModuleForm';
 import GameModulesPanel from './GameModulesPanel';
 import PlanSubjectsPanel from './PlanSubjectsPanel';
-import VideoLibraryPanel from './VideoLibraryPanel';
 import '@/OpsIdentity.css';
 
-const catalogTabs: CatalogTab[] = ['courses', 'videos', 'modules', 'plans'];
+/** The videos have their own page (/platform/videos); this one keeps the content that uses them. */
+const catalogTabs: CatalogTab[] = ['courses', 'modules', 'plans'];
 /** The last view of the library (tab, search and filters), kept for the session so coming back from an editor finds it as it was. */
 const viewKey = 'sipat-library-view';
 type CatalogDialog =
   | { kind: 'create' }
   | { kind: 'categories' }
-  | { kind: 'upload' }
   | { kind: 'game'; module: GameModule | null }
 
 
 export default function CourseCatalog({
   courses,
-  library,
   modules,
   isLoading,
   error,
@@ -52,13 +46,11 @@ export default function CourseCatalog({
   onOpen,
   onDuplicate,
   onCreated,
-  onVideoUploaded,
   onModulesChanged,
   onProgramsChanged,
   onError,
 }: {
   courses: PlatformCourse[];
-  library: PlatformLibraryVideo[];
   modules: GameModule[];
   isLoading: boolean;
   error: string;
@@ -67,12 +59,12 @@ export default function CourseCatalog({
   onOpen: (course: PlatformCourse) => void;
   onDuplicate: (course: PlatformCourse) => void;
   onCreated: (course: PlatformCourse) => Promise<void>;
-  onVideoUploaded: (video: PlatformCourseVideo) => Promise<void>;
   onModulesChanged: (message: string) => Promise<void>;
   onProgramsChanged: (message: string) => Promise<void>;
   onError: (message: string) => void;
 }) {
   const [params, setParams] = useSearchParams();
+  const navigate = useNavigate();
   const requestedTab = params.get('aba');
   const tab: CatalogTab = catalogTabs.includes(requestedTab as CatalogTab) ? (requestedTab as CatalogTab) : 'courses';
   const filters: CatalogFilters = {
@@ -112,38 +104,30 @@ export default function CourseCatalog({
   const { categories, create: createCategory, reload: reloadCategories } = useCourseCategories();
   const [dialog, setDialog] = useState<CatalogDialog | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
-  const [uploadError, setUploadError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
   const shownCourses = useMemo(() => filterCourses(courses, categories, filters), [courses, categories, filters.query, filters.status, filters.category]); // eslint-disable-line react-hooks/exhaustive-deps
-  const shownVideos = useMemo(() => filterVideos(library, filters.query), [library, filters.query]);
   const shownModules = useMemo(() => filterModules(modules, filters.query), [modules, filters.query]);
   const knownCategories = new Set(categories.map((item) => item.id));
   const hasUncategorized = courses.some((course) => !course.categoryId || !knownCategories.has(course.categoryId));
   const isFiltered = tab === 'courses' ? hasCourseFilters(filters) : filters.query.trim() !== '';
   const countText = {
-    courses: isFiltered ? `${shownCourses.length} de ${courses.length}` : pluralize(courses.length, 'curso', 'cursos'),
-    videos: isFiltered ? `${shownVideos.length} de ${library.length}` : pluralize(library.length, 'vídeo', 'vídeos'),
+    courses: isFiltered ? `${shownCourses.length} de ${courses.length}` : pluralize(courses.length, 'treinamento', 'treinamentos'),
+    videos: '',
     modules: isFiltered ? `${shownModules.length} de ${modules.length}` : pluralize(modules.length, 'jogo', 'jogos'),
     plans: '',
   }[tab];
   const isEmptyCatalog = !isLoading && !error && courses.length === 0;
   const showTabs = !isEmptyCatalog || tab !== 'courses';
   const tabs: { id: CatalogTab; label: string; count: number }[] = [
-    { id: 'courses', label: 'Assuntos', count: courses.length },
-    { id: 'videos', label: 'Vídeos', count: library.length },
+    { id: 'courses', label: 'Treinamentos', count: courses.length },
     { id: 'modules', label: 'Jogos e perguntas', count: modules.length },
     { id: 'plans', label: 'Planos', count: 4 },
   ];
 
-  function openUpload() {
-    setUploadError('');
-    setDialog({ kind: 'upload' });
-  }
-
   async function removeGame(module: GameModule) {
     const usage = module.usageCount > 0
-      ? ` Ele está em ${pluralize(module.usageCount, 'assunto', 'assuntos')} e sairá desses assuntos.`
+      ? ` Ele está em ${pluralize(module.usageCount, 'treinamento', 'treinamentos')} e sairá desses treinamentos.`
       : '';
     if (!window.confirm(`Remover o jogo "${module.title}"?${usage}`)) return;
     onError('');
@@ -159,26 +143,12 @@ export default function CourseCatalog({
   }
 
   async function removeCourse(course: PlatformCourse) {
-    if (!window.confirm(`Excluir o assunto "${course.title}"? As empresas que já receberam este conteúdo continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
+    if (!window.confirm(`Excluir o treinamento "${course.title}"? As empresas que já receberam este conteúdo continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
     onError('');
     setIsDeleting(true);
     try {
       await deletePlatformCourse(course.id);
-      await onProgramsChanged(`O assunto "${course.title}" foi excluído.`);
-    } catch (deleteError) {
-      onError(getErrorMessage(deleteError));
-    } finally {
-      setIsDeleting(false);
-    }
-  }
-
-  async function removeVideo(item: PlatformLibraryVideo) {
-    if (!window.confirm(`Excluir o vídeo "${item.video.title}"? O arquivo é apagado e isso não pode ser desfeito.`)) return;
-    onError('');
-    setIsDeleting(true);
-    try {
-      await deletePlatformVideo(item.video.id);
-      await onProgramsChanged(`O vídeo "${item.video.title}" foi excluído.`);
+      await onProgramsChanged(`O treinamento "${course.title}" foi excluído.`);
     } catch (deleteError) {
       onError(getErrorMessage(deleteError));
     } finally {
@@ -187,11 +157,14 @@ export default function CourseCatalog({
   }
 
   const primaryAction = {
-    courses: <Button className="ops-primary" onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar assunto</Button>,
+    courses: <Button className="ops-primary" onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar treinamento</Button>,
     plans: undefined,
-    videos: <Button className="ops-primary" onClick={openUpload}><Plus /> Enviar vídeo</Button>,
+    videos: undefined,
     modules: <Button className="ops-primary" onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
   }[tab];
+
+  // the old Vídeos tab (links, the remembered view) now opens the video library
+  if (requestedTab === 'videos') return <Navigate replace to="/platform/videos" />;
 
   const body = isLoading ? (
     <LoadingState className="list-state">Carregando catálogo...</LoadingState>
@@ -203,10 +176,10 @@ export default function CourseCatalog({
         <div className="ops-hero-copy">
           <p className="ops-hero-eyebrow">Acervo da plataforma</p>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="ops-hero-title">Biblioteca</h1>
+            <h1 className="ops-hero-title">Conteúdo</h1>
             {import.meta.env.DEV && <Badge variant="outline">Apresentação demo</Badge>}
           </div>
-          <p className="ops-hero-lead">{`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}</p>
+          <p className="ops-hero-lead">{`${pluralize(courses.length, 'treinamento', 'treinamentos')} no acervo da plataforma`}</p>
         </div>
         {primaryAction && <div className="ops-hero-actions">{primaryAction}</div>}
       </header>
@@ -245,14 +218,11 @@ export default function CourseCatalog({
 
         <TabsContent value="courses">
           {body ?? (isEmptyCatalog
-            ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => setTab('videos')} />
+            ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => navigate('/platform/videos')} />
             : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} categories={categories} courses={shownCourses} onClearFilters={clearFilters} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
         </TabsContent>
         <TabsContent value="plans">
           {body ?? <PlanSubjectsPanel />}
-        </TabsContent>
-        <TabsContent value="videos">
-          {body ?? <VideoLibraryPanel busy={isDeleting} hasVideos={library.length > 0} library={shownVideos} onClearFilters={clearFilters} onDelete={(item) => void removeVideo(item)} onUpload={openUpload} />}
         </TabsContent>
         <TabsContent value="modules">
           {body ?? (
@@ -280,15 +250,6 @@ export default function CourseCatalog({
         <ManageCategoriesDialog categories={categories} onChanged={async () => { await reloadCategories(); await onProgramsChanged('As categorias foram atualizadas.'); }} onClose={() => setDialog(null)} />
       )}
 
-      {dialog?.kind === 'upload' && (
-        <Dialog busy={dialogBusy} onClose={() => setDialog(null)} title="Enviar vídeo">
-          {uploadError && <p className="m-0 mb-4 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{uploadError}</p>}
-          <VideoUploadForm onBusyChange={setDialogBusy} onError={setUploadError} onUploaded={async (video) => {
-            setDialog(null);
-            await onVideoUploaded(video);
-          }} />
-        </Dialog>
-      )}
 
       {dialog?.kind === 'game' && (
         <Dialog busy={dialogBusy} onClose={() => setDialog(null)} size="lg" title={dialog.module ? 'Editar jogo' : 'Novo jogo'}>

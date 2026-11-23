@@ -4,7 +4,7 @@ import type { PlayerErrorKind, PlayerEvent, PlayerEventHandler, SaveReason, Watc
 import { bounceNativeSeek, clampSeek, enforcedRate, unlockedSeconds, type PlayerRules } from './rules';
 import { trackPlaybackQuality, type QualityLabel } from './quality';
 import { SAVE_INTERVAL_MS, planSave } from './saveSchedule';
-import { createDowngradeWatch, type QualityPreference, type SourceQuality, type VideoSource } from './sources';
+import { availableQualities, createDowngradeWatch, lowerQuality, type QualityPreference, type SourceQuality, type VideoSource } from './sources';
 
 export interface AttachOptions {
   /** Opt-in rules. Leave out for free playback (previews); the lesson page passes both. */
@@ -57,7 +57,7 @@ export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): A
   let currentQuality: QualityLabel = options.quality ?? 'single';
   // While another file loads, currentTime is 0 and the browser fires events that mean nothing to the viewer.
   let switching: { position: number; resume: boolean; seeking: boolean; timer: ReturnType<typeof setTimeout> | null } | null = null;
-  const downgrade = createDowngradeWatch();
+  const downgrade = createDowngradeWatch({ bottom: availableQualities(options.sources ?? []).at(-1) });
   let queue: Promise<unknown> = Promise.resolve();
   let inFlight = 0;
 
@@ -108,8 +108,9 @@ export function attachPlayer(video: HTMLVideoElement, options: AttachOptions): A
   const tracker = trackPlaybackQuality(video, {
     quality: currentQuality,
     onStall: () => {
-      if (options.preference?.() !== 'auto' || currentQuality !== '720p') return;
-      if (downgrade.recordStall(performance.now(), '720p')) switchTo('480p', true);
+      if (options.preference?.() !== 'auto' || currentQuality === 'single') return;
+      const lower = lowerQuality(options.sources ?? [], currentQuality);
+      if (lower && downgrade.recordStall(performance.now(), currentQuality)) switchTo(lower, true);
     },
     onReport: (summary, reason) => { emit({ type: 'quality', summary, reason }); },
   });

@@ -19,7 +19,7 @@ Crie estes registros, todos **DNS only** (nuvem cinza, sem proxy):
 | A | `*` | IP da VM (cada empresa será `<chave>.exemplo.com.br`) |
 | A | `@` | IP da VM (opcional) |
 
-> **Por que sem proxy.** O proxy da Cloudflare limita o tamanho do corpo de uma requisição (alguns planos, ~100 MB), o que bloquearia o envio de vídeos de até 250 MB, e os termos dos planos comuns restringem servir vídeo pelo proxy. Sem proxy a VM recebe o tráfego direto. Se depois quiser a proteção da Cloudflare, o caminho é mover os vídeos para o armazenamento deles (R2).
+> **Por que sem proxy.** O proxy da Cloudflare limita o tamanho do corpo de uma requisição (alguns planos, ~100 MB), o que bloquearia o envio de vídeos de até 2 GB, e os termos dos planos comuns restringem servir vídeo pelo proxy. Sem proxy a VM recebe o tráfego direto. Se depois quiser a proteção da Cloudflare, o caminho é mover os vídeos para o armazenamento deles (R2).
 
 ## 2. Certificado wildcard
 O Nginx usa um certificado Let's Encrypt único, nome `sipat-online`, para `exemplo.com.br` e `*.exemplo.com.br`. Com o plugin da Cloudflare:
@@ -68,7 +68,7 @@ curl -f https://ops.exemplo.com.br/health
 Abra `https://ops.exemplo.com.br`, entre com o dono e cadastre a primeira empresa. Os participantes e administradores da empresa entram em `https://<chave>.exemplo.com.br`.
 
 ## 5. Vídeos e backups
-- Os vídeos ficam no volume Docker `platform-videos` (na API: `/var/sipat/videos`); o limite é de **250 MB por vídeo**. O Nginx já libera esse tamanho só na rota de envio de vídeos.
+- Os vídeos ficam no volume Docker `platform-videos` (na API: `/var/sipat/videos`); o limite é de **2 GB por vídeo**. O Nginx já libera esse tamanho só na rota de envio de vídeos. Com o R2 e o envio direto ligado (`R2_DIRECT_UPLOAD=true`), o navegador manda o vídeo em partes de 16 MB direto para o bucket: uma queda de conexão perde só a parte em andamento, e o envio continua de onde parou.
 - O backup do banco gravado na própria VM **não substitui** uma cópia externa. Inclua o volume `platform-videos` na cópia externa (por exemplo, `rclone` ou *snapshot* do disco) e **teste a restauração** antes do go-live.
 - Banda: considere o tamanho médio dos vídeos e o horário de pico (o número de pessoas assistindo ao mesmo tempo) ao escolher o plano de rede da VM.
 
@@ -101,7 +101,7 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
    ```
    Em seguida rode a cópia (passo 4) outra vez. Ela envia o **tamanho real do arquivo** e, ao copiar com sucesso, corrige o `SizeBytes` cadastrado; o Mbps da linha já sai calculado com o tamanho novo.
 7. **Depois, gere a 480p dos vídeos antigos** com `--convert-catalog-videos` (veja **Conversão automática** abaixo). Ele coloca na fila todo vídeo pronto que ainda não tem 480p, e a API em execução cria **somente a 480p**, a partir da 720p atual, **mantendo o mesmo id**. A 720p **não é recodificada**: o arquivo, o tamanho e o tipo continuam exatamente os mesmos, então os Dias já entregues e quem estiver assistindo naquele momento não percebem nada; o vídeo continua no ar durante a conversão. Rode depois do passo 6, para a 480p sair da 720p já leve.
-8. **Todo vídeo novo é convertido sozinho no envio** (H.264 720p de cerca de 2 Mbps e 480p de cerca de 1 Mbps, áudio AAC e `faststart`). Não é preciso preparar o arquivo antes.
+8. **Todo vídeo novo é convertido sozinho no envio**: H.264 720p de cerca de 2 Mbps e, quando o original tem **mais de 720 linhas**, também 1080p de cerca de 4 Mbps (áudio AAC e `faststart`), em `videos/<id>/720p.mp4` e `videos/<id>/1080p.mp4`. Um original de 720p ou menor fica só em 720p: uma 1080p feita dele seria a mesma imagem ampliada. Vídeos novos **não** ganham mais a 480p; os convertidos antes desta mudança continuam com 720p e 480p, sem nada a fazer (o original deles já foi apagado, então só ganham 1080p se forem enviados de novo). O player começa na 1080p em rede rápida ou desconhecida, na 720p de 2 a 5 Mbps, e desce um degrau quando trava. Não é preciso preparar o arquivo antes.
 
 ### Conversão automática
 - A imagem da API já traz o `ffmpeg`. Cada envio fica guardado (com `VIDEO_STORAGE_PROVIDER=File`, no volume `video-work`, na API `/var/sipat/video-work`; com `R2`, veja o item seguinte) e aparece na biblioteca como **Processando**; a API converte **um vídeo por vez**, em prioridade baixa (`nice`), para não disputar a CPU com quem está assistindo. Ao terminar, o vídeo fica **Pronto** e o original sai da pasta. Um vídeo **Processando** não pode entrar num Dia.

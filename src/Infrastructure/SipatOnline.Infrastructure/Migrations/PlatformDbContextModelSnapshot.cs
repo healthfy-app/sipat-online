@@ -960,6 +960,11 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasMaxLength(240)
                         .HasColumnType("character varying(240)");
 
+                    b.Property<bool>("HasFhd1080")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false);
+
                     b.Property<bool>("HasSd480")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("boolean")

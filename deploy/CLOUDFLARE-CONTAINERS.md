@@ -11,7 +11,7 @@ Itens marcados com **verificar** não puderam ser confirmados sem acesso à cont
 - **Postgres gerenciado**: fora da Cloudflare (seção 3). Os containers não guardam estado; o disco deles é efêmero.
 - **R2**: guarda os vídeos. O navegador do operador envia o original direto ao R2 por um link assinado (seção 9).
 
-Fluxo de um envio: o navegador pede o link (`POST /api/platform/catalog/videos/uploads`), faz `PUT` direto no R2, chama `…/complete`; o Worker acorda o `SipatConverter`, que baixa o original do R2, converte para 720p e 480p e sobe os resultados.
+Fluxo de um envio: o navegador pede o link (`POST /api/platform/catalog/videos/uploads`), faz `PUT` direto no R2, chama `…/complete`; o Worker acorda o `SipatConverter`, que baixa o original do R2, converte para 720p (e 1080p quando o original tem mais de 720 linhas) e sobe os resultados.
 
 ## 2. Pré-requisitos
 
@@ -113,14 +113,14 @@ Crie no painel (Segurança → WAF → Regras de limite de taxa) uma regra de Ra
 - Existe uma instância nomeada `converter` (`SipatConverter`). O Worker a acorda quando um envio termina (`201` de `…/complete`) e a cada hora (cron `0 * * * *`), para pegar jobs que ficaram esperando.
 - Enquanto `GET /health/conversion` disser `busy`, o Worker renova o tempo de atividade e o container não dorme (`onActivityExpired` + `renewActivityTimeout`). Sem conversão, ele dorme após 10 minutos. **Verificar** esses dois métodos na versão instalada de `@cloudflare/containers` (0.3.7): o `tsc` aceitou os nomes, mas o comportamento só se confirma em `dev`.
 - As instâncias `SipatApi` têm `RunInBackground=false` e não pegam jobs. A fila é segura para várias instâncias mesmo assim (cada job é pego por uma só, com lease).
-- **Disco local por container**: precisa caber a cópia temporária de um envio (até 250 MB) mais a pasta do job com o original e as duas saídas (720p e 480p). Reserve folga de alguns GB. **Verificar** o disco da instância `standard-3` e `standard-1` (tamanhos de instância também a confirmar na documentação atual).
+- **Disco local por container**: precisa caber a cópia temporária de um envio (até 2 GB) mais a pasta do job com o original e as duas saídas (1080p e 720p). Reserve folga de alguns GB. **Verificar** o disco da instância `standard-3` e `standard-1` (tamanhos de instância também a confirmar na documentação atual).
 - Queda brusca: se o container do conversor cair no meio de uma conversão, o job volta para a fila quando o lease vence, em cerca de `LeaseDuration` + o intervalo de verificação do worker (2 min + 30 s, por volta de **2,5 min**). Em reinício normal (deploy, desligamento gracioso) o job é devolvido na hora e retomado logo ao subir.
 
 ## 9. Limite de corpo e envio direto
 
-O corpo de uma requisição pela Cloudflare tem limite de cerca de **100 MB** nos planos Free e Pro (**verificar** o limite do plano contratado). Um vídeo de até 250 MB não passa pelo Worker: por isso o envio vai direto ao R2 com `PUT` pré-assinado (validade de 1 hora). O formulário antigo (multipart pela API) só funciona na VM; no Cloudflare, `DirectUpload=true`.
+O corpo de uma requisição pela Cloudflare tem limite de cerca de **100 MB** nos planos Free e Pro (**verificar** o limite do plano contratado). Um vídeo de até 2 GB não passa pelo Worker: por isso o envio vai direto ao R2, em partes de 16 MB (multipart com `PUT` pré-assinado por parte, links de 1 hora pedidos em lotes). Uma queda de conexão perde só a parte em andamento; depois de recarregar a página, escolher o mesmo arquivo retoma do ponto em que parou (até cerca de 20 horas: a regra de ciclo de vida descarta multipart incompleto em 1 dia). O formulário antigo (multipart pela API) só funciona na VM; no Cloudflare, `DirectUpload=true`.
 
-Ao concluir (`complete`), a API confere o tamanho (1 B a 250 MB), o tipo (`video/mp4` ou `video/webm`) e a assinatura do arquivo. Um objeto grande demais ou inválido é apagado. Envios abandonados saem do bucket pela regra de ciclo de vida do prefixo `uploads/` (7 dias).
+Ao concluir (`complete`), a API confere o tamanho (1 B a 2 GB), o tipo (`video/mp4` ou `video/webm`) e a assinatura do arquivo. Um objeto grande demais ou inválido é apagado. Envios abandonados saem do bucket pela regra de ciclo de vida do prefixo `uploads/` (7 dias).
 
 ## 10. Atualizar e voltar atrás
 

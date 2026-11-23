@@ -13,18 +13,21 @@ Esta topologia é uma opção econômica de MVP, não uma arquitetura de alta di
 
 No PowerShell, na raiz do repositório:
 
+> **Dev e pipeline:** o ambiente de dev (VM grátis, sslip.io) e o deploy automático por GitHub Actions estão em [PIPELINE-VM.md](PIPELINE-VM.md). Esta página descreve a produção com zona de DNS na Azure.
+
 ```powershell
-Copy-Item deploy\terraform\terraform.tfvars.example deploy\terraform\terraform.tfvars
+Copy-Item deploy\terraform\environments\production.tfvars.example deploy\terraform\environments\production.tfvars
 ```
 
-Edite `deploy\terraform\terraform.tfvars`: informe domínio, e-mail de Let's Encrypt, caminho da chave SSH e IP/CIDR permitido para SSH. Nunca coloque senhas, tokens ou chaves privadas nesse arquivo.
+Edite `deploy\terraform\environments\production.tfvars`: informe domínio, e-mail de Let's Encrypt, caminho da chave SSH e IP/CIDR permitido para SSH. Nunca coloque senhas, tokens ou chaves privadas nesse arquivo.
 
 ```powershell
 Set-Location deploy\terraform
-terraform init
+terraform init -backend-config="workspace_dir=$HOME/.sipat-online/terraform-state"
+terraform workspace select -or-create production
 terraform fmt -check
 terraform validate
-terraform plan -out sipat-online.tfplan
+terraform plan -var-file=environments/production.tfvars -out=sipat-online.tfplan
 terraform apply sipat-online.tfplan
 terraform output
 ```

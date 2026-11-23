@@ -45,7 +45,7 @@ export default function GameModuleForm({
   module: GameModule | null;
   onBusyChange: (busy: boolean) => void;
   onCancel: () => void;
-  onSaved: (message: string) => Promise<void>;
+  onSaved: (message: string, saved: GameModule) => Promise<void> | void;
 }) {
   const [title, setTitle] = useState(module?.title ?? '');
   const [gameType, setGameType] = useState<GamificationGameType>(module?.gameType ?? 'Quiz');
@@ -99,9 +99,8 @@ export default function GameModuleForm({
     onBusyChange(true);
     const data = draftData();
     try {
-      if (module) await updateGameModule(module.id, data);
-      else await createGameModule(data);
-      await onSaved(module ? `O jogo "${data.title}" foi atualizado.` : `O jogo "${data.title}" foi criado.`);
+      const saved = module ? await updateGameModule(module.id, data) : await createGameModule(data);
+      await onSaved(module ? `O jogo "${data.title}" foi atualizado.` : `O jogo "${data.title}" foi criado.`, saved);
     } catch (saveError) {
       setError(getErrorMessage(saveError));
     } finally {
@@ -113,7 +112,7 @@ export default function GameModuleForm({
   return (
     <form className="grid gap-4" onSubmit={handleSubmit}>
       <p className="m-0 text-sm text-muted-foreground">
-        Jogos entram no curso ou param um vídeo num momento escolhido. O participante vê pontos e estrelas só como
+        Jogos entram no treinamento ou param um vídeo num momento escolhido. O participante vê pontos e estrelas só como
         incentivo (nada é salvo) e sempre pode pular.
       </p>
       {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}

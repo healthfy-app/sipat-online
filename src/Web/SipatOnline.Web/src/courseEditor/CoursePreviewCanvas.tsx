@@ -30,7 +30,7 @@ export default function CoursePreviewCanvas({
 
   return (
     <section
-      aria-label="Prévia do curso"
+      aria-label="Prévia do treinamento"
       className={cn(
         'relative flex min-h-0 min-w-0 flex-col items-center justify-[safe_center] gap-5 overflow-y-auto px-6 pb-6 pt-14',
         'max-[1180px]:min-h-auto max-[1180px]:overflow-visible max-[860px]:order-first max-[860px]:px-4 max-[860px]:pb-4',

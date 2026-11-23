@@ -35,16 +35,17 @@ public sealed class VideoConversionApiTests : IDisposable
     }
 
     [DockerFfmpegFact]
-    public async Task Uploads_as_processing_then_converts_to_both_renditions()
+    public async Task Uploads_as_processing_then_converts_a_full_hd_original_to_1080p_and_720p()
     {
         await using var postgres = await StartPostgres();
         await using var factory = await StartFactory(postgres.GetConnectionString());
         using var client = await OperatorClient(factory);
-        var source = await GenerateVideo("source.mp4", seconds: 2);
+        var source = await GenerateVideo("source.mp4", seconds: 2, size: "1920x1080");
 
         var uploaded = await Upload(client, await File.ReadAllBytesAsync(source), "Uso de EPI");
         Assert.Equal("Processing", uploaded.GetProperty("status").GetString());
         Assert.False(uploaded.GetProperty("hasSd480").GetBoolean());
+        Assert.False(uploaded.GetProperty("hasFhd1080").GetBoolean());
         var videoId = uploaded.GetProperty("id").GetGuid();
         Assert.Equal("Processing", (await LibraryVideo(client, videoId)).GetProperty("status").GetString());
         Assert.True(Directory.Exists(SourceFolder(videoId)));
@@ -53,13 +54,20 @@ public sealed class VideoConversionApiTests : IDisposable
 
         var ready = await LibraryVideo(client, videoId);
         Assert.Equal("Ready", ready.GetProperty("status").GetString());
-        Assert.True(ready.GetProperty("hasSd480").GetBoolean());
+        Assert.True(ready.GetProperty("hasFhd1080").GetBoolean());
+        // New uploads no longer get a 480p.
+        Assert.False(ready.GetProperty("hasSd480").GetBoolean());
         Assert.Equal("video/mp4", ready.GetProperty("contentType").GetString());
         Assert.InRange(ready.GetProperty("durationMilliseconds").GetInt64(), 1850, 2150);
         var storage = factory.Services.GetRequiredService<IPlatformCourseVideoStorage>();
+        await using (var fhd = await storage.OpenReadAsync(videoId, VideoRendition.Fhd1080, default))
+        {
+            Assert.NotNull(fhd);
+        }
+
         await using (var sd = await storage.OpenReadAsync(videoId, VideoRendition.Sd480, default))
         {
-            Assert.NotNull(sd);
+            Assert.Null(sd);
         }
 
         await using (var hd = await storage.OpenReadAsync(videoId, VideoRendition.Hd720, default))
@@ -136,7 +144,12 @@ public sealed class VideoConversionApiTests : IDisposable
         Assert.True(await ConvertNext(factory));
         var ready = await LibraryVideo(client, videoId);
         Assert.Equal("Ready", ready.GetProperty("status").GetString());
-        Assert.True(ready.GetProperty("hasSd480").GetBoolean());
+        // A 720-line original gives only the 720p: a 1080p would be the same picture enlarged.
+        Assert.False(ready.GetProperty("hasFhd1080").GetBoolean());
+        Assert.False(ready.GetProperty("hasSd480").GetBoolean());
+        await using var fhd = await factory.Services.GetRequiredService<IPlatformCourseVideoStorage>()
+            .OpenReadAsync(videoId, VideoRendition.Fhd1080, default);
+        Assert.Null(fhd);
     }
 
     [DockerFfmpegFact]
@@ -188,7 +201,7 @@ public sealed class VideoConversionApiTests : IDisposable
         using var operatorClient = await OperatorClient(restarted);
         var ready = await LibraryVideo(operatorClient, videoId);
         Assert.Equal("Ready", ready.GetProperty("status").GetString());
-        Assert.True(ready.GetProperty("hasSd480").GetBoolean());
+        Assert.False(ready.GetProperty("hasSd480").GetBoolean());
         Assert.InRange(ready.GetProperty("durationMilliseconds").GetInt64(), 39_500, 40_500);
     }
 
@@ -458,7 +471,7 @@ public sealed class VideoConversionApiTests : IDisposable
         return postgres;
     }
 
-    private async Task<string> GenerateVideo(string name, int seconds)
+    private async Task<string> GenerateVideo(string name, int seconds, string size = "1280x720")
     {
         Directory.CreateDirectory(root);
         var path = Path.Combine(root, name);
@@ -472,7 +485,7 @@ public sealed class VideoConversionApiTests : IDisposable
         foreach (var argument in new[]
                  {
                      "-hide_banner", "-nostdin", "-y",
-                     "-f", "lavfi", "-i", $"testsrc=duration={seconds}:size=1280x720:rate=25",
+                     "-f", "lavfi", "-i", $"testsrc=duration={seconds}:size={size}:rate=25",
                      "-f", "lavfi", "-i", $"sine=duration={seconds}",
                      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", path
                  })

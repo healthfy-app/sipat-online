@@ -21,6 +21,7 @@ import LoadingState from '@/LoadingState';
 import ParticipantOutcomesPanel from '@/ParticipantOutcomesPanel';
 import AddCollaboratorsDialog from '@/collaborators/AddCollaboratorsDialog';
 import AddAdministratorDialog from './AddAdministratorDialog';
+import CompanyAddress from './CompanyAddress';
 import CompanyAvatar from './CompanyAvatar';
 
 const pageSize = 50;
@@ -176,7 +177,7 @@ export default function CompanyPage() {
               ? <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><span aria-hidden="true" className="size-1.5 rounded-full bg-success" />Ativa</span>
               : <Badge variant="warning">Inativa</Badge>)}
             className="flex-1 items-center"
-            description={page ? `Identificador · ${page.companyKey}` : 'Carregando dados da empresa...'}
+            description={page ? <CompanyAddress className="text-sm" companyKey={page.companyKey} /> : 'Carregando dados da empresa...'}
             title={companyName || (isLoading ? 'Carregando empresa...' : 'Empresa')}
           />
         </div>

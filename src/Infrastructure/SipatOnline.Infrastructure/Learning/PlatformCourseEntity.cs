@@ -66,6 +66,9 @@ public sealed class PlatformCourseVideoEntity
 
     public bool HasSd480 { get; set; }
 
+    /// <summary>The 1080p exists in the storage (new uploads whose original is taller than 720 lines).</summary>
+    public bool HasFhd1080 { get; set; }
+
     /// <summary>Sipat (uploaded file), YouTube or Vimeo (see <c>VideoProvider</c>).</summary>
     public string Provider { get; set; } = "Sipat";
 

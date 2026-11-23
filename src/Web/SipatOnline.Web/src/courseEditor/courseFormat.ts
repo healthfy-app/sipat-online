@@ -2,7 +2,7 @@ import { isExtra, videoProvider, type PlatformCourseStatus, type VideoProvider }
 
 export type CourseOption = '1' | '2' | '3';
 
-export const maxVideoBytes = 250 * 1024 * 1024;
+export const maxVideoBytes = 2 * 1024 * 1024 * 1024;
 export const maxCoverBytes = 2 * 1024 * 1024;
 
 export const statusLabels: Record<PlatformCourseStatus, string> = {
@@ -16,7 +16,10 @@ export function formatDuration(milliseconds: number): string {
 }
 
 export function formatBytes(bytes: number): string {
-  return `${(bytes / (1024 * 1024)).toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
+  const megabytes = bytes / (1024 * 1024);
+  return megabytes >= 1024
+    ? `${(megabytes / 1024).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} GB`
+    : `${megabytes.toLocaleString('pt-BR', { maximumFractionDigits: 1 })} MB`;
 }
 
 export function getErrorMessage(error: unknown): string {

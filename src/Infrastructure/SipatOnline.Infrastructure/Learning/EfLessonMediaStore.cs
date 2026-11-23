@@ -28,6 +28,6 @@ public sealed class EfLessonMediaStore(PlatformDbContext db) : ILessonMediaStore
             .SingleOrDefaultAsync(item => item.Id == videoId, cancellationToken);
         return video is null || video.Status != nameof(PlatformVideoStatus.Ready)
             ? null
-            : new LessonMedia(videoId, video.ContentType, video.HasSd480);
+            : new LessonMedia(videoId, video.ContentType, video.HasSd480, video.HasFhd1080);
     }
 }

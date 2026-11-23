@@ -617,5 +617,6 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             ProcessingError: entity.ProcessingError,
             HasSd480: entity.HasSd480,
             Provider: Enum.TryParse<VideoProvider>(entity.Provider, out var provider) ? provider : VideoProvider.Sipat,
-            ExternalId: entity.ExternalId);
+            ExternalId: entity.ExternalId,
+            HasFhd1080: entity.HasFhd1080);
 }

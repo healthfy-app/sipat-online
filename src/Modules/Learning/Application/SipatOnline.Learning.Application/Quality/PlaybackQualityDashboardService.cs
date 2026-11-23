@@ -20,7 +20,7 @@ public sealed class PlaybackQualityDashboardService(
         if (!IsOperator())
         {
             return Failure<CompanyPlaybackQuality>("learning.playback_quality.forbidden",
-                "Somente a operação pode ver a qualidade do vídeo.");
+                "Somente a operação pode ver o Monitor de Desempenho.");
         }
 
         var scope = await store.FindScopeAsync(companyId, cancellationToken);
@@ -88,7 +88,7 @@ public sealed class PlaybackQualityDashboardService(
         if (!IsOperator())
         {
             return Failure<CompanyQualityComparison>("learning.playback_quality.forbidden",
-                "Somente a operação pode ver a qualidade do vídeo.");
+                "Somente a operação pode ver o Monitor de Desempenho.");
         }
 
         var end = to ?? DateOnly.FromDateTime(timeProvider.GetUtcNow().UtcDateTime);

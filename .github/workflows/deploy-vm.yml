@@ -1,0 +1,88 @@
+name: Deploy to VM
+
+# Reusable: runs deploy/scripts/deploy-vm.sh with the values of a GitHub environment (dev, production).
+# The script builds the images on the runner, copies them over SSH and starts the stack on the VM.
+#
+# variables: DEPLOY_HOST, DEPLOY_USER, DEPLOY_APP_PATH, DEPLOY_PLATFORM (linux/amd64 | linux/arm64),
+#            TENANT_BASE_DOMAIN, PLATFORM_HOST,
+#            PLATFORM_OPERATOR_LOGIN_IDENTIFIER, PLATFORM_OPERATOR_DISPLAY_NAME,
+#            CERTIFICATE_MODE (http01 | dns-azure | manual), ACME_EMAIL (optional),
+#            VIDEO_STORAGE_PROVIDER (File | R2), R2_SERVICE_URL, R2_VIDEO_BUCKET, R2_DIRECT_UPLOAD
+# secrets:   DEPLOY_SSH_PRIVATE_KEY, DEPLOY_SSH_KNOWN_HOSTS, POSTGRES_PASSWORD,
+#            PLATFORM_OPERATOR_PASSWORD, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+#            OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS (optional)
+# See deploy/PIPELINE-VM.md.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: GitHub environment with the variables and secrets of the target VM.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: Deploy ${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ inputs.environment }}
+      url: https://${{ vars.PLATFORM_HOST }}
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # an arm64 VM (DEPLOY_PLATFORM=linux/arm64) needs emulation for the last stage of each image
+      - name: Set up QEMU
+        if: vars.DEPLOY_PLATFORM == 'linux/arm64'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Deploy
+        env:
+          DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+          DEPLOY_PLATFORM: ${{ vars.DEPLOY_PLATFORM }}
+          IMAGE_TAG: ${{ github.sha }}
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_APP_PATH: ${{ vars.DEPLOY_APP_PATH }}
+          TENANT_BASE_DOMAIN: ${{ vars.TENANT_BASE_DOMAIN }}
+          PLATFORM_HOST: ${{ vars.PLATFORM_HOST }}
+          PLATFORM_OPERATOR_LOGIN_IDENTIFIER: ${{ vars.PLATFORM_OPERATOR_LOGIN_IDENTIFIER }}
+          PLATFORM_OPERATOR_DISPLAY_NAME: ${{ vars.PLATFORM_OPERATOR_DISPLAY_NAME }}
+          CERTIFICATE_MODE: ${{ vars.CERTIFICATE_MODE }}
+          ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+          VIDEO_STORAGE_PROVIDER: ${{ vars.VIDEO_STORAGE_PROVIDER }}
+          R2_SERVICE_URL: ${{ vars.R2_SERVICE_URL }}
+          R2_VIDEO_BUCKET: ${{ vars.R2_VIDEO_BUCKET }}
+          R2_DIRECT_UPLOAD: ${{ vars.R2_DIRECT_UPLOAD }}
+          POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+          PLATFORM_OPERATOR_PASSWORD: ${{ secrets.PLATFORM_OPERATOR_PASSWORD }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}
+          OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_SSH_PRIVATE_KEY:?Set secret DEPLOY_SSH_PRIVATE_KEY in the ${{ inputs.environment }} environment}"
+          : "${DEPLOY_SSH_KNOWN_HOSTS:?Set secret DEPLOY_SSH_KNOWN_HOSTS in the ${{ inputs.environment }} environment}"
+          export DEPLOY_SSH_KEY_FILE="$RUNNER_TEMP/deploy_key"
+          export DEPLOY_KNOWN_HOSTS_FILE="$RUNNER_TEMP/known_hosts"
+          (umask 077 && printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$DEPLOY_SSH_KEY_FILE" \
+            && printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$DEPLOY_KNOWN_HOSTS_FILE")
+          unset DEPLOY_SSH_PRIVATE_KEY
+          bash deploy/scripts/deploy-vm.sh
+
+      - name: Clean up
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts"

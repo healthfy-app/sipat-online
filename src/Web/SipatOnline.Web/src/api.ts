@@ -292,6 +292,8 @@ export interface PlatformCourseVideo {
   status: 'Ready' | 'Processing' | 'Failed';
   processingError: string | null;
   hasSd480: boolean;
+  /** New uploads whose original is taller than 720 lines also have a 1080p. */
+  hasFhd1080?: boolean;
   checkpoints: VideoCheckpoint[];
   lessonId?: string | null;
   libraryTitle?: string | null;
@@ -546,7 +548,7 @@ export interface LearningPlaybackSession {
   expiresAt: string;
   sessionId: string;
   isDevelopmentDemo: boolean;
-  sources?: { url: string; quality: '720p' | '480p' | null }[];
+  sources?: { url: string; quality: '1080p' | '720p' | '480p' | null }[];
 }
 
 export interface LearningProgress {
@@ -867,22 +869,90 @@ async function startVideoUpload(file: File): Promise<VideoUploadStart> {
   }
 }
 
-function uploadVideoMultipart(
+/** What a long upload reports while the file goes out, and how it is stopped. */
+export interface UploadProgressOptions {
+  onProgress?: (sentBytes: number, totalBytes: number) => void;
+  signal?: AbortSignal;
+}
+
+function abortError(): DOMException {
+  return new DOMException('O envio foi cancelado.', 'AbortError');
+}
+
+/**
+ * Sends a body and reports how much of it went out. fetch has no upload progress, so with
+ * onProgress the request goes through XMLHttpRequest and comes back as a Response.
+ */
+function sendBody(
+  url: string,
+  init: { method: string; body: Blob | FormData; headers: Headers; credentials: RequestCredentials },
+  options: UploadProgressOptions,
+): Promise<Response> {
+  if (!options.onProgress || typeof XMLHttpRequest === 'undefined') {
+    return fetch(url, { ...init, signal: options.signal });
+  }
+
+  const onProgress = options.onProgress;
+  return new Promise<Response>((resolve, reject) => {
+    if (options.signal?.aborted) {
+      reject(abortError());
+      return;
+    }
+
+    const xhr = new XMLHttpRequest();
+    xhr.open(init.method, url);
+    xhr.withCredentials = init.credentials === 'include';
+    init.headers.forEach((value, name) => xhr.setRequestHeader(name, value));
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) onProgress(event.loaded, event.total);
+    };
+    const abort = () => xhr.abort();
+    options.signal?.addEventListener('abort', abort, { once: true });
+    const settle = () => options.signal?.removeEventListener('abort', abort);
+    xhr.onload = () => {
+      settle();
+      resolve(new Response(xhr.status === 204 ? null : xhr.responseText, {
+        status: xhr.status,
+        headers: { 'Content-Type': xhr.getResponseHeader('Content-Type') ?? 'text/plain' },
+      }));
+    };
+    xhr.onerror = () => { settle(); reject(new TypeError('Failed to fetch')); };
+    xhr.ontimeout = xhr.onerror;
+    xhr.onabort = () => { settle(); reject(abortError()); };
+    xhr.send(init.body);
+  });
+}
+
+async function uploadVideoMultipart(
   title: string,
   durationMilliseconds: number,
   file: File,
-  courseId?: string,
+  courseId: string | undefined,
+  options: UploadProgressOptions,
 ): Promise<PlatformCourseVideo> {
   const formData = new FormData();
   formData.append('title', title);
   formData.append('durationMilliseconds', String(durationMilliseconds));
   formData.append('video', file);
-  return requestJson<PlatformCourseVideo>(
-    courseId
-      ? `/api/platform/catalog/courses/${courseId}/videos`
-      : '/api/platform/catalog/videos',
-    { method: 'POST', body: formData },
-  );
+  const path = courseId
+    ? `/api/platform/catalog/courses/${courseId}/videos`
+    : '/api/platform/catalog/videos';
+  if (!options.onProgress) {
+    return requestJson<PlatformCourseVideo>(path, { method: 'POST', body: formData, signal: options.signal });
+  }
+
+  const headers = new Headers({ Accept: 'application/json', 'X-CSRF-TOKEN': await currentAntiforgeryToken() });
+  let response: Response;
+  try {
+    response = await sendBody(path, { method: 'POST', body: formData, headers, credentials: 'include' }, options);
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
+    reportFailedRequest('POST', path, error);
+    throw new ApiError('Não foi possível enviar o vídeo. Verifique a conexão e tente de novo.', 0);
+  }
+  if (response.status >= 500) reportFailedRequest('POST', path, response.status);
+  if (!response.ok) throw await readError(response);
+  return response.json() as Promise<PlatformCourseVideo>;
 }
 
 export async function uploadPlatformVideo(
@@ -890,22 +960,25 @@ export async function uploadPlatformVideo(
   durationMilliseconds: number,
   file: File,
   courseId?: string,
+  options: UploadProgressOptions = {},
 ): Promise<PlatformCourseVideo> {
   const start = await startVideoUpload(file);
+  if (options.signal?.aborted) throw abortError();
   if (start.mode !== 'direct') {
-    return uploadVideoMultipart(title, durationMilliseconds, file, courseId);
+    return uploadVideoMultipart(title, durationMilliseconds, file, courseId, options);
   }
 
   // The bucket is another origin: no cookies and no CSRF header, only what the signed URL asks for.
   let put: Response;
   try {
-    put = await fetch(start.uploadUrl, {
+    put = await sendBody(start.uploadUrl, {
       method: 'PUT',
       body: file,
-      headers: start.headers,
+      headers: new Headers(start.headers),
       credentials: 'omit',
-    });
-  } catch {
+    }, options);
+  } catch (error) {
+    if (options.signal?.aborted) throw error;
     // network failure or a CORS refusal: the browser only says "Failed to fetch"
     throw new ApiError('Não foi possível enviar o vídeo. Verifique a conexão e tente de novo.', 0);
   }
@@ -920,6 +993,89 @@ export async function uploadPlatformVideo(
       body: JSON.stringify({ title, durationMilliseconds, courseId: courseId ?? null }),
     },
   );
+}
+
+/** A chunked upload: the file goes to the bucket in parts, and resumes from the parts already there. */
+export interface ChunkedVideoUpload {
+  mode: 'chunked';
+  videoId: string;
+  uploadId: string;
+  partSizeBytes: number;
+  partCount: number;
+  maxPartsPerRequest: number;
+  maxSizeBytes: number;
+}
+
+/** Null: this environment has no direct upload (or the API is older), send with uploadPlatformVideo. */
+export async function startChunkedVideoUpload(contentType: string, sizeBytes: number): Promise<ChunkedVideoUpload | null> {
+  try {
+    const start = await requestJson<ChunkedVideoUpload | { mode: 'multipart' }>('/api/platform/catalog/videos/uploads/chunked', {
+      method: 'POST',
+      body: JSON.stringify({ contentType, sizeBytes }),
+    });
+    return start.mode === 'chunked' ? start : null;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
+export async function signChunkedUploadParts(
+  videoId: string,
+  uploadId: string,
+  partNumbers: number[],
+): Promise<{ partNumber: number; url: string }[]> {
+  const response = await requestJson<{ parts: { partNumber: number; url: string }[] }>(
+    `/api/platform/catalog/videos/uploads/${videoId}/parts`,
+    { method: 'POST', body: JSON.stringify({ uploadId, partNumbers }) },
+  );
+  return response.parts;
+}
+
+export async function listChunkedUploadParts(
+  videoId: string,
+  uploadId: string,
+): Promise<{ partNumber: number; sizeBytes: number }[]> {
+  const response = await requestJson<{ parts: { partNumber: number; sizeBytes: number }[] }>(
+    `/api/platform/catalog/videos/uploads/${videoId}/parts/list`,
+    { method: 'POST', body: JSON.stringify({ uploadId }) },
+  );
+  return response.parts;
+}
+
+export async function finishChunkedUpload(videoId: string, uploadId: string): Promise<void> {
+  await request(`/api/platform/catalog/videos/uploads/${videoId}/finish`, {
+    method: 'POST',
+    body: JSON.stringify({ uploadId }),
+  });
+}
+
+export async function abortChunkedUpload(videoId: string, uploadId: string): Promise<void> {
+  await request(`/api/platform/catalog/videos/uploads/${videoId}/abort`, {
+    method: 'POST',
+    body: JSON.stringify({ uploadId }),
+  });
+}
+
+export function completeUploadedVideo(
+  videoId: string,
+  title: string,
+  durationMilliseconds: number,
+  courseId?: string,
+): Promise<PlatformCourseVideo> {
+  return requestJson<PlatformCourseVideo>(`/api/platform/catalog/videos/uploads/${videoId}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ title, durationMilliseconds, courseId: courseId ?? null }),
+  });
+}
+
+/**
+ * Sends one part straight to the bucket (another origin: no cookies, no headers). Resolves with the
+ * HTTP status; a network failure or a CORS refusal rejects with a TypeError.
+ */
+export async function putUploadPart(url: string, part: Blob, options: UploadProgressOptions): Promise<number> {
+  const response = await sendBody(url, { method: 'PUT', body: part, headers: new Headers(), credentials: 'omit' }, options);
+  return response.status;
 }
 
 export function createExternalPlatformVideo(data: {

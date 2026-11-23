@@ -1,16 +1,16 @@
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type DragEvent } from 'react';
+import { CloudUpload, FileVideo, X } from 'lucide-react';
 import {
   removePlatformCourseCover,
   setPlatformCourseCover,
-  uploadPlatformVideo,
   type PlatformCourse,
-  type PlatformCourseVideo,
 } from '@/api';
 import { Button } from '@/components/ui/button';
-import { Field } from '@/components/ui/field';
 import FilePicker from '@/components/ui/file-picker';
 import { Input } from '@/components/ui/input';
-import { getErrorMessage, maxCoverBytes, maxVideoBytes } from './courseFormat';
+import { cn } from '@/lib/utils';
+import { checkVideoFile, enqueueUploads, fileKey, titleFromFileName } from '@/videoUploads/uploadQueue';
+import { formatBytes, getErrorMessage, maxCoverBytes } from './courseFormat';
 
 export function CourseCoverEditor({
   course,
@@ -46,13 +46,13 @@ export function CourseCoverEditor({
       onError('A foto excede o limite de 2 MB.');
       return;
     }
-    void run(() => setPlatformCourseCover(course.id, file), 'A foto do curso foi atualizada.');
+    void run(() => setPlatformCourseCover(course.id, file), 'A foto do treinamento foi atualizada.');
   }
 
   return (
     <div className="grid gap-3">
       {course.coverUrl ? (
-        <img alt="Foto atual do curso" className="aspect-video w-full rounded-md object-cover" src={course.coverUrl} />
+        <img alt="Foto atual do treinamento" className="aspect-video w-full rounded-md object-cover" src={course.coverUrl} />
       ) : (
         <div
           aria-label={`Prévia da capa de ${course.title}`}
@@ -73,7 +73,7 @@ export function CourseCoverEditor({
         />
         {course.coverUrl && (
           <Button disabled={isBusy} variant="ghost"
-            onClick={() => void run(() => removePlatformCourseCover(course.id), 'A foto do curso foi removida.')}>
+            onClick={() => void run(() => removePlatformCourseCover(course.id), 'A foto do treinamento foi removida.')}>
             Remover foto
           </Button>
         )}
@@ -83,107 +83,149 @@ export function CourseCoverEditor({
   );
 }
 
-function titleFromFileName(name: string): string {
-  const base = name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').replace(/\s+/g, ' ').trim();
-  return base ? base.charAt(0).toLocaleUpperCase('pt-BR') + base.slice(1) : '';
+type PickedVideo = { key: string; file: File; title: string; problem: string | null };
+
+function toPicked(files: File[], known: Set<string>): PickedVideo[] {
+  const picked: PickedVideo[] = [];
+  for (const file of files) {
+    const key = fileKey(file);
+    if (known.has(key)) continue;
+    known.add(key);
+    picked.push({ key, file, title: titleFromFileName(file.name), problem: checkVideoFile(file) });
+  }
+  return picked;
 }
 
-function readVideoDuration(file: File): Promise<number | null> {
-  return new Promise((resolve) => {
-    if (typeof URL.createObjectURL !== 'function') { resolve(null); return; }
-    const url = URL.createObjectURL(file);
-    const video = document.createElement('video');
-    let settled = false;
-    const done = (value: number | null) => {
-      if (settled) return;
-      settled = true;
-      URL.revokeObjectURL(url);
-      resolve(value);
-    };
-    video.preload = 'metadata';
-    video.onloadedmetadata = () => done(Number.isFinite(video.duration) && video.duration > 0 ? video.duration : null);
-    video.onerror = () => done(null);
-    window.setTimeout(() => done(null), 8000);
-    video.src = url;
-  });
-}
-
+/**
+ * Picks one or many videos (button or drag and drop), lets the operator fix the titles, and hands them
+ * to the upload queue. The queue sends them in the background: the dialog closes right away.
+ */
 export function VideoUploadForm({
   courseId,
-  onBusyChange,
-  onError,
-  onUploaded,
+  initialFiles,
+  onQueued,
 }: {
   courseId?: string;
-  onBusyChange?: (busy: boolean) => void;
-  onError: (message: string) => void;
-  onUploaded: (video: PlatformCourseVideo) => Promise<void>;
+  /** Files dropped on the page before the form opened. */
+  initialFiles?: File[];
+  onQueued: (count: number) => void;
 }) {
-  const [title, setTitle] = useState('');
-  const [duration, setDuration] = useState('');
-  const [file, setFile] = useState<File | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const idSuffix = courseId ?? 'library';
-  const tooLarge = file !== null && file.size > maxVideoBytes;
+  const [picked, setPicked] = useState<PickedVideo[]>(() => toPicked(initialFiles ?? [], new Set()));
+  const [isDragging, setIsDragging] = useState(false);
+  const dragDepth = useRef(0);
+  const inputId = `platform-video-files-${courseId ?? 'library'}`;
+  const ready = picked.filter((item) => !item.problem);
+  const readyBytes = ready.reduce((total, item) => total + item.file.size, 0);
 
-  function chooseFile(picked: File | null) {
-    setFile(picked);
-    if (!picked) return;
-    // sugere um título a partir do nome do arquivo e lê a duração do próprio vídeo
-    setTitle((current) => current || titleFromFileName(picked.name));
-    readVideoDuration(picked).then((seconds) => {
-      if (seconds) setDuration((current) => current || String(Math.round(seconds * 10) / 10));
-    });
+  function add(files: FileList | File[] | null) {
+    if (!files || files.length === 0) return;
+    setPicked((current) => [...current, ...toPicked(Array.from(files), new Set(current.map((item) => item.key)))]);
   }
 
-  async function handleUpload(event: FormEvent<HTMLFormElement>) {
+  function handleDrop(event: DragEvent<HTMLLabelElement>) {
     event.preventDefault();
-    const form = event.currentTarget;
-    if (!file) return;
+    dragDepth.current = 0;
+    setIsDragging(false);
+    add(event.dataTransfer.files);
+  }
 
-    onError('');
-    setIsUploading(true);
-    onBusyChange?.(true);
-    try {
-      const video = await uploadPlatformVideo(title.trim(), Math.round(Number(duration) * 1000), file, courseId);
-      setTitle('');
-      setDuration('');
-      setFile(null);
-      form.reset();
-      await onUploaded(video);
-    } catch (uploadError) {
-      onError(getErrorMessage(uploadError));
-    } finally {
-      setIsUploading(false);
-      onBusyChange?.(false);
-    }
+  function submit() {
+    const entries = ready.map((item) => ({ file: item.file, title: item.title.trim() || titleFromFileName(item.file.name) }));
+    if (entries.length === 0) return;
+    enqueueUploads(entries, courseId);
+    setPicked([]);
+    onQueued(entries.length);
   }
 
   return (
-    <form className="grid gap-4" onSubmit={handleUpload}>
-      <Field hint="MP4 ou WebM, até 250 MB. O título e a duração são preenchidos a partir do arquivo."
-        htmlFor={`platform-video-file-${idSuffix}`} label="Arquivo de vídeo">
-        <FilePicker accept="video/mp4,video/webm,.mp4,.webm" buttonLabel="Escolher vídeo" file={file}
-          id={`platform-video-file-${idSuffix}`} onChange={chooseFile} required />
-      </Field>
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_9rem]">
-        <Field htmlFor={`platform-video-title-${idSuffix}`} label="Título do vídeo">
-          <Input id={`platform-video-title-${idSuffix}`} maxLength={200} required value={title}
-            onChange={(event) => setTitle(event.target.value)} />
-        </Field>
-        <Field htmlFor={`platform-video-duration-${idSuffix}`} label="Duração (segundos)">
-          <Input id={`platform-video-duration-${idSuffix}`} max={86400} min={0.001} required step="any" type="number"
-            value={duration} onChange={(event) => setDuration(event.target.value)} />
-        </Field>
-      </div>
-      {tooLarge && (
-        <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">
-          O arquivo excede o limite de 250 MB.
-        </p>
+    <div className="grid gap-4">
+      <label
+        className={cn(
+          'group grid cursor-pointer justify-items-center gap-2 rounded-xl border-2 border-dashed px-6 py-8 text-center transition-[border-color,background-color] duration-150',
+          'has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring',
+          isDragging ? 'border-primary bg-accent' : 'border-input bg-background hover:border-primary/50',
+          picked.length > 0 && 'py-5',
+          'max-[640px]:px-4 max-[640px]:py-6',
+        )}
+        htmlFor={inputId}
+        onDragEnter={(event) => { event.preventDefault(); dragDepth.current += 1; setIsDragging(true); }}
+        onDragLeave={() => { dragDepth.current -= 1; if (dragDepth.current <= 0) setIsDragging(false); }}
+        onDragOver={(event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; }}
+        onDrop={handleDrop}
+      >
+        <span className={cn(
+          'grid size-11 place-items-center rounded-full bg-card text-primary shadow-sm transition-transform duration-150',
+          isDragging && 'scale-110',
+        )}>
+          <CloudUpload aria-hidden="true" className="size-5" />
+        </span>
+        <strong className="text-[0.9375rem] max-[640px]:hidden">{isDragging ? 'Solte os vídeos aqui' : 'Arraste os vídeos para cá'}</strong>
+        <strong className="hidden text-[0.9375rem] max-[640px]:block">Toque para escolher os vídeos</strong>
+        <span className="text-sm text-muted-foreground max-[640px]:hidden">
+          ou <span className="font-semibold text-primary underline-offset-4 group-hover:underline">escolha no computador</span>
+        </span>
+        <small className="text-xs text-muted-foreground">MP4 ou WebM, até 2 GB cada. Dá para selecionar vários de uma vez.</small>
+        <input
+          accept="video/mp4,video/webm,.mp4,.webm"
+          className="sr-only"
+          id={inputId}
+          multiple
+          onChange={(event) => { add(event.target.files); event.target.value = ''; }}
+          type="file"
+        />
+      </label>
+
+      {picked.length > 0 && (
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <span className="font-medium">
+              {ready.length === 1 ? '1 vídeo' : `${ready.length} vídeos`} · {formatBytes(readyBytes)}
+              {picked.length > ready.length && <span className="text-destructive"> · {picked.length - ready.length} com problema</span>}
+            </span>
+            <Button onClick={() => setPicked([])} size="sm" variant="ghost">Limpar lista</Button>
+          </div>
+          <ul aria-label="Vídeos escolhidos" className="m-0 grid max-h-72 list-none overscroll-contain max-[640px]:max-h-[40vh] gap-1.5 overflow-y-auto p-0 pr-1">
+            {picked.map((item) => (
+              <li className={cn(
+                'flex items-center gap-3 rounded-lg border bg-card px-3 py-2',
+                item.problem ? 'border-destructive/30' : 'border-border',
+              )} key={item.key}>
+                <FileVideo aria-hidden="true" className={cn('size-5 shrink-0', item.problem ? 'text-destructive' : 'text-muted-foreground')} />
+                <div className="grid min-w-0 flex-1 gap-1">
+                  <Input
+                    aria-label={`Título de ${item.file.name}`}
+                    className="h-8"
+                    disabled={!!item.problem}
+                    maxLength={200}
+                    onChange={(event) => {
+                      const title = event.target.value;
+                      setPicked((current) => current.map((entry) => (entry.key === item.key ? { ...entry, title } : entry)));
+                    }}
+                    value={item.title}
+                  />
+                  <span className="truncate text-xs text-muted-foreground">
+                    {item.file.name} · {formatBytes(item.file.size)}
+                  </span>
+                  {item.problem && <span className="text-xs font-medium text-destructive">{item.problem}</span>}
+                </div>
+                <Button aria-label={`Tirar ${item.file.name} da lista`} className="max-[640px]:size-10" size="icon-sm" variant="ghost"
+                  onClick={() => setPicked((current) => current.filter((entry) => entry.key !== item.key))}>
+                  <X />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
-      <Button className="justify-self-end" disabled={isUploading || !file || tooLarge} type="submit">
-        {isUploading ? 'Enviando vídeo...' : 'Enviar vídeo'}
-      </Button>
-    </form>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="m-0 max-w-[26rem] text-xs leading-relaxed text-muted-foreground">
+          Os vídeos sobem em segundo plano: pode fechar esta janela e continuar usando o sistema. Só não feche a aba do navegador até terminar.
+        </p>
+        <Button className="ml-auto max-[640px]:h-11 max-[640px]:w-full" disabled={ready.length === 0} onClick={submit}>
+          <CloudUpload /> {ready.length > 1 ? `Enviar ${ready.length} vídeos` : 'Enviar vídeo'}
+        </Button>
+      </div>
+    </div>
   );
 }

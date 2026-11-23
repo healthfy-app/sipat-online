@@ -13,11 +13,12 @@ import LoadingState from './LoadingState';
 import CourseCatalog from './courseCatalog/CourseCatalog';
 import CourseEditor from './courseEditor/CourseEditor';
 import { getErrorMessage } from './courseEditor/courseFormat';
+import { onVideoUploaded } from './videoUploads/uploadQueue';
 import './PlatformCourses.css';
 
 /**
- * Página de conteúdo da plataforma: mostra o catálogo (cursos, vídeos e jogos)
- * ou, quando a rota traz um curso, o editor desse curso.
+ * Página de conteúdo da plataforma: mostra o catálogo (treinamentos, vídeos e jogos)
+ * ou, quando a rota traz um treinamento, o editor desse treinamento.
  */
 export default function PlatformCoursesPage() {
   const navigate = useNavigate();
@@ -57,6 +58,22 @@ export default function PlatformCoursesPage() {
 
   useEffect(() => { void refresh(); }, [refresh]);
 
+  // Each video the background upload finishes: reload the courses and the library quietly (no loading state,
+  // the editor stays open). Many finishing close together cause one reload.
+  useEffect(() => {
+    let timer: number | undefined;
+    const stop = onVideoUploaded(() => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        Promise.all([listPlatformCourses(), listPlatformLibraryVideos()]).then(([courseList, libraryList]) => {
+          setCourses(courseList);
+          setLibrary(libraryList);
+        }, () => undefined);
+      }, 1500);
+    });
+    return () => { stop(); window.clearTimeout(timer); };
+  }, []);
+
   // While a video is being converted, reload the library quietly until it is ready (or failed).
   const hasProcessing = library.some((item) => item.video.status === 'Processing');
   useEffect(() => {
@@ -75,7 +92,7 @@ export default function PlatformCoursesPage() {
       const copy = await duplicatePlatformCourse(course.id);
       await refresh();
       openCourse(copy.id);
-      setNotice(`O curso "${copy.title}" foi criado como rascunho, usando os mesmos vídeos.`);
+      setNotice(`O treinamento "${copy.title}" foi criado como rascunho, usando os mesmos vídeos.`);
     } catch (duplicateError) {
       setError(getErrorMessage(duplicateError));
     } finally {
@@ -103,11 +120,11 @@ export default function PlatformCoursesPage() {
             onError={setError}
           />
         ) : isLoading ? (
-          <LoadingState>Carregando curso...</LoadingState>
+          <LoadingState>Carregando treinamento...</LoadingState>
         ) : (
           <div className="empty-state">
-            <p>{error ? 'Não foi possível carregar o curso.' : 'Curso não encontrado.'}</p>
-            <button className="button" onClick={() => openCourse(null)} type="button">Voltar aos cursos</button>
+            <p>{error ? 'Não foi possível carregar o treinamento.' : 'Treinamento não encontrado.'}</p>
+            <button className="button" onClick={() => openCourse(null)} type="button">Voltar aos treinamentos</button>
           </div>
         )
       ) : (
@@ -116,13 +133,12 @@ export default function PlatformCoursesPage() {
           courses={courses}
           error={error}
           isLoading={isLoading}
-          library={library}
           modules={modules}
           onCreated={async (course) => {
             setError('');
             setCourses((current) => [course, ...current.filter((item) => item.id !== course.id)]);
             openCourse(course.id);
-            setNotice(`O curso "${course.title}" foi criado no catálogo global.`);
+            setNotice(`O treinamento "${course.title}" foi criado no catálogo global.`);
           }}
           onDuplicate={(course) => void duplicate(course)}
           onError={setError}
@@ -130,10 +146,6 @@ export default function PlatformCoursesPage() {
           onProgramsChanged={async (message) => { await refresh(); setNotice(message); }}
           onOpen={(course) => { setError(''); setNotice(''); openCourse(course.id); }}
           onRetry={() => void refresh()}
-          onVideoUploaded={async (video) => {
-            await refresh();
-            setNotice(`O vídeo "${video.title}" foi enviado ao catálogo.`);
-          }}
         />
       )}
     </div>

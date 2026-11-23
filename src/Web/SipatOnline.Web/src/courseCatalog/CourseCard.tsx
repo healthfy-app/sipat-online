@@ -49,9 +49,9 @@ export default function CourseCard({
           {course.gamificationEnabled && <Badge className="rounded-[0.3125rem] px-1.5 text-[0.6875rem]">Gamificação</Badge>}
         </div>
         <h3 className="m-0 min-h-[2.7em] text-[1.0625rem] font-extrabold leading-[1.3] tracking-[-0.01em] text-[#12332c]">
-          {/* o botão cobre o card inteiro: um clique em qualquer lugar abre o curso */}
+          {/* o botão cobre o card inteiro: um clique em qualquer lugar abre o treinamento */}
           <button
-            aria-label={`Abrir assunto ${course.title}`}
+            aria-label={`Abrir treinamento ${course.title}`}
             className="m-0 line-clamp-2 min-h-0 w-full cursor-pointer border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none after:absolute after:inset-0 after:content-['']"
             data-open=""
             onClick={onOpen}
@@ -72,23 +72,23 @@ export default function CourseCard({
         </span>
         <div className="flex items-center">
         <Button
-          aria-label={`Duplicar assunto ${course.title}`}
+          aria-label={`Duplicar treinamento ${course.title}`}
           className="relative z-10"
           disabled={busy}
           onClick={onDuplicate}
           size="icon-sm"
-          title="Duplicar assunto"
+          title="Duplicar treinamento"
           variant="ghost"
         >
           <Copy />
         </Button>
         <Button
-          aria-label={`Excluir assunto ${course.title}`}
+          aria-label={`Excluir treinamento ${course.title}`}
           className="relative z-10"
           disabled={busy}
           onClick={onDelete}
           size="icon-sm"
-          title="Excluir assunto"
+          title="Excluir treinamento"
           variant="ghost"
         >
           <Trash2 />
