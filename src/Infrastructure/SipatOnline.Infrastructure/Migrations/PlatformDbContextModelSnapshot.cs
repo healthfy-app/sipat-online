@@ -1010,6 +1010,36 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("PlatformCourseVideos", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.VideoSubjectEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("VideoSubjects", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.VideoSubjectLinkEntity", b =>
+                {
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SubjectId", "VideoId");
+
+                    b.HasIndex("VideoId");
+
+                    b.ToTable("VideoSubjectLinks", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoLinkEntity", b =>
                 {
                     b.Property<Guid>("CourseId")
@@ -1326,6 +1356,21 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasIndex("TenantId");
 
                     b.ToTable("CompanySubjects", "tenancy");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.CompanyVideoEntity", b =>
+                {
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("VideoId", "TenantId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("CompanyVideos", "tenancy");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity", b =>

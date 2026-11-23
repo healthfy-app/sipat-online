@@ -228,7 +228,7 @@ describe('collaborators', () => {
     expect(screen.queryByText(/sem setor/)).not.toBeInTheDocument();
   });
 
-  it('edits registration and sector of a collaborator with a single save, keeping a deactivated current sector', async () => {
+  it('edits registration and sector of a collaborator with a single save, typing the sector name', async () => {
     const user = userEvent.setup();
     vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
     vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-3', null, 's-3')]);
@@ -237,11 +237,10 @@ describe('collaborators', () => {
 
     await user.click(await screen.findByRole('button', { name: 'Editar Ana Lima' }));
     const dialog = await screen.findByRole('dialog', { name: 'Editar colaborador' });
-    expect(within(dialog).getByRole('option', { name: 'Antigo (desativado)' })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText('Setor')).toHaveValue('Antigo');
     await user.type(within(dialog).getByLabelText('Matrícula'), '123');
-    await user.selectOptions(within(dialog).getByLabelText('Setor'), 's-1');
-    // switching away does not take the deactivated sector out of the list: the person can still be put back
-    expect(within(dialog).getByRole('option', { name: 'Antigo (desativado)' })).toBeInTheDocument();
+    await user.clear(within(dialog).getByLabelText('Setor'));
+    await user.type(within(dialog).getByLabelText('Setor'), 'produção');
     await user.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }));
 
     await waitFor(() => expect(api.saveParticipantProfile).toHaveBeenCalledTimes(1));

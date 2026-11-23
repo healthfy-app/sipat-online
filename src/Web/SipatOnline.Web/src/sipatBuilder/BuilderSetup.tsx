@@ -1,17 +1,22 @@
 import { CalendarDays, Copy, FileSpreadsheet, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { Input, NativeSelect } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { maxDays } from './model';
 
 /** First step of "Novo treinamento": name it and say how many days it has. The grid comes next. */
-export default function BuilderSetup({ name, dayCount, startDate, onName, onDayCount, onStartDate, onStart, onImport, onTemplate, onCopy }: {
+export interface TrainingChoice { id: string; title: string; titles: number }
+
+export default function BuilderSetup({ name, dayCount, startDate, onName, onDayCount, onStartDate, onStart, onImport, onTemplate, onCopy, trainings, training, onTraining }: {
   name: string; dayCount: number; startDate: string;
   onName: (value: string) => void; onDayCount: (value: number) => void; onStartDate: (value: string) => void;
   onStart: () => void; onImport?: () => void; onTemplate: () => void; onCopy?: () => void;
+  /** The trainings of Conteúdo the company can start from; each Título becomes a day. */
+  trainings?: TrainingChoice[]; training?: string; onTraining?: (id: string) => void;
 }) {
   const clamp = (value: number) => onDayCount(Math.min(maxDays, Math.max(1, value)));
+  const picked = trainings?.find(item => item.id === training);
   return <section aria-labelledby="builder-setup-title" className="mx-auto grid w-full max-w-2xl gap-6 rounded-3xl border border-border bg-card p-6 shadow-card sm:p-9">
     <header className="grid gap-1.5">
       <p className="m-0 text-[0.6875rem] font-bold tracking-[0.08em] text-primary uppercase">Novo treinamento</p>
@@ -25,7 +30,16 @@ export default function BuilderSetup({ name, dayCount, startDate, onName, onDayC
       <Input data-autofocus id="builder-name" maxLength={200} onChange={event => onName(event.target.value)} placeholder="Ex.: SIPAT 2026" value={name} />
     </Field>
 
-    <fieldset className="m-0 grid gap-3 border-0 p-0">
+    {trainings && trainings.length > 0 && onTraining && <Field
+      hint={picked ? `Os ${picked.titles} títulos dele viram ${picked.titles} dias, com os seus vídeos. Depois você ajusta na grade.` : 'Opcional: cada Título do treinamento vira um dia, já com os vídeos.'}
+      htmlFor="builder-training" label="Começar de um treinamento do Conteúdo">
+      <NativeSelect id="builder-training" onChange={event => onTraining(event.target.value)} value={training ?? ''}>
+        <option value="">Montar do zero</option>
+        {trainings.map(item => <option key={item.id} value={item.id}>{item.title} ({item.titles} {item.titles === 1 ? 'título' : 'títulos'})</option>)}
+      </NativeSelect>
+    </Field>}
+
+    {!picked && <fieldset className="m-0 grid gap-3 border-0 p-0">
       <legend className="p-0 text-lg font-semibold">Quantos dias terá o seu treinamento?</legend>
       <div className="flex flex-wrap items-center gap-4">
         <div className="flex items-center gap-2">
@@ -41,7 +55,7 @@ export default function BuilderSetup({ name, dayCount, startDate, onName, onDayC
         </div>
       </div>
       <p className="m-0 text-xs text-muted-foreground">De 1 a {maxDays} dias. Dá para acrescentar ou tirar dias depois, na grade.</p>
-    </fieldset>
+    </fieldset>}
 
     <Field hint="Os dias seguintes recebem as datas em sequência, e você pode ajustar cada uma na grade." htmlFor="builder-start" label="Data do primeiro dia">
       <div className="relative max-w-56">

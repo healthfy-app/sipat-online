@@ -42,7 +42,8 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   const scroller = useRef<HTMLDivElement>(null);
   // set by "+ Dia" only: a day put back with undo returns to its own place and must not pull the grid to the end
   const addedAtEnd = useRef(false);
-  const themes = catalog.subjects.filter(subject => subject.id !== 'none');
+  // personalized grid: the assuntos of the videos are only filters; Bronze picks a ready training per day
+  const themes = canCustomizeGrid ? (catalog.filters ?? []) : catalog.subjects.filter(subject => subject.id !== 'none');
   const canAddDay = days.length < maxDays;
   // "Dia" when the training has dates, "Módulo" when none of its parts has one
   const word = partWord(days.map(day => day.date));
@@ -69,8 +70,10 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   /** A theme brings its videos (in its order), its games and, when the day still has the default title, its name. */
   const applyTheme = (index: number, themeId: string) => {
     const subject = themes.find(item => item.id === themeId);
-    if (!subject) { patchDay(index, { subject: '', videos: [], games: [] }); return; }
+    if (!subject) { patchDay(index, canCustomizeGrid ? { subject: '' } : { subject: '', videos: [], games: [] }); return; }
     const day = days[index];
+    // the assunto is a filter of the videos: the operator picks them one by one (Bronze still takes the ready set)
+    if (canCustomizeGrid) { patchDay(index, { subject: subject.title }); return; }
     const generic = !day.title.trim() || /^Dia [0-9]+$/.test(day.title.trim());
     patchDay(index, {
       subject: subject.title, videos: subject.videoIds.slice(0, maxVideoRows), games: subject.gameIds,

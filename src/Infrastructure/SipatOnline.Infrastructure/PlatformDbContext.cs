@@ -63,6 +63,9 @@ public sealed class PlatformDbContext(
 
     public DbSet<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity> PlanSubjectExclusions => Set<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity>();
     public DbSet<SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity> CompanySubjects => Set<SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity>();
+    public DbSet<SipatOnline.Infrastructure.Tenancy.CompanyVideoEntity> CompanyVideos => Set<SipatOnline.Infrastructure.Tenancy.CompanyVideoEntity>();
+    public DbSet<VideoSubjectEntity> VideoSubjects => Set<VideoSubjectEntity>();
+    public DbSet<VideoSubjectLinkEntity> VideoSubjectLinks => Set<VideoSubjectLinkEntity>();
     public DbSet<PlatformCourseModuleLinkEntity> PlatformCourseModuleLinks => Set<PlatformCourseModuleLinkEntity>();
     public DbSet<PlatformVideoCheckpointEntity> PlatformVideoCheckpoints => Set<PlatformVideoCheckpointEntity>();
     public DbSet<LearningContentSnapshotEntity> LearningContentSnapshots => Set<LearningContentSnapshotEntity>();

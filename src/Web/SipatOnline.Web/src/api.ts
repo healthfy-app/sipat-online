@@ -235,7 +235,7 @@ export async function deletePlatformVideo(videoId: string): Promise<void> {
   await request(`/api/platform/catalog/videos/${videoId}`, { method: 'DELETE' });
 }
 /** What a day of a SIPAT can be made of: published themes, library videos and games. Read only, for the company's administrator and the operator. */
-export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibraryVideo[]; games: GameModule[]; categories?: CourseCategory[] }
+export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibraryVideo[]; games: GameModule[]; categories?: CourseCategory[]; subjects?: VideoSubject[]; videoSubjects?: VideoSubjects[] }
 export function getSipatCatalog(): Promise<SipatCatalog> {
   return requestJson<SipatCatalog>('/api/admin/sipat-catalog');
 }
@@ -788,6 +788,34 @@ export function getPlatformCompanyEmployees(
   return requestJson<PlatformCompanyEmployeePage>(
     `/api/platform/companies/${encodeURIComponent(companyId)}/employees?${query.toString()}`,
   );
+}
+
+/** The assuntos (a classification, like a genre) each library video is in. */
+export interface VideoSubjects { videoId: string; subjectIds: string[] }
+/** The fixed list of assuntos (a classification of the videos, only a filter). */
+export interface VideoSubject { id: string; name: string }
+export function listSubjects(): Promise<VideoSubject[]> {
+  return requestJson<VideoSubject[]>('/api/platform/catalog/subjects');
+}
+export function listVideoSubjects(): Promise<VideoSubjects[]> {
+  return requestJson<VideoSubjects[]>('/api/platform/catalog/video-subjects');
+}
+export function setVideoSubjects(videoId: string, subjectIds: string[]): Promise<VideoSubjects> {
+  return requestJson<VideoSubjects>(`/api/platform/catalog/videos/${videoId}/subjects`, { method: 'PUT', body: JSON.stringify({ subjectIds }) });
+}
+
+/** Many videos at once: `add` is put on every one, `remove` taken from every one, the rest stays. */
+export interface BulkVideoChange { videoIds: string[]; add: string[]; remove: string[] }
+export function changeVideosSubjects(change: BulkVideoChange): Promise<void> {
+  return request('/api/platform/catalog/videos/subjects', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
+}
+/** The companies a video is private to; a video that is not listed is public. */
+export interface VideoCompanies { videoId: string; companyIds: string[] }
+export function listVideoCompanies(): Promise<VideoCompanies[]> {
+  return requestJson<VideoCompanies[]>('/api/platform/catalog/video-companies');
+}
+export function changeVideosCompanies(change: BulkVideoChange): Promise<void> {
+  return request('/api/platform/catalog/videos/companies', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
 }
 
 export function listPlatformCourses(): Promise<PlatformCourse[]> {

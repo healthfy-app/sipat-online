@@ -1,10 +1,15 @@
-import { CloudUpload, Plus, Search } from 'lucide-react';
+import { CloudUpload, Link2, Plus, Search, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { deletePlatformVideo, listPlatformLibraryVideos, type PlatformLibraryVideo } from '@/api';
+import {
+  deletePlatformVideo, listPlatformCompanies, listSubjects, listPlatformLibraryVideos, listVideoCompanies, listVideoSubjects, setVideoSubjects,
+  type PlatformLibraryVideo,
+} from '@/api';
+import type { SubjectOption } from '@/courseCatalog/VideoLibraryPanel';
+import AssociateVideosDialog, { type Choice } from './AssociateVideosDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Input, NativeSelect } from '@/components/ui/input';
 import { Page } from '@/components/ui/page';
 import { filterVideos } from '@/courseCatalog/catalogFilters';
 import VideoLibraryPanel from '@/courseCatalog/VideoLibraryPanel';
@@ -30,10 +35,27 @@ export default function VideoLibraryPage() {
   const [upload, setUpload] = useState<{ files: File[] } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragDepth = useRef(0);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [videoSubjects, setVideoSubjectMap] = useState<Map<string, string[]>>(new Map());
+  // '' every video, 'none' those without an assunto, or one assunto
+  const subjectFilter = params.get('assunto') ?? '';
+  const [companies, setCompanies] = useState<Choice[]>([]);
+  const [videoCompanies, setVideoCompanyMap] = useState<Map<string, string[]>>(new Map());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [associating, setAssociating] = useState(false);
 
   const refresh = useCallback(async () => {
     setError('');
     try {
+      // the assuntos come apart: the videos still show if they fail
+      Promise.all([listSubjects(), listVideoSubjects()]).then(([list, links]) => {
+        setSubjects(list.map(item => ({ id: item.id, title: item.name })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
+        setVideoSubjectMap(new Map(links.map(item => [item.videoId, item.subjectIds])));
+      }, () => undefined);
+      Promise.all([listPlatformCompanies(), listVideoCompanies()]).then(([list, rows]) => {
+        setCompanies(list.map(company => ({ id: company.id, title: company.name })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
+        setVideoCompanyMap(new Map(rows.map(item => [item.videoId, item.companyIds])));
+      }, () => undefined);
       setLibrary(await listPlatformLibraryVideos());
     } catch (loadError) {
       setError(getErrorMessage(loadError));
@@ -66,7 +88,36 @@ export default function VideoLibraryPage() {
     return () => window.clearInterval(timer);
   }, [hasProcessing]);
 
-  const shown = useMemo(() => filterVideos(library, query), [library, query]);
+  const shown = useMemo(() => filterVideos(library, query).filter(item => {
+    if (!subjectFilter) return true;
+    const ids = videoSubjects.get(item.video.id) ?? [];
+    return subjectFilter === 'none' ? ids.length === 0 : ids.includes(subjectFilter);
+  }), [library, query, subjectFilter, videoSubjects]);
+
+  const allShownSelected = shown.length > 0 && shown.every((item) => selected.has(item.video.id));
+  const privateTo = useMemo(() => {
+    const names = new Map(companies.map((company) => [company.id, company.title]));
+    return new Map([...videoCompanies].map(([videoId, ids]) => [videoId, ids.map((id) => names.get(id) ?? 'empresa removida')]));
+  }, [companies, videoCompanies]);
+
+  async function changeSubjects(videoId: string, subjectIds: string[]) {
+    const before = videoSubjects.get(videoId) ?? [];
+    setVideoSubjectMap(current => new Map(current).set(videoId, subjectIds));
+    try {
+      await setVideoSubjects(videoId, subjectIds);
+    } catch (saveError) {
+      setVideoSubjectMap(current => new Map(current).set(videoId, before));
+      setError(getErrorMessage(saveError));
+    }
+  }
+
+  function setSubjectFilter(value: string) {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value) next.set('assunto', value); else next.delete('assunto');
+      return next;
+    }, { replace: true });
+  }
   const totalBytes = library.reduce((sum, item) => sum + (item.video.sizeBytes ?? 0), 0);
   const processing = library.filter((item) => item.video.status === 'Processing').length;
   const unused = library.filter((item) => item.video.status === 'Ready' && item.courseCount === 0).length;
@@ -94,6 +145,31 @@ export default function VideoLibraryPage() {
     } finally {
       setIsDeleting(false);
     }
+  }
+
+  /** Deletes the checked videos one by one; one that cannot go (in use, for instance) stays checked and is reported. */
+  async function removeSelected() {
+    const items = library.filter((item) => selected.has(item.video.id));
+    const inUse = items.filter((item) => item.courseCount > 0).length;
+    const usage = inUse > 0 ? ` ${pluralize(inUse, 'deles está', 'deles estão')} em treinamentos.` : '';
+    if (!window.confirm(`Excluir ${pluralize(items.length, 'vídeo', 'vídeos')}?${usage} Os arquivos são apagados e isso não pode ser desfeito.`)) return;
+    setError(''); setNotice(''); setIsDeleting(true);
+    const failed: string[] = [];
+    let firstError = '';
+    for (const item of items) {
+      try {
+        await deletePlatformVideo(item.video.id);
+      } catch (deleteError) {
+        failed.push(item.video.id);
+        firstError ||= `"${item.video.title}": ${getErrorMessage(deleteError)}`;
+      }
+    }
+    setSelected(new Set(failed));
+    await refresh();
+    setIsDeleting(false);
+    const done = items.length - failed.length;
+    if (done > 0) setNotice(`${pluralize(done, 'vídeo excluído', 'vídeos excluídos')}.`);
+    if (failed.length > 0) setError(`${failed.length === 1 ? '1 vídeo não pôde ser excluído e continua selecionado' : `${failed.length} vídeos não puderam ser excluídos e continuam selecionados`}. ${firstError}`);
   }
 
   function hasFiles(event: DragEvent) {
@@ -159,6 +235,11 @@ export default function VideoLibraryPage() {
             <Input aria-label="Buscar vídeo" className="pl-9" onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar vídeo por nome" type="search" value={query} />
           </label>
+          <NativeSelect aria-label="Filtrar por assunto" className="w-auto max-w-xs" onChange={(event) => setSubjectFilter(event.target.value)} value={subjectFilter}>
+            <option value="">Todos os assuntos</option>
+            <option value="none">Sem assunto</option>
+            {subjects.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+          </NativeSelect>
           <span className="text-sm text-muted-foreground tabular-nums">
             <span>{query.trim() ? `${shown.length} de ${library.length}` : pluralize(library.length, 'vídeo', 'vídeos')}</span>
             {totalBytes > 0 && <> · <span title="Soma do tamanho de todos os vídeos da biblioteca">{formatBytes(totalBytes)} no total</span></>}
@@ -167,10 +248,41 @@ export default function VideoLibraryPage() {
         </div>
       )}
 
+      {shown.length > 0 && (
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 shadow-card max-[640px]:-mx-1">
+          <label className="m-0 flex cursor-pointer items-center gap-2 text-sm font-semibold">
+            <input aria-label="Selecionar todos os vídeos" checked={allShownSelected} className="size-5 accent-[var(--brand-primary)]"
+              onChange={(event) => setSelected(event.target.checked ? new Set(shown.map((item) => item.video.id)) : new Set())} type="checkbox" />
+            {selected.size > 0 ? pluralize(selected.size, 'selecionado', 'selecionados') : 'Selecionar todos'}
+          </label>
+          {selected.size > 0 && <Button aria-label="Limpar seleção" onClick={() => setSelected(new Set())} size="icon-sm" title="Limpar seleção" variant="ghost"><X /></Button>}
+          <Button className="ml-auto max-[640px]:ml-0 max-[640px]:flex-1" disabled={selected.size === 0 || isDeleting} onClick={() => void removeSelected()} variant="outline">
+            <Trash2 /> Excluir
+          </Button>
+          <Button className="max-[640px]:flex-[2]" disabled={selected.size === 0 || isDeleting} onClick={() => setAssociating(true)}>
+            <Link2 /> Associar a assunto ou empresa
+          </Button>
+        </div>
+      )}
+
       {isLoading
         ? <LoadingState className="list-state">Carregando vídeos...</LoadingState>
         : <VideoLibraryPanel busy={isDeleting} hasVideos={library.length > 0} library={shown}
-            onClearFilters={() => setQuery('')} onDelete={(item) => void removeVideo(item)} onUpload={() => setUpload({ files: [] })} />}
+            onClearFilters={() => { setQuery(''); setSubjectFilter(''); }} onDelete={(item) => void removeVideo(item)} onUpload={() => setUpload({ files: [] })}
+            onSubjects={(videoId, ids) => void changeSubjects(videoId, ids)} subjects={subjects} videoSubjects={videoSubjects}
+            onSelect={(videoId, checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(videoId); else next.delete(videoId); return next; })}
+            privateTo={privateTo} selected={selected} />}
+
+      {associating && (
+        <AssociateVideosDialog companies={companies} onClose={() => setAssociating(false)} subjects={subjects}
+          videoCompanies={videoCompanies} videoIds={[...selected]} videoSubjects={videoSubjects}
+          onSaved={async (message) => {
+            setAssociating(false);
+            setSelected(new Set());
+            await refresh();
+            setNotice(message);
+          }} />
+      )}
 
       {isDragging && (
         <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-primary/10 p-6 backdrop-blur-[2px]">

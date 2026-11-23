@@ -2,7 +2,7 @@ import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { ArrowDown, ArrowUp, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Pencil, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { isExtra, videoProvider } from '@/api';
-import { Input } from '@/components/ui/input';
+import { Input, NativeSelect } from '@/components/ui/input';
 import { extrasSuffix } from '@/courseEditor/courseFormat';
 import ExtraBadge from '@/courseEditor/ExtraBadge';
 import { cn } from '@/lib/utils';
@@ -24,36 +24,31 @@ const summary = (subject: Subject) => {
 
 const videoTime = (video: CatalogVideo) => (isExtra(video) && video.durationMs <= 0 ? videoProvider(video) : formatClock(video.durationMs));
 
-type TrayTab = 'videos' | 'subjects';
-
 /**
- * What goes onto the days: the standalone videos of the library, one by one, and the subjects (a ready set of
- * videos and games). With a plan that does not personalize the grid (Bronze), only subjects.
+ * What goes onto the days. A plan that personalizes the grid sees the complete list of videos, narrowed by an assunto
+ * (a filter); Bronze sees the ready trainings, each one a whole day.
  */
 export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, canEditThemes = false }: {
   subjects: Subject[]; videos?: CatalogVideo[]; canCustomizeGrid?: boolean; canEditThemes?: boolean;
 }) {
-  const [tab, setTab] = useState<TrayTab>(canCustomizeGrid ? 'videos' : 'subjects');
   const [query, setQuery] = useState('');
-  const current = canCustomizeGrid ? tab : 'subjects';
+  const [filter, setFilter] = useState('');
+  // personalized grid: one complete list of videos, narrowed by an assunto
+  const current = canCustomizeGrid ? 'videos' : 'subjects';
   const shownSubjects = useMemo(() => subjects.filter(subject => normalize(subject.title).includes(normalize(query))), [subjects, query]);
-  const shownVideos = useMemo(() => videos.filter(video => normalize(video.title).includes(normalize(query))), [videos, query]);
-  const tabButton = (value: TrayTab, label: string, count: number, Icon: typeof Film) => (
-    <button aria-pressed={current === value} className={cn(
-      'inline-flex h-8 min-h-0 cursor-pointer items-center gap-1.5 rounded-md border-0 px-3 text-[0.8125rem] font-semibold transition-colors',
-      current === value ? 'bg-card text-foreground shadow-sm' : 'bg-transparent text-muted-foreground hover:text-foreground',
-    )} onClick={() => setTab(value)} type="button">
-      <Icon aria-hidden="true" className="size-3.5" /> {label} <span className="text-xs font-normal tabular-nums text-muted-foreground">{count}</span>
-    </button>
-  );
+  const filterIds = subjects.find(item => item.id === filter)?.videoIds;
+  const shownVideos = useMemo(() => videos.filter(video => normalize(video.title).includes(normalize(query)) && (!filterIds || filterIds.includes(video.id))), [videos, query, filterIds]);
 
   return <section aria-label={current === 'videos' ? 'Vídeos avulsos' : 'Assuntos do acervo'} className="builder-tray ops-card grid gap-3 p-4 max-[760px]:hidden">
     <div className="flex flex-wrap items-center gap-2">
       {canCustomizeGrid
-        ? <div className="inline-flex rounded-lg bg-muted p-0.5" role="group" aria-label="O que arrastar para os dias">
-          {tabButton('videos', 'Vídeos avulsos', videos.length, Film)}
-          {tabButton('subjects', 'Assuntos', subjects.length, Layers)}
-        </div>
+        ? <>
+          <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Film aria-hidden="true" className="size-4" /> Lista completa <span className="text-xs font-normal tabular-nums text-muted-foreground">{shownVideos.length}</span></h2>
+          <NativeSelect aria-label="Filtrar por assunto" className="h-9 w-auto max-w-64" onChange={event => setFilter(event.target.value)} value={filter}>
+            <option value="">Filtrar por assunto</option>
+            {subjects.map(item => <option key={item.id} value={item.id}>{item.title} ({item.videoIds.length})</option>)}
+          </NativeSelect>
+        </>
         : <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo</h2>}
       <span className="text-sm text-muted-foreground max-[640px]:hidden">
         · {current === 'videos' ? 'arraste um vídeo para um dia' : 'arraste para um dia e ele traz todos os vídeos e jogos'}
@@ -63,7 +58,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
           <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank">
             <CloudUpload aria-hidden="true" className="size-4" /> Enviar vídeos
           </a>
-          <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href="/platform/courses" rel="noreferrer" target="_blank">
+          <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href={canCustomizeGrid ? '/platform/videos' : '/platform/courses'} rel="noreferrer" target="_blank">
             <Pencil aria-hidden="true" className="size-4" /> Editar assuntos
           </a>
         </>}
@@ -133,10 +128,16 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     <option value="">{subject ? 'Trocar assunto' : 'Escolher assunto'}</option>
     {themes.map(item => <option key={item.id} value={item.id}>{themeLabel(item)}</option>)}
   </select>;
-  const available = editable ? [...catalog.videos.values()].filter(video => !videoIds.includes(video.id)).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')) : [];
+  // the subject of the day filters the picker: only its videos are offered
+  const available = editable ? [...catalog.videos.values()].filter(video => !videoIds.includes(video.id) && (!subject || subject.videoIds.includes(video.id))).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')) : [];
   const videoPicker = editable && !full && available.length > 0 && <select aria-label={`Adicionar vídeo ao dia ${dayIndex + 1}`} className={cn('h-9 w-full rounded-md border border-dashed border-input bg-background px-2 text-sm text-muted-foreground', phoneSelect, 'max-[760px]:order-3')}
-    onChange={event => { if (event.target.value) onVideos!([...videoIds, event.target.value]); }} value="">
+    onChange={event => {
+      const value = event.target.value;
+      if (value === 'all') onVideos!([...videoIds, ...available.map(video => video.id)].slice(0, maxVideoRows));
+      else if (value) onVideos!([...videoIds, value]);
+    }} value="">
     <option value="">+ Adicionar vídeo</option>
+    {subject && available.length > 1 && <option value="all">Todos os vídeos de {subject.title} ({available.length})</option>}
     {available.map(video => <option key={video.id} value={video.id}>{video.title}</option>)}
   </select>;
   const move = (from: number, to: number) => {
@@ -150,11 +151,12 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
       {editable ? <Film aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" /> : <Layers aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" />}
       <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{editable ? 'Arraste vídeos ou um assunto para este dia' : 'Arraste um assunto para este dia'}</p>
-      {videoPicker}
       {chooser}
+      {videoPicker}
     </div>;
   }
   return <div className={frame} ref={setNodeRef}>
+    {chooser}
     {subject
       ? <div className="flex items-center gap-2.5">
         <Cover className="size-11" subject={subject} />
@@ -195,6 +197,5 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       </ul>}
     </div>
     {videoPicker}
-    {chooser}
   </div>;
 }

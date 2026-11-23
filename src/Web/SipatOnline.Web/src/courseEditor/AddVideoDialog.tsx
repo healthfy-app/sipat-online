@@ -3,12 +3,13 @@ import { createExternalPlatformVideo, type PlatformCourseVideo, type PlatformLib
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
-import { Input, NativeSelect } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/courseCatalog/SegmentedControl';
 import ExternalVideoPreview from '@/ExternalVideoPreview';
 import { getErrorMessage } from './courseFormat';
 import { externalIdFromLink } from './externalLink';
 import { VideoUploadForm } from './CourseMediaForms';
+import LibraryVideoPicker from './LibraryVideoPicker';
 
 type Source = 'house' | 'YouTube' | 'Vimeo' | 'Smartplayer';
 
@@ -44,21 +45,15 @@ export default function AddVideoDialog({
   const [source, setSource] = useState<Source>('house');
 
   return (
-    <Dialog busy={busy} onClose={onClose} title="Adicionar vídeo">
+    <Dialog busy={busy} onClose={onClose} size="lg" title="Adicionar vídeo">
       <div className="grid gap-5">
         <SegmentedControl disabled={busy} label="Origem do vídeo" onChange={setSource} options={sources} value={source} />
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
         {source === 'house' ? <>
           {availableVideos.length > 0 && (
             <div className="grid gap-3 rounded-lg bg-background p-4">
-              <Field htmlFor="link-library-video" label="Vincular da biblioteca">
-                <NativeSelect id="link-library-video" onChange={(event) => setVideoToLink(event.target.value)} value={videoToLink}>
-                  <option value="">Selecione um vídeo</option>
-                  {availableVideos.map((item) => (
-                    <option key={item.video.id} value={item.video.id}>{item.video.title}</option>
-                  ))}
-                </NativeSelect>
-              </Field>
+              <h3 className="m-0 text-sm font-semibold">Vincular da biblioteca</h3>
+              <LibraryVideoPicker onChange={setVideoToLink} value={videoToLink} videos={availableVideos} />
               <Button className="justify-self-start" disabled={!videoToLink || busy} variant="outline"
                 onClick={() => { const id = videoToLink; setVideoToLink(''); onLink(id); }}>
                 Vincular vídeo

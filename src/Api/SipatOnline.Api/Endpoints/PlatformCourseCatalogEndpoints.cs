@@ -98,6 +98,80 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("DeletePlatformCourse");
 
+        // assunto is a classification of the videos (like a genre): a video can be in several, from the operator's fixed list
+        catalog.MapGet("/subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+            Results.Ok(await db.VideoSubjects.AsNoTracking().OrderBy(item => item.Name)
+                .Select(item => new VideoSubjectResponse(item.Id, item.Name)).ToArrayAsync(cancellationToken)))
+        .WithName("ListSubjects");
+
+        catalog.MapGet("/video-subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+            Results.Ok(await VideoSubjectMapAsync(db, cancellationToken)))
+        .WithName("ListVideoSubjects");
+
+        catalog.MapPut("/videos/{videoId:guid}/subjects", async (
+            Guid videoId,
+            SetVideoSubjectsRequest request,
+            SipatOnline.Infrastructure.PlatformDbContext db,
+            CancellationToken cancellationToken) =>
+        {
+            if (!await db.PlatformCourseVideos.AnyAsync(video => video.Id == videoId, cancellationToken))
+                return Results.NotFound();
+            var wanted = (request.SubjectIds ?? []).Distinct().ToHashSet();
+            if (await db.VideoSubjects.CountAsync(item => wanted.Contains(item.Id), cancellationToken) != wanted.Count)
+                return Results.Problem(statusCode: 400, title: "catalog.subject_not_found", detail: "Um dos assuntos não foi encontrado.");
+            var current = await db.VideoSubjectLinks.Where(link => link.VideoId == videoId).ToListAsync(cancellationToken);
+            db.VideoSubjectLinks.RemoveRange(current.Where(link => !wanted.Contains(link.SubjectId)));
+            foreach (var subjectId in wanted.Where(id => current.All(link => link.SubjectId != id)))
+                db.VideoSubjectLinks.Add(new VideoSubjectLinkEntity { SubjectId = subjectId, VideoId = videoId });
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Ok(new VideoSubjectsResponse(videoId, wanted.ToArray()));
+        })
+        .WithName("SetVideoSubjects");
+
+        // many videos at once: the checked assuntos are added, the unchecked ones removed, the rest stays as it was
+        catalog.MapPut("/videos/subjects", async (BulkVideoChangeRequest request, SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+        {
+            var videoIds = request.VideoIds.Distinct().ToArray();
+            var add = request.Add.Distinct().ToArray();
+            if (await db.VideoSubjects.CountAsync(item => add.Contains(item.Id), cancellationToken) != add.Length)
+                return Results.Problem(statusCode: 400, title: "catalog.subject_not_found", detail: "Um dos assuntos não foi encontrado.");
+            var existing = await db.PlatformCourseVideos.Where(video => videoIds.Contains(video.Id)).Select(video => video.Id).ToListAsync(cancellationToken);
+            var links = await db.VideoSubjectLinks.Where(link => existing.Contains(link.VideoId)).ToListAsync(cancellationToken);
+            db.VideoSubjectLinks.RemoveRange(links.Where(link => request.Remove.Contains(link.SubjectId)));
+            foreach (var subjectId in add)
+                foreach (var videoId in existing.Where(id => !links.Any(link => link.VideoId == id && link.SubjectId == subjectId)))
+                    db.VideoSubjectLinks.Add(new VideoSubjectLinkEntity { SubjectId = subjectId, VideoId = videoId });
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("ChangeVideosSubjects");
+
+        // a video with companies is private to them; with none it is public
+        catalog.MapGet("/video-companies", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+        {
+            var rows = await db.CompanyVideos.AsNoTracking().ToListAsync(cancellationToken);
+            return Results.Ok(rows.GroupBy(row => row.VideoId)
+                .Select(group => new VideoCompaniesResponse(group.Key, group.Select(row => row.TenantId).ToArray())).ToArray());
+        })
+        .WithName("ListVideoCompanies");
+
+        catalog.MapPut("/videos/companies", async (BulkVideoChangeRequest request, SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+        {
+            var videoIds = request.VideoIds.Distinct().ToArray();
+            var add = request.Add.Distinct().ToArray();
+            if (await db.Tenants.CountAsync(tenant => add.Contains(tenant.Id), cancellationToken) != add.Length)
+                return Results.Problem(statusCode: 400, title: "catalog.company_not_found", detail: "Uma das empresas não foi encontrada.");
+            var existing = await db.PlatformCourseVideos.Where(video => videoIds.Contains(video.Id)).Select(video => video.Id).ToListAsync(cancellationToken);
+            var rows = await db.CompanyVideos.Where(row => existing.Contains(row.VideoId)).ToListAsync(cancellationToken);
+            db.CompanyVideos.RemoveRange(rows.Where(row => request.Remove.Contains(row.TenantId)));
+            foreach (var videoId in existing)
+                foreach (var tenantId in add.Where(id => !rows.Any(row => row.VideoId == videoId && row.TenantId == id)))
+                    db.CompanyVideos.Add(new SipatOnline.Infrastructure.Tenancy.CompanyVideoEntity { VideoId = videoId, TenantId = tenantId });
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("ChangeVideosCompanies");
+
         catalog.MapDelete("/videos/{videoId:guid}", async (
             Guid videoId,
             HttpContext context,
@@ -628,7 +702,8 @@ public static class PlatformCourseCatalogEndpoints
             var capabilities = await plans.CapabilitiesAsync(cancellationToken);
             // the assuntos of its plan, without other companies' own ones; its own (internal videos) only on Diamante
             var excluded = await plans.HiddenSubjectsAsync(cancellationToken);
-            var themes = (await courses.ListAsync(cancellationToken))
+            var allCourses = await courses.ListAsync(cancellationToken);
+            var themes = allCourses
                 .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
                 .Where(course => !excluded.Contains(course.Id))
                 .Select(course => ToResponse(course) with
@@ -639,8 +714,13 @@ public static class PlatformCourseCatalogEndpoints
                 })
                 .ToArray();
             var offered = themes.SelectMany(theme => theme.Videos.Select(video => video.Id)).ToHashSet();
+            // the library's standalone videos are offered too; only those of an assunto the company cannot use stay out
+            var blocked = allCourses.Where(course => excluded.Contains(course.Id))
+                .SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
+            var privateToOthers = await plans.HiddenVideosAsync(cancellationToken);
             var videos = (await courses.ListVideosAsync(cancellationToken))
-                .Where(item => offered.Contains(item.Video.Id))
+                .Where(item => offered.Contains(item.Video.Id) || !blocked.Contains(item.Video.Id))
+                .Where(item => !privateToOthers.Contains(item.Video.Id))
                 .Select(item => new PlatformLibraryVideoResponse(ToResponse(item.Video), item.CourseCount))
                 .ToArray();
             var games = capabilities.Quizzes
@@ -648,7 +728,9 @@ public static class PlatformCourseCatalogEndpoints
                 : [];
             var categories = await db.CourseCategories.AsNoTracking().OrderBy(item => item.Position).ThenBy(item => item.Name)
                 .Select(item => new CourseCategoryResponse(item.Id, item.Name, 0)).ToArrayAsync(cancellationToken);
-            return Results.Ok(new SipatCatalogResponse(themes, videos, games, categories));
+            var subjects = await db.VideoSubjects.AsNoTracking().OrderBy(item => item.Name)
+                .Select(item => new VideoSubjectResponse(item.Id, item.Name)).ToArrayAsync(cancellationToken);
+            return Results.Ok(new SipatCatalogResponse(themes, videos, games, categories, subjects, await VideoSubjectMapAsync(db, cancellationToken)));
         })
         .WithName("GetSipatCatalog");
 
@@ -785,6 +867,13 @@ public static class PlatformCourseCatalogEndpoints
             usageCount,
             module.Content);
 
+    private static async Task<VideoSubjectsResponse[]> VideoSubjectMapAsync(SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken)
+    {
+        var links = await db.VideoSubjectLinks.AsNoTracking().ToListAsync(cancellationToken);
+        return links.GroupBy(link => link.VideoId)
+            .Select(group => new VideoSubjectsResponse(group.Key, group.Select(link => link.SubjectId).ToArray())).ToArray();
+    }
+
     private static IResult ToProblem(DomainError error)
     {
         var statusCode = error.Code switch
@@ -873,6 +962,14 @@ public sealed record StoredUploadPartsResponse(IReadOnlyList<StoredUploadPartRes
 
 public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Video, int CourseCount);
 
+public sealed record VideoSubjectsResponse(Guid VideoId, Guid[] SubjectIds);
+
+public sealed record SetVideoSubjectsRequest(Guid[]? SubjectIds);
+
+public sealed record VideoCompaniesResponse(Guid VideoId, Guid[] CompanyIds);
+
+public sealed record BulkVideoChangeRequest(Guid[] VideoIds, Guid[] Add, Guid[] Remove);
+
 public sealed record PlanSubjectsResponse(IReadOnlyList<PlanSubjectCourse> Courses, IReadOnlyDictionary<string, IReadOnlyList<Guid>> Excluded);
 
 /// <summary>An assunto of the catalog; CompanyId is set when it belongs to one company (its internal videos).</summary>
@@ -886,7 +983,11 @@ public sealed record SipatCatalogResponse(
     IReadOnlyList<PlatformCourseResponse> Courses,
     IReadOnlyList<PlatformLibraryVideoResponse> Videos,
     IReadOnlyList<GameModuleResponse> Games,
-    IReadOnlyList<CourseCategoryResponse>? Categories = null);
+    IReadOnlyList<CourseCategoryResponse>? Categories = null,
+    IReadOnlyList<VideoSubjectResponse>? Subjects = null,
+    IReadOnlyList<VideoSubjectsResponse>? VideoSubjects = null);
+
+public sealed record VideoSubjectResponse(Guid Id, string Name);
 
 public sealed record PlatformCourseResponse(
     Guid Id,
