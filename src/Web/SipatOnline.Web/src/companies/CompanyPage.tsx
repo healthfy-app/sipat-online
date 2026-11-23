@@ -117,6 +117,12 @@ export default function CompanyPage() {
     });
   }
 
+  /** Whether the selection has someone active (true) or inactive (false); people chosen on another page count as both. */
+  function selectionHas(isActive: boolean) {
+    const chosen = page?.items.filter((employee) => selected.has(employee.id)) ?? [];
+    return chosen.length < selected.size || chosen.some((employee) => employee.isActive === isActive);
+  }
+
   async function changeStatus(isActive: boolean) {
     const ids = [...selected];
     if (ids.length === 0) return;
@@ -209,8 +215,8 @@ export default function CompanyPage() {
 
             {selected.size > 0 && <div aria-label="Ações para os selecionados" className="flex flex-wrap items-center gap-2 rounded-lg bg-accent px-3 py-2" role="group">
               <strong className="text-sm">{selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}</strong>
-              <Button disabled={isChangingStatus} onClick={() => void changeStatus(false)} size="sm" variant="outline">Inativar</Button>
-              <Button disabled={isChangingStatus} onClick={() => void changeStatus(true)} size="sm" variant="outline">Reativar</Button>
+              {selectionHas(true) && <Button disabled={isChangingStatus} onClick={() => void changeStatus(false)} size="sm" variant="outline">Inativar</Button>}
+              {selectionHas(false) && <Button disabled={isChangingStatus} onClick={() => void changeStatus(true)} size="sm" variant="outline">Reativar</Button>}
               <Button disabled={isChangingStatus} onClick={() => setSelected(new Set())} size="sm" variant="ghost">Limpar seleção</Button>
             </div>}
 
@@ -267,7 +273,7 @@ export default function CompanyPage() {
                           </div>
                         </TableCell>
                         <TableCell className="max-md:hidden"><ActiveStatus isActive={employee.isActive} /></TableCell>
-                        <TableCell className="py-2 pr-2 text-right"><ParticipantOutcomesPanel companyId={companyId} participantId={employee.id} quiet /></TableCell>
+                        <TableCell className="py-2 pr-2 text-right"><ParticipantOutcomesPanel companyId={companyId} participantId={employee.id} participantName={employee.displayName} quiet /></TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -291,7 +297,7 @@ export default function CompanyPage() {
                 <h2 className="m-0 text-lg font-semibold tracking-tight" id="company-administrators-title">
                   Administradores <span className="font-normal text-muted-foreground tabular-nums">· {administrators?.length ?? overview?.administratorCount ?? 0}</span>
                 </h2>
-                <p className="m-0 text-sm text-muted-foreground">Quem administra os treinamentos desta empresa: participantes, cursos e certificados.</p>
+                <p className="m-0 text-sm text-muted-foreground">Quem administra os treinamentos desta empresa: participantes, treinamentos e certificados.</p>
               </div>
               {!missingAdministrator && <Button onClick={() => setAddingAdmin(true)} variant="outline"><UserPlus /> Adicionar administrador</Button>}
             </div>

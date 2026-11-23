@@ -18,6 +18,6 @@ describe('participant credentials', () => {
       initialPassword: 'Secure1234567890',
     }]);
 
-    expect(csv).toBe('﻿"nome";"login";"senha_inicial"\r\n"Ana ""Nina""; Costa";"MAT-031";"Secure1234567890"\r\n');
+    expect(csv).toBe('﻿"Nome";"Login";"Senha inicial"\r\n"Ana ""Nina""; Costa";"MAT-031";"Secure1234567890"\r\n');
   });
 });

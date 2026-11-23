@@ -153,10 +153,15 @@
   /* on a phone the video comes first; the end-of-day card waits below it */
   .portal-layout-learner .day-done { order: 3; }
   .portal-layout-learner .day-stage { margin: 0 -0.5rem; padding: 0.9rem; border-radius: 18px; }
-  .portal-layout-learner .day-controls { grid-template-columns: auto minmax(0, 1fr); }
-  .portal-layout-learner .day-control:not(.is-next) span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
-  .portal-layout-learner .day-control:not(.is-next) { width: 3rem; padding: 0; }
-  .portal-layout-learner .day-status { grid-column: 1 / -1; grid-row: 2; justify-self: stretch; }
+  /* on a phone one slim row: a round back arrow, the status as quiet text, a compact "Próximo" */
+  .portal-layout-learner .day-controls { grid-template-columns: auto minmax(0, 1fr) auto; gap: 0.5rem; }
+  .portal-layout-learner .day-control:not(.is-next) span,
+  .portal-layout-learner .day-control-long { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .portal-layout-learner .day-control:not(.is-next) { width: 2.5rem; min-height: 2.5rem; padding: 0; border-radius: 999px; border-color: rgb(255 255 255 / 16%); background: transparent; }
+  .portal-layout-learner .day-control.is-next { min-height: 2.5rem; padding: 0 0.9rem 0 1.1rem; border-radius: 999px; font-size: 0.9375rem; }
+  .portal-layout-learner .day-control svg { width: 1.05rem; height: 1.05rem; }
+  .portal-layout-learner .day-status { min-height: 0; padding: 0; background: none; color: rgb(255 255 255 / 65%); font-size: 0.8125rem; font-weight: 600; }
+  .portal-layout-learner .day-status.is-complete { padding: 0; background: none; color: var(--learner-highlight, #7fe0a6); }
   .portal-layout-learner .day-done { grid-template-columns: auto minmax(0, 1fr); }
   .portal-layout-learner .day-done-action { grid-column: 1 / -1; justify-content: center; }
 }

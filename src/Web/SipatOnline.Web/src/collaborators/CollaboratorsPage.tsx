@@ -171,7 +171,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
     {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
 
-    {people && <section aria-label="Resumo dos colaboradores" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-3">
+    {people && <section aria-label="Resumo dos colaboradores" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,11rem),1fr))] gap-3 max-[720px]:grid-cols-2">
       <Stat label="Colaboradores" value={counts.total} />
       <Stat label="Com acesso ativo" value={counts.active} />
       <Stat label="Em andamento" value={counts.running} />
@@ -207,8 +207,8 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
 
     {!readOnly && selected.size > 0 && <div aria-label="Ações para os selecionados" className="flex flex-wrap items-center gap-2 rounded-lg bg-accent px-3 py-2" role="group">
       <strong className="text-sm">{selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}</strong>
-      <Button disabled={busy} onClick={() => void setStatus(true)} size="sm" variant="outline">Reativar</Button>
-      <Button disabled={busy} onClick={() => void setStatus(false)} size="sm" variant="outline">Inativar</Button>
+      {(people ?? []).some(person => selected.has(person.id) && !person.isActive) && <Button disabled={busy} onClick={() => void setStatus(true)} size="sm" variant="outline">Reativar</Button>}
+      {(people ?? []).some(person => selected.has(person.id) && person.isActive) && <Button disabled={busy} onClick={() => void setStatus(false)} size="sm" variant="outline">Inativar</Button>}
       {showPlacement && registry.units.length > 0 && <Button disabled={busy} onClick={() => setPlacing('unit')} size="sm" variant="outline">Mudar unidade</Button>}
       {showPlacement && registry.sectors.length > 0 && <Button disabled={busy} onClick={() => setPlacing('sector')} size="sm" variant="outline">Mudar setor</Button>}
       <Button disabled={busy} onClick={() => setSelected(new Set())} size="sm" variant="ghost">Limpar seleção</Button>
@@ -256,7 +256,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
               </TableCell>
               <TableCell className="text-right">
                 <div className="inline-flex gap-1.5">
-                  <Button aria-label={`Ver andamento de ${person.displayName}`} onClick={() => setViewing(person)} size="sm" variant="ghost">Andamento</Button>
+                  <Button aria-label={`Ver andamento de ${person.displayName}`} onClick={() => setViewing(person)} size="sm" variant="ghost">Ver andamento</Button>
                   {!readOnly && <Button aria-label={`Editar ${person.displayName}`} onClick={() => setEditing(person)} size="sm" variant="outline"><Pencil /> Editar</Button>}
                 </div>
               </TableCell>
@@ -269,7 +269,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
     {editing && <EditCollaboratorDialog onClose={() => setEditing(null)} onSaved={refreshWith} person={editing} profile={profiles ? (profiles.get(editing.id) ?? { id: editing.id, registrationNumber: null, email: null, phone: null, unitId: null, sectorId: null }) : undefined} registry={registry} />}
     {placing && registry && <PlacementDialog count={selected.size} field={placing} items={placing === 'unit' ? registry.units : registry.sectors}
       onClose={() => setPlacing(null)} onConfirm={valueId => place(placing, valueId)} />}
-    {viewing && <ProgressDialog onClose={() => setViewing(null)} person={viewing} />}
+    {viewing && <ProgressDialog onClose={() => setViewing(null)} person={viewing} trainingId={training.selectedId} />}
     {adding && <AddCollaboratorsDialog onClose={() => setAdding(false)} onCreated={refreshWith} />}
   </Page>;
 }

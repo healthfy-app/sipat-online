@@ -12,6 +12,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { Input } from '@/components/ui/input';
 import { Page } from '@/components/ui/page';
 import { extrasSuffix, getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
+import { cn } from '@/lib/utils';
 import LoadingState from '@/LoadingState';
 import '@/OpsIdentity.css';
 import { partWord } from '@/trainings/partWord';
@@ -24,6 +25,9 @@ import {
   addDays, buildCatalog, dayDuration, dayVideoCounts, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay,
   type Catalog, type DaySlots,
 } from './model';
+
+/** On the phone (up to 760px) the hero buttons are 44px tall: "Mais" and "Salvar" share a row, the main action takes the next one. */
+const phoneAction = 'max-[760px]:h-auto max-[760px]:min-h-11 max-[760px]:text-[0.9375rem]';
 
 function download(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
@@ -281,34 +285,37 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const exportCsv = () => download(`${(name || 'sipat').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.csv`, planToCsv(days, catalog));
 
   return <Page className="builder-page">
-    <header className="ops-hero" data-slot="page-header">
-      <div className="ops-hero-copy">
-        <Link className="ops-hero-back" to={basePath}><ArrowLeft aria-hidden="true" /> Todos os treinamentos</Link>
+    <header className="ops-hero max-[760px]:gap-4! max-[760px]:px-4! max-[760px]:pt-3! max-[760px]:pb-4!" data-slot="page-header">
+      <div className="ops-hero-copy max-[760px]:gap-2!">
+        <Link className="ops-hero-back max-[760px]:-mb-1! max-[760px]:min-h-11" to={basePath}><ArrowLeft aria-hidden="true" /> Todos os treinamentos</Link>
         <p className="ops-hero-eyebrow">Treinamento</p>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 max-[760px]:min-w-0 max-[760px]:basis-full max-[760px]:gap-x-2 max-[760px]:gap-y-1.5">
           {showNameInput
-            ? <Input aria-invalid={nameMissing} aria-label="Nome do treinamento" autoFocus className="ops-hero-title h-auto w-[min(100%,28rem)] border-dashed bg-transparent px-2 py-1"
+            ? <Input aria-invalid={nameMissing} aria-label="Nome do treinamento" autoFocus className="ops-hero-title h-auto w-[min(100%,28rem)] border-dashed bg-transparent px-2 py-1 max-[760px]:text-[1.5rem]!"
               data-name-issue={nameMissing ? true : undefined} maxLength={200} onBlur={() => setEditingName(false)}
               onChange={event => { setName(event.target.value); setDirty(true); }}
               onKeyDown={event => { if (event.key === 'Enter' || event.key === 'Escape') event.currentTarget.blur(); }}
               placeholder="Ex.: SIPAT 2026" value={name} />
-            : <h1 className="ops-hero-title">{isNew && stage === 'setup' ? 'Novo treinamento' : name || 'Treinamento'}</h1>}
-          {canRename && !showNameInput && <Button aria-label="Renomear o treinamento" onClick={() => setEditingName(true)} size="icon-sm" variant="ghost"><Pencil /></Button>}
+            : <h1 className="ops-hero-title max-[760px]:text-[1.5rem]!">{isNew && stage === 'setup' ? 'Novo treinamento' : name || 'Treinamento'}</h1>}
+          {canRename && !showNameInput && <Button aria-label="Renomear o treinamento" className="max-[760px]:-my-1.5 max-[760px]:size-11 max-[760px]:min-h-11" onClick={() => setEditingName(true)} size="icon-sm" variant="ghost"><Pencil /></Button>}
           {label && <Badge variant={label.variant}>{label.text}</Badge>}
           {dirty && <Badge variant="outline">Alterações não salvas</Badge>}
           {stage === 'grid' && sipat && sipat.status === 'Published' && <span className="text-xs text-muted-foreground">O nome fica fixo depois de publicado.</span>}
         </div>
-        <p className="ops-hero-lead is-keep">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</p>
-        {stage === 'grid' && <ul aria-label="Resumo do treinamento" className="ops-hero-stats">
+        <p className="ops-hero-lead is-keep max-[760px]:text-[0.875rem]! max-[760px]:leading-[1.45]">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : <>
+          <span className="max-[760px]:hidden">Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.</span>
+          <span className="hidden max-[760px]:inline">Escolha um assunto para cada dia e confira os vídeos e os jogos.</span>
+        </>}</p>
+        {stage === 'grid' && <ul aria-label="Resumo do treinamento" className="ops-hero-stats max-[760px]:mt-1! max-[760px]:grid! max-[760px]:basis-full max-[760px]:grid-cols-2 max-[760px]:gap-2! max-[760px]:*:min-w-0 max-[760px]:*:flex-wrap max-[760px]:*:rounded-xl max-[760px]:*:bg-muted max-[760px]:*:px-3 max-[760px]:*:py-2 max-[760px]:*:text-sm">
           <li><strong>{days.length}</strong> {days.length === 1 ? 'dia' : 'dias'}</li>
           <li><Film aria-hidden="true" /><strong>{totals.videos}</strong> {totals.videos === 1 ? 'vídeo' : 'vídeos'}{extrasSuffix(totals.extras)}</li>
           <li><Gamepad2 aria-hidden="true" /><strong>{totals.games}</strong> {totals.games === 1 ? 'jogo' : 'jogos'}</li>
           <li><Clock aria-hidden="true" />{totals.time > 0 ? formatSpan(totals.time) : 'sem vídeos'}</li>
         </ul>}
       </div>
-      {stage === 'grid' && !cancelled && <div className="ops-hero-actions">
+      {stage === 'grid' && !cancelled && <div className="ops-hero-actions max-[760px]:grid! max-[760px]:w-full max-[760px]:grid-cols-[auto_minmax(0,1fr)] max-[760px]:gap-2">
         <DropdownMenu modal={false}>
-          <DropdownMenuTrigger asChild><Button disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild><Button className={phoneAction} disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
           <DropdownMenuContent>
             {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
             {canCustomizeGrid && <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>}
@@ -319,8 +326,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
             </>}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
-        <Button className="ops-primary" disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
+        <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
+        <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
       </div>}
     </header>
 
@@ -362,7 +369,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       <DialogActions><Button onClick={() => setCopying(false)} variant="outline">Cancelar</Button></DialogActions>
     </Dialog>}
 
-    {(notice || removed) && <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 grid -translate-x-1/2 justify-items-center gap-2">
+    {(notice || removed) && <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 grid -translate-x-1/2 justify-items-center gap-2 max-[760px]:right-4 max-[760px]:bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] max-[760px]:left-4 max-[760px]:translate-x-0 max-[760px]:*:w-full max-[760px]:*:justify-between">
       {notice && <div className="builder-undo pointer-events-auto flex items-center gap-3 rounded-xl bg-foreground py-2 pr-2 pl-4 text-sm text-background shadow-overlay" role="status">
         <span>{notice}</span>
         <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setNotice('')} size="icon-sm" variant="ghost"><X /></Button>

@@ -11,7 +11,7 @@ export interface GameTypeLook {
 export const gameLooks: Record<GamificationGameType, GameTypeLook> = {
   Quiz: {
     label: 'Quiz', icon: MessageCircleQuestion,
-    howTo: ['Escolha a alternativa certa (dá para usar as teclas A, B, C...).', 'Acertos seguidos multiplicam seus pontos.', 'Responder rápido vale bônus.'],
+    howTo: ['Toque na alternativa certa.', 'Acertos seguidos multiplicam seus pontos.', 'Responder rápido vale bônus.'],
   },
   Scenario: {
     label: 'Simulador de cenários', icon: Signpost,

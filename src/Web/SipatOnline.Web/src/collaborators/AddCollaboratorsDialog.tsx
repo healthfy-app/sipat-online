@@ -136,7 +136,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
     const entries = result.credentials.map(credential => ({
       displayName: credential.name, loginIdentifier: credential.login, initialPassword: passwords.get(credential.row) ?? '',
     }));
-    downloadCsv(`acessos-colaboradores-${new Date().toISOString().slice(0, 10)}.csv`, serializeCredentialCsv(entries));
+    downloadCsv(`acessos-colaboradores-${new Date().toISOString().slice(0, 10)}.csv`, serializeCredentialCsv(entries, `${window.location.origin}/login`));
     setDownloaded(true); setError(stoppedAt === null ? '' : stopMessage(stoppedAt));
   }
 

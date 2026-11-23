@@ -58,7 +58,7 @@ export default function CertificatesPage() {
         <small>Identificador: {item.certificate.id}</small>
       </div> : <>
         <p className="muted-copy">{item.isEligible ? 'Tudo pronto para emitir seu certificado.'
-          : 'Conclua os dias pendentes. Cada vídeo exige pelo menos 90% de cobertura reproduzida.'}</p>
+          : 'Assista aos vídeos que faltam. Cada vídeo conta quando você assiste quase até o fim.'}</p>
         <button className="button button-primary" aria-busy={busy === item.sipatEventId} disabled={!item.isEligible || !!busy} onClick={() => void issue(item)} type="button">
           {busy === item.sipatEventId ? 'Emitindo...' : 'Emitir certificado'}
         </button>
