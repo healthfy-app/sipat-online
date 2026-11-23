@@ -130,6 +130,10 @@ describe('Video library page', () => {
     show();
     const card = (await screen.findByRole('heading', { name: 'Treinamento novo' })).closest('article') as HTMLElement;
     expect(within(card).getByText('Processando')).toBeVisible();
+    expect(within(card).getByText('Preparando o vídeo')).toBeVisible();
+    expect(within(card).queryByText(/720p|480p/)).toBeNull();
+    // no duration until the conversion measures it: only the size
+    expect(within(card).queryByText(/\d+:\d{2} ·/)).toBeNull();
     expect(card.querySelector('video')).toBeNull();
     const failed = screen.getByRole('heading', { name: 'Arquivo quebrado' }).closest('article') as HTMLElement;
     expect(within(failed).getByText('Arquivo de vídeo inválido.')).toBeVisible();
