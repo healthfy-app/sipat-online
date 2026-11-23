@@ -544,6 +544,29 @@ describe('Platform course catalog', () => {
     ]);
   });
 
+  it('creates a game right inside the activity dialog and puts it in the sequence', async () => {
+    const user = userEvent.setup();
+    const created = { ...memoryModule, id: 'm-new', title: 'Quiz de postura' };
+    vi.mocked(api.createGameModule).mockResolvedValue(created);
+    vi.mocked(api.setPlatformCourseModules).mockResolvedValue(ergonomics);
+    render(<PlatformCoursesPage />);
+    await user.click(await screen.findByRole('button', { name: 'Abrir assunto Ergonomia' }));
+
+    await user.click(screen.getAllByRole('button', { name: 'Atividade depois deste vídeo' })[0]);
+    await user.click(within(await screen.findByRole('dialog', { name: 'Adicionar atividade' })).getByRole('button', { name: 'Criar jogo' }));
+    const form = await screen.findByRole('dialog', { name: 'Novo jogo' });
+    await user.type(within(form).getByLabelText('Nome do jogo'), 'Quiz de postura');
+    await user.type(within(form).getByLabelText('Texto da pergunta 1'), 'Qual a postura certa?');
+    await user.type(within(form).getByLabelText('Alternativas da pergunta 1'), 'Reta{Enter}Curvada');
+    await user.click(within(form).getByRole('button', { name: 'Criar jogo' }));
+
+    expect(api.createGameModule).toHaveBeenCalled();
+    expect(api.setPlatformCourseModules).toHaveBeenCalledWith('c-1', [
+      ...ergonomics.modules,
+      { moduleId: 'm-new', afterVideoCount: 1 },
+    ]);
+  });
+
   it('saves gamification and status changes of a course', async () => {
     const user = userEvent.setup();
     vi.mocked(api.updatePlatformCourse).mockResolvedValue({ ...fire, gamificationEnabled: true, gameType: 'Puzzle' });

@@ -45,7 +45,7 @@ export default function GameModuleForm({
   module: GameModule | null;
   onBusyChange: (busy: boolean) => void;
   onCancel: () => void;
-  onSaved: (message: string) => Promise<void>;
+  onSaved: (message: string, saved: GameModule) => Promise<void> | void;
 }) {
   const [title, setTitle] = useState(module?.title ?? '');
   const [gameType, setGameType] = useState<GamificationGameType>(module?.gameType ?? 'Quiz');
@@ -99,9 +99,8 @@ export default function GameModuleForm({
     onBusyChange(true);
     const data = draftData();
     try {
-      if (module) await updateGameModule(module.id, data);
-      else await createGameModule(data);
-      await onSaved(module ? `O jogo "${data.title}" foi atualizado.` : `O jogo "${data.title}" foi criado.`);
+      const saved = module ? await updateGameModule(module.id, data) : await createGameModule(data);
+      await onSaved(module ? `O jogo "${data.title}" foi atualizado.` : `O jogo "${data.title}" foi criado.`, saved);
     } catch (saveError) {
       setError(getErrorMessage(saveError));
     } finally {

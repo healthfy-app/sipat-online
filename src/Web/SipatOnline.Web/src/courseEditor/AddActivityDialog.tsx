@@ -1,9 +1,15 @@
-import { Gamepad2 } from 'lucide-react';
+import { useState } from 'react';
+import { Gamepad2, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import type { GameModule } from '../api';
+import GameModuleForm from '../courseCatalog/GameModuleForm';
 import { gameTypeLabel } from './courseTrack';
 
-/** Escolha rápida de um jogo/quiz para encaixar na trilha, com um clique. */
+/**
+ * Escolha rápida de um jogo/quiz para encaixar na sequência, com um clique. Um jogo novo é criado aqui mesmo
+ * e já entra na posição escolhida, sem sair do editor.
+ */
 export default function AddActivityDialog({
   modules,
   position,
@@ -20,6 +26,31 @@ export default function AddActivityDialog({
   onPick: (moduleId: string) => void;
   onClose: () => void;
 }) {
+  const [creating, setCreating] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  if (creating) {
+    return (
+      <Dialog onClose={saving ? () => undefined : onClose} size="lg" title="Novo jogo">
+        <p className="m-0 mb-4 text-sm leading-relaxed text-muted-foreground">
+          {position === 0
+            ? 'Ao salvar, o jogo entra antes do primeiro vídeo.'
+            : `Ao salvar, o jogo entra logo depois do vídeo ${position}.`}
+        </p>
+        <GameModuleForm
+          module={null}
+          onBusyChange={setSaving}
+          onCancel={() => setCreating(false)}
+          onSaved={(_message, saved) => {
+            // back to the list, where an error of the placement would show
+            setCreating(false);
+            onPick(saved.id);
+          }}
+        />
+      </Dialog>
+    );
+  }
+
   return (
     <Dialog onClose={onClose} size="md" title="Adicionar atividade">
       <p className="m-0 mb-4 text-sm leading-relaxed text-muted-foreground">
@@ -29,11 +60,11 @@ export default function AddActivityDialog({
       </p>
       {error && <p className="m-0 mb-3 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
       {modules.length === 0 ? (
-        <p className="m-0 rounded-md border border-dashed border-input p-4 text-sm text-muted-foreground">
-          Ainda não há jogos ou quizzes na biblioteca. Crie um na aba "Jogos e perguntas" do catálogo.
+        <p className="m-0 mb-3 rounded-md border border-dashed border-input p-4 text-sm text-muted-foreground">
+          Ainda não há jogos ou quizzes. Crie o primeiro aqui mesmo.
         </p>
       ) : (
-        <ul className="m-0 grid list-none gap-2 p-0">
+        <ul className="m-0 mb-3 grid list-none gap-2 p-0">
           {modules.map((module) => (
             <li key={module.id}>
               <button
@@ -54,6 +85,9 @@ export default function AddActivityDialog({
           ))}
         </ul>
       )}
+      <Button className="w-full" disabled={busy} onClick={() => setCreating(true)} variant="outline">
+        <Plus /> Criar jogo
+      </Button>
     </Dialog>
   );
 }
