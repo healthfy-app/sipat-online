@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { partWord } from '@/trainings/partWord';
 import {
   addDays, dayDuration, dayVideoCounts, formatClock, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay,
-  type Catalog, type DaySlots,
+  type Catalog, type DaySlots, type TrainingTitle, type TrayTraining,
 } from './model';
 import { DayBox, dropId, ThemeTray } from './ThemeCards';
 import './builder.css';
@@ -30,8 +30,12 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, canEditThemes = true, canCustomizeGrid = false }: {
+export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onReplace, issues, trainings = [], canEditThemes = true, canCustomizeGrid = false }: {
   days: DaySlots[]; catalog: Catalog; onChange: (days: DaySlots[]) => void; canEditThemes?: boolean;
+  /** The trainings of Conteúdo, opened in the list so their Títulos go onto the days. */
+  trainings?: TrayTraining[];
+  /** Days whose videos were replaced at once; the page offers to undo it. Without it the change simply applies. */
+  onReplace?: (days: DaySlots[], message: string) => void;
   /** The plan personalizes the grid (Prata and above): standalone videos go onto the days one by one. */
   canCustomizeGrid?: boolean;
   /** Removes a day; the page offers to undo it. Without it the day is simply dropped. */
@@ -86,21 +90,55 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
     if (current.includes(videoId) || current.length >= maxVideoRows) return;
     patchDay(index, { videos: [...current, videoId] });
   };
+  const replace = (next: DaySlots[], message: string) => (onReplace ? onReplace(next, message) : onChange(next));
+  const generic = (title: string) => !title.trim() || /^(Dia|Módulo) [0-9]+$/.test(title.trim());
+  /** A Título dropped on a day: the day becomes it, its videos in order (and its name, if the day had none of its own). */
+  const titleOnDay = (day: DaySlots, title: TrainingTitle): DaySlots => {
+    const videos = title.videoIds.filter(id => catalog.videos.has(id)).slice(0, maxVideoRows);
+    return { ...day, subject: '', videos: [...videos, ...Array.from({ length: Math.max(0, day.videos.length - videos.length) }, () => null)], ...(generic(day.title) ? { title: title.title } : {}) };
+  };
+  const applyTitle = (index: number, title: TrainingTitle) => {
+    const had = filled(days[index].videos).length > 0;
+    const next = days.map((day, position) => (position === index ? titleOnDay(day, title) : day));
+    if (had) replace(next, `"${title.title}" no ${lower} ${index + 1}.`); else onChange(next);
+  };
+  /** The whole training on the days: Título 1 on day 1 and so on, adding days when it has more Títulos. */
+  const layTraining = (training: TrayTraining) => {
+    const titles = training.titles.slice(0, maxDays);
+    const next = [...days];
+    titles.forEach((title, index) => {
+      if (!next[index]) {
+        const last = next[index - 1];
+        next[index] = newDay(index, last?.date ? addDays(last.date, 1) : '');
+      }
+      next[index] = titleOnDay(next[index], title);
+    });
+    replace(next, `${training.title}: ${titles.length} ${titles.length === 1 ? 'título' : 'títulos'} nos ${lower}s.`);
+  };
+  // where each video already is, shown on its card in the list
+  const usedIn = useMemo(() => {
+    const places = new Map<string, string>();
+    days.forEach((day, index) => filled(day.videos).forEach(id => { if (!places.has(id)) places.set(id, `${word} ${index + 1}`); }));
+    return places;
+  }, [days, word]);
   const looseVideos = useMemo(() => [...catalog.videos.values()].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [catalog]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     const subject = active.data.current?.subject as { id: string } | undefined;
     const video = active.data.current?.video as { id: string } | undefined;
+    const title = active.data.current?.title as TrainingTitle | undefined;
     const target = typeof over?.id === 'string' ? days.findIndex((_, index) => dropId(index) === over.id) : -1;
     if (target < 0) return;
     if (subject) applyTheme(target, subject.id);
+    else if (title && canCustomizeGrid) applyTitle(target, title);
     else if (video && canCustomizeGrid) addVideo(target, video.id);
   };
   const column = (index: number, order: number): CSSProperties => ({ '--i': index, '--order': order } as CSSProperties);
 
   return <DndContext onDragEnd={onDragEnd} sensors={sensors}>
     <div className="grid gap-4">
-      <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} subjects={themes} videos={looseVideos} />
+      <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} onUseTraining={layTraining} subjects={themes}
+        trainings={trainings} usedIn={canCustomizeGrid ? usedIn : undefined} videos={looseVideos} />
       <div className="builder-board-card ops-card overflow-hidden max-[760px]:overflow-visible max-[760px]:border-0! max-[760px]:bg-transparent! max-[760px]:shadow-none">
         <div className="builder-board-scroller overflow-x-auto max-[760px]:overflow-visible" ref={scroller}>
           <div className="builder-board grid min-w-full [grid-template-columns:var(--columns)] max-[760px]:flex max-[760px]:flex-col" role="table" style={layout}>

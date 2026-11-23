@@ -1,12 +1,16 @@
 import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { ArrowDown, ArrowUp, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Pencil, Search, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, CalendarRange, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Pencil, Search, X } from 'lucide-react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { isExtra, videoProvider } from '@/api';
+import { Button } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { extrasSuffix } from '@/courseEditor/courseFormat';
 import ExtraBadge from '@/courseEditor/ExtraBadge';
 import { cn } from '@/lib/utils';
-import { formatClock, formatSpan, maxVideoRows, normalize, subjectColor, themeLabel, type Catalog, type CatalogVideo, type Subject } from './model';
+import {
+  formatClock, formatSpan, maxVideoRows, normalize, subjectColor, themeLabel,
+  type Catalog, type CatalogVideo, type Subject, type TrainingTitle, type TrayTraining,
+} from './model';
 
 export const dropId = (dayIndex: number) => `theme-day-${dayIndex}`;
 
@@ -28,16 +32,32 @@ const videoTime = (video: CatalogVideo) => (isExtra(video) && video.durationMs <
  * What goes onto the days. A plan that personalizes the grid sees the complete list of videos, narrowed by an assunto
  * (a filter); Bronze sees the ready trainings, each one a whole day.
  */
-export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, canEditThemes = false }: {
+export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, canEditThemes = false, trainings = [], usedIn, onUseTraining }: {
   subjects: Subject[]; videos?: CatalogVideo[]; canCustomizeGrid?: boolean; canEditThemes?: boolean;
+  /** The trainings of Conteúdo: one can be opened here, its Títulos dragged onto days. */
+  trainings?: TrayTraining[];
+  /** Where each video already is, as "Dia 2", so the operator sees what is placed. */
+  usedIn?: Map<string, string>;
+  /** Lays the whole training on the days, Título 1 on day 1 and so on. */
+  onUseTraining?: (training: TrayTraining) => void;
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
+  const [trainingId, setTrainingId] = useState('');
   // personalized grid: one complete list of videos, narrowed by an assunto
   const current = canCustomizeGrid ? 'videos' : 'subjects';
   const shownSubjects = useMemo(() => subjects.filter(subject => normalize(subject.title).includes(normalize(query))), [subjects, query]);
   const filterIds = subjects.find(item => item.id === filter)?.videoIds;
   const shownVideos = useMemo(() => videos.filter(video => normalize(video.title).includes(normalize(query)) && (!filterIds || filterIds.includes(video.id))), [videos, query, filterIds]);
+  // an open training splits the list: its videos by Título on top, every other video below as avulsos
+  const training = canCustomizeGrid ? trainings.find(item => item.id === trainingId) : undefined;
+  const shownById = useMemo(() => new Map(shownVideos.map(video => [video.id, video])), [shownVideos]);
+  const inTraining = useMemo(() => new Set(training?.titles.flatMap(title => title.videoIds) ?? []), [training]);
+  const looseVideos = training ? shownVideos.filter(video => !inTraining.has(video.id)) : shownVideos;
+  const narrowed = query.trim() !== '' || filter !== '';
+  const titleRows = (training?.titles ?? [])
+    .map(title => ({ title, videos: title.videoIds.flatMap(id => shownById.get(id) ?? []) }))
+    .filter(row => !narrowed || row.videos.length > 0);
 
   return <section aria-label={current === 'videos' ? 'Vídeos avulsos' : 'Assuntos do acervo'} className="builder-tray ops-card grid gap-3 p-4 max-[760px]:hidden">
     <div className="flex flex-wrap items-center gap-2">
@@ -51,7 +71,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
         </>
         : <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo</h2>}
       <span className="text-sm text-muted-foreground max-[640px]:hidden">
-        · {current === 'videos' ? 'arraste um vídeo para um dia' : 'arraste para um dia e ele traz todos os vídeos e jogos'}
+        · {current !== 'videos' ? 'arraste para um dia e ele traz todos os vídeos e jogos' : training ? 'arraste um título ou um vídeo para um dia' : 'arraste um vídeo para um dia'}
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {canEditThemes && <>
@@ -70,9 +90,17 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
       </div>
     </div>
     {current === 'videos'
-      ? shownVideos.length === 0
-        ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.' : 'Nenhum vídeo encontrado.'}</p>
-        : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">{shownVideos.map(video => <li className="shrink-0" key={video.id}><VideoCard video={video} /></li>)}</ul>
+      ? <>
+        {trainings.length > 0 && <TrainingPicker onPick={id => setTrainingId(current => (current === id ? '' : id))} selectedId={training?.id ?? ''} trainings={trainings} />}
+        {training && <TrainingPanel canEditThemes={canEditThemes} narrowed={narrowed} onClose={() => setTrainingId('')}
+          onUse={onUseTraining ? () => onUseTraining(training) : undefined} rows={titleRows} training={training} usedIn={usedIn} />}
+        {trainings.length > 0 && <Step className="pt-1">
+          {training ? 'Vídeos avulsos' : 'Todos os vídeos'} <span className="font-semibold tracking-normal tabular-nums normal-case">{looseVideos.length}</span>
+        </Step>}
+        {looseVideos.length === 0
+          ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.' : training && !narrowed ? 'Todos os vídeos estão neste treinamento.' : 'Nenhum vídeo encontrado.'}</p>
+          : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">{looseVideos.map(video => <li className="shrink-0" key={video.id}><VideoCard place={usedIn?.get(video.id)} video={video} /></li>)}</ul>}
+      </>
       : shownSubjects.length === 0
         ? <p className="m-0 py-3 text-sm text-muted-foreground">{subjects.length === 0 ? 'Ainda não há assuntos no acervo. Crie em Conteúdo.' : 'Nenhum assunto encontrado.'}</p>
         : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">{shownSubjects.map(subject => <li className="shrink-0" key={subject.id}><TrayCard subject={subject} /></li>)}</ul>}
@@ -91,16 +119,109 @@ function TrayCard({ subject }: { subject: Subject }) {
   </div>;
 }
 
-function VideoCard({ video }: { video: CatalogVideo }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `video:${video.id}`, data: { video } });
+function VideoCard({ video, place, dragId = `video:${video.id}` }: { video: CatalogVideo; place?: string; dragId?: string }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: dragId, data: { video } });
   return <div className={cn('flex w-60 items-center gap-2 rounded-[0.875rem] border border-border bg-card p-2 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary hover:shadow-card motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef}>
     <button aria-label={`Arrastar o vídeo ${video.title}`} className="grid size-7 min-h-0 shrink-0 cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
     <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-md bg-[#0b1f19] text-white/85"><Film className="size-4" /></span>
     <div className="grid min-w-0 flex-1 gap-0.5">
       <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={video.title}>{video.title}</strong>
-      <span className="text-xs tabular-nums text-muted-foreground">{videoTime(video)}{isExtra(video) && <> · <ExtraBadge className="align-middle" /></>}</span>
+      <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
+        {videoTime(video)}{isExtra(video) && <> · <ExtraBadge className="align-middle" /></>}
+        {place && <span className="rounded-full bg-accent px-1.5 py-px text-[0.625rem] font-bold text-primary" title={`Já está no ${place}`}>{place}</span>}
+      </span>
     </div>
   </div>;
+}
+
+/** A small label that numbers the steps of the box, so the order reads at a glance. */
+function Step({ number, children, className }: { number?: number; children: ReactNode; className?: string }) {
+  return <h3 className={cn('m-0 flex items-center gap-2 text-[0.6875rem] font-bold tracking-[0.08em] text-muted-foreground uppercase', className)}>
+    {number !== undefined && <span aria-hidden="true" className="grid size-4.5 place-items-center rounded-full bg-primary text-[0.625rem] tracking-normal text-primary-foreground">{number}</span>}
+    {children}
+    <span aria-hidden="true" className="h-px flex-1 bg-border" />
+  </h3>;
+}
+
+function TrainingCover({ training, className }: { training: TrayTraining; className?: string }) {
+  if (training.coverUrl) return <img alt="" className={cn('shrink-0 rounded-md object-cover', className)} src={training.coverUrl} />;
+  const initials = training.title.trim().split(/\s+/).slice(0, 2).map(word => word[0]?.toUpperCase() ?? '').join('');
+  return <span aria-hidden="true" className={cn('grid shrink-0 place-items-center rounded-md text-xs font-bold text-white', className)} style={{ backgroundColor: subjectColor(training.title) }}>{initials || 'T'}</span>;
+}
+
+const countVideos = (training: TrayTraining) => training.titles.reduce((sum, title) => sum + title.videoIds.length, 0);
+const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
+
+/** Step 1: the trainings of Conteúdo side by side; one click opens it, a second click closes it. */
+function TrainingPicker({ trainings, selectedId, onPick }: { trainings: TrayTraining[]; selectedId: string; onPick: (id: string) => void }) {
+  return <div className="grid gap-2">
+    <Step number={1}>Escolha o treinamento</Step>
+    <ul aria-label="Treinamentos" className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
+      {trainings.map(item => {
+        const selected = item.id === selectedId;
+        return <li className="shrink-0" key={item.id}>
+          <button aria-pressed={selected}
+            className={cn('flex w-60 cursor-pointer items-center gap-2.5 rounded-[0.875rem] border bg-card p-2 text-left transition-[border-color,box-shadow,background-color]',
+              selected ? 'border-primary bg-accent shadow-card ring-2 ring-primary/25' : 'border-border hover:border-primary/60 hover:bg-accent/40')}
+            onClick={() => onPick(item.id)} type="button">
+            <TrainingCover className="size-10" training={item} />
+            <span className="grid min-w-0 flex-1 gap-0.5">
+              <strong className={cn('line-clamp-2 text-[0.8125rem] leading-tight', selected && 'text-primary')}>{item.title}</strong>
+              <span className="text-xs text-muted-foreground">{plural(item.titles.length, 'título', 'títulos')} · {plural(countVideos(item), 'vídeo', 'vídeos')}</span>
+            </span>
+            {selected && <X aria-hidden="true" className="size-4 shrink-0 text-primary" />}
+          </button>
+        </li>;
+      })}
+    </ul>
+  </div>;
+}
+
+/** Step 2: each Título of the open training as one line; the line goes to a day whole, a video of it alone. */
+function TrainingPanel({ training, rows, narrowed, usedIn, canEditThemes, onUse, onClose }: {
+  training: TrayTraining; rows: { title: TrainingTitle; videos: CatalogVideo[] }[]; narrowed: boolean;
+  usedIn?: Map<string, string>; canEditThemes: boolean; onUse?: () => void; onClose: () => void;
+}) {
+  return <section aria-label={`Títulos de ${training.title}`} className="grid gap-2.5 rounded-2xl border border-primary/25 bg-accent/35 p-3">
+    <div className="flex flex-wrap items-center gap-2">
+      <Step className="min-w-48 flex-1 text-primary" number={2}>Arraste cada título para um dia</Step>
+      {onUse && <Button onClick={onUse} size="sm" title="Título 1 no dia 1, título 2 no dia 2…"><CalendarRange /> Usar como dias</Button>}
+      {canEditThemes && <a className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-card" href={`/platform/courses/${training.id}/edit`} rel="noreferrer" target="_blank">
+        Abrir no editor <ExternalLink aria-hidden="true" className="size-3.5" />
+      </a>}
+      <Button aria-label={`Fechar ${training.title}`} onClick={onClose} size="icon-sm" title="Fechar treinamento" variant="ghost"><X /></Button>
+    </div>
+    {rows.length === 0
+      ? <p className="m-0 px-1 py-2 text-sm text-muted-foreground">{narrowed ? 'Nenhum vídeo deste treinamento corresponde à busca.' : 'Este treinamento ainda não tem vídeos prontos.'}</p>
+      : <ol className="m-0 grid list-none gap-2 p-0">
+        {rows.map((row, index) => <TitleRow index={index} key={row.title.id} row={row} trainingId={training.id} usedIn={usedIn} />)}
+      </ol>}
+  </section>;
+}
+
+function TitleRow({ trainingId, row, index, usedIn }: {
+  trainingId: string; row: { title: TrainingTitle; videos: CatalogVideo[] }; index: number; usedIn?: Map<string, string>;
+}) {
+  const { title, videos } = row;
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `title:${trainingId}:${title.id}`, data: { title }, disabled: title.videoIds.length === 0 });
+  const totalMs = videos.filter(video => !isExtra(video)).reduce((sum, video) => sum + video.durationMs, 0);
+  return <li className={cn('grid grid-cols-[15rem_minmax(0,1fr)] items-stretch gap-2 max-[1000px]:grid-cols-1', isDragging && 'opacity-50')} ref={setNodeRef}>
+    <button aria-label={`Arrastar o título ${title.title} com ${plural(title.videoIds.length, 'vídeo', 'vídeos')}`}
+      className="group/title flex min-h-0 cursor-grab touch-none items-center gap-2.5 rounded-[0.875rem] border border-primary/30 bg-card p-2.5 text-left shadow-card transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary active:cursor-grabbing disabled:cursor-default disabled:opacity-60 motion-reduce:hover:translate-y-0"
+      disabled={title.videoIds.length === 0} type="button" {...attributes} {...listeners}>
+      <GripVertical aria-hidden="true" className="size-4 shrink-0 text-muted-foreground group-hover/title:text-primary" />
+      <span aria-hidden="true" className="grid size-7 shrink-0 place-items-center rounded-full bg-primary text-xs font-extrabold text-primary-foreground">{index + 1}</span>
+      <span className="grid min-w-0 flex-1 gap-0.5">
+        <strong className="truncate text-sm leading-tight" title={title.title}>{title.title}</strong>
+        <span className="text-xs tabular-nums text-muted-foreground">{plural(title.videoIds.length, 'vídeo', 'vídeos')}{totalMs > 0 && ` · ${formatClock(totalMs)}`}</span>
+      </span>
+    </button>
+    {videos.length === 0
+      ? <p className="m-0 grid place-content-center rounded-[0.875rem] border border-dashed border-border px-3 text-xs text-muted-foreground">Sem vídeos neste título.</p>
+      : <ul aria-label={`Vídeos de ${title.title}`} className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
+        {videos.map(video => <li className="shrink-0" key={video.id}><VideoCard dragId={`video:${title.id}:${video.id}`} place={usedIn?.get(video.id)} video={video} /></li>)}
+      </ul>}
+  </li>;
 }
 
 /**

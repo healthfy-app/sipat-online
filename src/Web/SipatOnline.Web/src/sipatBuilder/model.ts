@@ -66,6 +66,11 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
   return { videos, subjects, games: gameMap, filters };
 }
 
+/** A Título of a training of Conteúdo, as the planner offers it: it becomes one day. */
+export interface TrainingTitle { id: string; title: string; videoIds: string[] }
+/** A training of Conteúdo shown in the planner, with its Títulos in order (only the videos ready in the library). */
+export interface TrayTraining { id: string; title: string; coverUrl: string | null; titles: TrainingTitle[] }
+
 /** A day while it is being edited: empty slots are kept so the grid keeps its shape. */
 export interface DaySlots {
   key: string;
