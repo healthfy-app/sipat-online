@@ -51,6 +51,8 @@ import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
 import { BrandThemeContext, tenantTheme } from './branding';
 import LoadingState from './LoadingState';
+import VideoUploadTray from './videoUploads/VideoUploadTray';
+import VideoLibraryPage from './videoLibrary/VideoLibraryPage';
 
 type AppState =
   | { status: 'loading' }
@@ -355,6 +357,14 @@ export default function App() {
               }
             />
             <Route
+              path="/platform/videos"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <VideoLibraryPage />
+                  : <AccessDenied />
+              }
+            />
+            <Route
               path="/platform/courses/:courseId/edit"
               element={
                 state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
@@ -375,6 +385,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <VideoUploadTray />
       </BrowserRouter>
     </main>
     </BrandThemeContext.Provider>
@@ -604,7 +615,8 @@ function ProtectedPortal({
         <>
           <p className="sidebar-label sidebar-label-spaced">OPERAÇÃO</p>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Biblioteca</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Conteúdo</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/videos">Biblioteca de vídeos</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Qualidade do vídeo</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
         </>

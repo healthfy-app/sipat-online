@@ -54,7 +54,7 @@ export interface LessonGroup {
   items: TrackItem[];
 }
 
-/** Aulas do curso; cursos sem `lessons` (respostas antigas) viram uma única "Aula 1". */
+/** Aulas do assunto; assuntos sem `lessons` (respostas antigas) viram uma única "Aula 1". */
 export function courseLessons(course: PlatformCourse) {
   if (course.lessons && course.lessons.length > 0) return course.lessons;
   return course.videos.length > 0

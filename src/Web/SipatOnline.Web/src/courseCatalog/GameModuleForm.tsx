@@ -113,7 +113,7 @@ export default function GameModuleForm({
   return (
     <form className="grid gap-4" onSubmit={handleSubmit}>
       <p className="m-0 text-sm text-muted-foreground">
-        Jogos entram no curso ou param um vídeo num momento escolhido. O participante vê pontos e estrelas só como
+        Jogos entram no assunto ou param um vídeo num momento escolhido. O participante vê pontos e estrelas só como
         incentivo (nada é salvo) e sempre pode pular.
       </p>
       {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}

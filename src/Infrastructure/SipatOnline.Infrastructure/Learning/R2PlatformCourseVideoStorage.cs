@@ -113,7 +113,7 @@ internal static class VideoUploadValidation
         if (videoId == Guid.Empty ||
             declaredSize is < 1 or > PlatformCourseCatalogService.MaximumVideoSizeBytes)
         {
-            return Failure("learning.platform_course.video_size_invalid", "O vídeo deve ter entre 1 byte e 250 MB.");
+            return Failure("learning.platform_course.video_size_invalid", "O vídeo deve ter entre 1 byte e 2 GB.");
         }
 
         var tempPath = Path.Combine(Path.GetTempPath(), $"sipat-r2-{Guid.NewGuid():N}.tmp");
@@ -139,7 +139,7 @@ internal static class VideoUploadValidation
                     totalBytes += bytesRead;
                     if (totalBytes > PlatformCourseCatalogService.MaximumVideoSizeBytes)
                     {
-                        return Failure("learning.platform_course.video_size_invalid", "O vídeo excede o limite de 250 MB.");
+                        return Failure("learning.platform_course.video_size_invalid", "O vídeo excede o limite de 2 GB.");
                     }
 
                     var bytesToCopy = Math.Min(bytesRead, header.Length - headerLength);

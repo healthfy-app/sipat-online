@@ -94,7 +94,7 @@ export default function CourseEditor({
   async function saveCourse(nextStatus: PlatformCourseStatus = status) {
     onError('');
     if (!values.title.trim()) {
-      onError('Informe o nome do curso antes de salvar.');
+      onError('Informe o nome do assunto antes de salvar.');
       return;
     }
     setIsSaving(true);
@@ -111,7 +111,7 @@ export default function CourseEditor({
       setValues(next);
       setSavedValues(next);
       setStatus(saved.status);
-      await onChanged('As alterações do curso foram salvas.');
+      await onChanged('As alterações do assunto foram salvas.');
     } catch (saveError) {
       onError(getErrorMessage(saveError));
     } finally {
@@ -148,12 +148,12 @@ export default function CourseEditor({
     onRemoveLesson: (lessonId) => {
       const lesson = groups.find((group) => group.id === lessonId);
       const videos = lesson?.items.filter((item) => item.kind === 'video').length ?? 0;
-      if (videos > 0 && !window.confirm(`Remover a aula "${lesson?.title}" e tirar ${videos} vídeo(s) do curso? Eles continuam na biblioteca.`)) return;
+      if (videos > 0 && !window.confirm(`Remover a aula "${lesson?.title}" e tirar ${videos} vídeo(s) do assunto? Eles continuam na biblioteca.`)) return;
       void changeStructure(removeLesson(drafts(), lessonId), 'A aula foi removida; os vídeos continuam na biblioteca.');
     },
-    onRenameVideo: (videoId, title) => void changeStructure(retitleVideo(drafts(), videoId, title), 'O título do vídeo foi atualizado neste curso.'),
+    onRenameVideo: (videoId, title) => void changeStructure(retitleVideo(drafts(), videoId, title), 'O título do vídeo foi atualizado neste assunto.'),
     onMoveVideo: (videoId, offset) => void changeStructure(moveVideoInStructure(drafts(), videoId, offset), 'A ordem dos vídeos foi atualizada.'),
-    onRemoveVideo: (videoId) => void changeStructure(removeVideo(drafts(), videoId), 'O vídeo foi removido do curso; continua na biblioteca.'),
+    onRemoveVideo: (videoId) => void changeStructure(removeVideo(drafts(), videoId), 'O vídeo foi removido do assunto; continua na biblioteca.'),
     onManageActivities: () => openDialog('games'),
     onAddActivity: (afterVideoCount) => {
       onError('');
@@ -183,7 +183,7 @@ export default function CourseEditor({
     const current = drafts();
     const base = current.length > 0 ? current : addLesson([]);
     const target = base.some((lesson) => lesson.id === addTarget) ? addTarget : base[base.length - 1].id;
-    void changeStructure(addVideoToLesson(base, target, videoId), 'O vídeo foi vinculado ao curso.');
+    void changeStructure(addVideoToLesson(base, target, videoId), 'O vídeo foi vinculado ao assunto.');
   }
 
   function openDialog(dialog: 'video' | 'games') {
@@ -223,7 +223,7 @@ export default function CourseEditor({
               onManageActivities: () => openDialog('games'),
               onRemoveVideo: outlineActions.onRemoveVideo,
               onRenameLesson: outlineActions.onRenameLesson,
-              onRenameVideo: (videoId, title) => void changeStructure(retitleVideo(drafts(), videoId, title), 'O título do vídeo foi atualizado neste curso.'),
+              onRenameVideo: (videoId, title) => void changeStructure(retitleVideo(drafts(), videoId, title), 'O título do vídeo foi atualizado neste assunto.'),
             }}
             busy={busy}
             gamificationEnabled={values.gamificationEnabled}
@@ -262,7 +262,7 @@ export default function CourseEditor({
           onPublish={() => void saveCourse('Published')}
           onReviewSettings={() => setStep('configure')}
           onUnpublish={() => {
-            if (window.confirm('Voltar este curso para rascunho? Ele deixará de aparecer no catálogo.')) void saveCourse('Draft');
+            if (window.confirm('Voltar este assunto para rascunho? Ele deixará de aparecer no catálogo.')) void saveCourse('Draft');
           }}
           status={status}
           title={values.title}
@@ -290,11 +290,7 @@ export default function CourseEditor({
           onClose={() => setActiveDialog(null)}
           onError={onError}
           onLink={linkVideo}
-          onUploaded={async (video) => {
-            await onChanged(`O vídeo "${video.title}" foi enviado e vinculado ao curso.`);
-            setSelectedKey(`video-${video.id}`);
-            setActiveDialog(null);
-          }}
+          onQueued={() => setActiveDialog(null)}
         />
       )}
 

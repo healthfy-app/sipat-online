@@ -1,6 +1,6 @@
 import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { extrasSuffix } from '@/courseEditor/courseFormat';
@@ -30,8 +30,10 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, canEditThemes = true }: {
+export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, canEditThemes = true, canCustomizeGrid = false }: {
   days: DaySlots[]; catalog: Catalog; onChange: (days: DaySlots[]) => void; canEditThemes?: boolean;
+  /** The plan personalizes the grid (Prata and above): standalone videos go onto the days one by one. */
+  canCustomizeGrid?: boolean;
   /** Removes a day; the page offers to undo it. Without it the day is simply dropped. */
   onRemoveDay?: (index: number) => void;
   /** What is missing on each day, by position; shown on the day itself. */
@@ -75,17 +77,27 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
       ...(generic ? { title: subject.title } : {}),
     });
   };
+  /** A standalone video dropped on a day joins its videos (once), up to the limit of the day. */
+  const addVideo = (index: number, videoId: string) => {
+    const current = filled(days[index].videos);
+    if (current.includes(videoId) || current.length >= maxVideoRows) return;
+    patchDay(index, { videos: [...current, videoId] });
+  };
+  const looseVideos = useMemo(() => [...catalog.videos.values()].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [catalog]);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     const subject = active.data.current?.subject as { id: string } | undefined;
+    const video = active.data.current?.video as { id: string } | undefined;
     const target = typeof over?.id === 'string' ? days.findIndex((_, index) => dropId(index) === over.id) : -1;
-    if (subject && target >= 0) applyTheme(target, subject.id);
+    if (target < 0) return;
+    if (subject) applyTheme(target, subject.id);
+    else if (video && canCustomizeGrid) addVideo(target, video.id);
   };
   const column = (index: number, order: number): CSSProperties => ({ '--i': index, '--order': order } as CSSProperties);
 
   return <DndContext onDragEnd={onDragEnd} sensors={sensors}>
     <div className="grid gap-4">
-      <ThemeTray subjects={themes} />
+      <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} subjects={themes} videos={looseVideos} />
       <div className="builder-board-card ops-card overflow-hidden max-[760px]:overflow-visible max-[760px]:border-0! max-[760px]:bg-transparent! max-[760px]:shadow-none">
         <div className="builder-board-scroller overflow-x-auto max-[760px]:overflow-visible" ref={scroller}>
           <div className="builder-board grid min-w-full [grid-template-columns:var(--columns)] max-[760px]:flex max-[760px]:flex-col" role="table" style={layout}>
@@ -114,7 +126,8 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
             {days.map((day, index) => {
               const subject = themeOfDay(themes, day);
               return <Cell index={index} key={`box-${day.key}`} order={index * 3 + 1} row={2}>
-                <DayBox canEditThemes={canEditThemes} catalog={catalog} dayIndex={index} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
+                <DayBox canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} dayIndex={index}
+                  onVideos={videoIds => patchDay(index, { videos: videoIds })} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
                   onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)} />
               </Cell>;
             })}

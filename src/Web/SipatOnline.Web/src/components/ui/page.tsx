@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
 /** Cabeçalho padrão das telas: título, descrição e ações à direita. */
@@ -33,8 +33,8 @@ export function PageHeader({
 }
 
 /** Página com largura e espaçamento padrão. */
-export function Page({ className, children }: { className?: string; children: ReactNode }) {
-  return <div className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 text-foreground', className)}>{children}</div>;
+export function Page({ className, children, ...props }: ComponentProps<'div'> & { children: ReactNode }) {
+  return <div className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] gap-5 text-foreground', className)} {...props}>{children}</div>;
 }
 
 /** Estado vazio com mensagem e ação opcional. */

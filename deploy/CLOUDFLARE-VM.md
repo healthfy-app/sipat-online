@@ -19,7 +19,7 @@ Crie estes registros, todos **DNS only** (nuvem cinza, sem proxy):
 | A | `*` | IP da VM (cada empresa será `<chave>.exemplo.com.br`) |
 | A | `@` | IP da VM (opcional) |
 
-> **Por que sem proxy.** O proxy da Cloudflare limita o tamanho do corpo de uma requisição (alguns planos, ~100 MB), o que bloquearia o envio de vídeos de até 250 MB, e os termos dos planos comuns restringem servir vídeo pelo proxy. Sem proxy a VM recebe o tráfego direto. Se depois quiser a proteção da Cloudflare, o caminho é mover os vídeos para o armazenamento deles (R2).
+> **Por que sem proxy.** O proxy da Cloudflare limita o tamanho do corpo de uma requisição (alguns planos, ~100 MB), o que bloquearia o envio de vídeos de até 2 GB, e os termos dos planos comuns restringem servir vídeo pelo proxy. Sem proxy a VM recebe o tráfego direto. Se depois quiser a proteção da Cloudflare, o caminho é mover os vídeos para o armazenamento deles (R2).
 
 ## 2. Certificado wildcard
 O Nginx usa um certificado Let's Encrypt único, nome `sipat-online`, para `exemplo.com.br` e `*.exemplo.com.br`. Com o plugin da Cloudflare:
@@ -68,7 +68,7 @@ curl -f https://ops.exemplo.com.br/health
 Abra `https://ops.exemplo.com.br`, entre com o dono e cadastre a primeira empresa. Os participantes e administradores da empresa entram em `https://<chave>.exemplo.com.br`.
 
 ## 5. Vídeos e backups
-- Os vídeos ficam no volume Docker `platform-videos` (na API: `/var/sipat/videos`); o limite é de **250 MB por vídeo**. O Nginx já libera esse tamanho só na rota de envio de vídeos.
+- Os vídeos ficam no volume Docker `platform-videos` (na API: `/var/sipat/videos`); o limite é de **2 GB por vídeo**. O Nginx já libera esse tamanho só na rota de envio de vídeos. Com o R2 e o envio direto ligado (`R2_DIRECT_UPLOAD=true`), o navegador manda o vídeo em partes de 16 MB direto para o bucket: uma queda de conexão perde só a parte em andamento, e o envio continua de onde parou.
 - O backup do banco gravado na própria VM **não substitui** uma cópia externa. Inclua o volume `platform-videos` na cópia externa (por exemplo, `rclone` ou *snapshot* do disco) e **teste a restauração** antes do go-live.
 - Banda: considere o tamanho médio dos vídeos e o horário de pico (o número de pessoas assistindo ao mesmo tempo) ao escolher o plano de rede da VM.
 

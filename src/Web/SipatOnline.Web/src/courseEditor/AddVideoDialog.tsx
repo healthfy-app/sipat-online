@@ -28,7 +28,7 @@ export default function AddVideoDialog({
   onClose,
   onError,
   onLink,
-  onUploaded,
+  onQueued,
 }: {
   courseId: string;
   availableVideos: PlatformLibraryVideo[];
@@ -38,7 +38,7 @@ export default function AddVideoDialog({
   onClose: () => void;
   onError: (message: string) => void;
   onLink: (videoId: string) => void;
-  onUploaded: (video: PlatformCourseVideo) => Promise<void>;
+  onQueued: (count: number) => void;
 }) {
   const [videoToLink, setVideoToLink] = useState('');
   const [source, setSource] = useState<Source>('house');
@@ -66,8 +66,8 @@ export default function AddVideoDialog({
             </div>
           )}
           <div className="grid gap-3">
-            <h3 className="m-0 text-sm font-semibold">Enviar novo vídeo</h3>
-            <VideoUploadForm courseId={courseId} onBusyChange={onBusyChange} onError={onError} onUploaded={onUploaded} />
+            <h3 className="m-0 text-sm font-semibold">Enviar novos vídeos</h3>
+            <VideoUploadForm courseId={courseId} onQueued={onQueued} />
           </div>
         </> : (
           <ExternalVideoForm busy={busy} key={source} onBusyChange={onBusyChange} onError={onError} onLink={onLink} provider={source} />

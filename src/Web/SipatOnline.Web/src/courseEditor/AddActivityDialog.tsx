@@ -25,7 +25,7 @@ export default function AddActivityDialog({
       <p className="m-0 mb-4 text-sm leading-relaxed text-muted-foreground">
         {position === 0
           ? 'A atividade aparece antes do primeiro vídeo.'
-          : `A atividade aparece logo depois do vídeo ${position}. A pessoa joga e segue; nada bloqueia o curso.`}
+          : `A atividade aparece logo depois do vídeo ${position}. A pessoa joga e segue; nada bloqueia o assunto.`}
       </p>
       {error && <p className="m-0 mb-3 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
       {modules.length === 0 ? (
