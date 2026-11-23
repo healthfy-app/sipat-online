@@ -25,11 +25,11 @@ export default function CoursesPanel({
   const categoryNames = useMemo(() => new Map(categories.map((item) => [item.id, item.name])), [categories]);
 
   return (
-    <section aria-label="Assuntos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
+    <section aria-label="Treinamentos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       {courses.length === 0 ? (
         <EmptyState
           action={<Button onClick={onClearFilters} variant="outline">Limpar filtros</Button>}
-          title="Nenhum assunto corresponde aos filtros."
+          title="Nenhum treinamento corresponde aos filtros."
         />
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">

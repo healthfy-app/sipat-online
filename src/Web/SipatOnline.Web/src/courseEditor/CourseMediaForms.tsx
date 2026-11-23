@@ -46,13 +46,13 @@ export function CourseCoverEditor({
       onError('A foto excede o limite de 2 MB.');
       return;
     }
-    void run(() => setPlatformCourseCover(course.id, file), 'A foto do assunto foi atualizada.');
+    void run(() => setPlatformCourseCover(course.id, file), 'A foto do treinamento foi atualizada.');
   }
 
   return (
     <div className="grid gap-3">
       {course.coverUrl ? (
-        <img alt="Foto atual do assunto" className="aspect-video w-full rounded-md object-cover" src={course.coverUrl} />
+        <img alt="Foto atual do treinamento" className="aspect-video w-full rounded-md object-cover" src={course.coverUrl} />
       ) : (
         <div
           aria-label={`Prévia da capa de ${course.title}`}
@@ -73,7 +73,7 @@ export function CourseCoverEditor({
         />
         {course.coverUrl && (
           <Button disabled={isBusy} variant="ghost"
-            onClick={() => void run(() => removePlatformCourseCover(course.id), 'A foto do assunto foi removida.')}>
+            onClick={() => void run(() => removePlatformCourseCover(course.id), 'A foto do treinamento foi removida.')}>
             Remover foto
           </Button>
         )}

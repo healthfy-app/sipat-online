@@ -48,7 +48,7 @@ export default function CoursePropertiesPanel({
       </header>
 
       <div className="grid content-start gap-4 p-4 max-[1180px]:grid-cols-[repeat(auto-fit,minmax(min(100%,16rem),1fr))]">
-        {!item && !lesson && <p className="m-0 text-sm leading-relaxed text-muted-foreground">Crie uma aula e adicione vídeos para começar a montar o assunto.</p>}
+        {!item && !lesson && <p className="m-0 text-sm leading-relaxed text-muted-foreground">Crie uma aula e adicione vídeos para começar a montar o treinamento.</p>}
 
         {lesson && <>
           <CommitField
@@ -74,7 +74,7 @@ export default function CoursePropertiesPanel({
             disabled={busy}
             hint={item.video.libraryTitle && item.video.libraryTitle !== item.title
               ? `Título original na biblioteca: ${item.video.libraryTitle}`
-              : 'Muda só neste assunto; o título da biblioteca continua o mesmo.'}
+              : 'Muda só neste treinamento; o título da biblioteca continua o mesmo.'}
             id="prop-video-title"
             label="Título do vídeo"
             onCommit={(value) => {
@@ -94,7 +94,7 @@ export default function CoursePropertiesPanel({
           {isExtra(item.video)
             ? <p className="m-0 text-xs leading-relaxed text-muted-foreground">Vídeo extra: não conta no progresso nem no certificado.</p>
             : <Button disabled={busy} onClick={actions.onManageActivities} variant="outline">Editar perguntas do vídeo</Button>}
-          <Button disabled={busy} onClick={() => actions.onRemoveVideo(item.video.id)} variant="ghost">Remover do assunto</Button>
+          <Button disabled={busy} onClick={() => actions.onRemoveVideo(item.video.id)} variant="ghost">Remover do treinamento</Button>
         </>}
 
         {!lesson && item?.kind === 'activity' && <>

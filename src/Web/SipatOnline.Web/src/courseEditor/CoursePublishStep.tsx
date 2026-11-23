@@ -47,10 +47,10 @@ export default function CoursePublishStep({
   const hasVideos = house.length > 0;
   const isPublished = status === 'Published';
   const checklist: ChecklistItem[] = [
-    { label: 'Nome do assunto', state: title.trim() ? 'ready' : 'required', text: title.trim() ? 'Pronto' : 'Obrigatório' },
+    { label: 'Nome do treinamento', state: title.trim() ? 'ready' : 'required', text: title.trim() ? 'Pronto' : 'Obrigatório' },
     { label: 'Descrição', state: description.trim() ? 'ready' : 'required', text: description.trim() ? 'Pronta' : 'Obrigatória' },
     { label: 'Vídeo', state: hasVideos ? 'ready' : 'required', text: hasVideos ? 'Adicionado' : 'Obrigatório' },
-    { label: 'Foto do assunto', state: course.coverUrl ? 'ready' : 'optional', text: course.coverUrl ? 'Adicionada' : 'Opcional' },
+    { label: 'Foto do treinamento', state: course.coverUrl ? 'ready' : 'optional', text: course.coverUrl ? 'Adicionada' : 'Opcional' },
   ];
   const canPublish = hasVideos && title.trim() !== '' && description.trim() !== '';
   const summary = [
@@ -63,13 +63,13 @@ export default function CoursePublishStep({
   return (
     <StepPage label="Revisar e publicar">
       <CourseStepHeading eyebrow="Etapa 3 · Publicar" headingRef={headingRef} status={status} title="Revisar e publicar">
-        Confira os dados e os requisitos antes de disponibilizar o assunto para as empresas.
+        Confira os dados e os requisitos antes de disponibilizar o treinamento para as empresas.
       </CourseStepHeading>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.85fr)]">
         <Card aria-labelledby="course-publish-details-title" role="region">
           <CardHeader>
-            <CardTitle id="course-publish-details-title">Detalhes do assunto</CardTitle>
+            <CardTitle id="course-publish-details-title">Detalhes do treinamento</CardTitle>
             <CardDescription>Resumo das informações que serão exibidas no catálogo.</CardDescription>
           </CardHeader>
           <CardContent className="py-1">
@@ -91,7 +91,7 @@ export default function CoursePublishStep({
           <CardHeader className="flex items-start justify-between gap-4">
             <div className="grid gap-1">
               <CardTitle id="course-publish-action-title">Publicação no catálogo</CardTitle>
-              <CardDescription>Ao publicar, o assunto fica disponível no catálogo. Os vínculos e o progresso das empresas são preservados.</CardDescription>
+              <CardDescription>Ao publicar, o treinamento fica disponível no catálogo. Os vínculos e o progresso das empresas são preservados.</CardDescription>
             </div>
             <Badge variant={isPublished ? 'default' : 'warning'}>{isPublished ? 'No catálogo' : 'Rascunho'}</Badge>
           </CardHeader>

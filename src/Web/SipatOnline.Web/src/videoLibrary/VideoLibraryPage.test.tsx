@@ -53,7 +53,7 @@ describe('Video library page', () => {
     expect(screen.getByText(/2 vídeos · 2 KB|2 vídeos · 0 MB/)).toBeVisible();
     // the sum of every video's size, shown next to the count on the search row
     expect(screen.getByTitle('Soma do tamanho de todos os vídeos da biblioteca')).toHaveTextContent('0 MB no total');
-    expect(screen.getByText(/1 sem assunto/)).toBeVisible();
+    expect(screen.getByText(/1 sem treinamento/)).toBeVisible();
   });
 
   it('filters by name', async () => {
@@ -114,7 +114,7 @@ describe('Video library page', () => {
 
   it('deletes a video after asking and shows why when it is still in use', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.deletePlatformVideo).mockRejectedValueOnce(new Error('Este vídeo ainda está em uso (1 assunto).')).mockResolvedValue(undefined);
+    vi.mocked(api.deletePlatformVideo).mockRejectedValueOnce(new Error('Este vídeo ainda está em uso (1 treinamento).')).mockResolvedValue(undefined);
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     show();
     await user.click((await screen.findAllByRole('button', { name: /^Excluir vídeo / }))[0]);

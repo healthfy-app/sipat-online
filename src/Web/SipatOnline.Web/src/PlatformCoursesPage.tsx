@@ -17,8 +17,8 @@ import { onVideoUploaded } from './videoUploads/uploadQueue';
 import './PlatformCourses.css';
 
 /**
- * Página de conteúdo da plataforma: mostra o catálogo (assuntos, vídeos e jogos)
- * ou, quando a rota traz um assunto, o editor desse assunto.
+ * Página de conteúdo da plataforma: mostra o catálogo (treinamentos, vídeos e jogos)
+ * ou, quando a rota traz um treinamento, o editor desse treinamento.
  */
 export default function PlatformCoursesPage() {
   const navigate = useNavigate();
@@ -92,7 +92,7 @@ export default function PlatformCoursesPage() {
       const copy = await duplicatePlatformCourse(course.id);
       await refresh();
       openCourse(copy.id);
-      setNotice(`O assunto "${copy.title}" foi criado como rascunho, usando os mesmos vídeos.`);
+      setNotice(`O treinamento "${copy.title}" foi criado como rascunho, usando os mesmos vídeos.`);
     } catch (duplicateError) {
       setError(getErrorMessage(duplicateError));
     } finally {
@@ -120,11 +120,11 @@ export default function PlatformCoursesPage() {
             onError={setError}
           />
         ) : isLoading ? (
-          <LoadingState>Carregando assunto...</LoadingState>
+          <LoadingState>Carregando treinamento...</LoadingState>
         ) : (
           <div className="empty-state">
-            <p>{error ? 'Não foi possível carregar o assunto.' : 'Assunto não encontrado.'}</p>
-            <button className="button" onClick={() => openCourse(null)} type="button">Voltar aos assuntos</button>
+            <p>{error ? 'Não foi possível carregar o treinamento.' : 'Treinamento não encontrado.'}</p>
+            <button className="button" onClick={() => openCourse(null)} type="button">Voltar aos treinamentos</button>
           </div>
         )
       ) : (
@@ -138,7 +138,7 @@ export default function PlatformCoursesPage() {
             setError('');
             setCourses((current) => [course, ...current.filter((item) => item.id !== course.id)]);
             openCourse(course.id);
-            setNotice(`O assunto "${course.title}" foi criado no catálogo global.`);
+            setNotice(`O treinamento "${course.title}" foi criado no catálogo global.`);
           }}
           onDuplicate={(course) => void duplicate(course)}
           onError={setError}

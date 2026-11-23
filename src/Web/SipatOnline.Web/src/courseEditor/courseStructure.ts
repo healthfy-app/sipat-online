@@ -1,7 +1,7 @@
 import type { CourseLessonDraft, PlatformCourse } from '../api';
 import { courseLessons } from './courseTrack';
 
-/** Estrutura editável (aulas > vídeos) montada a partir do assunto salvo. */
+/** Estrutura editável (aulas > vídeos) montada a partir do treinamento salvo. */
 export function toDrafts(course: PlatformCourse): CourseLessonDraft[] {
   const videoById = new Map(course.videos.map((video) => [video.id, video]));
   return courseLessons(course).map((lesson) => ({

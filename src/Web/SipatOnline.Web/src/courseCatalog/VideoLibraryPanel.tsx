@@ -67,7 +67,7 @@ export default function VideoLibraryPanel({
                     : video.status === 'Failed' ? <Badge variant="destructive">Falhou</Badge>
                     : (
                       <Badge variant={courseCount === 0 ? 'warning' : 'default'}>
-                        {courseCount === 0 ? 'Ainda não usado em assuntos' : `Usado em ${pluralize(courseCount, 'assunto', 'assuntos')}`}
+                        {courseCount === 0 ? 'Ainda não usado em treinamentos' : `Usado em ${pluralize(courseCount, 'treinamento', 'treinamentos')}`}
                       </Badge>
                     )}
                   <Button aria-label={`Excluir vídeo ${video.title}`} disabled={busy} onClick={() => onDelete(item)} size="icon-sm" title="Excluir vídeo" variant="ghost"><Trash2 /></Button>

@@ -7,8 +7,8 @@ import PlanSubjectsPanel from './PlanSubjectsPanel';
 vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api')>()), getPlanSubjects: vi.fn(), setPlanSubjects: vi.fn(), setSubjectCompany: vi.fn(), listPlatformCompanies: vi.fn(), listCourseCategories: vi.fn() }));
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
-describe('assuntos of each plan', () => {
-  it('starts with everything available and saves the assuntos taken out of a plan', async () => {
+describe('treinamentos of each plan', () => {
+  it('starts with everything available and saves the treinamentos taken out of a plan', async () => {
     const user = userEvent.setup();
     vi.mocked(api.getPlanSubjects).mockResolvedValue({
       courses: [
@@ -56,10 +56,10 @@ describe('assuntos of each plan', () => {
     expect(screen.queryByText('Ergonomia')).not.toBeInTheDocument();
     expect(screen.getByText('Meio Ambiente')).toBeVisible();
 
-    await user.type(screen.getByPlaceholderText('Buscar assunto'), 'ergo');
+    await user.type(screen.getByPlaceholderText('Buscar treinamento'), 'ergo');
     expect(screen.getByText('Ergonomia')).toBeVisible();
 
-    await user.clear(screen.getByPlaceholderText('Buscar assunto'));
+    await user.clear(screen.getByPlaceholderText('Buscar treinamento'));
     await user.click(screen.getByRole('button', { name: 'Recolher todos' }));
     expect(screen.queryByText('Meio Ambiente')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Expandir todos' }));
@@ -67,7 +67,7 @@ describe('assuntos of each plan', () => {
     expect(screen.getByText('Meio Ambiente')).toBeVisible();
   });
 
-  it('gives an assunto to one company as its internal videos, outside the plans', async () => {
+  it('gives an treinamento to one company as its internal videos, outside the plans', async () => {
     const user = userEvent.setup();
     vi.mocked(api.getPlanSubjects).mockResolvedValue({
       courses: [
@@ -81,7 +81,7 @@ describe('assuntos of each plan', () => {
     vi.mocked(api.listCourseCategories).mockResolvedValue([]);
     render(<PlanSubjectsPanel />);
 
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Quem vê o assunto Vídeos da Acme' }), 'acme');
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Quem vê o treinamento Vídeos da Acme' }), 'acme');
     expect(api.setSubjectCompany).toHaveBeenCalledWith('c-2', 'acme');
     expect(screen.getByText(/Só Acme, no plano/)).toBeVisible();
     expect(screen.queryByRole('checkbox', { name: 'Bronze — Vídeos da Acme' })).not.toBeInTheDocument();

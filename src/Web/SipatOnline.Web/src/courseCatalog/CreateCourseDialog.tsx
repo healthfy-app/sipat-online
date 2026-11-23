@@ -60,7 +60,7 @@ export default function CreateCourseDialog({
       await onCreated(savedCourse);
     } catch (saveError) {
       setError(course
-        ? `O assunto foi criado, mas não foi possível salvar a capa. Tente novamente. ${getErrorMessage(saveError)}`
+        ? `O treinamento foi criado, mas não foi possível salvar a capa. Tente novamente. ${getErrorMessage(saveError)}`
         : getErrorMessage(saveError));
     } finally {
       setIsSaving(false);
@@ -68,14 +68,14 @@ export default function CreateCourseDialog({
   }
 
   return (
-    <Dialog busy={isSaving} onClose={onClose} title="Detalhes do assunto">
+    <Dialog busy={isSaving} onClose={onClose} title="Detalhes do treinamento">
       <form className="grid gap-4" onSubmit={handleSubmit}>
         <label
           className="relative m-0 grid aspect-[16/7] cursor-pointer place-items-center overflow-hidden rounded-lg border border-dashed border-input bg-muted text-sm font-semibold text-primary transition-colors hover:bg-accent has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-ring"
           htmlFor="create-course-cover"
         >
           {preview
-            ? <img alt="Prévia da capa do assunto" className="absolute inset-0 size-full object-cover" src={preview} />
+            ? <img alt="Prévia da capa do treinamento" className="absolute inset-0 size-full object-cover" src={preview} />
             : <span className="grid justify-items-center gap-1.5"><ImagePlus className="size-6" />Adicionar capa</span>}
           <input
             accept={acceptedCoverTypes.join(',')}
@@ -103,7 +103,7 @@ export default function CreateCourseDialog({
             onChange={setCategoryId} onCreate={onCreateCategory} value={categoryId} />
         </Field>
         <Field htmlFor="platform-course-title" label="Título (obrigatório)">
-          <Input data-autofocus disabled={locked} id="platform-course-title" maxLength={200} placeholder="Assunto sem título"
+          <Input data-autofocus disabled={locked} id="platform-course-title" maxLength={200} placeholder="Treinamento sem título"
             required value={title} onChange={(event) => setTitle(event.target.value)} />
         </Field>
         <Field htmlFor="platform-course-description" label="Descrição">

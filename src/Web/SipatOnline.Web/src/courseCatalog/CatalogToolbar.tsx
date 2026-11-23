@@ -7,7 +7,7 @@ import type { CatalogFilters, StatusFilter } from './catalogFilters';
 export type CatalogTab = 'courses' | 'videos' | 'modules' | 'plans';
 
 const searchLabel: Record<CatalogTab, { label: string; placeholder: string }> = {
-  courses: { label: 'Buscar assunto', placeholder: 'Buscar por nome ou descrição' },
+  courses: { label: 'Buscar treinamento', placeholder: 'Buscar por nome ou descrição' },
   videos: { label: 'Buscar vídeo', placeholder: 'Buscar vídeo por nome' },
   modules: { label: 'Buscar jogo', placeholder: 'Buscar jogo por nome' },
   plans: { label: 'Buscar', placeholder: 'Buscar' },

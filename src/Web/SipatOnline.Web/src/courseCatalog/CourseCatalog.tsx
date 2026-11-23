@@ -112,7 +112,7 @@ export default function CourseCatalog({
   const hasUncategorized = courses.some((course) => !course.categoryId || !knownCategories.has(course.categoryId));
   const isFiltered = tab === 'courses' ? hasCourseFilters(filters) : filters.query.trim() !== '';
   const countText = {
-    courses: isFiltered ? `${shownCourses.length} de ${courses.length}` : pluralize(courses.length, 'assunto', 'assuntos'),
+    courses: isFiltered ? `${shownCourses.length} de ${courses.length}` : pluralize(courses.length, 'treinamento', 'treinamentos'),
     videos: '',
     modules: isFiltered ? `${shownModules.length} de ${modules.length}` : pluralize(modules.length, 'jogo', 'jogos'),
     plans: '',
@@ -120,14 +120,14 @@ export default function CourseCatalog({
   const isEmptyCatalog = !isLoading && !error && courses.length === 0;
   const showTabs = !isEmptyCatalog || tab !== 'courses';
   const tabs: { id: CatalogTab; label: string; count: number }[] = [
-    { id: 'courses', label: 'Assuntos', count: courses.length },
+    { id: 'courses', label: 'Treinamentos', count: courses.length },
     { id: 'modules', label: 'Jogos e perguntas', count: modules.length },
     { id: 'plans', label: 'Planos', count: 4 },
   ];
 
   async function removeGame(module: GameModule) {
     const usage = module.usageCount > 0
-      ? ` Ele está em ${pluralize(module.usageCount, 'assunto', 'assuntos')} e sairá desses assuntos.`
+      ? ` Ele está em ${pluralize(module.usageCount, 'treinamento', 'treinamentos')} e sairá desses treinamentos.`
       : '';
     if (!window.confirm(`Remover o jogo "${module.title}"?${usage}`)) return;
     onError('');
@@ -143,12 +143,12 @@ export default function CourseCatalog({
   }
 
   async function removeCourse(course: PlatformCourse) {
-    if (!window.confirm(`Excluir o assunto "${course.title}"? As empresas que já receberam este conteúdo continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
+    if (!window.confirm(`Excluir o treinamento "${course.title}"? As empresas que já receberam este conteúdo continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
     onError('');
     setIsDeleting(true);
     try {
       await deletePlatformCourse(course.id);
-      await onProgramsChanged(`O assunto "${course.title}" foi excluído.`);
+      await onProgramsChanged(`O treinamento "${course.title}" foi excluído.`);
     } catch (deleteError) {
       onError(getErrorMessage(deleteError));
     } finally {
@@ -179,7 +179,7 @@ export default function CourseCatalog({
             <h1 className="ops-hero-title">Conteúdo</h1>
             {import.meta.env.DEV && <Badge variant="outline">Apresentação demo</Badge>}
           </div>
-          <p className="ops-hero-lead">{`${pluralize(courses.length, 'assunto', 'assuntos')} no acervo da plataforma`}</p>
+          <p className="ops-hero-lead">{`${pluralize(courses.length, 'treinamento', 'treinamentos')} no acervo da plataforma`}</p>
         </div>
         {primaryAction && <div className="ops-hero-actions">{primaryAction}</div>}
       </header>

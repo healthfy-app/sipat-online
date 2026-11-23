@@ -80,7 +80,7 @@ export default function VideoLibraryPage() {
   }
 
   async function removeVideo(item: PlatformLibraryVideo) {
-    const usage = item.courseCount > 0 ? ` Ele está em ${pluralize(item.courseCount, 'assunto', 'assuntos')}.` : '';
+    const usage = item.courseCount > 0 ? ` Ele está em ${pluralize(item.courseCount, 'treinamento', 'treinamentos')}.` : '';
     if (!window.confirm(`Excluir o vídeo "${item.video.title}"?${usage} O arquivo é apagado e isso não pode ser desfeito.`)) return;
     setError('');
     setNotice('');
@@ -135,7 +135,7 @@ export default function VideoLibraryPage() {
               pluralize(library.length, 'vídeo', 'vídeos'),
               totalBytes > 0 ? formatBytes(totalBytes) : '',
               processing > 0 ? `${processing} em conversão` : '',
-              unused > 0 ? `${unused} sem assunto` : '',
+              unused > 0 ? `${unused} sem treinamento` : '',
             ].filter(Boolean).join(' · ')}
           </p>
         </div>
