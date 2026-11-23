@@ -42,7 +42,8 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   const scroller = useRef<HTMLDivElement>(null);
   // set by "+ Dia" only: a day put back with undo returns to its own place and must not pull the grid to the end
   const addedAtEnd = useRef(false);
-  const themes = catalog.subjects.filter(subject => subject.id !== 'none');
+  // personalized grid: the assuntos of the videos are only filters; Bronze picks a ready training per day
+  const themes = canCustomizeGrid ? (catalog.filters ?? []) : catalog.subjects.filter(subject => subject.id !== 'none');
   const canAddDay = days.length < maxDays;
   // "Dia" when the training has dates, "Módulo" when none of its parts has one
   const word = partWord(days.map(day => day.date));

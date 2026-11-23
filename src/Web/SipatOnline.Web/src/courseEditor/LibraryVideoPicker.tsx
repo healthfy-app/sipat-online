@@ -1,6 +1,6 @@
 import { Film, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isExtra, listPlatformCourses, listVideoSubjects, type PlatformLibraryVideo } from '@/api';
+import { isExtra, listSubjects, listVideoSubjects, type PlatformLibraryVideo } from '@/api';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { formatDuration } from './courseFormat';
@@ -43,8 +43,8 @@ export default function LibraryVideoPicker({ videos, value, onChange }: {
   const [videoSubjects, setVideoSubjects] = useState<Map<string, string[]>>(new Map());
 
   useEffect(() => {
-    Promise.all([listPlatformCourses(), listVideoSubjects()]).then(([courses, links]) => {
-      setSubjects(courses.map(course => ({ id: course.id, title: course.title })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
+    Promise.all([listSubjects(), listVideoSubjects()]).then(([list, links]) => {
+      setSubjects(list.map(item => ({ id: item.id, title: item.name })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
       setVideoSubjects(new Map(links.map(item => [item.videoId, item.subjectIds])));
     }, () => undefined);
   }, []);

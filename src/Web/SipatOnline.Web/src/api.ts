@@ -235,7 +235,7 @@ export async function deletePlatformVideo(videoId: string): Promise<void> {
   await request(`/api/platform/catalog/videos/${videoId}`, { method: 'DELETE' });
 }
 /** What a day of a SIPAT can be made of: published themes, library videos and games. Read only, for the company's administrator and the operator. */
-export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibraryVideo[]; games: GameModule[]; categories?: CourseCategory[] }
+export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibraryVideo[]; games: GameModule[]; categories?: CourseCategory[]; subjects?: VideoSubject[]; videoSubjects?: VideoSubjects[] }
 export function getSipatCatalog(): Promise<SipatCatalog> {
   return requestJson<SipatCatalog>('/api/admin/sipat-catalog');
 }
@@ -792,6 +792,11 @@ export function getPlatformCompanyEmployees(
 
 /** The assuntos (a classification, like a genre) each library video is in. */
 export interface VideoSubjects { videoId: string; subjectIds: string[] }
+/** The fixed list of assuntos (a classification of the videos, only a filter). */
+export interface VideoSubject { id: string; name: string }
+export function listSubjects(): Promise<VideoSubject[]> {
+  return requestJson<VideoSubject[]>('/api/platform/catalog/subjects');
+}
 export function listVideoSubjects(): Promise<VideoSubjects[]> {
   return requestJson<VideoSubjects[]>('/api/platform/catalog/video-subjects');
 }

@@ -99,13 +99,13 @@ public static class PlatformCourseCatalogEndpoints
         .WithName("DeletePlatformCourse");
 
         // assunto is a classification of the videos (like a genre): a video can be in several, from the operator's fixed list
+        catalog.MapGet("/subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+            Results.Ok(await db.VideoSubjects.AsNoTracking().OrderBy(item => item.Name)
+                .Select(item => new VideoSubjectResponse(item.Id, item.Name)).ToArrayAsync(cancellationToken)))
+        .WithName("ListSubjects");
+
         catalog.MapGet("/video-subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
-        {
-            var links = await db.PlatformCourseVideoLinks.AsNoTracking()
-                .Select(link => new { link.VideoId, link.CourseId }).ToListAsync(cancellationToken);
-            return Results.Ok(links.GroupBy(link => link.VideoId)
-                .Select(group => new VideoSubjectsResponse(group.Key, group.Select(link => link.CourseId).ToArray())).ToArray());
-        })
+            Results.Ok(await VideoSubjectMapAsync(db, cancellationToken)))
         .WithName("ListVideoSubjects");
 
         catalog.MapPut("/videos/{videoId:guid}/subjects", async (
@@ -117,16 +117,12 @@ public static class PlatformCourseCatalogEndpoints
             if (!await db.PlatformCourseVideos.AnyAsync(video => video.Id == videoId, cancellationToken))
                 return Results.NotFound();
             var wanted = (request.SubjectIds ?? []).Distinct().ToHashSet();
-            if (await db.PlatformCourses.CountAsync(course => wanted.Contains(course.Id), cancellationToken) != wanted.Count)
+            if (await db.VideoSubjects.CountAsync(item => wanted.Contains(item.Id), cancellationToken) != wanted.Count)
                 return Results.Problem(statusCode: 400, title: "catalog.subject_not_found", detail: "Um dos assuntos não foi encontrado.");
-            var current = await db.PlatformCourseVideoLinks.Where(link => link.VideoId == videoId).ToListAsync(cancellationToken);
-            db.PlatformCourseVideoLinks.RemoveRange(current.Where(link => !wanted.Contains(link.CourseId)));
-            foreach (var courseId in wanted.Where(id => current.All(link => link.CourseId != id)))
-            {
-                var last = await db.PlatformCourseVideoLinks.Where(link => link.CourseId == courseId)
-                    .MaxAsync(link => (int?)link.Position, cancellationToken) ?? -1;
-                db.PlatformCourseVideoLinks.Add(new PlatformCourseVideoLinkEntity { CourseId = courseId, VideoId = videoId, Position = last + 1 });
-            }
+            var current = await db.VideoSubjectLinks.Where(link => link.VideoId == videoId).ToListAsync(cancellationToken);
+            db.VideoSubjectLinks.RemoveRange(current.Where(link => !wanted.Contains(link.SubjectId)));
+            foreach (var subjectId in wanted.Where(id => current.All(link => link.SubjectId != id)))
+                db.VideoSubjectLinks.Add(new VideoSubjectLinkEntity { SubjectId = subjectId, VideoId = videoId });
             await db.SaveChangesAsync(cancellationToken);
             return Results.Ok(new VideoSubjectsResponse(videoId, wanted.ToArray()));
         })
@@ -137,18 +133,14 @@ public static class PlatformCourseCatalogEndpoints
         {
             var videoIds = request.VideoIds.Distinct().ToArray();
             var add = request.Add.Distinct().ToArray();
-            if (await db.PlatformCourses.CountAsync(course => add.Contains(course.Id), cancellationToken) != add.Length)
+            if (await db.VideoSubjects.CountAsync(item => add.Contains(item.Id), cancellationToken) != add.Length)
                 return Results.Problem(statusCode: 400, title: "catalog.subject_not_found", detail: "Um dos assuntos não foi encontrado.");
             var existing = await db.PlatformCourseVideos.Where(video => videoIds.Contains(video.Id)).Select(video => video.Id).ToListAsync(cancellationToken);
-            var links = await db.PlatformCourseVideoLinks.Where(link => existing.Contains(link.VideoId)).ToListAsync(cancellationToken);
-            db.PlatformCourseVideoLinks.RemoveRange(links.Where(link => request.Remove.Contains(link.CourseId)));
-            foreach (var courseId in add)
-            {
-                var last = await db.PlatformCourseVideoLinks.Where(link => link.CourseId == courseId)
-                    .MaxAsync(link => (int?)link.Position, cancellationToken) ?? -1;
-                foreach (var videoId in existing.Where(id => !links.Any(link => link.VideoId == id && link.CourseId == courseId)))
-                    db.PlatformCourseVideoLinks.Add(new PlatformCourseVideoLinkEntity { CourseId = courseId, VideoId = videoId, Position = ++last });
-            }
+            var links = await db.VideoSubjectLinks.Where(link => existing.Contains(link.VideoId)).ToListAsync(cancellationToken);
+            db.VideoSubjectLinks.RemoveRange(links.Where(link => request.Remove.Contains(link.SubjectId)));
+            foreach (var subjectId in add)
+                foreach (var videoId in existing.Where(id => !links.Any(link => link.VideoId == id && link.SubjectId == subjectId)))
+                    db.VideoSubjectLinks.Add(new VideoSubjectLinkEntity { SubjectId = subjectId, VideoId = videoId });
             await db.SaveChangesAsync(cancellationToken);
             return Results.NoContent();
         })
@@ -736,7 +728,9 @@ public static class PlatformCourseCatalogEndpoints
                 : [];
             var categories = await db.CourseCategories.AsNoTracking().OrderBy(item => item.Position).ThenBy(item => item.Name)
                 .Select(item => new CourseCategoryResponse(item.Id, item.Name, 0)).ToArrayAsync(cancellationToken);
-            return Results.Ok(new SipatCatalogResponse(themes, videos, games, categories));
+            var subjects = await db.VideoSubjects.AsNoTracking().OrderBy(item => item.Name)
+                .Select(item => new VideoSubjectResponse(item.Id, item.Name)).ToArrayAsync(cancellationToken);
+            return Results.Ok(new SipatCatalogResponse(themes, videos, games, categories, subjects, await VideoSubjectMapAsync(db, cancellationToken)));
         })
         .WithName("GetSipatCatalog");
 
@@ -873,6 +867,13 @@ public static class PlatformCourseCatalogEndpoints
             usageCount,
             module.Content);
 
+    private static async Task<VideoSubjectsResponse[]> VideoSubjectMapAsync(SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken)
+    {
+        var links = await db.VideoSubjectLinks.AsNoTracking().ToListAsync(cancellationToken);
+        return links.GroupBy(link => link.VideoId)
+            .Select(group => new VideoSubjectsResponse(group.Key, group.Select(link => link.SubjectId).ToArray())).ToArray();
+    }
+
     private static IResult ToProblem(DomainError error)
     {
         var statusCode = error.Code switch
@@ -982,7 +983,11 @@ public sealed record SipatCatalogResponse(
     IReadOnlyList<PlatformCourseResponse> Courses,
     IReadOnlyList<PlatformLibraryVideoResponse> Videos,
     IReadOnlyList<GameModuleResponse> Games,
-    IReadOnlyList<CourseCategoryResponse>? Categories = null);
+    IReadOnlyList<CourseCategoryResponse>? Categories = null,
+    IReadOnlyList<VideoSubjectResponse>? Subjects = null,
+    IReadOnlyList<VideoSubjectsResponse>? VideoSubjects = null);
+
+public sealed record VideoSubjectResponse(Guid Id, string Name);
 
 public sealed record PlatformCourseResponse(
     Guid Id,

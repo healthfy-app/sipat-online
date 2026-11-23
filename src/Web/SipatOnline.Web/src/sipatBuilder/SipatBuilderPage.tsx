@@ -96,7 +96,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       const courses = canEditThemes
         ? content.courses.map(course => ({ ...course, coverUrl: course.coverUrl?.replace('/api/admin/sipat-catalog/courses/', '/api/platform/catalog/courses/') ?? null }))
         : content.courses;
-      setCatalog(buildCatalog(courses, content.videos, content.games, content.categories ?? []));
+      setCatalog(buildCatalog(courses, content.videos, content.games, content.categories ?? [], content.subjects ?? [], content.videoSubjects ?? []));
       setPlans(summaries);
       setOthers(events.items);
       if (!isNew && params.sipatId) {

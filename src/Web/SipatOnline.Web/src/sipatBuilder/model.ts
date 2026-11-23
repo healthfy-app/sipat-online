@@ -14,6 +14,8 @@ export interface Catalog {
   videos: Map<string, CatalogVideo>;
   subjects: Subject[];
   games: Map<string, GameModule>;
+  /** The assuntos of the videos (a classification): only filters, each with the videos in it. */
+  filters?: Subject[];
 }
 
 /** "A1V4-Ergonomia e doenças" -> "A1V4". Videos of the catalog carry their code at the start of the title. */
@@ -31,7 +33,8 @@ function houseTotals(ids: string[], videos: Map<string, CatalogVideo>) {
 }
 
 /** Subjects are the courses of the catalog; videos that belong to no course go to "Sem assunto". */
-export function buildCatalog(courses: PlatformCourse[], library: PlatformLibraryVideo[], games: GameModule[], categories: { id: string; name: string }[] = []): Catalog {
+export function buildCatalog(courses: PlatformCourse[], library: PlatformLibraryVideo[], games: GameModule[], categories: { id: string; name: string }[] = [],
+  filterList: { id: string; name: string }[] = [], videoSubjects: { videoId: string; subjectIds: string[] }[] = []): Catalog {
   const categoryNames = new Map(categories.map(item => [item.id, item.name]));
   const gameMap = new Map(games.map(game => [game.id, game]));
   const videos = new Map<string, CatalogVideo>();
@@ -54,7 +57,13 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
     subjects.push({ id: 'none', title: 'Sem assunto', coverUrl: null, gameIds: [], option: null, videoIds: loose, ...houseTotals(loose, videos) });
   }
   subjects.sort((a, b) => (a.id === 'none' ? 1 : b.id === 'none' ? -1 : a.title.localeCompare(b.title, 'pt-BR')));
-  return { videos, subjects, games: gameMap };
+  // the assuntos of the videos (only filters), in the same shape so the day can filter and bring all of one assunto
+  const byVideo = new Map(videoSubjects.map(item => [item.videoId, item.subjectIds]));
+  const filters: Subject[] = filterList.map(item => {
+    const ids = [...videos.keys()].filter(id => byVideo.get(id)?.includes(item.id));
+    return { id: item.id, title: item.name, coverUrl: null, gameIds: [], option: null, videoIds: ids, ...houseTotals(ids, videos) };
+  }).filter(item => item.videoIds.length > 0).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
+  return { videos, subjects, games: gameMap, filters };
 }
 
 /** A day while it is being edited: empty slots are kept so the grid keeps its shape. */

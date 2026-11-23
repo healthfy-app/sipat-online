@@ -2,7 +2,7 @@ import { CloudUpload, Link2, Plus, Search, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  deletePlatformVideo, listPlatformCompanies, listPlatformCourses, listPlatformLibraryVideos, listVideoCompanies, listVideoSubjects, setVideoSubjects,
+  deletePlatformVideo, listPlatformCompanies, listSubjects, listPlatformLibraryVideos, listVideoCompanies, listVideoSubjects, setVideoSubjects,
   type PlatformLibraryVideo,
 } from '@/api';
 import type { SubjectOption } from '@/courseCatalog/VideoLibraryPanel';
@@ -48,8 +48,8 @@ export default function VideoLibraryPage() {
     setError('');
     try {
       // the assuntos come apart: the videos still show if they fail
-      Promise.all([listPlatformCourses(), listVideoSubjects()]).then(([courses, links]) => {
-        setSubjects(courses.map(course => ({ id: course.id, title: course.title })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
+      Promise.all([listSubjects(), listVideoSubjects()]).then(([list, links]) => {
+        setSubjects(list.map(item => ({ id: item.id, title: item.name })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
         setVideoSubjectMap(new Map(links.map(item => [item.videoId, item.subjectIds])));
       }, () => undefined);
       Promise.all([listPlatformCompanies(), listVideoCompanies()]).then(([list, rows]) => {
