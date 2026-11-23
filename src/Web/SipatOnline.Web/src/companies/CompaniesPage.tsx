@@ -13,6 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import AddAdministratorDialog from './AddAdministratorDialog';
+import CompanyAddress from './CompanyAddress';
 import CompanyAvatar from './CompanyAvatar';
 import CreateCompanyDialog from './CreateCompanyDialog';
 
@@ -165,7 +166,7 @@ export default function CompaniesPage() {
                         >
                           {company.name}
                         </Link>
-                        <span className="truncate text-xs text-muted-foreground">{company.key}</span>
+                        <CompanyAddress companyKey={company.key} />
                       </div>
                     </div>
                   </TableCell>
