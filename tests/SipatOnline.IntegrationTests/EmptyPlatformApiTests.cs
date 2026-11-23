@@ -23,7 +23,7 @@ public sealed class EmptyPlatformApiTests
             var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
             // nothing but the owner: no company, no library, no category
             Assert.Equal(0, await db.Tenants.CountAsync());
-            Assert.Equal(0, await db.PlatformCourses.CountAsync());
+            Assert.Equal(16, await db.PlatformCourses.CountAsync()); // only the fixed list of assuntos, still without videos
             Assert.Equal(0, await db.CourseCategories.CountAsync());
             Assert.Equal(1, await db.Users.CountAsync());
         }
