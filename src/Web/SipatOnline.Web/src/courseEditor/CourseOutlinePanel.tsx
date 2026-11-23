@@ -1,5 +1,5 @@
-import { CirclePlus, Gamepad2, Puzzle } from 'lucide-react';
-import { Fragment, type Ref } from 'react';
+import { ChevronRight, CirclePlus, Gamepad2, Puzzle } from 'lucide-react';
+import { Fragment, useState, type Ref } from 'react';
 import { isExtra, type PlatformCourse, type PlatformCourseStatus } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,12 @@ export default function CourseOutlinePanel({
   const activityCount = groups.reduce((total, group) => total + group.items.filter((item) => item.kind === 'activity').length, 0);
   const flatItems = groups.flatMap((group) => group.items);
   const flatVideoIds = groups.flatMap((group) => group.items.flatMap((item) => (item.kind === 'video' ? [item.video.id] : [])));
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  const toggleGroup = (key: string) => setCollapsed((current) => {
+    const next = new Set(current);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    return next;
+  });
 
   return (
     <section aria-labelledby="ce-track-title" className={editorPanel}>
@@ -83,28 +89,60 @@ export default function CourseOutlinePanel({
           <Button disabled={busy} onClick={() => actions.onAddVideo('')} size="sm">Adicionar vídeo</Button>
         </div>
       ) : (
-        <div className="grid gap-3 p-4">
-          <p className="m-0 px-1 text-xs tabular-nums text-muted-foreground">
+        <div className="grid gap-2 p-3">
+          <p className="m-0 px-2 text-xs tabular-nums text-muted-foreground">
             {pluralize(groups.length, 'título', 'títulos')} · {formatDuration(totalMilliseconds)}{activityCount > 0 && ` · ${pluralize(activityCount, 'atividade', 'atividades')}`}
           </p>
           {groups.map((group, groupIndex) => {
             const groupVideos = group.items.flatMap((item) => (item.kind === 'video' && !isExtra(item.video) ? [item.video] : []));
             const groupMs = groupVideos.reduce((sum, video) => sum + video.durationMilliseconds, 0);
+            const groupKey = group.id || String(groupIndex);
+            const isCollapsed = collapsed.has(groupKey);
             return (
-            <section aria-label={group.title} className="grid gap-0.5" key={group.id || groupIndex}>
-              <div className="group/title flex items-center gap-1 rounded-md bg-accent px-2 py-1.5">
-                <span aria-hidden="true" className="shrink-0 text-[0.6875rem] font-bold uppercase tracking-wide text-primary">{groupIndex + 1}</span>
+            <section aria-label={group.title} className="grid gap-0.5" key={groupKey}>
+              <div className="group/title flex items-center gap-1 rounded-md bg-accent py-1.5 pl-1 pr-2">
+                <button
+                  aria-expanded={!isCollapsed}
+                  aria-label={isCollapsed ? `Mostrar vídeos de ${group.title}` : `Recolher vídeos de ${group.title}`}
+                  className="relative m-0 grid size-6 min-h-0 shrink-0 cursor-pointer place-items-center rounded-sm border-0 bg-transparent p-0 text-primary hover:bg-card"
+                  onClick={() => toggleGroup(groupKey)}
+                  title={isCollapsed ? 'Mostrar vídeos' : 'Recolher'}
+                  type="button"
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'text-[0.6875rem] font-bold tabular-nums transition-opacity',
+                      'group-hover/title:opacity-0 group-focus-within/title:opacity-0 max-[860px]:opacity-0',
+                      isCollapsed && 'opacity-0',
+                    )}
+                  >
+                    {groupIndex + 1}
+                  </span>
+                  <ChevronRight
+                    aria-hidden="true"
+                    className={cn(
+                      'absolute inset-0 m-auto size-4 opacity-0 transition-[opacity,rotate] duration-150',
+                      'group-hover/title:opacity-100 group-focus-within/title:opacity-100 max-[860px]:opacity-100',
+                      isCollapsed ? 'opacity-100' : 'rotate-90',
+                    )}
+                  />
+                </button>
                 <div className="min-w-0 flex-1">
                   <InlineText className="font-semibold" disabled={busy || !group.id} label={`Nome do título ${groupIndex + 1}`}
                     onCommit={(value) => actions.onRenameLesson(group.id, value)} value={group.title} />
-                  <span className="block px-1.5 text-xs tabular-nums text-muted-foreground">{formatDuration(groupMs)}</span>
+                  <span className="block px-1.5 text-xs tabular-nums text-muted-foreground">
+                    {pluralize(groupVideos.length, 'vídeo', 'vídeos')} · {formatDuration(groupMs)}
+                  </span>
                 </div>
-                {group.id && <span className="flex shrink-0 gap-0.5">
+                {group.id && <span className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover/title:opacity-100 group-focus-within/title:opacity-100 max-[860px]:opacity-100">
                   <MiniButton disabled={busy || groupIndex === 0} label={`Mover ${group.title} para cima`} onClick={() => actions.onMoveLesson(group.id, -1)}>↑</MiniButton>
                   <MiniButton disabled={busy || groupIndex === groups.length - 1} label={`Mover ${group.title} para baixo`} onClick={() => actions.onMoveLesson(group.id, 1)}>↓</MiniButton>
                   <MiniButton danger disabled={busy || groups.length === 1} label={`Remover o título ${group.title}`} onClick={() => actions.onRemoveLesson(group.id)}>×</MiniButton>
                 </span>}
               </div>
+              {!isCollapsed && (
+              <div className="ml-4 grid gap-0.5 border-l border-border pl-2">
                   <ol aria-label={`Vídeos de ${group.title}`} className="m-0 mt-1 grid list-none gap-0.5 p-0">
                     {group.items.map((item) => {
                       const selected = item.key === selectedKey;
@@ -168,7 +206,7 @@ export default function CourseOutlinePanel({
                         {item.kind === 'video' && (
                           <li className="min-h-0">
                             <button
-                              className="m-0 inline-flex min-h-7 cursor-pointer items-center gap-1.5 border-0 bg-transparent py-0 pl-7 pr-2 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
+                              className="m-0 ml-6 inline-flex min-h-6 cursor-pointer items-center gap-1.5 border-0 border-l border-dashed border-border bg-transparent py-0 pl-2 pr-2 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
                               disabled={busy}
                               onClick={() => actions.onAddActivity(item.videoIndex + 1)}
                               type="button"
@@ -189,6 +227,8 @@ export default function CourseOutlinePanel({
               >
                 <CirclePlus className="size-4" /> Novo vídeo
               </button>
+              </div>
+              )}
             </section>
             );
           })}

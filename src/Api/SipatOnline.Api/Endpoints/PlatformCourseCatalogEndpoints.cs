@@ -104,6 +104,38 @@ public static class PlatformCourseCatalogEndpoints
                 .Select(item => new VideoSubjectResponse(item.Id, item.Name)).ToArrayAsync(cancellationToken)))
         .WithName("ListSubjects");
 
+        // a new assunto for the list; a name already there (ignoring case) gives back that one instead of a twin
+        catalog.MapPost("/subjects", async (CreateSubjectRequest request, SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+        {
+            var name = string.Join(' ', (request.Name ?? string.Empty).Split(' ', StringSplitOptions.RemoveEmptyEntries));
+            if (name.Length == 0)
+                return Results.Problem(statusCode: 400, title: "catalog.subject_name_required", detail: "Escreva o nome do assunto.");
+            if (name.Length > 200)
+                return Results.Problem(statusCode: 400, title: "catalog.subject_name_too_long", detail: "O nome do assunto pode ter até 200 letras.");
+            var existing = await db.VideoSubjects.AsNoTracking()
+                .FirstOrDefaultAsync(item => item.Name.ToLower() == name.ToLower(), cancellationToken);
+            if (existing is not null)
+                return Results.Ok(new VideoSubjectResponse(existing.Id, existing.Name));
+            var subject = new VideoSubjectEntity { Id = Guid.NewGuid(), Name = name };
+            db.VideoSubjects.Add(subject);
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.Created($"/api/platform/catalog/subjects/{subject.Id}", new VideoSubjectResponse(subject.Id, subject.Name));
+        })
+        .WithName("CreateSubject");
+
+        // the assunto leaves the list and every video that was in it; the videos themselves stay
+        catalog.MapDelete("/subjects/{subjectId:guid}", async (Guid subjectId, SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+        {
+            var subject = await db.VideoSubjects.FirstOrDefaultAsync(item => item.Id == subjectId, cancellationToken);
+            if (subject is null)
+                return Results.NotFound();
+            db.VideoSubjectLinks.RemoveRange(await db.VideoSubjectLinks.Where(link => link.SubjectId == subjectId).ToListAsync(cancellationToken));
+            db.VideoSubjects.Remove(subject);
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteSubject");
+
         catalog.MapGet("/video-subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
             Results.Ok(await VideoSubjectMapAsync(db, cancellationToken)))
         .WithName("ListVideoSubjects");
@@ -965,6 +997,8 @@ public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Vi
 public sealed record VideoSubjectsResponse(Guid VideoId, Guid[] SubjectIds);
 
 public sealed record SetVideoSubjectsRequest(Guid[]? SubjectIds);
+
+public sealed record CreateSubjectRequest(string? Name);
 
 public sealed record VideoCompaniesResponse(Guid VideoId, Guid[] CompanyIds);
 
