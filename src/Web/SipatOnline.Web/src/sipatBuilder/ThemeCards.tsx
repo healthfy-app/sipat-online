@@ -133,7 +133,8 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     <option value="">{subject ? 'Trocar assunto' : 'Escolher assunto'}</option>
     {themes.map(item => <option key={item.id} value={item.id}>{themeLabel(item)}</option>)}
   </select>;
-  const available = editable ? [...catalog.videos.values()].filter(video => !videoIds.includes(video.id)).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')) : [];
+  // the subject of the day filters the picker: only its videos are offered
+  const available = editable ? [...catalog.videos.values()].filter(video => !videoIds.includes(video.id) && (!subject || subject.videoIds.includes(video.id))).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')) : [];
   const videoPicker = editable && !full && available.length > 0 && <select aria-label={`Adicionar vídeo ao dia ${dayIndex + 1}`} className={cn('h-9 w-full rounded-md border border-dashed border-input bg-background px-2 text-sm text-muted-foreground', phoneSelect, 'max-[760px]:order-3')}
     onChange={event => { if (event.target.value) onVideos!([...videoIds, event.target.value]); }} value="">
     <option value="">+ Adicionar vídeo</option>
@@ -150,11 +151,12 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
       {editable ? <Film aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" /> : <Layers aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" />}
       <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{editable ? 'Arraste vídeos ou um assunto para este dia' : 'Arraste um assunto para este dia'}</p>
-      {videoPicker}
       {chooser}
+      {videoPicker}
     </div>;
   }
   return <div className={frame} ref={setNodeRef}>
+    {chooser}
     {subject
       ? <div className="flex items-center gap-2.5">
         <Cover className="size-11" subject={subject} />
@@ -195,6 +197,5 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       </ul>}
     </div>
     {videoPicker}
-    {chooser}
   </div>;
 }
