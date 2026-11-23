@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
@@ -12,6 +12,8 @@ vi.mock('./api', async (importOriginal) => ({
   listPlatformUsers: vi.fn(),
   listSipatPrograms: vi.fn(),
   changePlatformCompanyEmployeesStatus: vi.fn(),
+  getCompanyRegistry: vi.fn(),
+  importParticipants: vi.fn(),
 }));
 
 /** the company page opens on its participants (the sidebar picks the section; there are no tabs) */
@@ -68,6 +70,31 @@ function employeePage(overrides: Partial<api.PlatformCompanyEmployeePage> = {}):
 }
 
 describe('Platform company employees', () => {
+  it('lets the platform operator import the sheet of the company it is looking at', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({ units: [], sectors: [], rules: { requireRegistration: false, requireEmail: false, requirePhone: false, requireUnit: false, requireSector: false } });
+    vi.mocked(api.importParticipants).mockImplementation(async (_dryRun, rows) => ({
+      created: rows.length, updated: 0, unchanged: 0, rejected: [],
+      credentials: rows.map(row => ({ row: row.row, name: row.name ?? '', login: row.login ?? '' })),
+    }));
+    renderPage();
+    await openParticipants();
+    await user.click(screen.getByRole('button', { name: 'Importar participantes' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Adicionar colaboradores' });
+    // opens straight on the sheet, for this company
+    await user.upload(within(dialog).getByLabelText('Planilha'), new File(['Login;Senha;Nome completo\nbia;Bia@2026x;Bia Souza\n'], 'carga.csv', { type: 'text/csv' }));
+    expect(await within(dialog).findByText(/serão criados/)).toHaveTextContent('1 serão criados');
+    expect(api.getCompanyRegistry).toHaveBeenCalledWith('company-1');
+    expect(vi.mocked(api.importParticipants).mock.calls[0][2]).toEqual({ companyId: 'company-1' });
+
+    await user.click(within(dialog).getByRole('button', { name: 'Confirmar carga' }));
+    await waitFor(() => expect(api.importParticipants).toHaveBeenCalledTimes(2));
+    expect(vi.mocked(api.importParticipants).mock.calls[1][2]).toEqual({ companyId: 'company-1' });
+    await user.click(await within(dialog).findByRole('button', { name: 'Concluir' }));
+    expect(await screen.findByText('1 colaboradores adicionados, 0 atualizados.')).toBeVisible();
+  });
+
   it('deactivates the chosen participants after asking, and reloads the list', async () => {
     const user = userEvent.setup();
     vi.mocked(api.getPlatformCompanyEmployees).mockResolvedValue(employeePage());

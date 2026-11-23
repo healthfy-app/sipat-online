@@ -277,7 +277,7 @@ describe('collaborators', () => {
     expect(screen.queryByRole('button', { name: 'Mudar setor' })).not.toBeInTheDocument();
   });
 
-  it('a carga mostra a prévia, confirma com as mesmas senhas e exige baixar os acessos', async () => {
+  it('a carga usa a planilha do RH: a senha vem da planilha e a linha sem senha é recusada com o motivo', async () => {
     const user = userEvent.setup();
     const downloads: Blob[] = [];
     Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn((blob: Blob) => { downloads.push(blob); return 'blob:x'; }) });
@@ -292,32 +292,34 @@ describe('collaborators', () => {
     await user.click(await screen.findByRole('button', { name: 'Adicionar colaboradores' }));
     const dialog = await screen.findByRole('dialog', { name: 'Adicionar colaboradores' });
     await user.click(within(dialog).getByRole('button', { name: 'Importar planilha' }));
-    await user.upload(within(dialog).getByLabelText('Planilha'), new File(['nome;setor\nAna Costa;Produção\nBia;Marketing\n'], 'carga.csv', { type: 'text/csv' }));
+    await user.upload(within(dialog).getByLabelText('Planilha'), new File([
+      'Login;Senha;Nome completo;*setor\nana.costa;Ana@2026x;Ana Costa;Produção\nbia;Bia@2026x;Bia;Marketing\ncarla;;Carla;Produção\n',
+    ], 'carga.csv', { type: 'text/csv' }));
 
-    expect(await within(dialog).findByText(/serão criados/)).toHaveTextContent('1 serão criados · 0 atualizados · 0 sem mudança · 1 recusados');
+    expect(await within(dialog).findByText(/serão criados/)).toHaveTextContent('1 serão criados · 0 atualizados · 0 sem mudança · 2 recusados');
     expect(within(dialog).getByText('Linha 3 · bia: Setor "Marketing" não está na lista da empresa.')).toBeVisible();
-    const [, previewRows] = vi.mocked(api.importParticipants).mock.calls[0];
-    expect(vi.mocked(api.importParticipants).mock.calls[0][0]).toBe(true);
-    expect(previewRows.map(row => row.row)).toEqual([2, 3]);
+    expect(within(dialog).getByText('Linha 4 · carla: Falta senha.')).toBeVisible();
+    expect(within(dialog).getByText('Colunas reconhecidas: Login, Senha, Nome completo, Setor')).toBeVisible();
+    const [dryRun, previewRows] = vi.mocked(api.importParticipants).mock.calls[0];
+    expect(dryRun).toBe(true);
+    // the line without a password never reaches the server; the others carry the password of the sheet
+    expect(previewRows.map(row => [row.row, row.password])).toEqual([[2, 'Ana@2026x'], [3, 'Bia@2026x']]);
 
     await user.click(within(dialog).getByRole('button', { name: 'Confirmar carga' }));
     await waitFor(() => expect(api.importParticipants).toHaveBeenCalledTimes(2));
     expect(vi.mocked(api.importParticipants).mock.calls[1][0]).toBe(false);
     expect(vi.mocked(api.importParticipants).mock.calls[1][1]).toEqual(previewRows);
 
-    await user.click(within(dialog).getByRole('button', { name: 'Concluir' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Baixe o arquivo de acessos antes de fechar.');
     await user.click(within(dialog).getByRole('button', { name: 'Baixar o arquivo de acessos' }));
     const csv = await new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsText(downloads[downloads.length - 1]); });
-    expect(csv).toContain(`"Ana Costa";"ana.costa";"${previewRows[0].password}"`);
+    expect(csv).toContain('"Ana Costa";"ana.costa";"Ana@2026x"');
+    // the passwords are in the sheet the company already has: closing does not ask for the file
+    await user.click(within(dialog).getByRole('button', { name: 'Concluir' }));
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Adicionar colaboradores' })).not.toBeInTheDocument());
   });
 
   it('a carga grava em partes de 100 e, quando uma parte falha, tenta de novo só as que faltam', async () => {
     const user = userEvent.setup();
-    const downloads: Blob[] = [];
-    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: vi.fn((blob: Blob) => { downloads.push(blob); return 'blob:x'; }) });
-    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: vi.fn() });
-    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
     const created = (rows: api.ImportRow[]) => ({
       created: rows.length, updated: 0, unchanged: 0, rejected: [],
       credentials: rows.map(row => ({ row: row.row, name: row.name ?? '', login: row.login ?? '' })),
@@ -329,7 +331,7 @@ describe('collaborators', () => {
       saves++;
       return saves === 2 ? new Promise((_, reject) => { failSecond = reject; }) : Promise.resolve(created(rows));
     });
-    const sheet = ['nome;login', ...Array.from({ length: 250 }, (_, index) => `Pessoa ${index};p${index}`)].join('\n');
+    const sheet = ['Login;Senha;Nome completo', ...Array.from({ length: 250 }, (_, index) => `p${index};Senha@${index}x;Pessoa ${index}`)].join('\n');
     renderPage();
     await user.click(await screen.findByRole('button', { name: 'Adicionar colaboradores' }));
     const dialog = await screen.findByRole('dialog', { name: 'Adicionar colaboradores' });
@@ -337,7 +339,6 @@ describe('collaborators', () => {
     await user.upload(within(dialog).getByLabelText('Planilha'), new File([sheet], 'carga.csv', { type: 'text/csv' }));
 
     expect(await within(dialog).findByText(/serão criados/)).toHaveTextContent('250 serão criados');
-    expect(within(dialog).getByText('Colunas reconhecidas: Nome, Login')).toBeVisible();
     await user.click(within(dialog).getByRole('button', { name: 'Confirmar carga' }));
     expect(await within(dialog).findByText('Gravando… 100 de 250')).toBeVisible();
     failSecond(new Error('A requisição demorou demais.'));
@@ -345,12 +346,6 @@ describe('collaborators', () => {
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(
       'A carga parou na linha 102. As pessoas já gravadas estão no arquivo de acessos. Tente de novo para gravar o restante.');
     expect(within(dialog).getByText(/100 criados/)).toBeVisible();
-    await user.click(within(dialog).getByRole('button', { name: 'Concluir' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Baixe o arquivo de acessos antes de fechar.');
-    await user.click(within(dialog).getByRole('button', { name: 'Baixar o arquivo de acessos' }));
-    const firstFile = await new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsText(downloads[downloads.length - 1]); });
-    expect(firstFile).toContain('"Pessoa 0";"p0";');
-    expect(firstFile).not.toContain('"Pessoa 100";');
 
     await user.click(within(dialog).getByRole('button', { name: 'Tentar de novo' }));
     expect(await within(dialog).findByText(/250 criados/)).toBeVisible();
@@ -359,12 +354,6 @@ describe('collaborators', () => {
     const saved = calls.filter(([dryRun]) => !dryRun).map(([, rows]) => [rows[0].row, rows.length]);
     expect(saved).toEqual([[2, 100], [102, 100], [102, 100], [202, 50]]);
     expect(within(dialog).queryByRole('button', { name: 'Tentar de novo' })).not.toBeInTheDocument();
-    // the people saved after the first download are not in that file: it has to be downloaded again
-    await user.click(within(dialog).getByRole('button', { name: 'Concluir' }));
-    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Baixe o arquivo de acessos antes de fechar.');
-    await user.click(within(dialog).getByRole('button', { name: 'Baixar o arquivo de acessos' }));
-    const allFile = await new Promise<string>(resolve => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsText(downloads[downloads.length - 1]); });
-    expect(allFile).toContain('"Pessoa 249";"p249";');
   });
 
   it('o cadastro de um colaborador só cria: recusa quem já existe e mostra o login de quem foi criado', async () => {
