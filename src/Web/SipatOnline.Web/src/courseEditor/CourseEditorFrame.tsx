@@ -77,7 +77,7 @@ export default function CourseEditorFrame({
           </button>
         </div>
 
-        <nav aria-label="Etapas do curso" className="flex items-start gap-6 max-[860px]:col-span-full max-[860px]:row-start-2 max-[860px]:justify-center">
+        <nav aria-label="Etapas do assunto" className="flex items-start gap-6 max-[860px]:col-span-full max-[860px]:row-start-2 max-[860px]:justify-center">
           {stages.map((stage, index) => {
             const current = step === stage.id;
             const done = index < activeIndex;

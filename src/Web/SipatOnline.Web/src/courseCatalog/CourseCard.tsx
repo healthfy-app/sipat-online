@@ -49,7 +49,7 @@ export default function CourseCard({
           {course.gamificationEnabled && <Badge className="rounded-[0.3125rem] px-1.5 text-[0.6875rem]">Gamificação</Badge>}
         </div>
         <h3 className="m-0 min-h-[2.7em] text-[1.0625rem] font-extrabold leading-[1.3] tracking-[-0.01em] text-[#12332c]">
-          {/* o botão cobre o card inteiro: um clique em qualquer lugar abre o curso */}
+          {/* o botão cobre o card inteiro: um clique em qualquer lugar abre o assunto */}
           <button
             aria-label={`Abrir assunto ${course.title}`}
             className="m-0 line-clamp-2 min-h-0 w-full cursor-pointer border-0 bg-transparent p-0 text-left font-[inherit] text-inherit outline-none after:absolute after:inset-0 after:content-['']"

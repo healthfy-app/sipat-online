@@ -101,4 +101,98 @@ public sealed class R2DirectVideoUploadStore(IAmazonS3 s3, R2StorageOptions opti
 
     public async Task DeleteAsync(Guid videoId, CancellationToken ct) =>
         await s3.DeleteObjectAsync(options.Bucket, R2VideoSourceStore.KeyFor(videoId), ct);
+
+    public async Task<string> StartMultipartAsync(Guid videoId, string contentType, CancellationToken ct)
+    {
+        var response = await s3.InitiateMultipartUploadAsync(new InitiateMultipartUploadRequest
+        {
+            BucketName = options.Bucket,
+            Key = R2VideoSourceStore.KeyFor(videoId),
+            ContentType = contentType
+        }, ct);
+        return response.UploadId;
+    }
+
+    public IReadOnlyList<SignedUploadPart> SignParts(Guid videoId, string uploadId, IReadOnlyList<int> partNumbers, TimeSpan validFor)
+    {
+        var expires = clock.GetUtcNow().Add(validFor).UtcDateTime;
+        return partNumbers
+            .Select(number => new SignedUploadPart(number, new Uri(s3.GetPreSignedURL(new GetPreSignedUrlRequest
+            {
+                BucketName = options.Bucket,
+                Key = R2VideoSourceStore.KeyFor(videoId),
+                Verb = HttpVerb.PUT,
+                UploadId = uploadId,
+                PartNumber = number,
+                Expires = expires,
+                Protocol = options.UsesHttp ? Protocol.HTTP : Protocol.HTTPS
+            }))))
+            .ToArray();
+    }
+
+    public async Task<IReadOnlyList<StoredUploadPart>?> ListPartsAsync(Guid videoId, string uploadId, CancellationToken ct)
+    {
+        var parts = await ReadPartsAsync(videoId, uploadId, ct);
+        return parts?.Select(part => new StoredUploadPart(part.PartNumber ?? 0, part.Size ?? 0)).ToArray();
+    }
+
+    public async Task<bool> FinishMultipartAsync(Guid videoId, string uploadId, CancellationToken ct)
+    {
+        // The ETags come from the bucket, not from the browser: the CORS rule need not expose them.
+        var parts = await ReadPartsAsync(videoId, uploadId, ct);
+        if (parts is null)
+        {
+            return false;
+        }
+
+        await s3.CompleteMultipartUploadAsync(new CompleteMultipartUploadRequest
+        {
+            BucketName = options.Bucket,
+            Key = R2VideoSourceStore.KeyFor(videoId),
+            UploadId = uploadId,
+            PartETags = parts.OrderBy(part => part.PartNumber).Select(part => new PartETag(part.PartNumber ?? 0, part.ETag)).ToList()
+        }, ct);
+        return true;
+    }
+
+    public async Task AbortMultipartAsync(Guid videoId, string uploadId, CancellationToken ct)
+    {
+        try
+        {
+            await s3.AbortMultipartUploadAsync(options.Bucket, R2VideoSourceStore.KeyFor(videoId), uploadId, ct);
+        }
+        catch (AmazonS3Exception exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+        }
+    }
+
+    private async Task<List<PartDetail>?> ReadPartsAsync(Guid videoId, string uploadId, CancellationToken ct)
+    {
+        var parts = new List<PartDetail>();
+        int? marker = null;
+        try
+        {
+            while (true)
+            {
+                var page = await s3.ListPartsAsync(new ListPartsRequest
+                {
+                    BucketName = options.Bucket,
+                    Key = R2VideoSourceStore.KeyFor(videoId),
+                    UploadId = uploadId,
+                    PartNumberMarker = marker?.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                }, ct);
+                parts.AddRange(page.Parts ?? []);
+                if (page.IsTruncated != true || page.NextPartNumberMarker is null)
+                {
+                    return parts;
+                }
+
+                marker = page.NextPartNumberMarker;
+            }
+        }
+        catch (AmazonS3Exception exception) when (exception.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
 }

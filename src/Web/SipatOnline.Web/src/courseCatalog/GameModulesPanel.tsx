@@ -57,7 +57,7 @@ export default function GameModulesPanel({
                   {gameTypeLabel(module)}
                   {module.questions.length > 0 && ` · ${pluralize(module.questions.length, 'pergunta', 'perguntas')}`}
                   {' · '}
-                  {module.usageCount === 0 ? 'não usado em cursos' : `usado ${module.usageCount}×`}
+                  {module.usageCount === 0 ? 'não usado em assuntos' : `usado ${module.usageCount}×`}
                 </span>
               </div>
               <div className="flex gap-1.5 max-sm:col-span-2 max-sm:justify-end">

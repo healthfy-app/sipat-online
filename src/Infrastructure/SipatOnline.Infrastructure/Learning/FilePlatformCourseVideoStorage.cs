@@ -48,7 +48,7 @@ public sealed class FilePlatformCourseVideoStorage(
         {
             return Failure(
                 "learning.platform_course.video_size_invalid",
-                "O vídeo deve ter entre 1 byte e 250 MB.");
+                "O vídeo deve ter entre 1 byte e 2 GB.");
         }
 
         Directory.CreateDirectory(storagePath);
@@ -80,7 +80,7 @@ public sealed class FilePlatformCourseVideoStorage(
                 {
                     return Failure(
                         "learning.platform_course.video_size_invalid",
-                        "O vídeo excede o limite de 250 MB.");
+                        "O vídeo excede o limite de 2 GB.");
                 }
 
                 var bytesToCopy = Math.Min(bytesRead, header.Length - headerLength);

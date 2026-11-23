@@ -339,7 +339,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={canCustomizeGrid ? () => setImporting(true) : undefined} onName={setName} onStart={start}
         onStartDate={setStartDate} onTemplate={template} startDate={startDate}
         onCopy={sources.length > 0 ? () => setCopying(true) : undefined} />
-      : <BuilderGrid canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined}
+      : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined}
         onChange={cancelled ? () => undefined : edit} onRemoveDay={cancelled ? undefined : removeDay} />}
 
     {importing && <ImportDialog catalog={catalog} hasPlan={stage === 'grid' && days.some(day => day.videos.some(Boolean))} onClose={() => setImporting(false)}

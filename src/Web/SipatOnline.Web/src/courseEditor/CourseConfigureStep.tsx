@@ -51,9 +51,9 @@ export default function CourseConfigureStep({
   }
 
   return (
-    <StepPage label="Configuração do curso">
-      <CourseStepHeading eyebrow="Etapa 2 · Configurar" headingRef={headingRef} status={status} title="Detalhes do curso">
-        Revise as informações e escolha como o curso será apresentado aos participantes.
+    <StepPage label="Configuração do assunto">
+      <CourseStepHeading eyebrow="Etapa 2 · Configurar" headingRef={headingRef} status={status} title="Detalhes do assunto">
+        Revise as informações e escolha como o assunto será apresentado aos participantes.
       </CourseStepHeading>
 
       <div className="grid items-start gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.85fr)]">
@@ -61,10 +61,10 @@ export default function CourseConfigureStep({
           <form className="contents" onSubmit={handleSubmit}>
             <CardHeader>
               <CardTitle as="h2">Informações e preferências</CardTitle>
-              <CardDescription>O nome e a descrição ajudam as pessoas a identificar este curso no catálogo.</CardDescription>
+              <CardDescription>O nome e a descrição ajudam as pessoas a identificar este assunto no catálogo.</CardDescription>
             </CardHeader>
             <CardContent>
-              <Field htmlFor="edit-course-title" label="Nome do curso">
+              <Field htmlFor="edit-course-title" label="Nome do assunto">
                 <Input disabled={busy} id="edit-course-title" maxLength={200} required value={values.title}
                   onChange={(event) => onChange({ title: event.target.value })} />
               </Field>
@@ -76,7 +76,7 @@ export default function CourseConfigureStep({
                 <Textarea className="min-h-28" disabled={busy} id="edit-course-description" maxLength={2000} rows={4} value={values.description}
                   onChange={(event) => onChange({ description: event.target.value })} />
               </Field>
-              <Switch checked={values.gamificationEnabled} description="Ative ou desative a experiência de jogo deste curso."
+              <Switch checked={values.gamificationEnabled} description="Ative ou desative a experiência de jogo deste assunto."
                 disabled={busy} id="edit-course-gamification" label="Gamificação após os vídeos"
                 onChange={(event) => onChange({ gamificationEnabled: event.target.checked })} />
 
@@ -106,9 +106,9 @@ export default function CourseConfigureStep({
           </form>
         </Card>
 
-        <Card aria-label="Foto do curso" role="complementary">
+        <Card aria-label="Foto do assunto" role="complementary">
           <CardHeader>
-            <CardTitle as="h2">Foto do curso</CardTitle>
+            <CardTitle as="h2">Foto do assunto</CardTitle>
             <CardDescription>Uma imagem ajuda a identificar o conteúdo no catálogo.</CardDescription>
           </CardHeader>
           <CardContent>

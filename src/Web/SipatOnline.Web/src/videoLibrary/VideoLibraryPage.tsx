@@ -1,0 +1,197 @@
+import { CloudUpload, Plus, Search } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { deletePlatformVideo, listPlatformLibraryVideos, type PlatformLibraryVideo } from '@/api';
+import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Page } from '@/components/ui/page';
+import { filterVideos } from '@/courseCatalog/catalogFilters';
+import VideoLibraryPanel from '@/courseCatalog/VideoLibraryPanel';
+import { VideoUploadForm } from '@/courseEditor/CourseMediaForms';
+import { formatBytes, getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
+import LoadingState from '@/LoadingState';
+import { onVideoUploaded } from '@/videoUploads/uploadQueue';
+import '@/OpsIdentity.css';
+import '@/PlatformCourses.css';
+
+/**
+ * The platform's video library, apart from the content (subjects, games, plans) that uses the videos.
+ * Videos can be dropped anywhere on the page: they open the upload with the files already picked.
+ */
+export default function VideoLibraryPage() {
+  const [params, setParams] = useSearchParams();
+  const query = params.get('q') ?? '';
+  const [library, setLibrary] = useState<PlatformLibraryVideo[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [upload, setUpload] = useState<{ files: File[] } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragDepth = useRef(0);
+
+  const refresh = useCallback(async () => {
+    setError('');
+    try {
+      setLibrary(await listPlatformLibraryVideos());
+    } catch (loadError) {
+      setError(getErrorMessage(loadError));
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void refresh(); }, [refresh]);
+
+  // each video the background upload finishes shows up here; many close together cause one reload
+  useEffect(() => {
+    let timer: number | undefined;
+    const stop = onVideoUploaded(() => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        listPlatformLibraryVideos().then(setLibrary, () => undefined);
+      }, 1500);
+    });
+    return () => { stop(); window.clearTimeout(timer); };
+  }, []);
+
+  // while a video is converting, reload quietly until it is ready (or failed)
+  const hasProcessing = library.some((item) => item.video.status === 'Processing');
+  useEffect(() => {
+    if (!hasProcessing) return;
+    const timer = window.setInterval(() => {
+      listPlatformLibraryVideos().then(setLibrary, () => undefined);
+    }, 15_000);
+    return () => window.clearInterval(timer);
+  }, [hasProcessing]);
+
+  const shown = useMemo(() => filterVideos(library, query), [library, query]);
+  const totalBytes = library.reduce((sum, item) => sum + (item.video.sizeBytes ?? 0), 0);
+  const processing = library.filter((item) => item.video.status === 'Processing').length;
+  const unused = library.filter((item) => item.video.status === 'Ready' && item.courseCount === 0).length;
+
+  function setQuery(value: string) {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value) next.set('q', value); else next.delete('q');
+      return next;
+    }, { replace: true });
+  }
+
+  async function removeVideo(item: PlatformLibraryVideo) {
+    const usage = item.courseCount > 0 ? ` Ele está em ${pluralize(item.courseCount, 'assunto', 'assuntos')}.` : '';
+    if (!window.confirm(`Excluir o vídeo "${item.video.title}"?${usage} O arquivo é apagado e isso não pode ser desfeito.`)) return;
+    setError('');
+    setNotice('');
+    setIsDeleting(true);
+    try {
+      await deletePlatformVideo(item.video.id);
+      await refresh();
+      setNotice(`O vídeo "${item.video.title}" foi excluído.`);
+    } catch (deleteError) {
+      setError(getErrorMessage(deleteError));
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  function hasFiles(event: DragEvent) {
+    return Array.from(event.dataTransfer.types).includes('Files');
+  }
+
+  return (
+    <Page
+      className="relative"
+      onDragEnter={(event) => {
+        if (!hasFiles(event) || upload) return;
+        event.preventDefault();
+        dragDepth.current += 1;
+        setIsDragging(true);
+      }}
+      onDragLeave={() => {
+        dragDepth.current -= 1;
+        if (dragDepth.current <= 0) setIsDragging(false);
+      }}
+      onDragOver={(event) => {
+        if (!hasFiles(event) || upload) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+      }}
+      onDrop={(event) => {
+        if (!hasFiles(event) || upload) return;
+        event.preventDefault();
+        dragDepth.current = 0;
+        setIsDragging(false);
+        setUpload({ files: Array.from(event.dataTransfer.files) });
+      }}
+    >
+      <header className="ops-hero" data-slot="page-header">
+        <div className="ops-hero-copy">
+          <p className="ops-hero-eyebrow">Acervo da plataforma</p>
+          <h1 className="ops-hero-title">Biblioteca de vídeos</h1>
+          <p className="ops-hero-lead">
+            {[
+              pluralize(library.length, 'vídeo', 'vídeos'),
+              totalBytes > 0 ? formatBytes(totalBytes) : '',
+              processing > 0 ? `${processing} em conversão` : '',
+              unused > 0 ? `${unused} sem assunto` : '',
+            ].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+        <div className="ops-hero-actions">
+          <Button className="ops-primary" onClick={() => setUpload({ files: [] })}><Plus /> Enviar vídeos</Button>
+        </div>
+      </header>
+
+      {error && (
+        <div className="flex flex-wrap items-center gap-3">
+          <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>
+          <Button disabled={isLoading} onClick={() => void refresh()} variant="outline">Tentar novamente</Button>
+        </div>
+      )}
+      {notice && <p className="m-0 rounded-md bg-accent px-3 py-2 text-sm font-medium text-accent-foreground" role="status">{notice}</p>}
+
+      {library.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2.5" role="search">
+          <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-md">
+            <Search className="pointer-events-none absolute left-3 size-4" />
+            <Input aria-label="Buscar vídeo" className="pl-9" onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar vídeo por nome" type="search" value={query} />
+          </label>
+          <span className="text-sm text-muted-foreground tabular-nums">
+            {query.trim() ? `${shown.length} de ${library.length}` : pluralize(library.length, 'vídeo', 'vídeos')}
+          </span>
+          <span className="ml-auto text-xs text-muted-foreground max-[640px]:hidden">Dica: arraste vídeos para esta página para enviar.</span>
+        </div>
+      )}
+
+      {isLoading
+        ? <LoadingState className="list-state">Carregando vídeos...</LoadingState>
+        : <VideoLibraryPanel busy={isDeleting} hasVideos={library.length > 0} library={shown}
+            onClearFilters={() => setQuery('')} onDelete={(item) => void removeVideo(item)} onUpload={() => setUpload({ files: [] })} />}
+
+      {isDragging && (
+        <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-primary/10 p-6 backdrop-blur-[2px]">
+          <div className="grid justify-items-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-card px-10 py-8 text-center shadow-overlay">
+            <span className="grid size-14 place-items-center rounded-full bg-accent text-primary"><CloudUpload className="size-7" /></span>
+            <strong className="text-lg">Solte para enviar os vídeos</strong>
+            <span className="text-sm text-muted-foreground">MP4 ou WebM, até 2 GB cada</span>
+          </div>
+        </div>
+      )}
+
+      {upload && (
+        <Dialog onClose={() => setUpload(null)} title="Enviar vídeos">
+          <VideoUploadForm initialFiles={upload.files} onQueued={(count) => {
+            setUpload(null);
+            setError('');
+            setNotice(count === 1
+              ? 'O vídeo entrou na fila de envio. Acompanhe o progresso no canto da tela.'
+              : `${count} vídeos entraram na fila de envio. Acompanhe o progresso no canto da tela.`);
+          }} />
+        </Dialog>
+      )}
+    </Page>
+  );
+}

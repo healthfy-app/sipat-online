@@ -30,7 +30,7 @@ function checkpointLabel(milliseconds: number) {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 }
 
-/** Configura as atividades (jogos e perguntas) de um curso: entre os vídeos e durante um vídeo. */
+/** Configura as atividades (jogos e perguntas) de um assunto: entre os vídeos e durante um vídeo. */
 export default function CourseGamesSection({
   course,
   modules,
@@ -64,7 +64,7 @@ export default function CourseGamesSection({
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div className="grid gap-1">
           <p className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-primary">INTERATIVIDADE OPCIONAL</p>
-          <h2 className="m-0 text-lg font-semibold leading-snug" id="course-games-title">Como usar atividades no curso</h2>
+          <h2 className="m-0 text-lg font-semibold leading-snug" id="course-games-title">Como usar atividades no assunto</h2>
           <p className="m-0 max-w-xl text-sm text-muted-foreground">
             Adicione uma atividade entre vídeos ou faça uma pergunta aparecer durante a reprodução.
           </p>
@@ -81,7 +81,7 @@ export default function CourseGamesSection({
       >
         {course.modules.length === 0 && modules.length > 0 && (
           <p className="m-0 rounded-md border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
-            Nenhuma atividade foi adicionada a este curso ainda.
+            Nenhuma atividade foi adicionada a este assunto ainda.
           </p>
         )}
 
@@ -109,7 +109,7 @@ export default function CourseGamesSection({
                       </Button>
                     )}
                     <Button
-                      aria-label={`Remover atividade ${found?.title ?? ''} do curso`}
+                      aria-label={`Remover atividade ${found?.title ?? ''} do assunto`}
                       onClick={() => void savePlacements(
                         course.modules.filter((_, itemIndex) => itemIndex !== index),
                         'A atividade foi removida do assunto.',
@@ -164,7 +164,7 @@ export default function CourseGamesSection({
       </Step>
 
       <Step
-        description="Escolha o momento e a atividade. O vídeo pausa para exibi-la, sem bloquear a conclusão do curso."
+        description="Escolha o momento e a atividade. O vídeo pausa para exibi-la, sem bloquear a conclusão do assunto."
         icon={<Clapperboard />}
         id="course-games-checkpoints-title"
         number={2}
@@ -172,7 +172,7 @@ export default function CourseGamesSection({
       >
         {houseVideos(course.videos).length === 0 ? (
           <p className="m-0 rounded-md border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">
-            Adicione um vídeo ao curso antes de configurar uma pergunta durante a reprodução.
+            Adicione um vídeo ao assunto antes de configurar uma pergunta durante a reprodução.
           </p>
         ) : modules.length === 0 ? (
           <p className="m-0 rounded-md border border-dashed border-border px-3 py-2.5 text-sm text-muted-foreground">

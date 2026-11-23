@@ -16,15 +16,28 @@ public sealed class PlatformCourseCatalogService(
 {
     private static readonly TimeSpan PreviewLinkLifetime = TimeSpan.FromMinutes(10);
 
-    /// <summary>Long enough for 250 MB on a slow office uplink.</summary>
-    private static readonly TimeSpan DirectUploadLifetime = TimeSpan.FromHours(1);
+    /// <summary>Long enough to start a 2 GB upload late in a queue on a slow office uplink.</summary>
+    private static readonly TimeSpan DirectUploadLifetime = TimeSpan.FromHours(3);
 
     private const string VideoTypeInvalidCode = "learning.platform_course.video_type_invalid";
     private const string VideoTypeInvalidMessage = "Envie um vídeo MP4 ou WebM.";
     private const string VideoSizeInvalidCode = "learning.platform_course.video_size_invalid";
-    private const string VideoSizeInvalidMessage = "O vídeo deve ter entre 1 byte e 250 MB.";
+    private const string VideoSizeInvalidMessage = "O vídeo deve ter entre 1 byte e 2 GB.";
 
-    public const long MaximumVideoSizeBytes = 250 * 1024 * 1024;
+    public const long MaximumVideoSizeBytes = 2L * 1024 * 1024 * 1024;
+
+    /// <summary>
+    /// Part of a chunked upload: a dropped connection costs at most this much. R2 wants every part but the last
+    /// the same size and at least 5 MiB; 2 GB is 128 parts.
+    /// </summary>
+    public const long ChunkedUploadPartSizeBytes = 16L * 1024 * 1024;
+
+    /// <summary>How many part links one call signs.</summary>
+    public const int MaximumSignedPartsPerCall = 32;
+
+    /// <summary>A part link only has to last until its part goes out; after a pause the browser asks for new ones.</summary>
+    private static readonly TimeSpan PartLinkLifetime = TimeSpan.FromHours(1);
+    private const int MaximumUploadIdLength = 1024;
     public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
     private const int MaximumExternalIdLength = ExternalVideoLink.MaximumSmartplayerLength;
@@ -544,6 +557,140 @@ public sealed class PlatformCourseCatalogService(
     }
 
     /// <summary>
+    /// Opens a chunked upload: the browser sends the file in parts and, after a lost connection or a reload, resumes
+    /// from the parts the bucket already holds. A null ticket means direct upload is off: use the multipart form.
+    /// </summary>
+    public async Task<Result<ChunkedUploadOpening>> StartChunkedUploadAsync(
+        string? contentType,
+        long sizeBytes,
+        CancellationToken cancellationToken)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<ChunkedUploadOpening>.Failure(permission.Error);
+        }
+
+        if (!IsVideoContentType(contentType))
+        {
+            return Failure<ChunkedUploadOpening>(VideoTypeInvalidCode, VideoTypeInvalidMessage);
+        }
+
+        if (sizeBytes is < 1 or > MaximumVideoSizeBytes)
+        {
+            return Failure<ChunkedUploadOpening>(VideoSizeInvalidCode, VideoSizeInvalidMessage);
+        }
+
+        if (!directUploads.IsEnabled)
+        {
+            return Result<ChunkedUploadOpening>.Success(new ChunkedUploadOpening(null));
+        }
+
+        var videoId = Guid.NewGuid();
+        var uploadId = await directUploads.StartMultipartAsync(videoId, contentType!, cancellationToken);
+        var partCount = (int)((sizeBytes + ChunkedUploadPartSizeBytes - 1) / ChunkedUploadPartSizeBytes);
+        return Result<ChunkedUploadOpening>.Success(new ChunkedUploadOpening(
+            new ChunkedUploadStart(videoId, uploadId, ChunkedUploadPartSizeBytes, partCount)));
+    }
+
+    public Result<IReadOnlyList<SignedUploadPart>> SignChunkedUploadParts(
+        Guid videoId,
+        string? uploadId,
+        IReadOnlyList<int>? partNumbers)
+    {
+        var check = CheckChunkedUpload(videoId, uploadId);
+        if (!check.IsSuccess)
+        {
+            return Result<IReadOnlyList<SignedUploadPart>>.Failure(check.Error);
+        }
+
+        var lastPart = (int)((MaximumVideoSizeBytes + ChunkedUploadPartSizeBytes - 1) / ChunkedUploadPartSizeBytes);
+        if (partNumbers is null || partNumbers.Count is < 1 or > MaximumSignedPartsPerCall
+            || partNumbers.Any(number => number < 1 || number > lastPart))
+        {
+            return Failure<IReadOnlyList<SignedUploadPart>>(
+                "learning.platform_course.upload_parts_invalid",
+                "As partes pedidas para o envio são inválidas.");
+        }
+
+        return Result<IReadOnlyList<SignedUploadPart>>.Success(
+            directUploads.SignParts(videoId, uploadId!, partNumbers.Distinct().ToArray(), PartLinkLifetime));
+    }
+
+    public async Task<Result<IReadOnlyList<StoredUploadPart>>> ListChunkedUploadPartsAsync(
+        Guid videoId,
+        string? uploadId,
+        CancellationToken cancellationToken)
+    {
+        var check = CheckChunkedUpload(videoId, uploadId);
+        if (!check.IsSuccess)
+        {
+            return Result<IReadOnlyList<StoredUploadPart>>.Failure(check.Error);
+        }
+
+        var parts = await directUploads.ListPartsAsync(videoId, uploadId!, cancellationToken);
+        return parts is null
+            ? Failure<IReadOnlyList<StoredUploadPart>>(UploadNotFoundCode, UploadNotFoundMessage)
+            : Result<IReadOnlyList<StoredUploadPart>>.Success(parts);
+    }
+
+    /// <summary>
+    /// Joins the parts into the original. Asked again after a lost answer, it succeeds when the original is already
+    /// there; <see cref="CompleteDirectUploadAsync"/> then checks it and registers the video.
+    /// </summary>
+    public async Task<Result<bool>> FinishChunkedUploadAsync(
+        Guid videoId,
+        string? uploadId,
+        CancellationToken cancellationToken)
+    {
+        var check = CheckChunkedUpload(videoId, uploadId);
+        if (!check.IsSuccess)
+        {
+            return check;
+        }
+
+        if (await directUploads.FinishMultipartAsync(videoId, uploadId!, cancellationToken)
+            || await directUploads.InspectAsync(videoId, cancellationToken) is not null)
+        {
+            return Result<bool>.Success(true);
+        }
+
+        return Failure<bool>(UploadNotFoundCode, UploadNotFoundMessage);
+    }
+
+    public async Task<Result<bool>> AbortChunkedUploadAsync(
+        Guid videoId,
+        string? uploadId,
+        CancellationToken cancellationToken)
+    {
+        var check = CheckChunkedUpload(videoId, uploadId);
+        if (!check.IsSuccess)
+        {
+            return check;
+        }
+
+        await directUploads.AbortMultipartAsync(videoId, uploadId!, cancellationToken);
+        return Result<bool>.Success(true);
+    }
+
+    private Result<bool> CheckChunkedUpload(Guid videoId, string? uploadId)
+    {
+        var permission = EnsurePlatformOperator();
+        if (!permission.IsSuccess)
+        {
+            return Result<bool>.Failure(permission.Error);
+        }
+
+        if (!directUploads.IsEnabled || videoId == Guid.Empty || string.IsNullOrWhiteSpace(uploadId)
+            || uploadId.Length > MaximumUploadIdLength)
+        {
+            return Failure<bool>(UploadNotFoundCode, UploadNotFoundMessage);
+        }
+
+        return Result<bool>.Success(true);
+    }
+
+    /// <summary>
     /// Registers what the browser uploaded for <paramref name="videoId"/> after checking that it exists, fits the size
     /// limit and starts like the declared format. An object that fails the checks is deleted.
     /// </summary>
@@ -717,10 +864,11 @@ public sealed class PlatformCourseCatalogService(
         return Result<(string Title, Guid ActorId)>.Success((normalizedTitle, actorId));
     }
 
+    private const string UploadNotFoundCode = "learning.platform_course.upload_not_found";
+    private const string UploadNotFoundMessage = "O envio não foi encontrado. Envie o vídeo de novo.";
+
     private static Result<PlatformCourseVideo> UploadNotFound() =>
-        Failure<PlatformCourseVideo>(
-            "learning.platform_course.upload_not_found",
-            "O envio não foi encontrado. Envie o vídeo de novo.");
+        Failure<PlatformCourseVideo>(UploadNotFoundCode, UploadNotFoundMessage);
 
     /// <summary>Registers a YouTube, Vimeo or Smartplayer link as a library item; the same link twice returns the first one.</summary>
     public async Task<Result<PlatformCourseVideo>> CreateExternalVideoAsync(

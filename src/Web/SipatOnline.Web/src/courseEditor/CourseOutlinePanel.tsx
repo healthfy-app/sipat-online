@@ -146,7 +146,7 @@ export default function CourseOutlinePanel({
                             >
                               <MiniButton disabled={busy || flatIndex === 0} label={`Mover ${item.title} para cima`} onClick={() => actions.onMoveVideo(item.video.id, -1)}>↑</MiniButton>
                               <MiniButton disabled={busy || flatIndex === flatVideoIds.length - 1} label={`Mover ${item.title} para baixo`} onClick={() => actions.onMoveVideo(item.video.id, 1)}>↓</MiniButton>
-                              <MiniButton danger disabled={busy} label={`Remover ${item.title} do curso`} onClick={() => actions.onRemoveVideo(item.video.id)}>×</MiniButton>
+                              <MiniButton danger disabled={busy} label={`Remover ${item.title} do assunto`} onClick={() => actions.onRemoveVideo(item.video.id)}>×</MiniButton>
                             </span>
                           </>}
                         </li>
