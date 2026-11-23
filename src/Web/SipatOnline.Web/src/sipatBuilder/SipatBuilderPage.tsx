@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   cancelSipatEvent, copySipatPlan, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, saveSipatPlan, updateSipatEvent,
-  type CompanyCapabilities, type SipatEvent, type SipatPlanSummary,
+  type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,13 +16,14 @@ import { cn } from '@/lib/utils';
 import LoadingState from '@/LoadingState';
 import '@/OpsIdentity.css';
 import { partWord } from '@/trainings/partWord';
+import { courseLessons as titlesOf } from '@/courseEditor/courseTrack';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
 import { phaseLabel, sipatPhase } from './sipatPhase';
 import {
-  addDays, buildCatalog, dayDuration, dayVideoCounts, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay,
+  addDays, buildCatalog, dayDuration, dayFromTitle, maxDays, dayVideoCounts, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay,
   type Catalog, type DaySlots,
 } from './model';
 
@@ -86,6 +87,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const [showIssues, setShowIssues] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
   const [editingName, setEditingName] = useState(false);
+  // the trainings of Conteúdo; starting from one makes a day of each of its Títulos
+  const [trainings, setTrainings] = useState<PlatformCourse[]>([]);
+  const [training, setTraining] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -97,6 +101,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         ? content.courses.map(course => ({ ...course, coverUrl: course.coverUrl?.replace('/api/admin/sipat-catalog/courses/', '/api/platform/catalog/courses/') ?? null }))
         : content.courses;
       setCatalog(buildCatalog(courses, content.videos, content.games, content.categories ?? [], content.subjects ?? [], content.videoSubjects ?? []));
+      setTrainings(courses);
       setPlans(summaries);
       setOthers(events.items);
       if (!isNew && params.sipatId) {
@@ -165,6 +170,13 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   function start() {
     if (!isValidDate(startDate)) { setError('Escolha a data de início do treinamento.'); return; }
     setError('');
+    const source = trainings.find(item => item.id === training);
+    if (source && catalog) {
+      const known = (ids: string[]) => ids.filter(id => catalog.videos.has(id));
+      setDays(titlesOf(source).slice(0, maxDays).map((title, index) => dayFromTitle(index, addDays(startDate, index), title.title, known(title.videoIds))));
+      setStage('grid'); setDirty(true);
+      return;
+    }
     setDays(Array.from({ length: dayCount }, (_, index) => newDay(index, addDays(startDate, index))));
     setStage('grid'); setDirty(true);
   }
@@ -349,7 +361,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     {stage === 'setup'
       ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={canCustomizeGrid ? () => setImporting(true) : undefined} onName={setName} onStart={start}
         onStartDate={setStartDate} onTemplate={template} startDate={startDate}
-        onCopy={sources.length > 0 ? () => setCopying(true) : undefined} />
+        onCopy={sources.length > 0 ? () => setCopying(true) : undefined}
+        onTraining={canCustomizeGrid ? setTraining : undefined} training={training}
+        trainings={trainings.map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
       : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined}
         onChange={cancelled ? () => undefined : edit} onRemoveDay={cancelled ? undefined : removeDay} />}
 

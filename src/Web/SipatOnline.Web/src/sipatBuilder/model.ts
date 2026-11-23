@@ -85,6 +85,12 @@ function pad<T>(items: (T | null)[], rows: number): (T | null)[] {
   return items.length >= rows ? items : [...items, ...Array.from({ length: rows - items.length }, () => null)];
 }
 
+/** A day made from a Título of a training of Conteúdo: its name and its videos, in order. */
+export function dayFromTitle(index: number, date: string, title: string, videoIds: string[]): DaySlots {
+  const videos = videoIds.slice(0, maxVideoRows);
+  return { ...newDay(index, date), title: title.trim() || `Dia ${index + 1}`, videos: pad(videos, Math.max(defaultVideoRows, videos.length)) };
+}
+
 export function newDay(index: number, date = ''): DaySlots {
   return {
     key: nextKey(), title: `Dia ${index + 1}`, date, subject: '',
