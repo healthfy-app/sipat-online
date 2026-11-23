@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react';
+import { LoaderCircle, Trash2 } from 'lucide-react';
 import { isExtra, videoProvider, type PlatformLibraryVideo } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -40,11 +40,15 @@ export default function VideoLibraryPanel({
                   isExtra(video)
                     ? <ExternalVideoFrame title={`Prévia de ${video.title}`} video={video} />
                     : <VideoPreview preload="metadata" src={video.fileUrl} title={`Prévia de ${video.title}`} />
+                ) : video.status === 'Processing' ? (
+                  <div className="grid size-full place-content-center justify-items-center gap-2 p-4 text-center text-white/80">
+                    <LoaderCircle aria-hidden="true" className="size-6 animate-spin motion-reduce:animate-none" />
+                    <p className="m-0 text-[0.875rem] font-semibold text-white">Preparando o vídeo</p>
+                    <p className="m-0 max-w-[30ch] text-[0.8125rem] leading-snug">Leva alguns minutos. Você pode sair desta tela.</p>
+                  </div>
                 ) : (
                   <p className="m-0 grid size-full place-items-center p-4 text-center text-[0.8125rem] leading-snug text-white/80">
-                    {video.status === 'Processing'
-                      ? 'Convertendo para 720p e 480p. O vídeo fica disponível para os Dias quando terminar.'
-                      : video.processingError ?? 'A conversão deste vídeo falhou.'}
+                    {video.processingError ?? 'Não foi possível preparar este vídeo. Envie o arquivo de novo.'}
                   </p>
                 )}
               </div>
@@ -53,7 +57,9 @@ export default function VideoLibraryPanel({
                 <p className="m-0 text-[0.8125rem] tabular-nums text-muted-foreground">
                   {isExtra(video)
                     ? `${videoProvider(video)}${video.durationMilliseconds > 0 ? ` · ${formatDuration(video.durationMilliseconds)}` : ''}`
-                    : `${formatDuration(video.durationMilliseconds)} · ${formatBytes(video.sizeBytes)}`}
+                    : video.status === 'Ready'
+                      ? `${formatDuration(video.durationMilliseconds)} · ${formatBytes(video.sizeBytes)}`
+                      : formatBytes(video.sizeBytes)}
                 </p>
                 {isExtra(video) && <ExternalVideoOutside video={video} />}
                 <div className="mt-1 flex items-center justify-between gap-2">

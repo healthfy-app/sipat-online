@@ -1049,7 +1049,11 @@ describe('Platform course catalog', () => {
     await user.click(await screen.findByRole('tab', { name: /Vídeos/ }));
     const card = (await screen.findByRole('heading', { name: 'Treinamento novo' })).closest('article') as HTMLElement;
     expect(within(card).getByText('Processando')).toBeVisible();
-    expect(within(card).getByText('Convertendo para 720p e 480p. O vídeo fica disponível para os Dias quando terminar.')).toBeVisible();
+    expect(within(card).getByText('Preparando o vídeo')).toBeVisible();
+    expect(within(card).getByText('Leva alguns minutos. Você pode sair desta tela.')).toBeVisible();
+    expect(within(card).queryByText(/720p|480p/)).toBeNull();
+    // No duration until the conversion measures it: only the size.
+    expect(within(card).queryByText(/\d+:\d{2} ·/)).toBeNull();
     expect(card.querySelector('video')).toBeNull();
   });
 

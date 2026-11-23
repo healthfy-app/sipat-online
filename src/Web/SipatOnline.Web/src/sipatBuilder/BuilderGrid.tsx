@@ -15,6 +15,14 @@ import './builder.css';
 
 export { subjectColor };
 
+/**
+ * Phone (up to 760px): the columns would be too thin to read, so the days stack one below the other, each one a card of
+ * its own (head, content, time). The board keeps its DOM: `--order` puts every cell back under its day. Fields use 16px
+ * type (iOS zooms the page on focus below that) and every control is at least 44px tall.
+ */
+const phoneCell = 'max-[760px]:order-(--order) max-[760px]:min-w-0 max-[760px]:border-r-0 max-[760px]:[animation-name:builder-col-up]!';
+const phoneField = 'max-[760px]:h-11 max-[760px]:min-h-11 max-[760px]:w-full max-[760px]:px-3 max-[760px]:text-base';
+
 const filled = (items: (string | null)[]) => items.filter((id): id is string => !!id);
 
 /**
@@ -73,29 +81,29 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
     const target = typeof over?.id === 'string' ? days.findIndex((_, index) => dropId(index) === over.id) : -1;
     if (subject && target >= 0) applyTheme(target, subject.id);
   };
-  const column = (index: number): CSSProperties => ({ '--i': index } as CSSProperties);
+  const column = (index: number, order: number): CSSProperties => ({ '--i': index, '--order': order } as CSSProperties);
 
   return <DndContext onDragEnd={onDragEnd} sensors={sensors}>
     <div className="grid gap-4">
       <ThemeTray subjects={themes} />
-      <div className="ops-card overflow-hidden">
-        <div className="overflow-x-auto" ref={scroller}>
-          <div className="grid min-w-full [grid-template-columns:var(--columns)]" role="table" style={layout}>
+      <div className="builder-board-card ops-card overflow-hidden max-[760px]:overflow-visible max-[760px]:border-0! max-[760px]:bg-transparent! max-[760px]:shadow-none">
+        <div className="builder-board-scroller overflow-x-auto max-[760px]:overflow-visible" ref={scroller}>
+          <div className="builder-board grid min-w-full [grid-template-columns:var(--columns)] max-[760px]:flex max-[760px]:flex-col" role="table" style={layout}>
             {days.map((day, index) => {
               const color = subjectColor(day.subject);
               const dayIssues = issues?.[index];
-              return <div className={cn('builder-col grid content-start gap-2 border-r border-b border-border p-3', dayIssues && 'bg-destructive-soft')}
-                data-day-issue={dayIssues ? true : undefined} key={`head-${day.key}`} role="columnheader"
-                style={{ ...column(index), borderTop: `4px solid ${dayIssues ? 'var(--color-destructive)' : color}`, gridColumn: index + 1, gridRow: 1 }}>
+              return <div className={cn('builder-col grid content-start gap-2 border-r border-b border-border p-3', phoneCell, 'max-[760px]:mt-4 max-[760px]:gap-3 max-[760px]:border max-[760px]:border-b-0 max-[760px]:rounded-t-2xl max-[760px]:px-4 max-[760px]:py-3 max-[760px]:first:mt-0', dayIssues ? 'bg-destructive-soft' : 'max-[760px]:bg-card')}
+                data-day-issue={dayIssues ? true : undefined} data-part="head" key={`head-${day.key}`} role="columnheader"
+                style={{ ...column(index, index * 3), borderTop: `4px solid ${dayIssues ? 'var(--color-destructive)' : color}`, gridColumn: index + 1, gridRow: 1 }}>
                 <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
-                  <span className="rounded-full px-2.5 py-0.5 text-xs font-extrabold tracking-wide text-white" style={{ backgroundColor: color }}>{word.toUpperCase()} {index + 1}</span>
+                  <span className="rounded-full px-2.5 py-0.5 text-xs max-[760px]:px-3 max-[760px]:py-1 max-[760px]:tracking-[0.04em] font-extrabold tracking-wide text-white" style={{ backgroundColor: color }}>{word.toUpperCase()} {index + 1}</span>
                   {/* the date field shows day/month; only the weekday is added here. The time of the day lives in the column footer. */}
-                  <span className="mr-auto text-xs font-semibold text-muted-foreground capitalize">{shortDate(day.date).split(' ')[0]}</span>
-                  <Button aria-label={`Remover o ${lower} ${index + 1}`} disabled={days.length === 1} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
+                  <span className="mr-auto text-xs font-semibold text-muted-foreground capitalize max-[760px]:text-[0.9375rem] max-[760px]:text-foreground">{shortDate(day.date).split(' ')[0]}</span>
+                  <Button aria-label={`Remover o ${lower} ${index + 1}`} className="max-[760px]:-my-1.5 max-[760px]:-mr-2.5 max-[760px]:size-11 max-[760px]:min-h-11" disabled={days.length === 1} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </div>
-                <Input aria-label={`Data do ${lower} ${index + 1}`} className="h-9 min-w-0 px-2 text-sm" onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
+                <Input aria-label={`Data do ${lower} ${index + 1}`} className={cn('h-9 min-w-0 px-2 text-sm', phoneField)} onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
                 <Input aria-describedby={dayIssues ? `day-issues-${day.key}` : undefined} aria-invalid={!!dayIssues && !day.title.trim()}
-                  aria-label={`Título do ${lower} ${index + 1}`} className="font-medium" maxLength={160}
+                  aria-label={`Título do ${lower} ${index + 1}`} className={cn('font-medium', phoneField)} maxLength={160}
                   onChange={event => patchDay(index, { title: event.target.value })} placeholder={`Slogan do ${lower}`} value={day.title} />
                 {dayIssues && <ul className="m-0 grid list-none gap-0.5 p-0 text-xs font-semibold text-destructive" id={`day-issues-${day.key}`}>
                   {dayIssues.map(text => <li key={text}>{text}</li>)}
@@ -105,7 +113,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
 
             {days.map((day, index) => {
               const subject = themeOfDay(themes, day);
-              return <Cell index={index} key={`box-${day.key}`} row={2}>
+              return <Cell index={index} key={`box-${day.key}`} order={index * 3 + 1} row={2}>
                 <DayBox canEditThemes={canEditThemes} catalog={catalog} dayIndex={index} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
                   onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)} />
               </Cell>;
@@ -113,16 +121,17 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
 
             {days.map((day, index) => {
               const counts = dayVideoCounts(filled(day.videos), catalog);
-              return <div className="builder-col flex items-baseline justify-between gap-2 border-r border-border bg-muted px-4 py-3" key={`time-${day.key}`} style={{ ...column(index), gridColumn: index + 1, gridRow: 3 }}>
-                <span className="text-xl font-extrabold tabular-nums text-foreground">{formatClock(dayDuration(day, catalog))}</span>
-                <span className="text-xs text-muted-foreground">{`${counts.house} ${counts.house === 1 ? 'vídeo' : 'vídeos'}${extrasSuffix(counts.extras)}`}</span>
+              return <div className={cn('builder-col flex items-baseline justify-between gap-2 border-r border-border bg-muted px-4 py-3', phoneCell, 'max-[760px]:grid max-[760px]:grid-cols-[minmax(0,1fr)_auto] max-[760px]:items-center max-[760px]:gap-x-3 max-[760px]:gap-y-0 max-[760px]:border max-[760px]:rounded-b-2xl max-[760px]:pt-2.5 max-[760px]:pb-3')} data-part="time" key={`time-${day.key}`} style={{ ...column(index, index * 3 + 2), gridColumn: index + 1, gridRow: 3 }}>
+                <span aria-hidden="true" className="hidden text-[0.6875rem] font-bold tracking-[0.06em] text-muted-foreground uppercase max-[760px]:col-start-1 max-[760px]:block">Tempo total</span>
+                <span className="text-xl font-extrabold tabular-nums text-foreground max-[760px]:col-start-1 max-[760px]:text-[1.375rem] max-[760px]:leading-tight">{formatClock(dayDuration(day, catalog))}</span>
+                <span className="text-xs text-muted-foreground max-[760px]:col-start-2 max-[760px]:row-span-2 max-[760px]:row-start-1 max-[760px]:text-sm">{`${counts.house} ${counts.house === 1 ? 'vídeo' : 'vídeos'}${extrasSuffix(counts.extras)}`}</span>
               </div>;
             })}
 
-            {canAddDay && <button aria-label="Adicionar dia" className="builder-add-day group flex flex-col items-center justify-center gap-2 border-l border-dashed border-border bg-muted/30 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
+            {canAddDay && <button aria-label="Adicionar dia" className="builder-add-day group flex flex-col items-center justify-center gap-2 border-l border-dashed border-border bg-muted/30 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring max-[760px]:order-[99999] max-[760px]:mt-4 max-[760px]:min-h-14 max-[760px]:flex-row max-[760px]:gap-2.5 max-[760px]:rounded-2xl max-[760px]:border-[1.5px] max-[760px]:border-dashed max-[760px]:border-primary/55 max-[760px]:bg-transparent max-[760px]:font-bold max-[760px]:text-primary max-[760px]:transition-[background-color,color,transform] max-[760px]:duration-150 max-[760px]:ease-out max-[760px]:motion-safe:active:scale-[0.98]"
               onClick={addDay} style={{ gridColumn: days.length + 1, gridRow: '1 / span 3' }} type="button">
-              <span aria-hidden="true" className="grid size-9 place-items-center rounded-full border-2 border-dashed border-current transition-transform group-hover:scale-110"><Plus className="size-4" /></span>
-              <span className="text-xs">Dia</span>
+              <span aria-hidden="true" className="grid size-9 place-items-center rounded-full border-2 border-dashed border-current transition-transform group-hover:scale-110 max-[760px]:size-7 max-[760px]:border-solid"><Plus className="size-4" /></span>
+              <span className="text-xs max-[760px]:text-base"><span className="max-[760px]:hidden">{word}</span><span className="hidden max-[760px]:inline">Adicionar {lower}</span></span>
             </button>}
           </div>
         </div>
@@ -131,6 +140,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   </DndContext>;
 }
 
-function Cell({ children, index, row }: { children: ReactNode; index: number; row: number }) {
-  return <div className={cn('builder-col min-w-0 border-r border-b border-border p-2')} role="cell" style={{ '--i': index, gridColumn: index + 1, gridRow: row } as CSSProperties}>{children}</div>;
+/** `order` puts the cell back under its own day when the phone stacks the days one below the other. */
+function Cell({ children, index, order, row }: { children: ReactNode; index: number; order: number; row: number }) {
+  return <div className={cn('builder-col min-w-0 border-r border-b border-border p-2', phoneCell, 'max-[760px]:border-x max-[760px]:border-b-0 max-[760px]:bg-card max-[760px]:px-4 max-[760px]:pt-0 max-[760px]:pb-4')} data-part="box" role="cell" style={{ '--i': index, '--order': order, gridColumn: index + 1, gridRow: row } as CSSProperties}>{children}</div>;
 }

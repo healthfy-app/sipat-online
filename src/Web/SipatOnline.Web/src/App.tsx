@@ -1,3 +1,4 @@
+import { Menu } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import {
   BrowserRouter,
@@ -24,6 +25,8 @@ import {
   type IdentitySession,
   type TenantBranding,
 } from './api';
+import { Button } from './components/ui/button';
+import { Sheet } from './components/ui/sheet';
 import SipatsPage from './sipatBuilder/SipatsPage';
 import { LegacySipatRedirect } from './trainings/LegacySipatRedirect';
 import CompanyContext from './companies/CompanyContext';
@@ -536,6 +539,9 @@ function ProtectedPortal({
     getCompanyCapabilities().then(result => { if (current) setCapabilities(result); }).catch(() => undefined);
     return () => { current = false; };
   }, [session]);
+  // the phone menu (sheet) closes whenever the page changes, including after tapping one of its links
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
 
   if (!session) {
     return <Navigate to="/login" replace />;
@@ -567,6 +573,44 @@ function ProtectedPortal({
     configureCompanyAdministration(null);
     window.sessionStorage.removeItem(companyContextKey);
   }
+
+  // the same links serve the desktop sidebar and the phone menu
+  const sidebarNav = (
+    <>
+      {session.roles.includes('Participant') && !isPlatformCompanyContext && (
+        <>
+          <p className="sidebar-label">APRENDIZAGEM</p>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/learning">
+            Meus treinamentos
+          </NavLink>
+        </>
+      )}
+      {canViewCompany(session) && (!isPlatformOperator || isPlatformCompanyContext) && (
+        <>
+          <p className="sidebar-label">GESTÃO DA EMPRESA</p>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
+          {hasAdminRole(session) && <>
+            <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
+            {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
+          </>}
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
+            {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}
+          </NavLink>
+          {hasAdminRole(session) && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/cadastro">Cadastro</NavLink>}
+        </>
+      )}
+      {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}
+      {isPlatformOperator && !isPlatformCompanyContext && !companyWorkspaceId && (
+        <>
+          <p className="sidebar-label sidebar-label-spaced">OPERAÇÃO</p>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Biblioteca</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Qualidade do vídeo</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
+        </>
+      )}
+    </>
+  );
 
   return (
     <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${isPlatformCompanyContext ? ' portal-layout-company-context' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
@@ -665,39 +709,18 @@ function ProtectedPortal({
             </Link>
             {capabilities?.plan && (!isPlatformOperator || isPlatformCompanyContext) && <PlanMedal plan={capabilities.plan} />}
           </div>
-          {session.roles.includes('Participant') && !isPlatformCompanyContext && (
-            <>
-              <p className="sidebar-label">APRENDIZAGEM</p>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/learning">
-                Meus treinamentos
-              </NavLink>
-            </>
-          )}
-          {canViewCompany(session) && (!isPlatformOperator || isPlatformCompanyContext) && (
-            <>
-              <p className="sidebar-label">GESTÃO DA EMPRESA</p>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
-              {hasAdminRole(session) && <>
-                <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
-                {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
-              </>}
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
-                {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}
-              </NavLink>
-              {hasAdminRole(session) && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/cadastro">Cadastro</NavLink>}
-            </>
-          )}
-          {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}
-          {isPlatformOperator && !isPlatformCompanyContext && !companyWorkspaceId && (
-            <>
-              <p className="sidebar-label sidebar-label-spaced">OPERAÇÃO</p>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Biblioteca</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Qualidade do vídeo</NavLink>
-              <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
-            </>
-          )}
-          <div className="sidebar-account">
+          {/* on the phone the bar keeps only the logo and this button; the links and "Sair" open in a side panel */}
+          <div className="contents max-[861px]:hidden">{sidebarNav}</div>
+          <button
+            aria-expanded={isMenuOpen}
+            aria-label="Abrir menu"
+            className="ml-auto hidden size-11 shrink-0 cursor-pointer place-items-center rounded-[0.625rem] border-0 bg-transparent p-0 text-[#12332c] transition-colors active:bg-[#eef3f1] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary max-[861px]:inline-grid"
+            onClick={() => setIsMenuOpen(true)}
+            type="button"
+          >
+            <Menu aria-hidden="true" className="size-[1.375rem]" />
+          </button>
+          <div className="sidebar-account max-[861px]:hidden!">
             <span className="user-name">{session.displayName}</span>
             <button
               className="sidebar-signout"
@@ -713,6 +736,27 @@ function ProtectedPortal({
             <span>{tenant.tenantKey === 'platform' ? 'Operação SIPAT Online' : 'Portal da empresa'}</span>
           </div>
         </aside>}
+        {!isLearnerOnly && isMenuOpen && (
+          <Sheet className="w-[min(20rem,86vw)]" onClose={() => setIsMenuOpen(false)} title="Menu">
+            <nav
+              aria-label="Menu"
+              className={[
+                'flex min-h-full flex-col gap-0.5',
+                '[&_.sidebar-label]:mx-2 [&_.sidebar-label]:mt-3 [&_.sidebar-label]:mb-1 [&_.sidebar-label]:text-[11px] [&_.sidebar-label]:font-semibold [&_.sidebar-label]:tracking-[0.08em] [&_.sidebar-label]:text-muted-foreground [&_.sidebar-label:first-child]:mt-0',
+                '[&_.sidebar-link]:flex [&_.sidebar-link]:min-h-11 [&_.sidebar-link]:items-center [&_.sidebar-link]:rounded-lg [&_.sidebar-link]:bg-transparent [&_.sidebar-link]:px-3 [&_.sidebar-link]:text-[15px] [&_.sidebar-link]:font-medium [&_.sidebar-link]:text-muted-foreground [&_.sidebar-link]:shadow-none',
+                '[&_.sidebar-link.active]:bg-accent [&_.sidebar-link.active]:font-semibold [&_.sidebar-link.active]:text-primary',
+              ].join(' ')}
+            >
+              {sidebarNav}
+              <div className="mt-auto grid gap-2.5 border-t border-border pt-4 text-sm font-bold text-foreground">
+                <span>{session.displayName}</span>
+                <Button disabled={isSigningOut} onClick={handleSignOut} type="button" variant="outline">
+                  {isSigningOut ? 'Saindo...' : 'Sair'}
+                </Button>
+              </div>
+            </nav>
+          </Sheet>
+        )}
         <section
           className={`portal-content${isLearnerOnly ? ' portal-content-learner' : ''}`}
           id="app-content"

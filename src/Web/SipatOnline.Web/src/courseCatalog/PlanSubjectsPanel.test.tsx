@@ -22,18 +22,49 @@ describe('assuntos of each plan', () => {
     vi.mocked(api.listCourseCategories).mockResolvedValue([{ id: 'cat-post', name: 'Postura', courseCount: 1 }]);
     render(<PlanSubjectsPanel />);
 
-    const bronze = await screen.findByRole('checkbox', { name: 'Meio Ambiente no plano Bronze' });
+    const bronze = await screen.findByRole('checkbox', { name: 'Bronze — Meio Ambiente' });
     expect(bronze).toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Meio Ambiente no plano Ouro' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Ouro — Meio Ambiente' })).toBeChecked();
     expect(await screen.findByText('Postura')).toBeVisible();
 
     await user.click(bronze);
     expect(api.setPlanSubjects).toHaveBeenCalledWith('Bronze', ['c-2']);
     expect(bronze).not.toBeChecked();
-    expect(screen.getByRole('checkbox', { name: 'Meio Ambiente no plano Prata' })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: 'Prata — Meio Ambiente' })).toBeChecked();
 
     await user.click(bronze);
     expect(api.setPlanSubjects).toHaveBeenLastCalledWith('Bronze', []);
+  });
+
+  it('folds a category away and opens every one while searching', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getPlanSubjects).mockResolvedValue({
+      courses: [
+        { id: 'c-1', title: 'Ergonomia', description: null, videoCount: 4, categoryId: 'cat-post' },
+        { id: 'c-2', title: 'Meio Ambiente', description: null, videoCount: 5 },
+      ],
+      excluded: { Bronze: [], Prata: [], Ouro: [], Diamante: [] },
+    });
+    vi.mocked(api.listPlatformCompanies).mockResolvedValue([]);
+    vi.mocked(api.listCourseCategories).mockResolvedValue([{ id: 'cat-post', name: 'Postura', courseCount: 1 }]);
+    render(<PlanSubjectsPanel />);
+
+    const postura = await screen.findByRole('button', { name: /Postura/ });
+    expect(postura).toHaveAttribute('aria-expanded', 'true');
+    await user.click(postura);
+    expect(postura).toHaveAttribute('aria-expanded', 'false');
+    expect(screen.queryByText('Ergonomia')).not.toBeInTheDocument();
+    expect(screen.getByText('Meio Ambiente')).toBeVisible();
+
+    await user.type(screen.getByPlaceholderText('Buscar assunto'), 'ergo');
+    expect(screen.getByText('Ergonomia')).toBeVisible();
+
+    await user.clear(screen.getByPlaceholderText('Buscar assunto'));
+    await user.click(screen.getByRole('button', { name: 'Recolher todos' }));
+    expect(screen.queryByText('Meio Ambiente')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Expandir todos' }));
+    expect(screen.getByText('Ergonomia')).toBeVisible();
+    expect(screen.getByText('Meio Ambiente')).toBeVisible();
   });
 
   it('gives an assunto to one company as its internal videos, outside the plans', async () => {
@@ -50,10 +81,10 @@ describe('assuntos of each plan', () => {
     vi.mocked(api.listCourseCategories).mockResolvedValue([]);
     render(<PlanSubjectsPanel />);
 
-    await user.selectOptions(await screen.findByRole('combobox', { name: 'Empresa do assunto Vídeos da Acme' }), 'acme');
+    await user.selectOptions(await screen.findByRole('combobox', { name: 'Quem vê o assunto Vídeos da Acme' }), 'acme');
     expect(api.setSubjectCompany).toHaveBeenCalledWith('c-2', 'acme');
     expect(screen.getByText(/Só Acme, no plano/)).toBeVisible();
-    expect(screen.queryByRole('checkbox', { name: 'Vídeos da Acme no plano Bronze' })).not.toBeInTheDocument();
-    expect(screen.getAllByText('1 de 1').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('checkbox', { name: 'Bronze — Vídeos da Acme' })).not.toBeInTheDocument();
+    expect(screen.getAllByText('Todos').length).toBe(4);
   });
 });

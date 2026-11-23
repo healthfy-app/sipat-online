@@ -42,6 +42,7 @@ import {
 } from '@sipat/video-player';
 import { partWord } from '@/trainings/partWord';
 import { formatDayDate } from './WeekVideos';
+import UpNextCard from './UpNextCard';
 import './LearningMotion.css';
 import './DayPage.css';
 
@@ -90,6 +91,9 @@ export default function LearningTrackPage({
   const endedSaveRef = useRef<'failed' | 'moved' | null>(null);
   const switchingLessonRef = useRef(false);
   const [switchingLesson, setSwitchingLesson] = useState(false);
+  /** The video that starts by itself when the countdown over the finished one closes. */
+  const [upNextId, setUpNextId] = useState<string | null>(null);
+  useEffect(() => { setUpNextId(null); }, [selectedLessonId]);
   const [saveFailed, setSaveFailed] = useState(false);
 
   useEffect(() => {
@@ -404,6 +408,8 @@ export default function LearningTrackPage({
         return savePlayback(event.reason, event.positionMs, event.range);
       case 'playing':
         setIsPlaying(true);
+        // watching the finished video again cancels the countdown
+        setUpNextId(null);
         if (activeSession?.expiresAt && Date.parse(activeSession.expiresAt) <= Date.now()) {
           playerRef.current?.pause();
           setPlaybackError('Sua sessão de vídeo expirou. Inicie uma nova sessão para continuar.');
@@ -457,8 +463,9 @@ export default function LearningTrackPage({
     const next = currentLesson && experienceRef.current?.lessons.find(
       lesson => lesson.position > currentLesson.position && !lesson.isCompleted,
     );
+    // not at once: a countdown over the finished video, then the next one starts by itself
     if (next) {
-      setSelectedLessonId(next.id);
+      setUpNextId(next.id);
     }
   }
 
@@ -501,6 +508,7 @@ export default function LearningTrackPage({
   const currentIndex = experience.lessons.findIndex((lesson) => lesson.id === selectedLesson?.id);
   const previousLesson = currentIndex > 0 ? experience.lessons[currentIndex - 1] : null;
   const nextLesson = currentIndex >= 0 ? experience.lessons[currentIndex + 1] ?? null : null;
+  const upNextLesson = upNextId ? experience.lessons.find(lesson => lesson.id === upNextId) ?? null : null;
   const countedLessons = houseLessons(experience.lessons);
   const hasExtras = countedLessons.length !== experience.lessons.length;
   const completedLessons = countedLessons.filter(lesson => lesson.isCompleted).length;
@@ -598,6 +606,14 @@ export default function LearningTrackPage({
                   title={selectedLesson.title}
                   videoRef={videoRef}
                 />
+                {upNextLesson && (
+                  <UpNextCard
+                    key={upNextLesson.id}
+                    onCancel={() => setUpNextId(null)}
+                    onPlay={() => { setUpNextId(null); setSelectedLessonId(upNextLesson.id); }}
+                    title={upNextLesson.title}
+                  />
+                )}
                 {activeSession.isDevelopmentDemo && (
                   <p className="learning-demo-notice" role="note">
                     Vídeo de demonstração. O progresso registrado aqui não comprova participação oficial.
@@ -640,13 +656,11 @@ export default function LearningTrackPage({
               </button>
               {selectedLesson.isBonus
                 ? <span className="day-status">{extraLabel(selectedLesson)}</span>
+                // a quiet line: done, or how much was watched; nothing before the video starts
                 : <span className={`day-status${selectedLesson.isCompleted ? ' is-complete' : ''}`}>
-                  {selectedLesson.isCompleted ? <Check aria-hidden="true" /> : <Play aria-hidden="true" />}
                   {selectedLesson.isCompleted
-                    ? 'Concluído'
-                    : selectedLesson.watchedPercentage > 0
-                      ? `${selectedLesson.watchedPercentage}% assistido`
-                      : 'Assista até o fim para concluir'}
+                    ? <><Check aria-hidden="true" />Concluído</>
+                    : selectedLesson.watchedPercentage > 0 ? `${selectedLesson.watchedPercentage}% assistido` : null}
                 </span>}
               <button
                 className="day-control is-next"
@@ -654,7 +668,7 @@ export default function LearningTrackPage({
                 onClick={() => nextLesson && selectLesson(nextLesson)}
                 type="button"
               >
-                <span>Próximo vídeo</span> <ArrowRight aria-hidden="true" />
+                <span>Próximo<span className="day-control-long"> vídeo</span></span> <ArrowRight aria-hidden="true" />
               </button>
             </div>
           )}
