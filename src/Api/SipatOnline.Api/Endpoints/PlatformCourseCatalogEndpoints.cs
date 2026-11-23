@@ -123,6 +123,19 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("CreateSubject");
 
+        // the assunto leaves the list and every video that was in it; the videos themselves stay
+        catalog.MapDelete("/subjects/{subjectId:guid}", async (Guid subjectId, SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+        {
+            var subject = await db.VideoSubjects.FirstOrDefaultAsync(item => item.Id == subjectId, cancellationToken);
+            if (subject is null)
+                return Results.NotFound();
+            db.VideoSubjectLinks.RemoveRange(await db.VideoSubjectLinks.Where(link => link.SubjectId == subjectId).ToListAsync(cancellationToken));
+            db.VideoSubjects.Remove(subject);
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("DeleteSubject");
+
         catalog.MapGet("/video-subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
             Results.Ok(await VideoSubjectMapAsync(db, cancellationToken)))
         .WithName("ListVideoSubjects");

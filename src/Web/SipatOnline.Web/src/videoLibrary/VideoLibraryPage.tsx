@@ -278,6 +278,10 @@ export default function VideoLibraryPage() {
         <AssociateVideosDialog companies={companies} onClose={() => setAssociating(false)} subjects={subjects}
           onSubjectCreated={(subject) => setSubjects(current => current.some(item => item.id === subject.id)
             ? current : [...current, subject].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')))}
+          onSubjectDeleted={(subjectId) => {
+            setSubjects(current => current.filter(item => item.id !== subjectId));
+            setVideoSubjectMap(current => new Map([...current].map(([videoId, ids]) => [videoId, ids.filter(id => id !== subjectId)])));
+          }}
           videoCompanies={videoCompanies} videoIds={[...selected]} videoSubjects={videoSubjects}
           onSaved={async (message) => {
             setAssociating(false);

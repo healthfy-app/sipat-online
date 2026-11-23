@@ -800,6 +800,9 @@ export function listSubjects(): Promise<VideoSubject[]> {
 export function createSubject(name: string): Promise<VideoSubject> {
   return requestJson<VideoSubject>('/api/platform/catalog/subjects', { method: 'POST', body: JSON.stringify({ name }) });
 }
+export function deleteSubject(subjectId: string): Promise<void> {
+  return request(`/api/platform/catalog/subjects/${subjectId}`, { method: 'DELETE' }).then(() => undefined);
+}
 export function listVideoSubjects(): Promise<VideoSubjects[]> {
   return requestJson<VideoSubjects[]>('/api/platform/catalog/video-subjects');
 }
