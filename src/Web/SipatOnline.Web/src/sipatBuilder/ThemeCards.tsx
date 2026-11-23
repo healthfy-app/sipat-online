@@ -65,14 +65,16 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
   const groups = (training?.titles ?? [])
     .map(title => ({ title, videos: title.videoIds.flatMap(id => shownById.get(id) ?? []) }))
     .filter(group => !narrowed || group.videos.length > 0);
-  const empty = groups.length === 0 && looseVideos.length === 0;
+  // a training picked shows only its Títulos; "Todos os vídeos da biblioteca" in the same picker brings the whole library back
+  const empty = training ? groups.length === 0 : looseVideos.length === 0;
+  const trainingVideoCount = groups.reduce((sum, group) => sum + group.videos.length, 0);
 
   return <section aria-label={current === 'videos' ? 'Biblioteca de vídeos' : 'Assuntos do acervo'} className="builder-tray ops-card grid gap-3 p-4 max-[760px]:hidden">
     <div className="flex flex-wrap items-center gap-2">
       {canCustomizeGrid
         ? <>
           <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Film aria-hidden="true" className="size-4" /> Lista completa
-            <span className="text-xs font-normal tabular-nums text-muted-foreground">{shownVideos.length}{training && ` · ${plural(groups.length, 'título', 'títulos')}`}</span></h2>
+            <span className="text-xs font-normal tabular-nums text-muted-foreground">{training ? `${plural(groups.length, 'título', 'títulos')} · ${plural(trainingVideoCount, 'vídeo', 'vídeos')}` : shownVideos.length}</span></h2>
           {trainings.length > 0 && <span className="inline-flex items-center gap-1.5">
             {/* a pill that says what it is: "Treinamento:" then the name, whole on hover, with its own way out */}
             <label className={cn('relative m-0 inline-flex h-9 max-w-96 items-center rounded-full border pl-3 text-sm shadow-none transition-colors',
@@ -81,7 +83,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
               <select aria-label="Treinamento" className={cn('m-0 h-full min-h-0 min-w-0 flex-1 cursor-pointer appearance-none truncate rounded-none border-0 bg-transparent py-0 pr-9 pl-1.5 text-sm shadow-none outline-none',
                 training ? 'font-bold text-primary' : 'text-foreground')}
                 onChange={event => onTraining?.(event.target.value)} value={training?.id ?? ''}>
-                <option value="">escolher…</option>
+                <option value="">Todos os vídeos da biblioteca</option>
                 {/* two trainings can share a name: their size tells them apart */}
                 {trainings.map(item => <option key={item.id} value={item.id}>{item.title} · {plural(item.titles.length, 'título', 'títulos')} · {plural(item.titles.reduce((sum, title) => sum + title.videoIds.length, 0), 'vídeo', 'vídeos')}</option>)}
               </select>
@@ -124,22 +126,12 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
     </div>
     {current === 'videos'
       ? empty
-        ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.' : 'Nenhum vídeo encontrado.'}</p>
+        ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.'
+          : training ? (narrowed ? 'Nenhum vídeo deste treinamento corresponde à busca.' : 'Este treinamento ainda não tem vídeos prontos.') : 'Nenhum vídeo encontrado.'}</p>
         : groups.length > 0
           // a training open: every part is a block of the same build (header, then one row of cards), tops aligned
           ? <ul className="m-0 flex list-none items-stretch gap-3 overflow-x-auto p-0 pb-1">
             {groups.map((group, index) => <TitleGroup index={index} key={group.title.id} onPlay={setPlaying} title={group.title} usedIn={usedIn} videos={group.videos} />)}
-            {/* the rest of the library the company can use (videos private to other companies never come) */}
-            {looseVideos.length > 0 && <li aria-label={`Biblioteca de vídeos, ${plural(looseVideos.length, 'vídeo', 'vídeos')}`} className="flex shrink-0 flex-col overflow-hidden rounded-2xl border-2 border-border bg-card">
-              <div className="flex h-9 items-center gap-2 bg-muted px-3 text-muted-foreground">
-                <Film aria-hidden="true" className="size-4 shrink-0" />
-                <span className="text-[0.625rem] font-extrabold tracking-[0.08em] uppercase">Biblioteca de vídeos</span>
-                <span className="ml-auto pl-2 text-xs tabular-nums">{plural(looseVideos.length, 'vídeo', 'vídeos')}</span>
-              </div>
-              <ul className="m-0 flex flex-1 list-none items-center gap-2 p-2">
-                {looseVideos.map(video => <li className="shrink-0" key={video.id}><VideoCard onPlay={setPlaying} place={usedIn?.get(video.id)} video={video} /></li>)}
-              </ul>
-            </li>}
           </ul>
           : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
             {looseVideos.map(video => <li className="shrink-0" key={video.id}><VideoCard onPlay={setPlaying} place={usedIn?.get(video.id)} video={video} /></li>)}
