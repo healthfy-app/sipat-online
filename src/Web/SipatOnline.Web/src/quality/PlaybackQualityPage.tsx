@@ -47,11 +47,11 @@ export default function PlaybackQualityPage() {
     setError('');
     getCompanyPlaybackQuality(companyId, { sipatId, day })
       .then(result => { if (current) setData(result); })
-      .catch(failure => { if (current) setError(failure instanceof Error ? failure.message : 'Não foi possível carregar a qualidade do vídeo.'); });
+      .catch(failure => { if (current) setError(failure instanceof Error ? failure.message : 'Não foi possível carregar o monitor de desempenho.'); });
     return () => { current = false; };
   }, [companyId, sipatId, day]);
 
-  if (!data) return <div className="page-content">{error ? <p role="alert">{error}</p> : <LoadingState>Carregando a qualidade do vídeo...</LoadingState>}</div>;
+  if (!data) return <div className="page-content">{error ? <p role="alert">{error}</p> : <LoadingState>Carregando o monitor de desempenho...</LoadingState>}</div>;
 
   const effectiveSipat = sipatId ?? data.sipatId;
   const indicators = data.indicators;
@@ -71,7 +71,7 @@ export default function PlaybackQualityPage() {
             </select>
             <a className={buttonVariants({ variant: 'default' })} href={playbackQualitySummaryUrl(companyId, { sipatId: effectiveSipat, day })}>Baixar resumo</a>
           </>}
-          title={`Qualidade do vídeo · ${data.companyName}`}
+          title={`Monitor de Desempenho · ${data.companyName}`}
         />
         {error && <p role="alert">{error}</p>}
         {indicators.sessions === 0

@@ -23,6 +23,6 @@ describe('company sidebar', () => {
     vi.mocked(api.getPlatformDashboard).mockResolvedValue([] as never);
     render(<MemoryRouter initialEntries={['/platform/companies/c1/treinamentos']}><CompanyNav companyId="c1" /></MemoryRouter>);
 
-    expect(await screen.findByRole('link', { name: 'Qualidade do vídeo' })).toHaveAttribute('href', '/platform/companies/c1/qualidade');
+    expect(await screen.findByRole('link', { name: 'Monitor de Desempenho' })).toHaveAttribute('href', '/platform/companies/c1/qualidade');
   });
 });

@@ -126,14 +126,14 @@ export default function PlaybackQualityComparisonPage() {
               <input className={inputClass} onChange={event => event.target.value && setPeriod({ from, to: event.target.value })} type="date" value={to} />
             </label>
           </>}
-          title="Qualidade do vídeo"
+          title="Monitor de Desempenho"
         />
         {message && <ErrorMessage>{message}</ErrorMessage>}
         {message || !data ? null : sorted.length === 0
           ? <EmptyState description="Escolha outro período para comparar as empresas." title="Nenhuma empresa teve treinamento neste período" />
           : (
             <div aria-busy={loading} className={loading ? 'ops-table opacity-50' : 'ops-table'}>
-              <Table aria-label="Qualidade do vídeo por empresa">
+              <Table aria-label="Monitor de Desempenho por empresa">
                 <TableHeader>
                   <TableRow>
                     {sortable('name', 'Empresa')}

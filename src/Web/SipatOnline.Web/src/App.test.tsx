@@ -170,7 +170,7 @@ describe('tenant portal', () => {
 
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('playback-quality'))).toBe(false);
-    expect(screen.queryByRole('heading', { name: /Qualidade do vídeo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Monitor de Desempenho/ })).not.toBeInTheDocument();
   });
   it.each(['ClientAdmin', 'Participant', 'Supervisor'])('keeps the company comparison screen away from a platform %s account', async (role) => {
     window.history.pushState({}, '', '/platform/qualidade');
@@ -186,7 +186,7 @@ describe('tenant portal', () => {
 
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('playback-quality'))).toBe(false);
-    expect(screen.queryByRole('heading', { name: 'Qualidade do vídeo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Monitor de Desempenho' })).not.toBeInTheDocument();
   });
   it.each(['ClientAdmin', 'Participant', 'Supervisor'])('denies the operational editor to a %s account', async (role) => {
     window.history.pushState({}, '', '/platform/courses/course-1/edit');
@@ -527,7 +527,7 @@ describe('tenant portal', () => {
     expect(screen.queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Conteúdo' })).toHaveAttribute('href', '/platform/courses');
     expect(screen.getByRole('link', { name: 'Biblioteca de vídeos' })).toHaveAttribute('href', '/platform/videos');
-    expect(screen.getByRole('link', { name: 'Qualidade do vídeo' })).toHaveAttribute('href', '/platform/qualidade');
+    expect(screen.getByRole('link', { name: 'Monitor de Desempenho' })).toHaveAttribute('href', '/platform/qualidade');
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/platform/dashboard',

@@ -617,7 +617,7 @@ function ProtectedPortal({
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Conteúdo</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/videos">Biblioteca de vídeos</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Qualidade do vídeo</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Monitor de Desempenho</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
         </>
       )}

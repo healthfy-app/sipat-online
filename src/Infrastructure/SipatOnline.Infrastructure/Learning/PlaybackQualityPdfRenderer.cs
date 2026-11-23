@@ -28,7 +28,7 @@ public sealed class PlaybackQualityPdfRenderer : IPlaybackQualityPdfRenderer
     {
         ArgumentNullException.ThrowIfNull(content);
         using var document = new PdfDocument();
-        document.Info.Title = $"Qualidade do vídeo - {content.CompanyName}";
+        document.Info.Title = $"Monitor de Desempenho - {content.CompanyName}";
         document.Info.Author = "SIPAT Online";
         var page = document.AddPage();
         page.Width = XUnit.FromPoint(PageWidth);
@@ -40,7 +40,7 @@ public sealed class PlaybackQualityPdfRenderer : IPlaybackQualityPdfRenderer
         var width = PageWidth - Margin * 2;
 
         graphics.DrawRectangle(new XSolidBrush(XColor.FromArgb(247, 249, 246)), 0, 0, PageWidth, PageHeight);
-        Line(graphics, "Qualidade do vídeo", 26, ink, Margin, 52, width, 34);
+        Line(graphics, "Monitor de Desempenho", 26, ink, Margin, 52, width, 34);
         Line(graphics, content.CompanyName, 15, ink, Margin, 94, width, 22);
         Line(graphics, $"Treinamento: {content.SipatTitle}", 12, muted, Margin, 120, width, 18);
         Line(graphics, content.DayLabel, 12, muted, Margin, 140, width, 18);
