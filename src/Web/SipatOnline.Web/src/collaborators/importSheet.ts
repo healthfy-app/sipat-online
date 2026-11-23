@@ -7,20 +7,26 @@ export const IMPORT_SAVE_CHUNK = 100;
 
 /** `columns` are the fields the header was recognized as, in the order of the sheet, so a column left out shows. */
 export type SheetReadResult = { rows: ImportRow[]; columns: (keyof ImportRow)[]; fatalError?: string };
-type Field = Exclude<keyof ImportRow, 'row' | 'password'>;
+type Field = Exclude<keyof ImportRow, 'row'>;
 
 const synonyms: Record<Field, string[]> = {
   name: ['nome', 'nome completo', 'colaborador', 'funcionario'],
   login: ['login', 'usuario'],
+  password: ['senha', 'senha inicial'],
   registrationNumber: ['matricula', 'registro', 're', 'chapa'],
   email: ['email', 'e-mail', 'e mail'],
   phone: ['telefone', 'celular', 'whatsapp', 'fone'],
-  unit: ['unidade', 'filial', 'planta', 'unidade organizacional'],
+  unit: ['unidade', 'unidade empresarial', 'filial', 'planta', 'unidade organizacional'],
   sector: ['setor', 'departamento', 'area'],
 };
 
+/** The columns every sheet must have, and every line must fill. */
+export const REQUIRED_COLUMNS: readonly Field[] = ['login', 'password', 'name'];
+const requiredLabels: Record<string, string> = { login: 'Login', password: 'Senha', name: 'Nome completo' };
+
+/** Ignores accents, case and the "*" that marks an optional column in the model ("*e-mail"). */
 const normalize = (value: string) =>
-  value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ').trim();
+  value.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\*/g, '').toLocaleLowerCase('pt-BR').replace(/\s+/g, ' ').trim();
 
 /** Maps a spreadsheet header to the field it fills, ignoring accents and case. */
 export function mapHeader(header: string): keyof ImportRow | null {
@@ -30,7 +36,21 @@ export function mapHeader(header: string): keyof ImportRow | null {
 }
 
 const unknownColumns = 'Não reconhecemos as colunas. Use o modelo.';
-const missingIdentity = 'A planilha precisa da coluna nome ou da coluna login/matrícula.';
+
+/** "Login, Senha e Nome completo" from the fields the header lacks. */
+function missingColumnsMessage(missing: Field[]): string {
+  const names = missing.map(field => requiredLabels[field]);
+  const list = names.length === 1 ? names[0] : `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}`;
+  return `A planilha precisa ${names.length === 1 ? 'da coluna' : 'das colunas'} ${list}. Use o modelo: Login, Senha e Nome completo são obrigatórios.`;
+}
+
+/** The required fields a line left empty, in words, or null when the line has all of them. */
+export function missingInRow(row: ImportRow): string | null {
+  const missing = REQUIRED_COLUMNS.filter(field => !row[field]?.toString().trim()).map(field => requiredLabels[field].toLocaleLowerCase('pt-BR'));
+  if (missing.length === 0) return null;
+  const list = missing.length === 1 ? missing[0] : `${missing.slice(0, -1).join(', ')} e ${missing[missing.length - 1]}`;
+  return `Falta ${list}.`;
+}
 
 /** Reads a .csv or .xlsx file; `row` is the line in the sheet (header = 1). Blank lines are skipped. */
 export async function readSheet(file: File): Promise<SheetReadResult> {
@@ -74,13 +94,18 @@ function mapRecords(records: string[][]): SheetReadResult {
     if (field && !columns.has(field)) columns.set(field, index);
   });
   if (columns.size === 0) return failed(unknownColumns);
-  if (!columns.has('name') && !columns.has('login') && !columns.has('registrationNumber')) return failed(missingIdentity);
+  const missing = REQUIRED_COLUMNS.filter(field => !columns.has(field));
+  if (missing.length > 0) return failed(missingColumnsMessage(missing));
 
   const rows: ImportRow[] = [];
   records.forEach((record, index) => {
     if (index === 0 || record.every(cell => !cell.trim())) return;
     const row: ImportRow = { row: index + 1 };
-    columns.forEach((column, field) => { const value = (record[column] ?? '').trim(); if (value) row[field] = value; });
+    columns.forEach((column, field) => {
+      // a password is kept exactly as typed: spaces may be part of it
+      const value = field === 'password' ? (record[column] ?? '') : (record[column] ?? '').trim();
+      if (value.trim()) row[field] = value;
+    });
     rows.push(row);
   });
   if (rows.length > MAX_IMPORT_ROWS) return failed(`O limite é ${MAX_IMPORT_ROWS} linhas por carga.`);
@@ -129,7 +154,10 @@ function readBuffer(file: File): Promise<ArrayBuffer> {
   });
 }
 
-/** Downloads the sample sheet: the people tab plus the lists of active units and sectors. */
+/**
+ * Downloads the sample sheet: the people tab plus the lists of active units and sectors. Login, Senha and Nome completo
+ * are required; a "*" marks the optional columns.
+ */
 export async function downloadTemplate(registry: CompanyRegistry): Promise<void> {
   const ExcelJS = (await import('exceljs')).default;
   const workbook = new ExcelJS.Workbook();
@@ -137,11 +165,13 @@ export async function downloadTemplate(registry: CompanyRegistry): Promise<void>
   const sectors = registry.sectors.filter(sector => sector.isActive).map(sector => sector.name);
 
   const people = workbook.addWorksheet('Participantes');
-  people.addRow(['Nome', 'Login', 'Matrícula', 'E-mail', 'Telefone', 'Unidade', 'Setor']);
+  people.addRow(['Login', 'Senha', 'Nome completo', '*e-mail', '*matrícula', '*setor', '*unidade empresarial']);
   // an example left in the sheet is obvious in the preview: it would create "Exemplo (Apague Esta Linha)"
-  people.addRow(['Exemplo (apague esta linha)', 'exemplo', '123456', 'exemplo@empresa.com.br', '(11) 98888-7777', units[0] ?? '', sectors[0] ?? '']);
+  people.addRow(['exemplo', 'Troque@2026', 'Exemplo (apague esta linha)', 'exemplo@empresa.com.br', '123456', sectors[0] ?? '', units[0] ?? '']);
   people.getRow(1).font = { bold: true };
   people.columns.forEach(column => { column.width = 22; });
+  // Excel would turn a login or a password made only of digits into a number ("0123" into 123): the columns are text
+  [1, 2, 5].forEach(index => { people.getColumn(index).numFmt = '@'; });
 
   const lists = workbook.addWorksheet('Listas válidas');
   lists.addRow(['Unidades', 'Setores']);

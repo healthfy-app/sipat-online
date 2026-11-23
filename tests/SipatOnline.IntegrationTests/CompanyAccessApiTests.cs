@@ -278,12 +278,21 @@ public sealed class CompanyAccessApiTests
             new { logoReference = (string?)null, primaryColor = "#123456", secondaryColor = "#FFFFFF", customDomain = (string?)null });
         Assert.Equal(HttpStatusCode.OK, brandingUpdate.StatusCode);
 
+        // the operator loads the HR sheet of this company from the operation portal
+        using var imported = await MutateAsync(owner, HttpMethod.Post, "/api/admin/users/import",
+            new SipatOnline.Infrastructure.Identity.ImportRequest(false,
+                [new SipatOnline.Infrastructure.Identity.ImportRow(2, "Bia Souza", "bia.import", null, null, null, null, null, "ImportPassword123")]));
+        Assert.Equal(HttpStatusCode.OK, imported.StatusCode);
+        Assert.Equal(1, (await imported.Content.ReadFromJsonAsync<JsonElement>()).GetProperty("created").GetInt32());
+
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
             var audit = await db.AuditEntries.Where(item => item.TenantId == company.Id &&
                 item.Action == "learning.track.created").SingleAsync();
             Assert.Equal(actorId, audit.ActorId);
+            var person = await db.Users.AsNoTracking().SingleAsync(user => user.NormalizedEmployeeIdentifier == "BIA.IMPORT");
+            Assert.Equal(company.Id, person.TenantId);
         }
 
         owner.DefaultRequestHeaders.Remove(PlatformCompanyContextMiddleware.HeaderName);
