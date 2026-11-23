@@ -5,9 +5,11 @@ import {
   listGameModules,
   listPlatformCourses,
   listPlatformLibraryVideos,
+  listSipatWeeks,
   type GameModule,
   type PlatformCourse,
   type PlatformLibraryVideo,
+  type SipatWeek,
 } from './api';
 import LoadingState from './LoadingState';
 import CourseCatalog from './courseCatalog/CourseCatalog';
@@ -26,6 +28,8 @@ export default function PlatformCoursesPage() {
   const [courses, setCourses] = useState<PlatformCourse[]>([]);
   const [library, setLibrary] = useState<PlatformLibraryVideo[]>([]);
   const [modules, setModules] = useState<GameModule[]>([]);
+  // the SIPATs' weeks: trainings opened from a company's planner, edited here but never listed in Conteúdo
+  const [weeks, setWeeks] = useState<SipatWeek[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDuplicating, setIsDuplicating] = useState(false);
   const [error, setError] = useState('');
@@ -40,11 +44,13 @@ export default function PlatformCoursesPage() {
     setError('');
     setIsLoading(true);
     try {
-      const [courseList, libraryList, moduleList] = await Promise.all([
+      const [courseList, libraryList, moduleList, weekList] = await Promise.all([
         listPlatformCourses(),
         listPlatformLibraryVideos(),
         listGameModules(),
+        listSipatWeeks().catch(() => [] as SipatWeek[]),
       ]);
+      setWeeks(weekList);
       setCourses(courseList);
       setLibrary(libraryList);
       setModules(moduleList);
@@ -101,6 +107,10 @@ export default function PlatformCoursesPage() {
   }
 
   const selectedCourse = courseId ? courses.find((course) => course.id === courseId) ?? null : null;
+  const week = selectedCourse ? weeks.find((item) => item.courseId === selectedCourse.id) : undefined;
+  const catalogCourses = courses.filter((course) => !weeks.some((item) => item.courseId === course.id));
+  // back from a week: to that company's planner, which reads the days from the week's títulos
+  const backToWeek = week ? () => navigate(`/platform/companies/${week.tenantId}/treinamentos/${week.sipatEventId}`) : undefined;
 
   return (
     <div className="page-content course-workspace">
@@ -114,10 +124,11 @@ export default function PlatformCoursesPage() {
             key={selectedCourse.id}
             library={library}
             modules={modules}
-            onBack={() => { openCourse(null); setError(''); setNotice(''); }}
+            onBack={() => { setError(''); setNotice(''); if (backToWeek) backToWeek(); else openCourse(null); }}
             onChanged={async (message) => { await refresh(true); setNotice(message); }}
             onDuplicate={() => void duplicate(selectedCourse)}
             onError={setError}
+            week={week ? { sipatTitle: week.sipatTitle, companyName: week.companyName } : undefined}
           />
         ) : isLoading ? (
           <LoadingState>Carregando treinamento...</LoadingState>
@@ -130,7 +141,7 @@ export default function PlatformCoursesPage() {
       ) : (
         <CourseCatalog
           busy={isDuplicating}
-          courses={courses}
+          courses={catalogCourses}
           error={error}
           isLoading={isLoading}
           modules={modules}

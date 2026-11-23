@@ -2,7 +2,7 @@ import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2,
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
-  cancelSipatEvent, copySipatPlan, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, saveSipatPlan, updateSipatEvent,
+  cancelSipatEvent, copySipatPlan, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -271,6 +271,21 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     } finally { setBusy(false); }
   }
 
+  /** All the days in the video editor: saves them if needed, writes them into the week's títulos and opens it there. */
+  async function editWeek() {
+    const id = dirty || !sipat ? await save() : sipat.id;
+    if (!id) return;
+    setBusy(true); setError('');
+    try {
+      const { courseId } = await openSipatWeek(id);
+      setDirty(false);
+      navigate(`/platform/courses/${courseId}/edit`);
+    } catch (failure) {
+      setError(getErrorMessage(failure));
+      setBusy(false);
+    }
+  }
+
   async function publish() {
     setConfirmingLaunch(false);
     const id = await save();
@@ -385,6 +400,10 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
           </DropdownMenuContent>
         </DropdownMenu>
         <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
+        {canEditThemes && <Button className={cn(phoneAction, 'max-[760px]:hidden')} disabled={busy || days.length === 0} onClick={() => void editWeek()}
+          title="Abre todos os dias no editor de vídeos: cada dia é um título. Ao salvar lá, os dias voltam atualizados." variant="outline">
+          <Pencil /> Editar a semana no editor
+        </Button>}
         <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
       </div>}
     </header>

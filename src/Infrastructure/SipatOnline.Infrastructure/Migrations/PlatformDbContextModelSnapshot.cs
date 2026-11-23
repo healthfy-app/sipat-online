@@ -1235,6 +1235,27 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("SipatPlans", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatWeekCourseEntity", b =>
+                {
+                    b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SipatEventId");
+
+                    b.HasIndex("CourseId")
+                        .IsUnique();
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("SipatWeekCourses", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.SipatProgramEntity", b =>
                 {
                     b.Property<Guid>("Id")

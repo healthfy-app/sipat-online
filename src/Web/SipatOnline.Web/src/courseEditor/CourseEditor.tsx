@@ -50,6 +50,7 @@ export default function CourseEditor({
   onChanged,
   onDuplicate,
   onError,
+  week,
 }: {
   course: PlatformCourse;
   error: string;
@@ -59,6 +60,8 @@ export default function CourseEditor({
   onChanged: (message: string) => Promise<void>;
   onDuplicate: () => void;
   onError: (message: string) => void;
+  /** The training is the week of a SIPAT (its Títulos are the days): the editor only edits, saves and goes back. */
+  week?: { sipatTitle: string; companyName: string };
 }) {
   const [values, setValues] = useState(() => settingsFrom(course));
   const [savedValues, setSavedValues] = useState(() => settingsFrom(course));
@@ -91,11 +94,11 @@ export default function CourseEditor({
 
   useEffect(() => { heading.current?.focus(); }, []);
 
-  async function saveCourse(nextStatus: PlatformCourseStatus = status) {
+  async function saveCourse(nextStatus: PlatformCourseStatus = status): Promise<boolean> {
     onError('');
     if (!values.title.trim()) {
       onError('Informe o nome do treinamento antes de salvar.');
-      return;
+      return false;
     }
     setIsSaving(true);
     try {
@@ -112,8 +115,10 @@ export default function CourseEditor({
       setSavedValues(next);
       setStatus(saved.status);
       await onChanged('As alterações do treinamento foram salvas.');
+      return true;
     } catch (saveError) {
       onError(getErrorMessage(saveError));
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -192,7 +197,9 @@ export default function CourseEditor({
   }
 
   return (
-    <CourseEditorFrame busy={busy} dirty={dirty} onBack={onBack} onSave={() => void saveCourse()} onStep={setStep} step={step}>
+    <CourseEditorFrame busy={busy} dirty={dirty} onBack={onBack} onStep={setStep} step={step} week={week}
+      // the structure (títulos, videos, activities) saves as it changes; the week button saves the rest and goes back
+      onSave={() => void (week ? (dirty ? saveCourse() : Promise.resolve(true)).then((ok) => { if (ok) onBack(); }) : saveCourse())}>
       {error && !activeDialog && (
         <p className="fixed left-1/2 top-[4.75rem] z-[25] m-0 max-w-[min(36rem,calc(100%-2rem))] -translate-x-1/2 rounded-md bg-destructive-soft px-4 py-2.5 text-sm font-medium text-destructive shadow-overlay" role="alert">{error}</p>
       )}
@@ -208,6 +215,7 @@ export default function CourseEditor({
             selectedKey={selectedLesson ? `lesson-${selectedLesson.id}` : selectedItem?.key ?? null}
             status={status}
             title={values.title}
+            week={!!week}
           />
           <CoursePreviewCanvas
             onSelectIndex={(index) => setSelectedKey(track[index]?.key ?? null)}

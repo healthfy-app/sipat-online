@@ -36,6 +36,7 @@ export default function CourseOutlinePanel({
   selectedKey,
   busy,
   actions,
+  week = false,
 }: {
   course: PlatformCourse;
   status: PlatformCourseStatus;
@@ -45,6 +46,8 @@ export default function CourseOutlinePanel({
   selectedKey: string | null;
   busy: boolean;
   actions: OutlineActions;
+  /** The week of a SIPAT: no status to publish and nothing to duplicate, each título is a day. */
+  week?: boolean;
 }) {
   const house = houseVideos(course.videos);
   const totalMilliseconds = house.reduce((total, video) => total + video.durationMilliseconds, 0);
@@ -67,7 +70,9 @@ export default function CourseOutlinePanel({
             <InlineText className="font-semibold" disabled={busy} label="Renomear treinamento" onCommit={actions.onTitle} value={title || course.title} />
           </h1>
           <div className="flex flex-wrap items-center gap-2 px-1.5 text-xs text-muted-foreground">
-            <Badge variant={status === 'Published' ? 'default' : 'warning'}>{statusLabels[status]}</Badge>
+            {week
+              ? <Badge variant="default">Semana da SIPAT</Badge>
+              : <Badge variant={status === 'Published' ? 'default' : 'warning'}>{statusLabels[status]}</Badge>}
             <span>{pluralize(house.length, 'vídeo', 'vídeos')}{extrasSuffix(course.videos.length - house.length)}</span>
           </div>
         </div>
@@ -238,9 +243,9 @@ export default function CourseOutlinePanel({
         </div>
       )}
 
-      <footer className="mt-auto flex border-t border-border px-4 py-3">
+      {!week && <footer className="mt-auto flex border-t border-border px-4 py-3">
         <Button disabled={busy} onClick={actions.onDuplicate} size="sm" variant="outline">Duplicar treinamento</Button>
-      </footer>
+      </footer>}
     </section>
   );
 }

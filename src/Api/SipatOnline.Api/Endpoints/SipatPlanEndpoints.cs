@@ -56,6 +56,14 @@ public static class SipatPlanEndpoints
         })
         .WithName("SaveSipatPlan");
 
+        // the week in the video editor: a copy training of this SIPAT whose Títulos are its days (made once, then kept in step)
+        group.MapPost("/sipats/{sipatId:guid}/week", async (Guid sipatId, SipatPlanService service, CancellationToken token) =>
+        {
+            var result = await service.OpenWeekAsync(sipatId, token);
+            return result.IsSuccess ? Results.Ok(new { courseId = result.Value }) : ToProblem(result.Error);
+        })
+        .WithName("OpenSipatWeek");
+
         group.MapPost("/sipats/{sipatId:guid}/plan/copy-from/{sourceId:guid}", async (
             Guid sipatId, Guid sourceId, HttpContext context,
             SipatPlanService service, CancellationToken token) =>
@@ -86,6 +94,7 @@ public static class SipatPlanEndpoints
         {
             "sipat.not_found" => StatusCodes.Status404NotFound,
             "sipat.already_published" or "sipat.cancelled" => StatusCodes.Status409Conflict,
+            "sipat.week.forbidden" => StatusCodes.Status403Forbidden,
             _ => StatusCodes.Status400BadRequest
         },
         title: error.Code, detail: error.Message, extensions: new Dictionary<string, object?> { ["code"] = error.Code });
