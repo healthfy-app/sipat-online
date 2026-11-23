@@ -13,8 +13,12 @@ public sealed class R2PlatformCourseVideoStorage(
 {
     private bool UsesHttp => options.UsesHttp;
 
-    public static string KeyFor(Guid videoId, VideoRendition rendition) =>
-        rendition == VideoRendition.Sd480 ? $"videos/{videoId:N}/480p.mp4" : $"videos/{videoId:N}/720p.mp4";
+    public static string KeyFor(Guid videoId, VideoRendition rendition) => rendition switch
+    {
+        VideoRendition.Sd480 => $"videos/{videoId:N}/480p.mp4",
+        VideoRendition.Fhd1080 => $"videos/{videoId:N}/1080p.mp4",
+        _ => $"videos/{videoId:N}/720p.mp4"
+    };
 
     public async Task<Result<StoredPlatformVideo>> SaveAsync(
         Guid videoId,

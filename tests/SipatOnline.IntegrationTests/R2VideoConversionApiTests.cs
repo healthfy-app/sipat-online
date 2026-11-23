@@ -38,7 +38,7 @@ public sealed class R2VideoConversionApiTests : IDisposable
         await using var minio = await MinioFixture.StartAsync();
         await using var factory = await StartFactory(postgres.GetConnectionString(), minio);
         using var client = await OperatorClient(factory);
-        var bytes = await File.ReadAllBytesAsync(await GenerateVideo("source.mp4", seconds: 2));
+        var bytes = await File.ReadAllBytesAsync(await GenerateVideo("source.mp4", seconds: 2, size: "1920x1080"));
 
         var videoId = (await Upload(client, bytes)).GetProperty("id").GetGuid();
 
@@ -50,9 +50,11 @@ public sealed class R2VideoConversionApiTests : IDisposable
 
         var ready = await LibraryVideo(client, videoId);
         Assert.Equal("Ready", ready.GetProperty("status").GetString());
-        Assert.True(ready.GetProperty("hasSd480").GetBoolean());
+        Assert.True(ready.GetProperty("hasFhd1080").GetBoolean());
+        Assert.False(ready.GetProperty("hasSd480").GetBoolean());
         Assert.True(await minio.ExistsAsync($"videos/{videoId:N}/720p.mp4"));
-        Assert.True(await minio.ExistsAsync($"videos/{videoId:N}/480p.mp4"));
+        Assert.True(await minio.ExistsAsync($"videos/{videoId:N}/1080p.mp4"));
+        Assert.False(await minio.ExistsAsync($"videos/{videoId:N}/480p.mp4"));
         Assert.False(await minio.ExistsAsync($"uploads/{videoId:N}/source"));
         Assert.Empty(Directory.EnumerateFileSystemEntries(Path.Combine(WorkPath, "jobs")));
         Assert.False(Directory.Exists(Path.Combine(WorkPath, videoId.ToString("N"))));
@@ -187,7 +189,7 @@ public sealed class R2VideoConversionApiTests : IDisposable
         return postgres;
     }
 
-    private async Task<string> GenerateVideo(string name, int seconds)
+    private async Task<string> GenerateVideo(string name, int seconds, string size = "1280x720")
     {
         Directory.CreateDirectory(root);
         var path = Path.Combine(root, name);
@@ -201,7 +203,7 @@ public sealed class R2VideoConversionApiTests : IDisposable
         foreach (var argument in new[]
                  {
                      "-hide_banner", "-nostdin", "-y",
-                     "-f", "lavfi", "-i", $"testsrc=duration={seconds}:size=1280x720:rate=25",
+                     "-f", "lavfi", "-i", $"testsrc=duration={seconds}:size={size}:rate=25",
                      "-f", "lavfi", "-i", $"sine=duration={seconds}",
                      "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-c:a", "aac", "-shortest", path
                  })

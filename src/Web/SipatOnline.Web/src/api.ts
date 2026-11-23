@@ -292,6 +292,8 @@ export interface PlatformCourseVideo {
   status: 'Ready' | 'Processing' | 'Failed';
   processingError: string | null;
   hasSd480: boolean;
+  /** New uploads whose original is taller than 720 lines also have a 1080p. */
+  hasFhd1080?: boolean;
   checkpoints: VideoCheckpoint[];
   lessonId?: string | null;
   libraryTitle?: string | null;
@@ -546,7 +548,7 @@ export interface LearningPlaybackSession {
   expiresAt: string;
   sessionId: string;
   isDevelopmentDemo: boolean;
-  sources?: { url: string; quality: '720p' | '480p' | null }[];
+  sources?: { url: string; quality: '1080p' | '720p' | '480p' | null }[];
 }
 
 export interface LearningProgress {

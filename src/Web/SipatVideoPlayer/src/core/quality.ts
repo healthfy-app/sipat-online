@@ -1,7 +1,7 @@
 // Measures the quality of one video playback session. Pure TypeScript: no React and no
 // imports from the app; the player knows nothing about lessons or API sessions.
 
-export type QualityLabel = 'single' | '720p' | '480p';
+export type QualityLabel = 'single' | '1080p' | '720p' | '480p';
 export type PlaybackDevice = 'phone' | 'tablet' | 'desktop';
 
 export interface PlaybackEnvironment {

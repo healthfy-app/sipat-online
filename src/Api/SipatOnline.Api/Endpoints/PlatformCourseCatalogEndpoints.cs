@@ -678,7 +678,8 @@ public static class PlatformCourseCatalogEndpoints
             video.ProcessingError,
             video.HasSd480,
             video.Provider.ToString(),
-            video.ExternalId);
+            video.ExternalId,
+            video.HasFhd1080);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -861,7 +862,8 @@ public sealed record PlatformCourseVideoResponse(
     string? ProcessingError = null,
     bool HasSd480 = false,
     string Provider = "Sipat",
-    string? ExternalId = null);
+    string? ExternalId = null,
+    bool HasFhd1080 = false);
 
 public sealed record CreateExternalVideoRequest(
     string? Provider,

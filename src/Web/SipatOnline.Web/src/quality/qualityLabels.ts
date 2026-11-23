@@ -9,7 +9,7 @@ export function levelLabel(level: QualityLevel | null | undefined): string {
 
 const connections: Record<string, string> = { 'slow-2g': '2G lenta', '2g': '2G', '3g': '3G', '4g': '4G ou melhor', unknown: 'Desconhecida' };
 const devices: Record<string, string> = { phone: 'Celular', tablet: 'Tablet', desktop: 'Computador' };
-const qualities: Record<string, string> = { single: 'Única', '720p': '720p', '480p': '480p' };
+const qualities: Record<string, string> = { single: 'Única', '1080p': '1080p', '720p': '720p', '480p': '480p' };
 
 export const connectionLabel = (key: string | null) => (key ? connections[key] ?? key : 'Desconhecida');
 export const deviceLabel = (key: string | null) => (key ? devices[key] ?? key : 'Desconhecido');

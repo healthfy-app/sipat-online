@@ -10,7 +10,8 @@ namespace SipatOnline.Infrastructure.Learning;
 public sealed record ClaimedConversionJob(Guid JobId, Guid VideoId, int Attempts);
 
 /// <summary>
-/// Runs queued conversions: the upload becomes the library 720p and 480p. Several instances may share the queue:
+/// Runs queued conversions: the upload becomes the library 720p, and the 1080p when its original is taller than
+/// 720 lines (older videos gain a 480p instead, on request). Several instances may share the queue:
 /// a job is claimed by one statement with <c>FOR UPDATE SKIP LOCKED</c>, kept with a renewed lease, and every later
 /// write is fenced by <c>LeasedBy</c>. A broken file ends as "Failed" with the reason; it never throws at the worker.
 /// </summary>
@@ -152,14 +153,17 @@ public sealed class VideoConversionProcessor(
         }
     }
 
-    /// <summary>Queues every ready video that has no 480p yet; it gains only the 480p, made from its current 720p, which is never re-encoded. It stays online meanwhile.</summary>
+    /// <summary>
+    /// Queues every ready video from before the conversion (no 480p and no 1080p); it gains only the 480p, made from its
+    /// current 720p, which is never re-encoded. It stays online meanwhile. Videos converted in 1080p are left alone.
+    /// </summary>
     public async Task<int> EnqueueMissingSd480Async(CancellationToken cancellationToken)
     {
         var queued = db.VideoConversionJobs
             .Where(job => job.Status == VideoConversionJobEntity.Pending || job.Status == VideoConversionJobEntity.Running)
             .Select(job => job.VideoId);
         var videoIds = await db.PlatformCourseVideos.AsNoTracking()
-            .Where(video => video.Provider == SipatProvider && video.Status == Ready && !video.HasSd480 && !queued.Contains(video.Id))
+            .Where(video => video.Provider == SipatProvider && video.Status == Ready && !video.HasSd480 && !video.HasFhd1080 && !queued.Contains(video.Id))
             .OrderBy(video => video.CreatedAt)
             .ThenBy(video => video.Id)
             .Select(video => video.Id)
@@ -210,13 +214,20 @@ public sealed class VideoConversionProcessor(
         }
 
         // A video that is already ready may be playing right now: rewriting its 720p would answer
-        // the viewers' range requests from another encoding. It only gains the 480p, made from that 720p.
+        // the viewers' range requests from another encoding. It only gains the 480p, made from that 720p
+        // (the --convert-catalog-videos path for videos from before the 480p).
+        // A new upload becomes the 720p and, when its original is taller than 720 lines, the 1080p too;
+        // a 1080p made from a smaller original would only be the 720p enlarged.
         var addsSd480Only = status == Ready;
         var hd = OutputPath(job.JobId, VideoRendition.Hd720);
         var sd = OutputPath(job.JobId, VideoRendition.Sd480);
+        var fhd = OutputPath(job.JobId, VideoRendition.Fhd1080);
+        var makesFhd1080 = !addsSd480Only && await transcoder.ProbeHeightAsync(source, cancellationToken) > 720;
         var renditions = addsSd480Only
             ? new[] { (VideoRendition.Sd480, sd) }
-            : new[] { (VideoRendition.Hd720, hd), (VideoRendition.Sd480, sd) };
+            : makesFhd1080
+                ? new[] { (VideoRendition.Hd720, hd), (VideoRendition.Fhd1080, fhd) }
+                : new[] { (VideoRendition.Hd720, hd) };
         foreach (var (rendition, output) in renditions)
         {
             var result = await transcoder.TranscodeAsync(source, output, rendition, cancellationToken);
@@ -250,7 +261,14 @@ public sealed class VideoConversionProcessor(
             return ConversionOutcome.Lost;
         }
 
-        await storage.SaveRenditionAsync(videoId, VideoRendition.Sd480, sd, cancellationToken);
+        if (addsSd480Only)
+        {
+            await storage.SaveRenditionAsync(videoId, VideoRendition.Sd480, sd, cancellationToken);
+        }
+        else if (makesFhd1080)
+        {
+            await storage.SaveRenditionAsync(videoId, VideoRendition.Fhd1080, fhd, cancellationToken);
+        }
 
         await using (var transaction = await db.Database.BeginTransactionAsync(cancellationToken))
         {
@@ -270,14 +288,15 @@ public sealed class VideoConversionProcessor(
                 .Where(video => video.Id == videoId)
                 .ExecuteUpdateAsync(setters =>
                 {
-                    setters.SetProperty(video => video.HasSd480, true);
                     if (addsSd480Only)
                     {
                         // The 720p, its size and its type stay exactly as they were.
+                        setters.SetProperty(video => video.HasSd480, true);
                         return;
                     }
 
                     setters
+                        .SetProperty(video => video.HasFhd1080, makesFhd1080)
                         .SetProperty(video => video.Status, Ready)
                         .SetProperty(video => video.ProcessingError, (string?)null)
                         // Both versions are mp4 now (R2 stores them as video/mp4), whatever was uploaded.
@@ -306,7 +325,9 @@ public sealed class VideoConversionProcessor(
         }
         else
         {
-            logger.LogInformation("Video {VideoId} converted to 720p and 480p", videoId);
+            logger.LogInformation(
+                makesFhd1080 ? "Video {VideoId} converted to 1080p and 720p" : "Video {VideoId} converted to 720p (its original is 720 lines or less)",
+                videoId);
         }
 
         return ConversionOutcome.Converted;
@@ -385,7 +406,12 @@ public sealed class VideoConversionProcessor(
     private string OutputPath(Guid jobId, VideoRendition rendition) =>
         Path.Combine(
             EfVideoConversionQueue.JobFolder(options, jobId),
-            rendition == VideoRendition.Sd480 ? "480p.mp4" : "720p.mp4");
+            rendition switch
+            {
+                VideoRendition.Sd480 => "480p.mp4",
+                VideoRendition.Fhd1080 => "1080p.mp4",
+                _ => "720p.mp4"
+            });
 
     /// <summary>The original is no longer needed; failing to remove it is logged, never a reason to undo the result.</summary>
     private async Task DiscardSourceAsync(Guid videoId)

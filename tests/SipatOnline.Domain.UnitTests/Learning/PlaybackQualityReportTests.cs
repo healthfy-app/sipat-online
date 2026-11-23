@@ -96,7 +96,7 @@ public sealed class PlaybackQualityReportTests
         { "stall ms too high", Create(stallMs: 21_600_001) },
         { "watched negative", Create(watchedMs: -1) },
         { "watched too high", Create(watchedMs: 21_600_001) },
-        { "unknown quality", Create(quality: "1080p") },
+        { "unknown quality", Create(quality: "4k") },
         { "quality case", Create(quality: "720P") },
         { "empty quality", Create(quality: "") },
         { "switches negative", Create(switches: -1) },
