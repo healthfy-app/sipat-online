@@ -501,7 +501,7 @@ describe('Platform course catalog', () => {
 
     expect(api.setPlatformCourseStructure).toHaveBeenCalledWith('c-1', [
       expect.objectContaining({
-        title: 'Aula 1',
+        title: 'Título 1',
         videos: [{ videoId: 'v-2', title: null }, { videoId: 'v-1', title: null }],
       }),
     ]);
@@ -773,7 +773,7 @@ describe('Platform course catalog', () => {
       vi.mocked(api.listPlatformCourses).mockResolvedValue([{ ...ergonomics, videos: [opening, extra] }, fire]);
       render(<PlatformCoursesPage />, '/platform/courses/c-1/edit');
 
-      const outline = await screen.findByRole('list', { name: 'Vídeos do treinamento' });
+      const outline = await screen.findByRole('list', { name: /^Vídeos de / });
       expect(within(outline).getAllByText('Extra')).toHaveLength(1);
       expect(within(outline).getByText('YouTube')).toBeVisible();
 
