@@ -4,6 +4,7 @@ import { isExtra, videoProvider, type PlatformLibraryVideo } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/page';
+import SelectCheck from '@/components/ui/select-check';
 import ExtraBadge from '@/courseEditor/ExtraBadge';
 import { ExternalVideoFrame, ExternalVideoOutside } from '@/ExternalVideoPreview';
 import { formatBytes, formatDuration, pluralize } from '@/courseEditor/courseFormat';
@@ -61,6 +62,7 @@ export default function VideoLibraryPanel({
   /** The names of the companies each private video belongs to. */
   privateTo?: Map<string, string[]>;
 }) {
+  const selecting = (selected?.size ?? 0) > 0;
   return (
     <section aria-label="Vídeos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
       {library.length === 0 ? (
@@ -71,12 +73,25 @@ export default function VideoLibraryPanel({
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {library.map((item) => {
             const { video, courseCount } = item;
+            const isChecked = selected?.has(video.id) ?? false;
             return (
-            <article className={cn('relative flex min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-card', selected?.has(video.id) && 'ring-2 ring-primary')} key={video.id}>
-              {selected && onSelect && <label className="absolute left-2 top-2 z-10 m-0 grid size-9 cursor-pointer place-items-center rounded-md bg-card/90 shadow-card">
-                <input aria-label={`Selecionar ${video.title}`} checked={selected.has(video.id)} className="size-5 accent-[var(--brand-primary)]"
-                  onChange={event => onSelect(video.id, event.target.checked)} type="checkbox" />
-              </label>}
+            <article
+              className={cn(
+                'group/card relative flex min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-card transition-shadow duration-150 hover:shadow-[0_6px_20px_rgb(0_0_0/0.1)]',
+                isChecked && 'ring-2 ring-primary ring-offset-2 ring-offset-background',
+              )}
+              key={video.id}
+            >
+              {selected && onSelect && <div
+                className={cn(
+                  'absolute left-0 top-0 z-10 grid size-12 place-items-center rounded-br-lg bg-[radial-gradient(circle_at_top_left,rgb(0_0_0/0.45),transparent_70%)]',
+                  'opacity-0 transition-opacity duration-150 group-hover/card:opacity-100 focus-within:opacity-100 max-[860px]:opacity-100',
+                  (selecting || isChecked) && 'opacity-100',
+                )}
+              >
+                <SelectCheck checked={isChecked} label={`Selecionar ${video.title}`} onChange={(checked) => onSelect(video.id, checked)} tone="dark" />
+              </div>}
+              {isChecked && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-[5] aspect-video bg-primary/15" />}
               <div className="aspect-video bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
                 {video.status === 'Ready' ? (
                   isExtra(video)

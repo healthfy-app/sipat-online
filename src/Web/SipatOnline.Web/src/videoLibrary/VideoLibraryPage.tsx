@@ -7,6 +7,7 @@ import {
 } from '@/api';
 import type { SubjectOption } from '@/courseCatalog/VideoLibraryPanel';
 import AssociateVideosDialog, { type Choice } from './AssociateVideosDialog';
+import SelectCheck from '@/components/ui/select-check';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Input, NativeSelect } from '@/components/ui/input';
@@ -251,8 +252,8 @@ export default function VideoLibraryPage() {
       {shown.length > 0 && (
         <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 shadow-card max-[640px]:-mx-1">
           <label className="m-0 flex cursor-pointer items-center gap-2 text-sm font-semibold">
-            <input aria-label="Selecionar todos os vídeos" checked={allShownSelected} className="size-5 accent-[var(--brand-primary)]"
-              onChange={(event) => setSelected(event.target.checked ? new Set(shown.map((item) => item.video.id)) : new Set())} type="checkbox" />
+            <SelectCheck checked={allShownSelected} label="Selecionar todos os vídeos" mixed={selected.size > 0}
+              onChange={(checked) => setSelected(checked ? new Set(shown.map((item) => item.video.id)) : new Set())} />
             {selected.size > 0 ? pluralize(selected.size, 'selecionado', 'selecionados') : 'Selecionar todos'}
           </label>
           {selected.size > 0 && <Button aria-label="Limpar seleção" onClick={() => setSelected(new Set())} size="icon-sm" title="Limpar seleção" variant="ghost"><X /></Button>}
