@@ -56,7 +56,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
         </div>
         : <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo</h2>}
       <span className="text-sm text-muted-foreground max-[640px]:hidden">
-        · {current === 'videos' ? 'arraste um vídeo para um dia' : 'arraste para um dia e ele traz todos os vídeos e jogos'}
+        · {current === 'videos' ? 'arraste um vídeo para um dia' : canCustomizeGrid ? 'arraste para um dia e escolha os vídeos dele' : 'arraste para um dia e ele traz todos os vídeos e jogos'}
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {canEditThemes && <>

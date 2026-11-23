@@ -790,6 +790,15 @@ export function getPlatformCompanyEmployees(
   );
 }
 
+/** The assuntos (a classification, like a genre) each library video is in. */
+export interface VideoSubjects { videoId: string; subjectIds: string[] }
+export function listVideoSubjects(): Promise<VideoSubjects[]> {
+  return requestJson<VideoSubjects[]>('/api/platform/catalog/video-subjects');
+}
+export function setVideoSubjects(videoId: string, subjectIds: string[]): Promise<VideoSubjects> {
+  return requestJson<VideoSubjects>(`/api/platform/catalog/videos/${videoId}/subjects`, { method: 'PUT', body: JSON.stringify({ subjectIds }) });
+}
+
 export function listPlatformCourses(): Promise<PlatformCourse[]> {
   return requestJson<PlatformCourse[]>('/api/platform/catalog/courses');
 }

@@ -1,10 +1,11 @@
 import { CloudUpload, Plus, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { deletePlatformVideo, listPlatformLibraryVideos, type PlatformLibraryVideo } from '@/api';
+import { deletePlatformVideo, listPlatformCourses, listPlatformLibraryVideos, listVideoSubjects, setVideoSubjects, type PlatformLibraryVideo } from '@/api';
+import type { SubjectOption } from '@/courseCatalog/VideoLibraryPanel';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Input, NativeSelect } from '@/components/ui/input';
 import { Page } from '@/components/ui/page';
 import { filterVideos } from '@/courseCatalog/catalogFilters';
 import VideoLibraryPanel from '@/courseCatalog/VideoLibraryPanel';
@@ -30,10 +31,19 @@ export default function VideoLibraryPage() {
   const [upload, setUpload] = useState<{ files: File[] } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragDepth = useRef(0);
+  const [subjects, setSubjects] = useState<SubjectOption[]>([]);
+  const [videoSubjects, setVideoSubjectMap] = useState<Map<string, string[]>>(new Map());
+  // '' every video, 'none' those without an assunto, or one assunto
+  const subjectFilter = params.get('assunto') ?? '';
 
   const refresh = useCallback(async () => {
     setError('');
     try {
+      // the assuntos come apart: the videos still show if they fail
+      Promise.all([listPlatformCourses(), listVideoSubjects()]).then(([courses, links]) => {
+        setSubjects(courses.map(course => ({ id: course.id, title: course.title })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
+        setVideoSubjectMap(new Map(links.map(item => [item.videoId, item.subjectIds])));
+      }, () => undefined);
       setLibrary(await listPlatformLibraryVideos());
     } catch (loadError) {
       setError(getErrorMessage(loadError));
@@ -66,7 +76,30 @@ export default function VideoLibraryPage() {
     return () => window.clearInterval(timer);
   }, [hasProcessing]);
 
-  const shown = useMemo(() => filterVideos(library, query), [library, query]);
+  const shown = useMemo(() => filterVideos(library, query).filter(item => {
+    if (!subjectFilter) return true;
+    const ids = videoSubjects.get(item.video.id) ?? [];
+    return subjectFilter === 'none' ? ids.length === 0 : ids.includes(subjectFilter);
+  }), [library, query, subjectFilter, videoSubjects]);
+
+  async function changeSubjects(videoId: string, subjectIds: string[]) {
+    const before = videoSubjects.get(videoId) ?? [];
+    setVideoSubjectMap(current => new Map(current).set(videoId, subjectIds));
+    try {
+      await setVideoSubjects(videoId, subjectIds);
+    } catch (saveError) {
+      setVideoSubjectMap(current => new Map(current).set(videoId, before));
+      setError(getErrorMessage(saveError));
+    }
+  }
+
+  function setSubjectFilter(value: string) {
+    setParams((current) => {
+      const next = new URLSearchParams(current);
+      if (value) next.set('assunto', value); else next.delete('assunto');
+      return next;
+    }, { replace: true });
+  }
   const totalBytes = library.reduce((sum, item) => sum + (item.video.sizeBytes ?? 0), 0);
   const processing = library.filter((item) => item.video.status === 'Processing').length;
   const unused = library.filter((item) => item.video.status === 'Ready' && item.courseCount === 0).length;
@@ -159,6 +192,11 @@ export default function VideoLibraryPage() {
             <Input aria-label="Buscar vídeo" className="pl-9" onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar vídeo por nome" type="search" value={query} />
           </label>
+          <NativeSelect aria-label="Filtrar por assunto" className="w-auto max-w-xs" onChange={(event) => setSubjectFilter(event.target.value)} value={subjectFilter}>
+            <option value="">Todos os assuntos</option>
+            <option value="none">Sem assunto</option>
+            {subjects.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+          </NativeSelect>
           <span className="text-sm text-muted-foreground tabular-nums">
             <span>{query.trim() ? `${shown.length} de ${library.length}` : pluralize(library.length, 'vídeo', 'vídeos')}</span>
             {totalBytes > 0 && <> · <span title="Soma do tamanho de todos os vídeos da biblioteca">{formatBytes(totalBytes)} no total</span></>}
@@ -170,7 +208,8 @@ export default function VideoLibraryPage() {
       {isLoading
         ? <LoadingState className="list-state">Carregando vídeos...</LoadingState>
         : <VideoLibraryPanel busy={isDeleting} hasVideos={library.length > 0} library={shown}
-            onClearFilters={() => setQuery('')} onDelete={(item) => void removeVideo(item)} onUpload={() => setUpload({ files: [] })} />}
+            onClearFilters={() => { setQuery(''); setSubjectFilter(''); }} onDelete={(item) => void removeVideo(item)} onUpload={() => setUpload({ files: [] })}
+            onSubjects={(videoId, ids) => void changeSubjects(videoId, ids)} subjects={subjects} videoSubjects={videoSubjects} />}
 
       {isDragging && (
         <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-primary/10 p-6 backdrop-blur-[2px]">
