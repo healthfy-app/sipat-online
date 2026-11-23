@@ -816,8 +816,8 @@ describe('Platform course catalog', () => {
 
     await user.click((await screen.findAllByRole('button', { name: 'Adicionar vídeo' }))[0]);
     const dialog = await screen.findByRole('dialog', { name: 'Adicionar vídeo' });
-    const options = within(within(dialog).getByLabelText('Vincular da biblioteca')).getAllByRole('option').map(option => option.textContent);
-    expect(options).toEqual(['Selecione um vídeo', 'Abertura', 'Pronto para usar']);
+    const options = within(within(dialog).getByLabelText('Vincular da biblioteca')).getAllByRole('option').map(option => option.getAttribute('aria-label'));
+    expect(options).toEqual(['Abertura', 'Pronto para usar']);
   });
 
   it('explains where optional activities appear and how to configure a video question', async () => {
