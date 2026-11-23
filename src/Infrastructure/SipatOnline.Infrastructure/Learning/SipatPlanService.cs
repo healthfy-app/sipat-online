@@ -134,8 +134,11 @@ public sealed class SipatPlanService(
             var title = sipat.Title.Trim();
             var course = new PlatformCourseEntity
             {
-                Id = Guid.NewGuid(), Title = title.Length > 200 ? title[..200] : title, CreatedAt = now,
-                Status = (int)PlatformCourseStatus.Draft, GamificationEnabled = false,
+                Id = Guid.NewGuid(),
+                Title = title.Length > 200 ? title[..200] : title,
+                CreatedAt = now,
+                Status = (int)PlatformCourseStatus.Draft,
+                GamificationEnabled = false,
             };
             db.PlatformCourses.Add(course);
             if (week is null)
@@ -260,7 +263,11 @@ public sealed class SipatPlanService(
             foreach (var moduleId in days[index].GameIds.Distinct())
                 db.PlatformCourseModuleLinks.Add(new PlatformCourseModuleLinkEntity
                 {
-                    Id = Guid.NewGuid(), CourseId = courseId, ModuleId = moduleId, AfterVideoCount = after, Order = order++,
+                    Id = Guid.NewGuid(),
+                    CourseId = courseId,
+                    ModuleId = moduleId,
+                    AfterVideoCount = after,
+                    Order = order++,
                 });
         }
     }
