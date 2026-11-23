@@ -607,7 +607,6 @@ function ProtectedPortal({
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
             {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}
           </NavLink>
-          {hasAdminRole(session) && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/cadastro">Cadastro</NavLink>}
         </>
       )}
       {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}

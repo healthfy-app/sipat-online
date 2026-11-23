@@ -1,13 +1,13 @@
 import { KeyRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import {
-  changeEmployeeLogin, changeUserStatus, renameUser, resetEmployeePassword, saveParticipantProfile,
-  type CompanyRegistry, type ParticipantAccount, type ParticipantProfile, type RegistryItem,
+  addRegistryItems, changeEmployeeLogin, changeUserStatus, renameUser, resetEmployeePassword, saveParticipantProfile,
+  type CompanyRegistry, type ParticipantAccount, type ParticipantProfile, type RegistryItem, type RegistryKind,
 } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
-import { Input, NativeSelect } from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import { getErrorMessage } from '@/courseEditor/courseFormat';
 import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { generateInitialPassword } from '@/participantCsv';
@@ -15,18 +15,26 @@ import { generateInitialPassword } from '@/participantCsv';
 const requiredMark = ' (obrigatório nesta empresa)';
 const mark = (required?: boolean) => (required ? requiredMark : '');
 
-/** The active items plus the person's own (as it was when the dialog opened), even deactivated: whoever is in it stays in it until moved, and can be put back. */
-const choices = (items: RegistryItem[], initial: string) => items.filter(item => item.isActive || item.id === initial);
+const key = (value: string) => value.trim().toLocaleLowerCase('pt-BR');
+const nameOf = (items: RegistryItem[] | undefined, id: string | null | undefined) => items?.find(item => item.id === id)?.name ?? '';
 
-function PlacementSelect({ id, label, empty, items, initial, value, onChange }: {
-  id: string; label: string; empty: string; items: RegistryItem[]; initial: string; value: string; onChange: (value: string) => void;
+/** Typed with suggestions of the company's units or sectors; a new name is created when saving. */
+function PlacementInput({ id, label, items, value, onChange }: {
+  id: string; label: string; items: RegistryItem[]; value: string; onChange: (value: string) => void;
 }) {
   return <Field htmlFor={id} label={label}>
-    <NativeSelect id={id} onChange={event => onChange(event.target.value)} value={value}>
-      <option value="">{empty}</option>
-      {choices(items, initial).map(item => <option key={item.id} value={item.id}>{item.name}{item.isActive ? '' : ' (desativado)'}</option>)}
-    </NativeSelect>
+    <Input autoComplete="off" id={id} list={`${id}-options`} maxLength={120} onChange={event => onChange(event.target.value)} placeholder="Digite ou escolha" value={value} />
+    <datalist id={`${id}-options`}>{items.filter(item => item.isActive).map(item => <option key={item.id} value={item.name} />)}</datalist>
   </Field>;
+}
+
+/** The id of the typed name: an existing item (any case) or a new one created now; empty takes the person out of it. */
+async function resolvePlacement(kind: RegistryKind, items: RegistryItem[], typed: string): Promise<string | null> {
+  if (!typed.trim()) return null;
+  const found = items.find(item => key(item.name) === key(typed));
+  if (found) return found.id;
+  const registry = await addRegistryItems(kind, [typed.trim()]);
+  return registry[kind].find(item => key(item.name) === key(typed))?.id ?? null;
 }
 
 /**
@@ -45,8 +53,10 @@ export default function EditCollaboratorDialog({ person, profile, registry, onCl
   const [registration, setRegistration] = useState(profile?.registrationNumber ?? '');
   const [email, setEmail] = useState(profile?.email ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
-  const [unitId, setUnitId] = useState(profile?.unitId ?? '');
-  const [sectorId, setSectorId] = useState(profile?.sectorId ?? '');
+  const initialUnit = nameOf(registry?.units, profile?.unitId);
+  const initialSector = nameOf(registry?.sectors, profile?.sectorId);
+  const [unit, setUnit] = useState(initialUnit);
+  const [sector, setSector] = useState(initialSector);
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -56,7 +66,7 @@ export default function EditCollaboratorDialog({ person, profile, registry, onCl
   const statusChanged = active !== person.isActive;
   const profileChanged = !!profile && (
     registration.trim() !== (profile.registrationNumber ?? '') || email.trim() !== (profile.email ?? '') || phone.trim() !== (profile.phone ?? '')
-    || unitId !== (profile.unitId ?? '') || sectorId !== (profile.sectorId ?? ''));
+    || key(unit) !== key(initialUnit) || key(sector) !== key(initialSector));
   const changed = nameChanged || loginChanged || statusChanged || password !== '' || profileChanged;
   const rules = registry?.rules;
 
@@ -73,7 +83,8 @@ export default function EditCollaboratorDialog({ person, profile, registry, onCl
       if (profileChanged) {
         await saveParticipantProfile(person.id, {
           registrationNumber: registration.trim() || null, email: email.trim() || null, phone: phone.trim() || null,
-          unitId: unitId || null, sectorId: sectorId || null,
+          unitId: await resolvePlacement('units', registry?.units ?? [], unit),
+          sectorId: await resolvePlacement('sectors', registry?.sectors ?? [], sector),
         });
         done.push('cadastro');
       }
@@ -104,10 +115,8 @@ export default function EditCollaboratorDialog({ person, profile, registry, onCl
         <Field htmlFor="edit-phone" label={`Telefone${mark(rules?.requirePhone)}`}>
           <Input autoComplete="off" id="edit-phone" inputMode="tel" maxLength={32} onChange={event => setPhone(event.target.value)} type="tel" value={phone} />
         </Field>
-        {registry && registry.units.length > 0
-          && <PlacementSelect empty="Sem unidade" id="edit-unit" initial={profile.unitId ?? ''} items={registry.units} label={`Unidade${mark(rules?.requireUnit)}`} onChange={setUnitId} value={unitId} />}
-        {registry && registry.sectors.length > 0
-          && <PlacementSelect empty="Sem setor" id="edit-sector" initial={profile.sectorId ?? ''} items={registry.sectors} label={`Setor${mark(rules?.requireSector)}`} onChange={setSectorId} value={sectorId} />}
+        <PlacementInput id="edit-unit" items={registry?.units ?? []} label={`Unidade${mark(rules?.requireUnit)}`} onChange={setUnit} value={unit} />
+        <PlacementInput id="edit-sector" items={registry?.sectors ?? []} label={`Setor${mark(rules?.requireSector)}`} onChange={setSector} value={sector} />
       </>}
       <Field hint={`${passwordRulesHint} Entregue a nova senha por um canal seguro: ela não aparece de novo.`} htmlFor="edit-password" label="Nova senha (opcional)">
         <div className="flex gap-2">
