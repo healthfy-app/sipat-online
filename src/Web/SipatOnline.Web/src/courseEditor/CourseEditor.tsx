@@ -138,18 +138,18 @@ export default function CourseEditor({
   const outlineActions: OutlineActions = {
     onSelect: setSelectedKey,
     onTitle: (title) => setValues((current) => ({ ...current, title })),
-    onAddLesson: () => void changeStructure(addLesson(drafts()), 'A aula foi criada.'),
+    onAddLesson: () => void changeStructure(addLesson(drafts()), 'O título foi criado.'),
     onAddVideo: (lessonId) => {
       setAddTarget(lessonId);
       openDialog('video');
     },
-    onRenameLesson: (lessonId, title) => void changeStructure(renameLesson(drafts(), lessonId, title), 'O nome da aula foi atualizado.'),
-    onMoveLesson: (lessonId, offset) => void changeStructure(moveLesson(drafts(), lessonId, offset), 'A ordem das aulas foi atualizada.'),
+    onRenameLesson: (lessonId, title) => void changeStructure(renameLesson(drafts(), lessonId, title), 'O nome do título foi atualizado.'),
+    onMoveLesson: (lessonId, offset) => void changeStructure(moveLesson(drafts(), lessonId, offset), 'A ordem dos títulos foi atualizada.'),
     onRemoveLesson: (lessonId) => {
       const lesson = groups.find((group) => group.id === lessonId);
       const videos = lesson?.items.filter((item) => item.kind === 'video').length ?? 0;
-      if (videos > 0 && !window.confirm(`Remover a aula "${lesson?.title}" e tirar ${videos} vídeo(s) do treinamento? Eles continuam na biblioteca.`)) return;
-      void changeStructure(removeLesson(drafts(), lessonId), 'A aula foi removida; os vídeos continuam na biblioteca.');
+      if (videos > 0 && !window.confirm(`Remover o título "${lesson?.title}" e tirar ${videos} vídeo(s) do treinamento? Eles continuam na biblioteca.`)) return;
+      void changeStructure(removeLesson(drafts(), lessonId), 'O título foi removido; os vídeos continuam na biblioteca.');
     },
     onRenameVideo: (videoId, title) => void changeStructure(retitleVideo(drafts(), videoId, title), 'O título do vídeo foi atualizado neste treinamento.'),
     onMoveVideo: (videoId, offset) => void changeStructure(moveVideoInStructure(drafts(), videoId, offset), 'A ordem dos vídeos foi atualizada.'),
@@ -219,7 +219,7 @@ export default function CourseEditor({
           <CoursePropertiesPanel
             actions={{
               onAddVideo: outlineActions.onAddVideo,
-              onDescribeLesson: (lessonId, description) => void changeStructure(describeLesson(drafts(), lessonId, description), 'A descrição da aula foi atualizada.'),
+              onDescribeLesson: (lessonId, description) => void changeStructure(describeLesson(drafts(), lessonId, description), 'A descrição do título foi atualizada.'),
               onManageActivities: () => openDialog('games'),
               onRemoveVideo: outlineActions.onRemoveVideo,
               onRenameLesson: outlineActions.onRenameLesson,

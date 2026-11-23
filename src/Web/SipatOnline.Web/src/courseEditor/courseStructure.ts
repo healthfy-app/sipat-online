@@ -28,7 +28,7 @@ export const describeLesson = (drafts: CourseLessonDraft[], id: string, descript
 
 export const addLesson = (drafts: CourseLessonDraft[]) => [
   ...drafts,
-  { id: null, title: `Aula ${drafts.length + 1}`, description: null, videos: [] },
+  { id: null, title: `Título ${drafts.length + 1}`, description: null, videos: [] },
 ];
 
 export const removeLesson = (drafts: CourseLessonDraft[], id: string) => drafts.filter((lesson) => lesson.id !== id);

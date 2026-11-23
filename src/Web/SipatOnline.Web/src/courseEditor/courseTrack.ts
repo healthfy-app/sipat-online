@@ -54,11 +54,11 @@ export interface LessonGroup {
   items: TrackItem[];
 }
 
-/** Aulas do treinamento; treinamentos sem `lessons` (respostas antigas) viram uma única "Aula 1". */
+/** Aulas do treinamento; treinamentos sem `lessons` (respostas antigas) viram uma única "Título 1". */
 export function courseLessons(course: PlatformCourse) {
   if (course.lessons && course.lessons.length > 0) return course.lessons;
   return course.videos.length > 0
-    ? [{ id: course.id, title: 'Aula 1', description: null, videoIds: course.videos.map((video) => video.id) }]
+    ? [{ id: course.id, title: 'Título 1', description: null, videoIds: course.videos.map((video) => video.id) }]
     : [];
 }
 

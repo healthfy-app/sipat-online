@@ -83,15 +83,30 @@ export default function CourseOutlinePanel({
           <Button disabled={busy} onClick={() => actions.onAddVideo('')} size="sm">Adicionar vídeo</Button>
         </div>
       ) : (
-        <div className="grid gap-1 p-4">
-          <div className="flex flex-col gap-0.5 rounded-md bg-accent px-3 py-2">
-            <span className="text-base leading-normal">Conteúdo</span>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {formatDuration(totalMilliseconds)}{activityCount > 0 && ` · ${pluralize(activityCount, 'atividade', 'atividades')}`}
-            </span>
-          </div>
-                  <ol aria-label="Vídeos do treinamento" className="m-0 mt-1 grid list-none gap-0.5 p-0">
-                    {flatItems.map((item) => {
+        <div className="grid gap-3 p-4">
+          <p className="m-0 px-1 text-xs tabular-nums text-muted-foreground">
+            {pluralize(groups.length, 'título', 'títulos')} · {formatDuration(totalMilliseconds)}{activityCount > 0 && ` · ${pluralize(activityCount, 'atividade', 'atividades')}`}
+          </p>
+          {groups.map((group, groupIndex) => {
+            const groupVideos = group.items.flatMap((item) => (item.kind === 'video' && !isExtra(item.video) ? [item.video] : []));
+            const groupMs = groupVideos.reduce((sum, video) => sum + video.durationMilliseconds, 0);
+            return (
+            <section aria-label={group.title} className="grid gap-0.5" key={group.id || groupIndex}>
+              <div className="group/title flex items-center gap-1 rounded-md bg-accent px-2 py-1.5">
+                <span aria-hidden="true" className="shrink-0 text-[0.6875rem] font-bold uppercase tracking-wide text-primary">{groupIndex + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <InlineText className="font-semibold" disabled={busy || !group.id} label={`Nome do título ${groupIndex + 1}`}
+                    onCommit={(value) => actions.onRenameLesson(group.id, value)} value={group.title} />
+                  <span className="block px-1.5 text-xs tabular-nums text-muted-foreground">{formatDuration(groupMs)}</span>
+                </div>
+                {group.id && <span className="flex shrink-0 gap-0.5">
+                  <MiniButton disabled={busy || groupIndex === 0} label={`Mover ${group.title} para cima`} onClick={() => actions.onMoveLesson(group.id, -1)}>↑</MiniButton>
+                  <MiniButton disabled={busy || groupIndex === groups.length - 1} label={`Mover ${group.title} para baixo`} onClick={() => actions.onMoveLesson(group.id, 1)}>↓</MiniButton>
+                  <MiniButton danger disabled={busy || groups.length === 1} label={`Remover o título ${group.title}`} onClick={() => actions.onRemoveLesson(group.id)}>×</MiniButton>
+                </span>}
+              </div>
+                  <ol aria-label={`Vídeos de ${group.title}`} className="m-0 mt-1 grid list-none gap-0.5 p-0">
+                    {group.items.map((item) => {
                       const selected = item.key === selectedKey;
                       const flatIndex = item.kind === 'video' ? flatVideoIds.indexOf(item.video.id) : -1;
                       return (
@@ -166,14 +181,20 @@ export default function CourseOutlinePanel({
                       );
                     })}
                   </ol>
-          <button
-            className="m-0 mt-1 inline-flex min-h-8 cursor-pointer items-center gap-2 justify-self-start border-0 bg-transparent py-0 pl-1 pr-2 text-sm text-primary hover:underline hover:underline-offset-4 disabled:opacity-50"
-            disabled={busy}
-            onClick={() => actions.onAddVideo('')}
-            type="button"
-          >
-            <CirclePlus className="size-4" /> Novo vídeo
-          </button>
+              <button
+                className="m-0 inline-flex min-h-8 cursor-pointer items-center gap-2 justify-self-start border-0 bg-transparent py-0 pl-1 pr-2 text-sm text-primary hover:underline hover:underline-offset-4 disabled:opacity-50"
+                disabled={busy}
+                onClick={() => actions.onAddVideo(group.id)}
+                type="button"
+              >
+                <CirclePlus className="size-4" /> Novo vídeo
+              </button>
+            </section>
+            );
+          })}
+          <Button className="justify-self-start" disabled={busy} onClick={actions.onAddLesson} size="sm" variant="outline">
+            <CirclePlus /> Novo título
+          </Button>
         </div>
       )}
 
