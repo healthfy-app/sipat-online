@@ -20,9 +20,10 @@ public sealed class DevelopmentCatalogVideoProvider(PlatformDbContext db, Develo
         if (video.Status != nameof(SipatOnline.Learning.Application.Catalog.PlatformVideoStatus.Ready))
             return CatalogVideoPlaybackProvider.NotReady();
         var url = $"/api/learning/lessons/{lessonId:D}/media";
-        IReadOnlyList<PlaybackSource> sources = video.HasSd480
-            ? [new(url, "720p"), new($"{url}?quality=480p", "480p")]
-            : [new(url, null)];
+        var sources = new List<PlaybackSource>(3);
+        if (video.HasFhd1080) sources.Add(new($"{url}?quality=1080p", "1080p"));
+        sources.Add(new(url, video.HasSd480 || video.HasFhd1080 ? "720p" : null));
+        if (video.HasSd480) sources.Add(new($"{url}?quality=480p", "480p"));
         return await samples.CreateLocalSession(
             url, video.ContentType, video.DurationMilliseconds, participantId, lessonId, sources);
     }

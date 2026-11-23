@@ -16,6 +16,17 @@ public sealed class NoDirectVideoUploadStore : IDirectVideoUploadStore
 
     public Task DeleteAsync(Guid videoId, CancellationToken ct) => throw Disabled();
 
+    public Task<string> StartMultipartAsync(Guid videoId, string contentType, CancellationToken ct) => throw Disabled();
+
+    public IReadOnlyList<SignedUploadPart> SignParts(Guid videoId, string uploadId, IReadOnlyList<int> partNumbers, TimeSpan validFor) =>
+        throw Disabled();
+
+    public Task<IReadOnlyList<StoredUploadPart>?> ListPartsAsync(Guid videoId, string uploadId, CancellationToken ct) => throw Disabled();
+
+    public Task<bool> FinishMultipartAsync(Guid videoId, string uploadId, CancellationToken ct) => throw Disabled();
+
+    public Task AbortMultipartAsync(Guid videoId, string uploadId, CancellationToken ct) => throw Disabled();
+
     private static InvalidOperationException Disabled() =>
         new("Direct video upload is disabled in this environment.");
 }

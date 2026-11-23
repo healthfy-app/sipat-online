@@ -280,6 +280,84 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("CompletePlatformVideoUpload");
 
+        // Chunked upload: the browser sends the file in parts straight to the bucket and, after a lost connection
+        // or a reload, asks which parts are there and sends only the rest. Then finish joins them and complete
+        // (above) checks and registers the video.
+        catalog.MapPost("/videos/uploads/chunked", async (
+            StartPlatformVideoUploadRequest request,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.StartChunkedUploadAsync(request.ContentType, request.SizeBytes, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return ToProblem(result.Error);
+            }
+
+            return result.Value.Ticket is not { } start
+                ? Results.Ok(new MultipartVideoUploadResponse(DirectUploadStart.Multipart, PlatformCourseCatalogService.MaximumVideoSizeBytes))
+                : Results.Ok(new ChunkedVideoUploadResponse(
+                    "chunked",
+                    start.VideoId,
+                    start.UploadId,
+                    start.PartSizeBytes,
+                    start.PartCount,
+                    PlatformCourseCatalogService.MaximumSignedPartsPerCall,
+                    PlatformCourseCatalogService.MaximumVideoSizeBytes));
+        })
+        .WithName("StartPlatformChunkedVideoUpload");
+
+        catalog.MapPost("/videos/uploads/{videoId:guid}/parts", (
+            Guid videoId,
+            SignChunkedUploadPartsRequest request,
+            PlatformCourseCatalogService catalogService) =>
+        {
+            var result = catalogService.SignChunkedUploadParts(videoId, request.UploadId, request.PartNumbers);
+            return result.IsSuccess
+                ? Results.Ok(new SignedUploadPartsResponse(result.Value
+                    .Select(part => new SignedUploadPartResponse(part.PartNumber, part.UploadUrl.AbsoluteUri))
+                    .ToArray()))
+                : ToProblem(result.Error);
+        })
+        .WithName("SignPlatformChunkedVideoUploadParts");
+
+        catalog.MapPost("/videos/uploads/{videoId:guid}/parts/list", async (
+            Guid videoId,
+            ChunkedUploadRequest request,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.ListChunkedUploadPartsAsync(videoId, request.UploadId, cancellationToken);
+            return result.IsSuccess
+                ? Results.Ok(new StoredUploadPartsResponse(result.Value
+                    .Select(part => new StoredUploadPartResponse(part.PartNumber, part.SizeBytes))
+                    .ToArray()))
+                : ToProblem(result.Error);
+        })
+        .WithName("ListPlatformChunkedVideoUploadParts");
+
+        catalog.MapPost("/videos/uploads/{videoId:guid}/finish", async (
+            Guid videoId,
+            ChunkedUploadRequest request,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.FinishChunkedUploadAsync(videoId, request.UploadId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("FinishPlatformChunkedVideoUpload");
+
+        catalog.MapPost("/videos/uploads/{videoId:guid}/abort", async (
+            Guid videoId,
+            ChunkedUploadRequest request,
+            PlatformCourseCatalogService catalogService,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await catalogService.AbortChunkedUploadAsync(videoId, request.UploadId, cancellationToken);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("AbortPlatformChunkedVideoUpload");
+
         catalog.MapPost("/videos/external", async (
             CreateExternalVideoRequest request,
             PlatformCourseCatalogService catalogService,
@@ -678,7 +756,8 @@ public static class PlatformCourseCatalogEndpoints
             video.ProcessingError,
             video.HasSd480,
             video.Provider.ToString(),
-            video.ExternalId);
+            video.ExternalId,
+            video.HasFhd1080);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -769,6 +848,28 @@ public sealed record DirectVideoUploadResponse(
     IReadOnlyDictionary<string, string> Headers,
     DateTimeOffset ExpiresAt,
     long MaxSizeBytes);
+
+/// <summary>The browser sends parts of <see cref="PartSizeBytes"/> (the last one smaller), asking for links in batches.</summary>
+public sealed record ChunkedVideoUploadResponse(
+    string Mode,
+    Guid VideoId,
+    string UploadId,
+    long PartSizeBytes,
+    int PartCount,
+    int MaxPartsPerRequest,
+    long MaxSizeBytes);
+
+public sealed record ChunkedUploadRequest(string? UploadId);
+
+public sealed record SignChunkedUploadPartsRequest(string? UploadId, IReadOnlyList<int>? PartNumbers);
+
+public sealed record SignedUploadPartResponse(int PartNumber, string Url);
+
+public sealed record SignedUploadPartsResponse(IReadOnlyList<SignedUploadPartResponse> Parts);
+
+public sealed record StoredUploadPartResponse(int PartNumber, long SizeBytes);
+
+public sealed record StoredUploadPartsResponse(IReadOnlyList<StoredUploadPartResponse> Parts);
 
 public sealed record PlatformLibraryVideoResponse(PlatformCourseVideoResponse Video, int CourseCount);
 
@@ -861,7 +962,8 @@ public sealed record PlatformCourseVideoResponse(
     string? ProcessingError = null,
     bool HasSd480 = false,
     string Provider = "Sipat",
-    string? ExternalId = null);
+    string? ExternalId = null,
+    bool HasFhd1080 = false);
 
 public sealed record CreateExternalVideoRequest(
     string? Provider,

@@ -46,7 +46,7 @@ export default function ManageCategoriesDialog({
 
   async function remove(category: CourseCategory) {
     const usage = category.courseCount > 0
-      ? ` ${pluralize(category.courseCount, 'assunto fica', 'assuntos ficam')} sem categoria.`
+      ? ` ${pluralize(category.courseCount, 'treinamento fica', 'treinamentos ficam')} sem categoria.`
       : '';
     if (!window.confirm(`Excluir a categoria "${category.name}"?${usage}`)) return;
     await run(() => deleteCourseCategory(category.id));
@@ -56,7 +56,7 @@ export default function ManageCategoriesDialog({
     <Dialog busy={busy} onClose={onClose} title="Categorias da biblioteca">
       <div className="grid gap-4">
         <p className="m-0 text-sm text-muted-foreground">
-          Agrupam os assuntos da biblioteca (Alimentação, Postura...). Excluir uma categoria não apaga os assuntos.
+          Agrupam os treinamentos da biblioteca (Alimentação, Postura...). Excluir uma categoria não apaga os treinamentos.
         </p>
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
 
@@ -80,7 +80,7 @@ export default function ManageCategoriesDialog({
               ) : (
                 <>
                   <span className="min-w-0 flex-1 truncate font-semibold">{category.name}</span>
-                  <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">{pluralize(category.courseCount, 'assunto', 'assuntos')}</span>
+                  <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">{pluralize(category.courseCount, 'treinamento', 'treinamentos')}</span>
                   <Button aria-label={`Renomear ${category.name}`} disabled={busy} onClick={() => setEditing({ id: category.id, name: category.name })} size="icon-sm" variant="ghost"><Pencil /></Button>
                   <Button aria-label={`Excluir ${category.name}`} disabled={busy} onClick={() => void remove(category)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </>

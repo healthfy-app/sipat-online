@@ -101,7 +101,7 @@ resource "azurerm_network_interface_security_group_association" "app" {
 
 resource "azurerm_linux_virtual_machine" "app" {
   name                            = "${local.name_prefix}-vm"
-  computer_name                   = "sipat-online"
+  computer_name                   = "${var.project_name}-${var.environment}"
   location                        = azurerm_resource_group.main.location
   resource_group_name             = azurerm_resource_group.main.name
   size                            = var.vm_size
@@ -109,17 +109,24 @@ resource "azurerm_linux_virtual_machine" "app" {
   disable_password_authentication = true
   network_interface_ids           = [azurerm_network_interface.app.id]
   custom_data = base64encode(templatefile("${path.module}/cloud-init.yaml.tftpl", {
-    admin_username = var.admin_username
-    acme_email     = var.acme_email
-    domain_name    = lower(var.domain_name)
-    dns_zone_id    = azurerm_dns_zone.main.id
-    reload_script  = file("${path.module}/reload-nginx.sh")
+    admin_username  = var.admin_username
+    create_dns_zone = var.create_dns_zone
+    domain_name     = lower(var.domain_name)
+    dns_zone_id     = var.create_dns_zone ? azurerm_dns_zone.main[0].id : ""
+    reload_script   = file("${path.module}/reload-nginx.sh")
+    swap_size_mb    = var.swap_size_mb
   }))
   tags = local.common_tags
 
-  admin_ssh_key {
-    username   = var.admin_username
-    public_key = file(pathexpand(var.ssh_public_key_path))
+  dynamic "admin_ssh_key" {
+    for_each = toset(concat(
+      [trimspace(file(pathexpand(var.ssh_public_key_path)))],
+      [for key in var.additional_ssh_public_keys : trimspace(key)]
+    ))
+    content {
+      username   = var.admin_username
+      public_key = admin_ssh_key.value
+    }
   }
 
   identity {
@@ -129,44 +136,58 @@ resource "azurerm_linux_virtual_machine" "app" {
   os_disk {
     name                 = "${local.name_prefix}-osdisk"
     caching              = "ReadWrite"
-    storage_account_type = "StandardSSD_LRS"
-    disk_size_gb         = 32
+    storage_account_type = var.os_disk_type
+    disk_size_gb         = var.os_disk_size_gb
   }
 
   source_image_reference {
     publisher = "Canonical"
     offer     = "ubuntu-24_04-lts"
-    sku       = "server"
+    sku       = var.image_sku
     version   = "latest"
   }
 
   boot_diagnostics {}
+
+  lifecycle {
+    # cloud-init runs only on the first boot: changing it must never recreate the VM (and the data on its disk)
+    ignore_changes = [custom_data]
+
+    precondition {
+      condition     = !var.create_dns_zone || var.domain_name != ""
+      error_message = "domain_name is required when create_dns_zone is true."
+    }
+  }
 }
 
 resource "azurerm_dns_zone" "main" {
+  count               = var.create_dns_zone ? 1 : 0
   name                = lower(var.domain_name)
   resource_group_name = azurerm_resource_group.main.name
   tags                = local.common_tags
 }
 
 resource "azurerm_dns_a_record" "apex" {
+  count               = var.create_dns_zone ? 1 : 0
   name                = "@"
-  zone_name           = azurerm_dns_zone.main.name
+  zone_name           = azurerm_dns_zone.main[0].name
   resource_group_name = azurerm_resource_group.main.name
   ttl                 = 300
   records             = [azurerm_public_ip.app.ip_address]
 }
 
 resource "azurerm_dns_a_record" "tenant_wildcard" {
+  count               = var.create_dns_zone ? 1 : 0
   name                = "*"
-  zone_name           = azurerm_dns_zone.main.name
+  zone_name           = azurerm_dns_zone.main[0].name
   resource_group_name = azurerm_resource_group.main.name
   ttl                 = 300
   records             = [azurerm_public_ip.app.ip_address]
 }
 
 resource "azurerm_role_assignment" "dns_zone_contributor" {
-  scope                = azurerm_dns_zone.main.id
+  count                = var.create_dns_zone ? 1 : 0
+  scope                = azurerm_dns_zone.main[0].id
   role_definition_name = "DNS Zone Contributor"
   principal_id         = azurerm_linux_virtual_machine.app.identity[0].principal_id
   principal_type       = "ServicePrincipal"

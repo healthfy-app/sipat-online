@@ -1,4 +1,5 @@
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+# the build runs on the machine that builds (no emulation): the published IL is the same for amd64 and arm64
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /source
 
 COPY Directory.Build.props Directory.Packages.props global.json ./

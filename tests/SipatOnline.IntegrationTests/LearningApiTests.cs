@@ -34,7 +34,8 @@ public sealed class LearningApiTests
         await SignInAdminAsync(client);
 
         using var adminTracksResponse = await client.GetAsync("/api/learning/tracks");
-        Assert.Equal(HttpStatusCode.Forbidden, adminTracksResponse.StatusCode);
+        // the company admin also takes the trainings
+        Assert.Equal(HttpStatusCode.OK, adminTracksResponse.StatusCode);
 
         using var tenantTracksResponse = await client.GetAsync("/api/admin/learning/tracks");
         Assert.Equal(HttpStatusCode.OK, tenantTracksResponse.StatusCode);
@@ -242,7 +243,7 @@ public sealed class LearningApiTests
             Assert.Equal(HttpStatusCode.OK, reportResponse.StatusCode);
             using var report = JsonDocument.Parse(await reportResponse.Content.ReadAsStringAsync());
             var reportedTrack = Assert.Single(report.RootElement.EnumerateArray(),
-                item => item.GetProperty("trackId").GetGuid() == trackId);
+                item => item.GetProperty("trackId").GetGuid() == trackId && item.GetProperty("progressPercentage").GetInt32() > 0);
             Assert.Equal(coursePercentage, reportedTrack.GetProperty("progressPercentage").GetInt32());
             Assert.Equal(completion, reportedTrack.GetProperty("isCompleted").GetBoolean());
         }
@@ -288,7 +289,8 @@ public sealed class LearningApiTests
         Assert.Equal(100, card.GetProperty("progressPercentage").GetInt32());
         var row = Assert.Single(
             (await scenario.Admin.GetFromJsonAsync<JsonElement>("/api/admin/learning/participation")).EnumerateArray(),
-            item => item.GetProperty("trackId").GetGuid() == scenario.TrackId);
+            // the admin takes the trainings too and has its own row, still at zero
+            item => item.GetProperty("trackId").GetGuid() == scenario.TrackId && item.GetProperty("completedLessonCount").GetInt32() > 0);
         Assert.True(row.GetProperty("isCompleted").GetBoolean());
         Assert.Equal(100, row.GetProperty("progressPercentage").GetInt32());
     }
@@ -348,7 +350,7 @@ public sealed class LearningApiTests
 
         var row = Assert.Single(
             (await scenario.Admin.GetFromJsonAsync<JsonElement>("/api/admin/learning/participation")).EnumerateArray(),
-            item => item.GetProperty("trackId").GetGuid() == scenario.TrackId);
+            item => item.GetProperty("trackId").GetGuid() == scenario.TrackId && item.GetProperty("completedLessonCount").GetInt32() > 0);
         Assert.Equal(2, row.GetProperty("lessonCount").GetInt32());
         Assert.Equal(1, row.GetProperty("completedLessonCount").GetInt32());
         Assert.Equal(50, row.GetProperty("progressPercentage").GetInt32());

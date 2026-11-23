@@ -123,7 +123,8 @@ public sealed class EfUserAccountStore(
             .AsNoTracking()
             .Where(user => user.TenantId == tenantId.Value &&
                            dbContext.UserRoles.Any(role =>
-                               role.UserId == user.Id && role.RoleId == participantRoleId.Value));
+                               role.UserId == user.Id && role.RoleId == participantRoleId.Value))
+            .WithoutAdmins(dbContext);
         var totalCount = await participants.CountAsync(cancellationToken);
         var users = await participants
             .OrderBy(user => user.DisplayName)

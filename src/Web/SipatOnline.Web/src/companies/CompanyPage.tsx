@@ -1,4 +1,4 @@
-import { Award, LogIn, MoreHorizontal, Search, TriangleAlert, UserPlus } from 'lucide-react';
+import { Award, FileSpreadsheet, LogIn, MoreHorizontal, Search, TriangleAlert, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -19,7 +19,9 @@ import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import LoadingState from '@/LoadingState';
 import ParticipantOutcomesPanel from '@/ParticipantOutcomesPanel';
+import AddCollaboratorsDialog from '@/collaborators/AddCollaboratorsDialog';
 import AddAdministratorDialog from './AddAdministratorDialog';
+import CompanyAddress from './CompanyAddress';
 import CompanyAvatar from './CompanyAvatar';
 
 const pageSize = 50;
@@ -53,6 +55,7 @@ export default function CompanyPage() {
   const [summaryError, setSummaryError] = useState('');
   const [notice, setNotice] = useState('');
   const [addingAdmin, setAddingAdmin] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [reload, setReload] = useState(0);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -174,7 +177,7 @@ export default function CompanyPage() {
               ? <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground"><span aria-hidden="true" className="size-1.5 rounded-full bg-success" />Ativa</span>
               : <Badge variant="warning">Inativa</Badge>)}
             className="flex-1 items-center"
-            description={page ? `Identificador · ${page.companyKey}` : 'Carregando dados da empresa...'}
+            description={page ? <CompanyAddress className="text-sm" companyKey={page.companyKey} /> : 'Carregando dados da empresa...'}
             title={companyName || (isLoading ? 'Carregando empresa...' : 'Empresa')}
           />
         </div>
@@ -198,6 +201,7 @@ export default function CompanyPage() {
               <h2 className="m-0 text-lg font-semibold tracking-tight" id="company-participants-title">
                 Participantes <span className="font-normal text-muted-foreground tabular-nums">· {participantCount.toLocaleString('pt-BR')}</span>
               </h2>
+              <Button onClick={() => setImporting(true)} size="sm" variant="outline"><FileSpreadsheet /> Importar participantes</Button>
             </div>
             {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
             <div aria-label="Filtros de participantes" className="flex flex-wrap items-center justify-between gap-3" role="group">
@@ -337,6 +341,20 @@ export default function CompanyPage() {
         )}
       </Page>
 
+      {importing && (
+        <AddCollaboratorsDialog
+          companyId={companyId}
+          initialMode="sheet"
+          onClose={() => setImporting(false)}
+          onCreated={async (message) => {
+            setImporting(false);
+            setNotice(message);
+            setOffset(0);
+            setReload((value) => value + 1);
+            setRefreshKey((value) => value + 1);
+          }}
+        />
+      )}
       {addingAdmin && (
         <AddAdministratorDialog
           companyId={companyId}

@@ -9,6 +9,7 @@ packages:
   - python3-pip
 
 write_files:
+%{ if create_dns_zone }
   - path: /etc/letsencrypt/dns-azure.ini
     owner: root:root
     permissions: "0600"
@@ -16,11 +17,12 @@ write_files:
       dns_azure_msi_system_assigned = true
       dns_azure_environment = "AzurePublicCloud"
       dns_azure_zone1 = ${domain_name}:${dns_zone_id}
+%{ endif }
   - path: /usr/local/bin/sipat-online-reload-nginx
     owner: root:root
     permissions: "0750"
     content: |
-${indent(6, reload_script)}
+      ${indent(6, reload_script)}
   - path: /usr/local/bin/sipat-online-backup
     owner: root:root
     permissions: "0750"
@@ -94,10 +96,22 @@ ${indent(6, reload_script)}
       WantedBy=timers.target
 
 runcmd:
+%{ if swap_size_mb > 0 }
+  - [sh, -c, "test -f /swapfile || (fallocate -l ${swap_size_mb}M /swapfile && chmod 600 /swapfile && mkswap /swapfile)"]
+  - [sh, -c, "swapon /swapfile || true"]
+  - [sh, -c, "grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab"]
+  - [sh, -c, "echo 'vm.swappiness=10' > /etc/sysctl.d/90-sipat-swap.conf && sysctl --system"]
+%{ endif }
+  # webroot of the HTTP-01 challenge, served by the web container on port 80
+  - [sh, -c, "install -d -m 0755 /var/www/certbot"]
   - [sh, -c, "usermod -aG docker ${admin_username}"]
   - [sh, -c, "install -d -o ${admin_username} -g ${admin_username} -m 0750 /opt/sipat-online /opt/sipat-online/app"]
   - [sh, -c, "python3 -m venv /opt/certbot"]
+%{ if create_dns_zone }
   - [sh, -c, "/opt/certbot/bin/pip install --upgrade certbot certbot-dns-azure"]
+%{ else }
+  - [sh, -c, "/opt/certbot/bin/pip install --upgrade certbot"]
+%{ endif }
   - [systemctl, daemon-reload]
   - [systemctl, enable, --now, docker]
   - [systemctl, enable, --now, sipat-online-certbot-renew.timer]

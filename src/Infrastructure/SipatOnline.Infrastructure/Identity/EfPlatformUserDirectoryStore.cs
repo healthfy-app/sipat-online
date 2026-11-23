@@ -37,7 +37,10 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
                         user.IsActive &&
                         dbContext.UserRoles.Any(userRole =>
                             userRole.UserId == user.Id &&
-                            userRole.RoleId == participantRoleId)),
+                            userRole.RoleId == participantRoleId) &&
+                        !dbContext.UserRoles.Any(userRole =>
+                            userRole.UserId == user.Id &&
+                            administratorRoleIds.Contains(userRole.RoleId))),
                 AdministratorCount = dbContext.Users.Count(user =>
                     user.TenantId == tenant.Id &&
                     user.IsActive &&
@@ -93,6 +96,7 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
                            dbContext.UserRoles.Any(userRole =>
                                userRole.UserId == user.Id &&
                                userRole.RoleId == participantRoleId))
+            .WithoutAdmins(dbContext)
             .ToListAsync(cancellationToken);
         foreach (var user in users)
         {
@@ -131,7 +135,8 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
                            participantRoleId != null &&
                            dbContext.UserRoles.Any(userRole =>
                                userRole.UserId == user.Id &&
-                               userRole.RoleId == participantRoleId));
+                               userRole.RoleId == participantRoleId))
+            .WithoutAdmins(dbContext);
         if (!string.IsNullOrWhiteSpace(search))
         {
             var term = search.Trim().ToLower();

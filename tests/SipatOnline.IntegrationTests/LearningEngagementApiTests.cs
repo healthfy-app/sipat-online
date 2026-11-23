@@ -162,7 +162,8 @@ public sealed class LearningEngagementApiTests
                 Assert.Equal("video/mp4", media.Content.Headers.ContentType?.MediaType);
                 Assert.Equal(videoBytes[..8], await media.Content.ReadAsByteArrayAsync());
             }
-            using (var forbiddenMedia = await admin.GetAsync($"/api/learning/lessons/{lessonId}/media")) Assert.Equal(HttpStatusCode.Forbidden, forbiddenMedia.StatusCode);
+            // the company admin also takes the trainings, so it plays the media too
+            using (var adminMedia = await admin.GetAsync($"/api/learning/lessons/{lessonId}/media")) Assert.Equal(HttpStatusCode.OK, adminMedia.StatusCode);
             var playback = await Call(participant, $"/api/learning/tracks/{trackId}/lessons/{lessonId}/playback", HttpMethod.Post, new { });
             var sessionId = playback.GetProperty("sessionId").GetGuid();
             await Call(participant, $"/api/learning/tracks/{trackId}/lessons/{lessonId}/ranges", HttpMethod.Post,

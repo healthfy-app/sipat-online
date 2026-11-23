@@ -7,13 +7,13 @@ import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import { useCourseCategories } from './useCourseCategories';
 import { cn } from '@/lib/utils';
 
-/** Plan columns on a wide screen: the assunto takes what is left, and the whole grid stays narrow enough to read across. */
+/** Plan columns on a wide screen: the treinamento takes what is left, and the whole grid stays narrow enough to read across. */
 const rowGrid = 'md:grid md:grid-cols-[minmax(0,1fr)_repeat(4,6rem)] md:items-center';
 
 type Course = PlanSubjects['courses'][number];
 
 /**
- * Which assuntos each plan can use. Every assunto starts available to every plan; the operator takes one out of a plan
+ * Which treinamentos each plan can use. Every treinamento starts available to every plan; the operator takes one out of a plan
  * here, and the companies of that plan stop seeing it when they build a SIPAT.
  */
 export default function PlanSubjectsPanel() {
@@ -29,12 +29,12 @@ export default function PlanSubjectsPanel() {
   useEffect(() => {
     let current = true;
     getPlanSubjects().then(result => { if (current) setData(result); }).catch((failure: unknown) => { if (current) setError(getErrorMessage(failure)); });
-    // the companies are only needed to give an assunto to one of them; without them the panel still works
+    // the companies are only needed to give an treinamento to one of them; without them the panel still works
     listPlatformCompanies().then(result => { if (current) setCompanies(result ?? []); }).catch(() => undefined);
     return () => { current = false; };
   }, []);
 
-  /** The assuntos that match the search, grouped by category (the ones without a category last). */
+  /** The treinamentos that match the search, grouped by category (the ones without a category last). */
   const groups = useMemo(() => {
     const term = query.trim().toLocaleLowerCase('pt-BR');
     const courses = (data?.courses ?? []).filter(course => !term || course.title.toLocaleLowerCase('pt-BR').includes(term));
@@ -61,7 +61,7 @@ export default function PlanSubjectsPanel() {
     } finally { setBusy(''); }
   }
 
-  /** An assunto with the internal videos of one company: only it sees the assunto, and only while on Diamante. */
+  /** An treinamento with the internal videos of one company: only it sees the treinamento, and only while on Diamante. */
   async function giveTo(courseId: string, companyId: string | null) {
     if (!data) return;
     const before = data;
@@ -85,7 +85,7 @@ export default function PlanSubjectsPanel() {
     if (!set.delete(courseId)) set.add(courseId);
     void save(target, [...set]);
   };
-  // an assunto of one company is not part of any plan's list
+  // an treinamento of one company is not part of any plan's list
   const shared = data.courses.filter(course => !course.companyId);
   const offered = (target: CompanyPlan) => shared.filter(course => !excludedOf(target).has(course.id)).length;
 
@@ -99,10 +99,10 @@ export default function PlanSubjectsPanel() {
   const named = groups.filter(group => group.name).map(group => group.name);
   const allCollapsed = named.length > 0 && named.every(name => collapsed.has(name));
 
-  return <section aria-label="Assuntos por plano" className="grid w-full max-w-5xl min-w-0 gap-4">
+  return <section aria-label="Treinamentos por plano" className="grid w-full max-w-5xl min-w-0 gap-4">
     <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
       <p className="m-0 max-w-xl text-sm text-muted-foreground">
-        Escolha os assuntos que cada plano pode usar. Todos começam liberados; ao tirar um assunto de um plano, as empresas daquele plano deixam de vê-lo.
+        Escolha os treinamentos que cada plano pode usar. Todos começam liberados; ao tirar um treinamento de um plano, as empresas daquele plano deixam de vê-lo.
       </p>
       <div className="flex items-center gap-2">
         {named.length > 1 && !searching && <button className="h-9 shrink-0 cursor-pointer rounded-md px-2.5 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -110,9 +110,9 @@ export default function PlanSubjectsPanel() {
           {allCollapsed ? 'Expandir todos' : 'Recolher todos'}
         </button>}
         <label className="relative block w-full md:w-72">
-          <span className="sr-only">Buscar assunto</span>
+          <span className="sr-only">Buscar treinamento</span>
           <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input className="pl-9" onChange={event => setQuery(event.target.value)} placeholder="Buscar assunto" type="search" value={query} />
+          <Input className="pl-9" onChange={event => setQuery(event.target.value)} placeholder="Buscar treinamento" type="search" value={query} />
         </label>
       </div>
     </div>
@@ -122,7 +122,7 @@ export default function PlanSubjectsPanel() {
     <div className="rounded-2xl border border-border bg-card shadow-card">
       {/* the plans: column heads on a wide screen, a strip of counts on a phone */}
       <div className={cn('sticky top-0 z-10 grid grid-cols-4 gap-1.5 rounded-t-2xl border-b border-border bg-card/95 px-4 py-3 backdrop-blur md:gap-0', rowGrid)}>
-        <span className="hidden text-xs font-bold tracking-wider text-muted-foreground uppercase md:block">Assunto</span>
+        <span className="hidden text-xs font-bold tracking-wider text-muted-foreground uppercase md:block">Treinamento</span>
         {planOptions.map(option => {
           const Icon = option.icon;
           const count = offered(option.id);
@@ -137,8 +137,8 @@ export default function PlanSubjectsPanel() {
       </div>
 
       {groups.length === 0
-        ? <p className="m-0 px-4 py-10 text-center text-sm text-muted-foreground">Nenhum assunto com “{query.trim()}”.</p>
-        : groups.map(group => <div key={group.name || 'todos'} role="group" aria-label={group.name || 'Assuntos'}>
+        ? <p className="m-0 px-4 py-10 text-center text-sm text-muted-foreground">Nenhum treinamento com “{query.trim()}”.</p>
+        : groups.map(group => <div key={group.name || 'todos'} role="group" aria-label={group.name || 'Treinamentos'}>
           {group.name && <h3 className="m-0">
             <button aria-expanded={isOpen(group.name)} className={cn('flex w-full cursor-pointer items-center gap-2 px-4 text-left text-sm font-bold text-foreground hover:bg-muted/25',
               'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
@@ -146,7 +146,7 @@ export default function PlanSubjectsPanel() {
               disabled={searching} onClick={() => toggleGroup(group.name)} type="button">
               <ChevronDown aria-hidden="true" className={cn('size-4 shrink-0 text-muted-foreground transition-transform duration-150', !isOpen(group.name) && '-rotate-90')} />
               {group.name}
-              <span className="text-xs font-normal text-muted-foreground">{pluralize(group.items.length, 'assunto', 'assuntos')}</span>
+              <span className="text-xs font-normal text-muted-foreground">{pluralize(group.items.length, 'treinamento', 'treinamentos')}</span>
             </button>
           </h3>}
           {isOpen(group.name) && <ul className="m-0 list-none p-0">
@@ -159,7 +159,7 @@ export default function PlanSubjectsPanel() {
                     <span>{pluralize(course.videoCount, 'vídeo', 'vídeos')}</span>
                     {companies.length > 0 && <>
                       <span aria-hidden="true">·</span>
-                      <select aria-label={`Quem vê o assunto ${course.title}`}
+                      <select aria-label={`Quem vê o treinamento ${course.title}`}
                         // the admin stylesheet sizes every select as a form field; this one is a quiet inline choice
                         className="-ml-1 [field-sizing:content] h-6! min-h-0! max-w-full min-w-0 cursor-pointer truncate rounded-md! border! border-transparent! bg-transparent! px-1! text-xs! text-muted-foreground shadow-none! hover:border-border! hover:bg-background! disabled:opacity-60"
                         disabled={busy === course.id} onChange={event => void giveTo(course.id, event.target.value || null)} value={course.companyId ?? ''}>
@@ -179,7 +179,7 @@ export default function PlanSubjectsPanel() {
                       const on = !excludedOf(option.id).has(course.id);
                       return <label className="flex justify-center" key={option.id}>
                         <input checked={on} className="peer sr-only" disabled={busy === option.id} onChange={() => toggle(option.id, course.id)} type="checkbox" />
-                        {/* "liberado" is the normal state, so it stays quiet; an assunto taken out of a plan is what the eye should find */}
+                        {/* "liberado" is the normal state, so it stays quiet; an treinamento taken out of a plan is what the eye should find */}
                         <span className={cn(
                           'flex h-10 w-full cursor-pointer items-center justify-center rounded-lg border select-none',
                           'transition-[transform,background-color,border-color] duration-150 ease-out active:scale-[0.94]',
@@ -201,7 +201,7 @@ export default function PlanSubjectsPanel() {
     </div>
 
     <p className="m-0 text-xs text-muted-foreground">
-      Um assunto com os vídeos internos de uma empresa fica só para ela, e só no plano Diamante: escolha a empresa no lugar de “Para todas as empresas”.
+      Um treinamento com os vídeos internos de uma empresa fica só para ela, e só no plano Diamante: escolha a empresa no lugar de “Para todas as empresas”.
     </p>
   </section>;
 }

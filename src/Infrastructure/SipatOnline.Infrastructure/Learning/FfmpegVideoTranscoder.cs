@@ -45,6 +45,7 @@ public sealed class FfmpegVideoTranscoder(VideoConversionOptions options)
         var (height, profile, videoBitrate, maxRate, bufferSize, audioBitrate) = rendition switch
         {
             VideoRendition.Sd480 => (480, "main", "1M", "1250k", "2M", "96k"),
+            VideoRendition.Fhd1080 => (1080, "high", "4M", "5M", "8M", "128k"),
             _ => (720, "high", "2M", "2500k", "4M", "128k")
         };
 
@@ -113,6 +114,30 @@ public sealed class FfmpegVideoTranscoder(VideoConversionOptions options)
             }
 
             return (long)Math.Round(seconds * 1000, MidpointRounding.AwayFromZero);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>The height in lines of the first video stream, or null when ffprobe cannot tell.</summary>
+    public async Task<int?> ProbeHeightAsync(string path, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var run = await RunAsync(
+                options.FfprobePath,
+                ["-v", "error", "-select_streams", "v:0", "-show_entries", "stream=height", "-of", "csv=p=0", path],
+                TimeSpan.FromMinutes(1),
+                lowPriority: false,
+                cancellationToken);
+            // Some files list the field twice (side data); the first number is the stream's.
+            var first = run.Output.Split(['\n', '\r', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .FirstOrDefault();
+            return run.ExitCode == 0 && int.TryParse(first, NumberStyles.Integer, CultureInfo.InvariantCulture, out var height) && height > 0
+                ? height
+                : null;
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {

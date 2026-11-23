@@ -343,6 +343,8 @@ public sealed class ParticipantImportService(
         var participantIds = (await db.UserRoles.AsNoTracking()
             .Where(link => link.RoleId == participantRole && db.Users.Any(user => user.Id == link.UserId && user.TenantId == tenant))
             .Select(link => link.UserId).ToListAsync(token)).ToHashSet();
+        // an admin is a participant too, but the sheet never changes it
+        participantIds.ExceptWith(await AdminAccounts.AdminIdsAsync(db, tenant, token));
 
         // the preview reads; the save tracks the people so their changes go in the same transaction
         var accounts = db.Users.Where(user => user.TenantId == tenant);

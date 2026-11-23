@@ -77,7 +77,7 @@ public sealed class DirectVideoUploadApiTests : IDisposable
     }
 
     [DockerFact]
-    public async Task Start_refuses_more_than_250_MB()
+    public async Task Start_refuses_more_than_2_GB()
     {
         await using var postgres = await StartPostgres();
         await using var minio = await MinioFixture.StartAsync();
@@ -230,7 +230,103 @@ public sealed class DirectVideoUploadApiTests : IDisposable
     }
 
     [DockerFact]
-    public async Task Complete_of_an_object_larger_than_250_MB_deletes_it()
+    public async Task Chunked_upload_resumes_from_the_parts_in_the_bucket_and_registers_the_video()
+    {
+        await using var postgres = await StartPostgres();
+        await using var minio = await MinioFixture.StartAsync();
+        await using var factory = await StartFactory(postgres.GetConnectionString(), minio, directUpload: true, converts: true);
+        using var client = await OperatorClient(factory);
+        var partSize = (int)PlatformCourseCatalogService.ChunkedUploadPartSizeBytes;
+        var original = new byte[partSize + 1000];
+        Mp4.CopyTo(original, 0);
+        new Random(7).NextBytes(original.AsSpan(Mp4.Length));
+
+        using var started = await Send(client, "/api/platform/catalog/videos/uploads/chunked", new { contentType = "video/mp4", sizeBytes = original.Length });
+        Assert.True(started.StatusCode == HttpStatusCode.OK, await started.Content.ReadAsStringAsync());
+        var start = await Read(started);
+        Assert.Equal("chunked", start.GetProperty("mode").GetString());
+        Assert.Equal(partSize, start.GetProperty("partSizeBytes").GetInt64());
+        Assert.Equal(2, start.GetProperty("partCount").GetInt32());
+        var videoId = start.GetProperty("videoId").GetGuid();
+        var uploadId = start.GetProperty("uploadId").GetString()!;
+        var basePath = $"/api/platform/catalog/videos/uploads/{videoId:D}";
+
+        using var signed = await Send(client, $"{basePath}/parts", new { uploadId, partNumbers = new[] { 1, 2 } });
+        Assert.True(signed.StatusCode == HttpStatusCode.OK, await signed.Content.ReadAsStringAsync());
+        var links = (await Read(signed)).GetProperty("parts").EnumerateArray()
+            .ToDictionary(part => part.GetProperty("partNumber").GetInt32(), part => new Uri(part.GetProperty("url").GetString()!));
+
+        // the second part first, as when the first one was cut by a lost connection
+        await PutPart(links[2], original.AsSpan(partSize).ToArray());
+        var afterSecond = await ListParts(client, basePath, uploadId);
+        Assert.Equal(new[] { 2 }, afterSecond);
+        await PutPart(links[1], original.AsSpan(0, partSize).ToArray());
+        var afterBoth = await ListParts(client, basePath, uploadId);
+        Assert.Equal(new[] { 1, 2 }, afterBoth);
+
+        using var finished = await Send(client, $"{basePath}/finish", new { uploadId });
+        Assert.True(finished.StatusCode == HttpStatusCode.NoContent, await finished.Content.ReadAsStringAsync());
+        // asked again after a lost answer: the original is already there
+        using var again = await Send(client, $"{basePath}/finish", new { uploadId });
+        Assert.Equal(HttpStatusCode.NoContent, again.StatusCode);
+
+        using var completed = await Complete(client, videoId, "Uso de EPI", 90000, null);
+        Assert.True(completed.StatusCode == HttpStatusCode.Created, await completed.Content.ReadAsStringAsync());
+        Assert.Equal(original.Length, (await Read(completed)).GetProperty("sizeBytes").GetInt64());
+        Assert.Equal(original, await minio.ReadAsync($"uploads/{videoId:N}/source"));
+    }
+
+    [DockerFact]
+    public async Task Chunked_upload_abort_drops_the_parts()
+    {
+        await using var postgres = await StartPostgres();
+        await using var minio = await MinioFixture.StartAsync();
+        await using var factory = await StartFactory(postgres.GetConnectionString(), minio, directUpload: true, converts: false);
+        using var client = await OperatorClient(factory);
+        using var started = await Send(client, "/api/platform/catalog/videos/uploads/chunked", new { contentType = "video/mp4", sizeBytes = Mp4.Length });
+        var start = await Read(started);
+        var basePath = $"/api/platform/catalog/videos/uploads/{start.GetProperty("videoId").GetGuid():D}";
+        var uploadId = start.GetProperty("uploadId").GetString()!;
+
+        using var aborted = await Send(client, $"{basePath}/abort", new { uploadId });
+        using var list = await Send(client, $"{basePath}/parts/list", new { uploadId });
+        using var badParts = await Send(client, $"{basePath}/parts", new { uploadId, partNumbers = new[] { 0 } });
+
+        Assert.Equal(HttpStatusCode.NoContent, aborted.StatusCode);
+        await AssertProblem(list, HttpStatusCode.NotFound, "learning.platform_course.upload_not_found");
+        await AssertProblem(badParts, HttpStatusCode.BadRequest, "learning.platform_course.upload_parts_invalid");
+    }
+
+    [DockerFact]
+    public async Task Chunked_start_says_multipart_when_the_storage_is_file()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = await StartFactory(postgres.GetConnectionString(), minio: null, directUpload: true, converts: false);
+        using var client = await OperatorClient(factory);
+
+        using var response = await Send(client, "/api/platform/catalog/videos/uploads/chunked", new { contentType = "video/mp4", sizeBytes = 1234 });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("multipart", (await Read(response)).GetProperty("mode").GetString());
+    }
+
+    private static async Task PutPart(Uri url, byte[] bytes)
+    {
+        using var http = new HttpClient();
+        using var put = await http.PutAsync(url, new ByteArrayContent(bytes));
+        Assert.True(put.IsSuccessStatusCode, await put.Content.ReadAsStringAsync());
+    }
+
+    private static async Task<int[]> ListParts(HttpClient client, string basePath, string uploadId)
+    {
+        using var response = await Send(client, $"{basePath}/parts/list", new { uploadId });
+        Assert.True(response.StatusCode == HttpStatusCode.OK, await response.Content.ReadAsStringAsync());
+        return (await Read(response)).GetProperty("parts").EnumerateArray()
+            .Select(part => part.GetProperty("partNumber").GetInt32()).Order().ToArray();
+    }
+
+    [DockerFact]
+    public async Task Complete_of_an_object_larger_than_2_GB_deletes_it()
     {
         await using var postgres = await StartPostgres();
         var fake = new FakeDirectVideoUploadStore(new UploadedObject(MaxSize + 1, "video/mp4", Mp4[..12]));
@@ -385,5 +481,20 @@ public sealed class DirectVideoUploadApiTests : IDisposable
             Deleted.Add(videoId);
             return Task.CompletedTask;
         }
+
+        public Task<string> StartMultipartAsync(Guid videoId, string contentType, CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public IReadOnlyList<SignedUploadPart> SignParts(Guid videoId, string uploadId, IReadOnlyList<int> partNumbers, TimeSpan validFor) =>
+            throw new NotSupportedException();
+
+        public Task<IReadOnlyList<StoredUploadPart>?> ListPartsAsync(Guid videoId, string uploadId, CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public Task<bool> FinishMultipartAsync(Guid videoId, string uploadId, CancellationToken ct) =>
+            throw new NotSupportedException();
+
+        public Task AbortMultipartAsync(Guid videoId, string uploadId, CancellationToken ct) =>
+            throw new NotSupportedException();
     }
 }

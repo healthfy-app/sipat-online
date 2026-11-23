@@ -7,17 +7,19 @@ import { Field } from '@/components/ui/field';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { getErrorMessage } from '@/courseEditor/courseFormat';
 import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
-import { generateInitialPassword, serializeCredentialCsv } from '@/participantCsv';
+import { serializeCredentialCsv } from '@/participantCsv';
 import { cn } from '@/lib/utils';
 import { downloadCsv } from './csvFile';
-import { downloadTemplate, IMPORT_SAVE_CHUNK, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, readSheet } from './importSheet';
+import { downloadTemplate, IMPORT_SAVE_CHUNK, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, missingInRow, readSheet } from './importSheet';
 
 const emptyForm = { name: '', registrationNumber: '', login: '', email: '', phone: '', unit: '', sector: '', password: '' };
 type Mode = 'single' | 'sheet';
+/** `rows` are the lines sent to the server; `result.rejected` also lists the lines refused here (a required cell empty). */
 type Preview = { rows: ImportRow[]; columns: (keyof ImportRow)[]; result: ImportResult };
 
 const columnLabels: Partial<Record<keyof ImportRow, string>> = {
-  name: 'Nome', login: 'Login', registrationNumber: 'Matrícula', email: 'E-mail', phone: 'Telefone', unit: 'Unidade', sector: 'Setor',
+  login: 'Login', password: 'Senha', name: 'Nome completo', registrationNumber: 'Matrícula', email: 'E-mail', phone: 'Telefone',
+  unit: 'Unidade empresarial', sector: 'Setor',
 };
 
 const chunksOf = (rows: ImportRow[]) =>
@@ -31,11 +33,14 @@ const sum = (total: ImportResult | null, part: ImportResult): ImportResult => to
   rejected: [...total.rejected, ...part.rejected], credentials: [...total.credentials, ...part.credentials],
 };
 
-/** Adds collaborators: one at a time, or many from the HR sheet (CSV or Excel) with a preview before saving. */
-export default function AddCollaboratorsDialog({ onClose, onCreated }: {
-  onClose: () => void; onCreated: (message: string) => Promise<void>;
+/**
+ * Adds collaborators: one at a time, or many from the HR sheet (CSV or Excel) with a preview before saving.
+ * `companyId` is set when the platform operator adds them to a company from the operation portal.
+ */
+export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, initialMode = 'single' }: {
+  onClose: () => void; onCreated: (message: string) => Promise<void>; companyId?: string; initialMode?: Mode;
 }) {
-  const [mode, setMode] = useState<Mode>('single');
+  const [mode, setMode] = useState<Mode>(initialMode);
   const [registry, setRegistry] = useState<CompanyRegistry | null>(null);
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
@@ -52,7 +57,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
   const [singleMessage, setSingleMessage] = useState('');
   const [downloaded, setDownloaded] = useState(false);
 
-  useEffect(() => { void getCompanyRegistry().then(setRegistry, () => undefined); }, []);
+  useEffect(() => { void getCompanyRegistry(companyId).then(setRegistry, () => undefined); }, [companyId]);
 
   const field = (key: keyof typeof emptyForm) => ({
     onChange: (event: ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setForm(current => ({ ...current, [key]: event.target.value })),
@@ -71,7 +76,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
     });
     try {
       // the form creates: someone who already exists is refused, never overwritten
-      const outcome = await importParticipants(false, [row], { createOnly: true });
+      const outcome = await importParticipants(false, [row], { createOnly: true, companyId });
       if (outcome.rejected.length) { setError(outcome.rejected[0].message); return; }
       const created = outcome.credentials[0];
       if (!created) { setError('Não foi possível adicionar o colaborador. Tente de novo.'); return; }
@@ -91,10 +96,18 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
     try {
       const sheet = await readSheet(file);
       if (sheet.fatalError) { setFileError(sheet.fatalError); return; }
-      const issued = new Map(sheet.rows.map(row => [row.row, generateInitialPassword()] as const));
-      const rows = sheet.rows.map(row => ({ ...row, password: issued.get(row.row) }));
-      setPasswords(issued);
-      setPreview({ rows, columns: sheet.columns, result: await importParticipants(true, rows) });
+      // login, password and full name are required on every line: one left empty is refused here, with the reason
+      const refused = sheet.rows.flatMap(row => {
+        const message = missingInRow(row);
+        return message ? [{ row: row.row, login: row.login ?? null, message }] : [];
+      });
+      const rows = sheet.rows.filter(row => !missingInRow(row));
+      setPasswords(new Map(rows.map(row => [row.row, row.password ?? ''] as const)));
+      const checked = rows.length > 0
+        ? await importParticipants(true, rows, { companyId })
+        : { created: 0, updated: 0, unchanged: 0, rejected: [], credentials: [] };
+      const rejected = [...refused, ...checked.rejected].sort((a, b) => a.row - b.row);
+      setPreview({ rows, columns: sheet.columns, result: { ...checked, rejected } });
     } catch (failure) {
       setFileError(getErrorMessage(failure));
     } finally { setBusy(false); }
@@ -113,7 +126,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
     try {
       for (; index < chunks.length; index++) {
         setSaving({ saved: index * IMPORT_SAVE_CHUNK, total: preview.rows.length });
-        const part = await importParticipants(false, chunks[index]);
+        const part = await importParticipants(false, chunks[index], { companyId });
         total = sum(total, part);
         setResult(total);
         setSavedChunks(index + 1);
@@ -141,9 +154,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
   }
 
   async function finish() {
-    if (mode === 'sheet' && result?.credentials.length && !downloaded) {
-      setError('Baixe o arquivo de acessos antes de fechar. As senhas não ficam salvas no portal.'); return;
-    }
+    // the passwords came from the sheet itself: the file of accesses is a convenience, not the only copy
     await onCreated(mode === 'single' ? singleMessage : `${result?.created ?? 0} colaboradores adicionados, ${result?.updated ?? 0} atualizados.`);
   }
 
@@ -205,8 +216,9 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
         : <div className="grid gap-4">
           <div className="flex flex-wrap items-start justify-between gap-3 rounded-lg bg-muted/60 p-3 text-sm">
             <p className="m-0 max-w-prose">
-              Use uma planilha Excel (.xlsx) ou CSV com as colunas <strong>nome</strong>, login, matrícula, e-mail, telefone, unidade e setor. Até {MAX_IMPORT_ROWS} linhas.
-              Antes de gravar, mostramos o que vai acontecer. As senhas iniciais são geradas e entregues em um arquivo para baixar.
+              Use uma planilha Excel (.xlsx) ou CSV. <strong>Login, Senha e Nome completo</strong> são obrigatórios;
+              e-mail, matrícula, setor e unidade empresarial são opcionais. Até {MAX_IMPORT_ROWS} linhas.
+              Antes de gravar, mostramos o que vai acontecer.
             </p>
             <Button disabled={!registry} onClick={() => registry && void downloadTemplate(registry)} size="sm" variant="outline"><FileSpreadsheet /> Baixar modelo</Button>
           </div>
@@ -232,7 +244,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated }: {
               {complete ? '' : 'Gravados até agora: '}{result.created} criados · {result.updated} atualizados · {result.unchanged} sem mudança · {result.rejected.length} recusados.
             </p>
             {result.credentials.length > 0 && <div className="grid gap-2 rounded-lg bg-warning-soft p-3 text-sm">
-              <p className="m-0">Baixe agora as senhas iniciais. Elas não ficam salvas no portal e não dá para recuperar depois que você fechar esta janela.</p>
+              <p className="m-0">Se quiser, baixe a lista de acessos (nome, login, senha e endereço) para entregar aos colaboradores.</p>
               <Button className="justify-self-start" disabled={busy} onClick={downloadCredentials}>{downloaded ? 'Baixar o arquivo de acessos novamente' : 'Baixar o arquivo de acessos'}</Button>
             </div>}
           </div>}

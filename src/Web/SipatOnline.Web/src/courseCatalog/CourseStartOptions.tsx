@@ -11,13 +11,13 @@ export default function CourseStartOptions({
   return (
     <section aria-label="Como deseja começar?" className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,18rem),1fr))] gap-4">
       <StartOption
-        description="Envie os vídeos que você já tem para a biblioteca e monte o curso com eles."
+        description="Envie os vídeos que você já tem para a biblioteca e monte o treinamento com eles."
         icon={<FolderOpen className="size-6" />}
         onClick={onReuse}
         title={<>Tenho um <span className="text-primary">treinamento já existente</span></>}
       />
       <StartOption
-        description="Comece um curso com uma capa, um título e uma breve descrição."
+        description="Comece um treinamento com uma capa, um título e uma breve descrição."
         icon={<PenLine className="size-6" />}
         onClick={onCreate}
         title={<>Quero <span className="text-primary">criar um treinamento</span></>}

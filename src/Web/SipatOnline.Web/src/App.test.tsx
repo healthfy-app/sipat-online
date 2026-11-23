@@ -170,7 +170,7 @@ describe('tenant portal', () => {
 
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('playback-quality'))).toBe(false);
-    expect(screen.queryByRole('heading', { name: /Qualidade do vídeo/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Monitor de Desempenho/ })).not.toBeInTheDocument();
   });
   it.each(['ClientAdmin', 'Participant', 'Supervisor'])('keeps the company comparison screen away from a platform %s account', async (role) => {
     window.history.pushState({}, '', '/platform/qualidade');
@@ -186,7 +186,7 @@ describe('tenant portal', () => {
 
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
     expect(fetch.mock.calls.some(([url]) => String(url).includes('playback-quality'))).toBe(false);
-    expect(screen.queryByRole('heading', { name: 'Qualidade do vídeo' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Monitor de Desempenho' })).not.toBeInTheDocument();
   });
   it.each(['ClientAdmin', 'Participant', 'Supervisor'])('denies the operational editor to a %s account', async (role) => {
     window.history.pushState({}, '', '/platform/courses/course-1/edit');
@@ -203,7 +203,7 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Acesso não autorizado' })).toBeVisible();
     // a company admin also asks for its capabilities, which may land just after the heading
     await waitFor(() => expect(fetch).toHaveBeenCalledTimes(role === 'ClientAdmin' ? 3 : 2));
-    expect(screen.queryByRole('navigation', { name: 'Etapas do curso' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Etapas do assunto' })).not.toBeInTheDocument();
   });
 
   it('opens the sign-in page directly from the root when unauthenticated', async () => {
@@ -525,8 +525,9 @@ describe('tenant portal', () => {
     expect(screen.queryByRole('link', { name: 'Cadastrar empresa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Painel' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Biblioteca' })).toHaveAttribute('href', '/platform/courses');
-    expect(screen.getByRole('link', { name: 'Qualidade do vídeo' })).toHaveAttribute('href', '/platform/qualidade');
+    expect(screen.getByRole('link', { name: 'Conteúdo' })).toHaveAttribute('href', '/platform/courses');
+    expect(screen.getByRole('link', { name: 'Biblioteca de vídeos' })).toHaveAttribute('href', '/platform/videos');
+    expect(screen.getByRole('link', { name: 'Monitor de Desempenho' })).toHaveAttribute('href', '/platform/qualidade');
     await waitFor(() => {
       expect(fetchMock).toHaveBeenCalledWith(
         '/api/platform/dashboard',

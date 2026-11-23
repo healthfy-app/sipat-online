@@ -186,7 +186,7 @@ public sealed class PlaybackQualityDashboardApiTests
         using var stream = new MemoryStream(bytes);
         using var pdf = PdfReader.Open(stream, PdfDocumentOpenMode.Import);
         Assert.Equal(1, pdf.PageCount);
-        Assert.Equal("Qualidade do vídeo - Integration Test", pdf.Info.Title);
+        Assert.Equal("Monitor de Desempenho - Integration Test", pdf.Info.Title);
     }
 
     [DockerFact]
