@@ -1,3 +1,4 @@
+using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application;
 using SipatOnline.Learning.Application.Quality;
@@ -151,8 +152,17 @@ public static class LearningEndpoints
 
         participant.MapGet("/tracks", async (
             LearningService learningService,
+            SipatOnline.Infrastructure.Learning.LearningDistributionService distribution,
+            ITenantContext tenantContext,
+            ICurrentActor actor,
             CancellationToken cancellationToken) =>
         {
+            // someone who became a participant after a SIPAT went live (an admin, say) gets its days on the first visit
+            if (tenantContext.CurrentTenantId is { IsEmpty: false } tenant && Guid.TryParse(actor.UserId, out var participantId))
+            {
+                await distribution.EnsureAssignmentsAsync(tenant.Value, [participantId], cancellationToken);
+            }
+
             var result = await learningService.ListAssignedAsync(cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
         })

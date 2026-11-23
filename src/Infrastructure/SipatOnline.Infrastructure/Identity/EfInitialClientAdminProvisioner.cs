@@ -77,7 +77,8 @@ public sealed class EfInitialClientAdminProvisioner(
                         : "Não foi possível criar o administrador inicial.");
             }
 
-            var roleResult = await userManager.AddToRoleAsync(account, PlatformRoles.ClientAdmin);
+            // the admin also takes the trainings of its company
+            var roleResult = await userManager.AddToRolesAsync(account, [PlatformRoles.ClientAdmin, PlatformRoles.Participant]);
             if (!roleResult.Succeeded)
             {
                 return Failure(
