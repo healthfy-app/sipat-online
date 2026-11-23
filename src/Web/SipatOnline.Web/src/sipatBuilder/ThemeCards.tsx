@@ -125,14 +125,25 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
     {current === 'videos'
       ? empty
         ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.' : 'Nenhum vídeo encontrado.'}</p>
-        : <ul className="m-0 flex list-none items-end gap-2 overflow-x-auto p-0 pb-1">
-          {groups.map((group, index) => <TitleGroup index={index} key={group.title.id} onPlay={setPlaying} title={group.title} usedIn={usedIn} videos={group.videos} />)}
-          {/* after the training's Títulos, the rest of the library the company can use (videos private to other companies never come) */}
-          {groups.length > 0 && looseVideos.length > 0 && <li aria-hidden="true" className="ml-1 grid shrink-0 self-stretch place-content-center border-l border-dashed border-border pr-1 pl-3 text-[0.6875rem] leading-tight font-bold tracking-[0.06em] text-muted-foreground uppercase">
-            <span>Biblioteca</span><span>de vídeos</span><span className="font-semibold tracking-normal tabular-nums normal-case">{looseVideos.length}</span>
-          </li>}
-          {looseVideos.map(video => <li className="shrink-0" key={video.id}><VideoCard onPlay={setPlaying} place={usedIn?.get(video.id)} video={video} /></li>)}
-        </ul>
+        : groups.length > 0
+          // a training open: every part is a block of the same build (header, then one row of cards), tops aligned
+          ? <ul className="m-0 flex list-none items-stretch gap-3 overflow-x-auto p-0 pb-1">
+            {groups.map((group, index) => <TitleGroup index={index} key={group.title.id} onPlay={setPlaying} title={group.title} usedIn={usedIn} videos={group.videos} />)}
+            {/* the rest of the library the company can use (videos private to other companies never come) */}
+            {looseVideos.length > 0 && <li aria-label={`Biblioteca de vídeos, ${plural(looseVideos.length, 'vídeo', 'vídeos')}`} className="flex shrink-0 flex-col overflow-hidden rounded-2xl border-2 border-border bg-card">
+              <div className="flex h-9 items-center gap-2 bg-muted px-3 text-muted-foreground">
+                <Film aria-hidden="true" className="size-4 shrink-0" />
+                <span className="text-[0.625rem] font-extrabold tracking-[0.08em] uppercase">Biblioteca de vídeos</span>
+                <span className="ml-auto pl-2 text-xs tabular-nums">{plural(looseVideos.length, 'vídeo', 'vídeos')}</span>
+              </div>
+              <ul className="m-0 flex flex-1 list-none items-center gap-2 p-2">
+                {looseVideos.map(video => <li className="shrink-0" key={video.id}><VideoCard onPlay={setPlaying} place={usedIn?.get(video.id)} video={video} /></li>)}
+              </ul>
+            </li>}
+          </ul>
+          : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
+            {looseVideos.map(video => <li className="shrink-0" key={video.id}><VideoCard onPlay={setPlaying} place={usedIn?.get(video.id)} video={video} /></li>)}
+          </ul>
       : shownSubjects.length === 0
         ? <p className="m-0 py-3 text-sm text-muted-foreground">{subjects.length === 0 ? 'Ainda não há assuntos no acervo. Crie em Conteúdo.' : 'Nenhum assunto encontrado.'}</p>
         : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">{shownSubjects.map(subject => <li className="shrink-0" key={subject.id}><TrayCard subject={subject} /></li>)}</ul>}
@@ -160,7 +171,8 @@ function TrayCard({ subject }: { subject: Subject }) {
 
 function VideoCard({ video, place, dragId = `video:${video.id}`, onPlay }: { video: CatalogVideo; place?: string; dragId?: string; onPlay?: (video: CatalogVideo) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: dragId, data: { video } });
-  return <div className={cn('flex w-60 items-center gap-2 rounded-[0.875rem] border border-border bg-card p-2 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary hover:shadow-card motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef}>
+  // one height for every card (two lines of title, one of time), so rows and blocks line up whatever the title
+  return <div className={cn('flex h-[4.25rem] w-60 items-center gap-2 rounded-[0.875rem] border border-border bg-card p-2 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary hover:shadow-card motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef}>
     <button aria-label={`Arrastar o vídeo ${video.title}`} className="grid size-7 min-h-0 shrink-0 cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
     {/* the dark square plays the video; the grip beside it is what drags */}
     {onPlay && video.source
@@ -172,9 +184,10 @@ function VideoCard({ video, place, dragId = `video:${video.id}`, onPlay }: { vid
       : <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-md bg-[#0b1f19] text-white/85"><Film className="size-4" /></span>}
     <div className="grid min-w-0 flex-1 gap-0.5">
       <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={video.title}>{video.title}</strong>
-      <span className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground">
-        {videoTime(video)}{isExtra(video) && <> · <ExtraBadge className="align-middle" /></>}
-        {place && <span className="rounded-full bg-accent px-1.5 py-px text-[0.625rem] font-bold text-primary" title={`Já está no ${place}`}>{place}</span>}
+      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs whitespace-nowrap tabular-nums text-muted-foreground">
+        <span className="shrink-0">{videoTime(video)}</span>
+        {isExtra(video) && <ExtraBadge className="shrink-0" />}
+        {place && <span className="shrink-0 rounded-full bg-accent px-1.5 py-px text-[0.625rem] leading-tight font-bold text-primary" title={`Já está no ${place}`}>{place}</span>}
       </span>
     </div>
   </div>;
@@ -222,10 +235,10 @@ function TitleGroup({ title, videos, index, usedIn, onPlay }: { title: TrainingT
   const totalMs = videos.filter(video => !isExtra(video)).reduce((sum, video) => sum + video.durationMs, 0);
   const color = titleColor(index);
   return <li aria-label={`${title.title}, ${plural(title.videoIds.length, 'vídeo', 'vídeos')}`}
-    className={cn('shrink-0 overflow-hidden rounded-2xl border-2 bg-card shadow-card transition-opacity', isDragging && 'opacity-50')}
+    className={cn('flex shrink-0 flex-col overflow-hidden rounded-2xl border-2 bg-card transition-opacity', isDragging && 'opacity-50')}
     ref={setNodeRef} style={{ borderColor: color }}>
     <button aria-label={`Arrastar o título ${title.title} com todos os vídeos`}
-      className="m-0 flex min-h-0 w-full cursor-grab touch-none items-center gap-2 rounded-none border-0 px-3 py-1.5 text-left text-white shadow-none active:cursor-grabbing disabled:cursor-default"
+      className="m-0 flex h-9 min-h-0 w-full shrink-0 cursor-grab touch-none items-center gap-2 rounded-none border-0 px-3 py-0 text-left text-white shadow-none active:cursor-grabbing disabled:cursor-default"
       disabled={title.videoIds.length === 0} style={{ backgroundColor: color }} title="Arraste para um dia: leva todos os vídeos deste título" type="button" {...attributes} {...listeners}>
       <GripVertical aria-hidden="true" className="size-4 shrink-0 opacity-80" />
       <span className="shrink-0 rounded-full bg-white/20 px-2 py-px text-[0.625rem] font-extrabold tracking-[0.08em] uppercase">Título {index + 1}</span>
@@ -233,8 +246,8 @@ function TitleGroup({ title, videos, index, usedIn, onPlay }: { title: TrainingT
       <span className="ml-auto shrink-0 pl-2 text-xs tabular-nums opacity-85">{plural(title.videoIds.length, 'vídeo', 'vídeos')}{totalMs > 0 && ` · ${formatClock(totalMs)}`}</span>
     </button>
     {videos.length === 0
-      ? <p className="m-0 w-60 px-3 py-4 text-xs text-muted-foreground">Sem vídeos prontos neste título.</p>
-      : <ul className="m-0 flex list-none gap-2 p-2" style={{ backgroundColor: `color-mix(in srgb, ${color} 9%, transparent)` }}>
+      ? <p className="m-0 grid w-64 flex-1 place-content-center px-3 text-xs text-muted-foreground">Sem vídeos prontos neste título.</p>
+      : <ul className="m-0 flex flex-1 list-none items-center gap-2 p-2" style={{ backgroundColor: `color-mix(in srgb, ${color} 9%, transparent)` }}>
         {videos.map(video => <li className="shrink-0" key={video.id}><VideoCard dragId={`video:${title.id}:${video.id}`} onPlay={onPlay} place={usedIn?.get(video.id)} video={video} /></li>)}
       </ul>}
   </li>;
