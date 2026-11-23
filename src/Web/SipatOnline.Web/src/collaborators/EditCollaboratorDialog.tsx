@@ -23,7 +23,7 @@ function PlacementInput({ id, label, items, value, onChange }: {
   id: string; label: string; items: RegistryItem[]; value: string; onChange: (value: string) => void;
 }) {
   return <Field htmlFor={id} label={label}>
-    <Input autoComplete="off" id={id} list={`${id}-options`} maxLength={120} onChange={event => onChange(event.target.value)} placeholder="Digite ou escolha" value={value} />
+    <Input autoComplete="off" id={id} list={`${id}-options`} maxLength={100} onChange={event => onChange(event.target.value)} placeholder="Digite ou escolha" value={value} />
     <datalist id={`${id}-options`}>{items.filter(item => item.isActive).map(item => <option key={item.id} value={item.name} />)}</datalist>
   </Field>;
 }
@@ -42,8 +42,17 @@ async function resolvePlacement(kind: RegistryKind, items: RegistryItem[], typed
  * access is active and, when the profile is known, registration number, e-mail, phone, unit and sector. Only what changed
  * is sent. The fields the company made required are flagged but do not block saving: the rule applies on creation.
  */
-export default function EditCollaboratorDialog({ person, profile, registry, onClose, onSaved }: {
-  person: ParticipantAccount; profile?: ParticipantProfile; registry?: CompanyRegistry | null;
+/** The sectors where people of the unit already are come first: unit and sector stay independent, the people relate them. */
+function sectorsFor(registry: CompanyRegistry | null | undefined, everyone: ParticipantProfile[], unit: string): RegistryItem[] {
+  const sectors = registry?.sectors ?? [];
+  const unitId = registry?.units.find(item => key(item.name) === key(unit))?.id;
+  if (!unitId) return sectors;
+  const used = new Set(everyone.filter(item => item.unitId === unitId).map(item => item.sectorId));
+  return [...sectors.filter(item => used.has(item.id)), ...sectors.filter(item => !used.has(item.id))];
+}
+
+export default function EditCollaboratorDialog({ person, profile, profiles = [], registry, onClose, onSaved }: {
+  person: ParticipantAccount; profile?: ParticipantProfile; profiles?: ParticipantProfile[]; registry?: CompanyRegistry | null;
   onClose: () => void; onSaved: (message: string) => Promise<void>;
 }) {
   const [name, setName] = useState(person.displayName);
@@ -116,7 +125,7 @@ export default function EditCollaboratorDialog({ person, profile, registry, onCl
           <Input autoComplete="off" id="edit-phone" inputMode="tel" maxLength={32} onChange={event => setPhone(event.target.value)} type="tel" value={phone} />
         </Field>
         <PlacementInput id="edit-unit" items={registry?.units ?? []} label={`Unidade${mark(rules?.requireUnit)}`} onChange={setUnit} value={unit} />
-        <PlacementInput id="edit-sector" items={registry?.sectors ?? []} label={`Setor${mark(rules?.requireSector)}`} onChange={setSector} value={sector} />
+        <PlacementInput id="edit-sector" items={sectorsFor(registry, profiles, unit)} label={`Setor${mark(rules?.requireSector)}`} onChange={setSector} value={sector} />
       </>}
       <Field hint={`${passwordRulesHint} Entregue a nova senha por um canal seguro: ela não aparece de novo.`} htmlFor="edit-password" label="Nova senha (opcional)">
         <div className="flex gap-2">

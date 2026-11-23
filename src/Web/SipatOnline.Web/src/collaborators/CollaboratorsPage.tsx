@@ -266,7 +266,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       </Table>
     </>}
 
-    {editing && <EditCollaboratorDialog onClose={() => setEditing(null)} onSaved={refreshWith} person={editing} profile={profiles ? (profiles.get(editing.id) ?? { id: editing.id, registrationNumber: null, email: null, phone: null, unitId: null, sectorId: null }) : undefined} registry={registry} />}
+    {editing && <EditCollaboratorDialog onClose={() => setEditing(null)} onSaved={refreshWith} person={editing} profiles={profiles ? [...profiles.values()] : []} profile={profiles ? (profiles.get(editing.id) ?? { id: editing.id, registrationNumber: null, email: null, phone: null, unitId: null, sectorId: null }) : undefined} registry={registry} />}
     {placing && registry && <PlacementDialog count={selected.size} field={placing} items={placing === 'unit' ? registry.units : registry.sectors}
       onClose={() => setPlacing(null)} onConfirm={valueId => place(placing, valueId)} />}
     {viewing && <ProgressDialog onClose={() => setViewing(null)} person={viewing} trainingId={training.selectedId} />}
