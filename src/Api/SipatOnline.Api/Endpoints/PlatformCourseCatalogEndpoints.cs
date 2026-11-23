@@ -98,6 +98,11 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("DeletePlatformCourse");
 
+        // the week copies of the SIPATs (trainings opened from a company's planner): Conteúdo hides them, the editor says whose week it is
+        catalog.MapGet("/sipat-weeks", async (SipatOnline.Infrastructure.Learning.SipatPlanService plans, CancellationToken cancellationToken) =>
+            Results.Ok(await plans.WeeksAsync(cancellationToken)))
+        .WithName("ListSipatWeeks");
+
         // assunto is a classification of the videos (like a genre): a video can be in several, from the operator's fixed list
         catalog.MapGet("/subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
             Results.Ok(await db.VideoSubjects.AsNoTracking().OrderBy(item => item.Name)
@@ -729,15 +734,18 @@ public static class PlatformCourseCatalogEndpoints
             IGameModuleStore modules,
             SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             SipatOnline.Infrastructure.PlatformDbContext db,
+            SipatOnline.Infrastructure.Learning.SipatPlanService sipatPlans,
             CancellationToken cancellationToken) =>
         {
             var capabilities = await plans.CapabilitiesAsync(cancellationToken);
             // the assuntos of its plan, without other companies' own ones; its own (internal videos) only on Diamante
             var excluded = await plans.HiddenSubjectsAsync(cancellationToken);
+            // a SIPAT's week copy is that SIPAT's days, never something to start another from
+            var weeks = await sipatPlans.WeekCourseIdsAsync(cancellationToken);
             var allCourses = await courses.ListAsync(cancellationToken);
             var themes = allCourses
                 .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
-                .Where(course => !excluded.Contains(course.Id))
+                .Where(course => !excluded.Contains(course.Id) && !weeks.Contains(course.Id))
                 .Select(course => ToResponse(course) with
                 {
                     CoverUrl = course.CoverContentType is null

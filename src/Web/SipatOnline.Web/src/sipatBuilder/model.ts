@@ -8,7 +8,11 @@ export const maxGameRows = 5;
 export const maxDays = 14;
 
 /** `durationMs` of an extra is only what the operator typed: it never enters a sum. */
-export interface CatalogVideo { id: string; title: string; durationMs: number; code: string | null; provider?: VideoProvider }
+export interface CatalogVideo {
+  id: string; title: string; durationMs: number; code: string | null; provider?: VideoProvider;
+  /** The library video itself, so the planner can play it. */
+  source?: PlatformLibraryVideo['video'];
+}
 export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; extraCount?: number; coverUrl: string | null; gameIds: string[]; option: string | null }
 export interface Catalog {
   videos: Map<string, CatalogVideo>;
@@ -41,7 +45,7 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
   for (const item of library) {
     if (item.video.status !== 'Ready') continue;
     const title = item.video.libraryTitle ?? item.video.title;
-    videos.set(item.video.id, { id: item.video.id, title, durationMs: item.video.durationMilliseconds, code: videoCode(title), provider: videoProvider(item.video) });
+    videos.set(item.video.id, { id: item.video.id, title, durationMs: item.video.durationMilliseconds, code: videoCode(title), provider: videoProvider(item.video), source: item.video });
   }
   const used = new Set<string>();
   const subjects: Subject[] = [];
@@ -64,6 +68,19 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
     return { id: item.id, title: item.name, coverUrl: null, gameIds: [], option: null, videoIds: ids, ...houseTotals(ids, videos) };
   }).filter(item => item.videoIds.length > 0).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR'));
   return { videos, subjects, games: gameMap, filters };
+}
+
+/** A Título of a training of Conteúdo, as the planner offers it: it becomes one day. */
+export interface TrainingTitle { id: string; title: string; videoIds: string[] }
+/** A training of Conteúdo shown in the planner, with its Títulos in order (only the videos ready in the library). */
+export interface TrayTraining { id: string; title: string; coverUrl: string | null; titles: TrainingTitle[] }
+
+/** A name the operator never typed ("Dia 3", "Módulo 3"): it follows the word and the position of the day. */
+export const isGenericDayTitle = (title: string) => !title.trim() || /^(Dia|Módulo) [0-9]+$/.test(title.trim());
+
+/** Untyped day names said with the word the board uses ("Dia" with dates, "Módulo" without) and renumbered by position. */
+export function withDayWord<T extends { title: string }>(days: T[], word: string): T[] {
+  return days.map((day, index) => (isGenericDayTitle(day.title) ? { ...day, title: `${word} ${index + 1}` } : day));
 }
 
 /** A day while it is being edited: empty slots are kept so the grid keeps its shape. */
@@ -164,6 +181,15 @@ export function normalize(text: string): string {
 }
 
 const palette = ['#2563eb', '#d97706', '#059669', '#7c3aed', '#dc2626', '#0d9488', '#db2777', '#4f46e5'];
+
+/**
+ * Each Título of a training by its place, in the site's own tones (brand green, forest, teal, the gold of the top
+ * bar, darkened): neighbours never share one, and white text reads on all of them.
+ */
+const titlePalette = ['var(--brand-primary, #1b6b52)', '#12332c', '#0f766e', '#8a6416'];
+export function titleColor(index: number): string {
+  return titlePalette[index % titlePalette.length];
+}
 
 /** The same theme always gets the same color, like the colored blocks of the sheet. */
 export function subjectColor(subject: string): string {

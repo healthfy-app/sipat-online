@@ -824,6 +824,16 @@ export function changeVideosCompanies(change: BulkVideoChange): Promise<void> {
   return request('/api/platform/catalog/videos/companies', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
 }
 
+/** A SIPAT's week opened in the video editor: a copy training whose Títulos are the days of that SIPAT. */
+export interface SipatWeek { courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string }
+export function listSipatWeeks(): Promise<SipatWeek[]> {
+  return requestJson<SipatWeek[]>('/api/platform/catalog/sipat-weeks');
+}
+/** Writes the SIPAT's days into its week copy (made the first time) and gives the training to open in the editor. */
+export function openSipatWeek(sipatId: string): Promise<{ courseId: string }> {
+  return requestJson<{ courseId: string }>(`/api/admin/sipats/${sipatId}/week`, { method: 'POST' });
+}
+
 export function listPlatformCourses(): Promise<PlatformCourse[]> {
   return requestJson<PlatformCourse[]>('/api/platform/catalog/courses');
 }

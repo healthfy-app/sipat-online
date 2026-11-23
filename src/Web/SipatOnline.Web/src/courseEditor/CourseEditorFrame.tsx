@@ -17,7 +17,7 @@ const leaveMessage = 'Há alterações não salvas. Deseja sair sem salvar?';
  * etapas Editar → Configurar → Publicar e o estado de salvamento.
  */
 export default function CourseEditorFrame({
-  step, onStep, dirty, busy, onBack, onSave, children,
+  step, onStep, dirty, busy, onBack, onSave, week, children,
 }: {
   step: CourseEditorStep;
   onStep: (step: CourseEditorStep) => void;
@@ -25,6 +25,8 @@ export default function CourseEditorFrame({
   busy: boolean;
   onBack: () => void;
   onSave: () => void;
+  /** The week of a SIPAT opened from its planner: no Configurar or Publicar, only edit, save and go back to the week. */
+  week?: { sipatTitle: string; companyName: string };
   children: ReactNode;
 }) {
   const activeIndex = stages.findIndex((stage) => stage.id === step);
@@ -73,11 +75,20 @@ export default function CourseEditorFrame({
             type="button"
           >
             <span className="inline-grid size-8 place-items-center rounded-md border border-border bg-card text-primary transition-colors group-hover:bg-accent">←</span>{' '}
-            <span className="max-[520px]:sr-only">Voltar ao conteúdo</span>
+            <span className="max-[520px]:sr-only">{week ? 'Voltar à semana' : 'Voltar ao conteúdo'}</span>
           </button>
         </div>
 
-        <nav aria-label="Etapas do treinamento" className="flex items-start gap-6 max-[860px]:col-span-full max-[860px]:row-start-2 max-[860px]:justify-center">
+        {week ? (
+          <div className="grid min-w-0 justify-items-center gap-0.5 text-center max-[860px]:col-span-full max-[860px]:row-start-2">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-primary">
+              <span className="shrink-0 uppercase tracking-[0.06em]">Semana da SIPAT</span>
+              <span aria-hidden="true">·</span>
+              <span className="truncate">{week.sipatTitle} · {week.companyName}</span>
+            </span>
+            <span className="text-xs text-muted-foreground">Cada título é um dia. O que você salvar aqui vai para os dias da semana; o treinamento original do Conteúdo não muda.</span>
+          </div>
+        ) : <nav aria-label="Etapas do treinamento" className="flex items-start gap-6 max-[860px]:col-span-full max-[860px]:row-start-2 max-[860px]:justify-center">
           {stages.map((stage, index) => {
             const current = step === stage.id;
             const done = index < activeIndex;
@@ -111,7 +122,7 @@ export default function CourseEditorFrame({
               </button>
             );
           })}
-        </nav>
+        </nav>}
 
         <div className="flex min-w-0 items-center justify-end gap-2">
           <span
@@ -124,8 +135,10 @@ export default function CourseEditorFrame({
           >
             {busy ? 'Salvando...' : dirty ? 'Alterações não salvas' : 'Salvo'}
           </span>
-          <Button disabled={busy || !dirty} onClick={onSave} size="sm" variant="outline">Salvar</Button>
-          {nextStage && (
+          {week
+            ? <Button disabled={busy} onClick={onSave} size="sm">Salvar e voltar à semana →</Button>
+            : <Button disabled={busy || !dirty} onClick={onSave} size="sm" variant="outline">Salvar</Button>}
+          {!week && nextStage && (
             <Button disabled={busy} onClick={() => onStep(nextStage.id)} size="sm">
               Próximo: {nextStage.label} →
             </Button>
