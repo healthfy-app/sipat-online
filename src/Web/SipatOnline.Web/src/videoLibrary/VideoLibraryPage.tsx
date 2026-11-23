@@ -1,4 +1,4 @@
-import { CloudUpload, Link2, Plus, Search, X } from 'lucide-react';
+import { CloudUpload, Link2, Plus, Search, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -147,6 +147,31 @@ export default function VideoLibraryPage() {
     }
   }
 
+  /** Deletes the checked videos one by one; one that cannot go (in use, for instance) stays checked and is reported. */
+  async function removeSelected() {
+    const items = library.filter((item) => selected.has(item.video.id));
+    const inUse = items.filter((item) => item.courseCount > 0).length;
+    const usage = inUse > 0 ? ` ${pluralize(inUse, 'deles está', 'deles estão')} em treinamentos.` : '';
+    if (!window.confirm(`Excluir ${pluralize(items.length, 'vídeo', 'vídeos')}?${usage} Os arquivos são apagados e isso não pode ser desfeito.`)) return;
+    setError(''); setNotice(''); setIsDeleting(true);
+    const failed: string[] = [];
+    let firstError = '';
+    for (const item of items) {
+      try {
+        await deletePlatformVideo(item.video.id);
+      } catch (deleteError) {
+        failed.push(item.video.id);
+        firstError ||= `"${item.video.title}": ${getErrorMessage(deleteError)}`;
+      }
+    }
+    setSelected(new Set(failed));
+    await refresh();
+    setIsDeleting(false);
+    const done = items.length - failed.length;
+    if (done > 0) setNotice(`${pluralize(done, 'vídeo excluído', 'vídeos excluídos')}.`);
+    if (failed.length > 0) setError(`${failed.length === 1 ? '1 vídeo não pôde ser excluído e continua selecionado' : `${failed.length} vídeos não puderam ser excluídos e continuam selecionados`}. ${firstError}`);
+  }
+
   function hasFiles(event: DragEvent) {
     return Array.from(event.dataTransfer.types).includes('Files');
   }
@@ -231,7 +256,10 @@ export default function VideoLibraryPage() {
             {selected.size > 0 ? pluralize(selected.size, 'selecionado', 'selecionados') : 'Selecionar todos'}
           </label>
           {selected.size > 0 && <Button aria-label="Limpar seleção" onClick={() => setSelected(new Set())} size="icon-sm" title="Limpar seleção" variant="ghost"><X /></Button>}
-          <Button className="ml-auto max-[640px]:w-full" disabled={selected.size === 0} onClick={() => setAssociating(true)}>
+          <Button className="ml-auto max-[640px]:ml-0 max-[640px]:flex-1" disabled={selected.size === 0 || isDeleting} onClick={() => void removeSelected()} variant="outline">
+            <Trash2 /> Excluir
+          </Button>
+          <Button className="max-[640px]:flex-[2]" disabled={selected.size === 0 || isDeleting} onClick={() => setAssociating(true)}>
             <Link2 /> Associar a assunto ou empresa
           </Button>
         </div>
