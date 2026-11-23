@@ -182,9 +182,13 @@ export function normalize(text: string): string {
 
 const palette = ['#2563eb', '#d97706', '#059669', '#7c3aed', '#dc2626', '#0d9488', '#db2777', '#4f46e5'];
 
-/** Each Título of a training by its place: Título 1, 2, 3… never share a color side by side. */
+/**
+ * Each Título of a training by its place, in the site's own tones (brand green, forest, teal, the gold of the top
+ * bar, darkened): neighbours never share one, and white text reads on all of them.
+ */
+const titlePalette = ['var(--brand-primary, #1b6b52)', '#12332c', '#0f766e', '#8a6416'];
 export function titleColor(index: number): string {
-  return palette[index % palette.length];
+  return titlePalette[index % titlePalette.length];
 }
 
 /** The same theme always gets the same color, like the colored blocks of the sheet. */
