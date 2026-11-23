@@ -200,9 +200,15 @@ public sealed class LearningProgress
             return Failure("learning.progress.position_invalid", "A posição informada está fora do vídeo.");
         }
 
-        if (accessedAt < LastAccessedAt || accessedAt == default)
+        if (accessedAt == default)
         {
             return Failure("learning.progress.access_date_invalid", "A data de acesso é inválida.");
+        }
+
+        // a save that arrives after a newer one (requests racing) changes nothing: the newer position stays
+        if (accessedAt < LastAccessedAt)
+        {
+            return Result<LearningProgress>.Success(this);
         }
 
         LastPlaybackPositionMilliseconds = positionMilliseconds;
