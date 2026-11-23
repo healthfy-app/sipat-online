@@ -127,7 +127,8 @@ describe('Platform company employees', () => {
     expect(screen.getByRole('progressbar', { name: /50% concluído; 1 de 2 aulas/ }))
       .toHaveAttribute('aria-valuenow', '50');
     expect(screen.getByText('Ativo')).toBeInTheDocument();
-    expect(screen.getByText('Identificador · acme')).toBeInTheDocument();
+    // the company's sign-in address, as a link the operator hands to the client
+    expect(screen.getByRole('link', { name: /^acme\./ })).toHaveAttribute('href', expect.stringMatching(/^https:\/\/acme\./));
     expect(screen.queryByRole('region', { name: 'Resumo da empresa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('tab')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Histórico/ })).toBeInTheDocument();

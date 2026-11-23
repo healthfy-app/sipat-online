@@ -97,7 +97,7 @@ public sealed class EmployeeCredentialService(
         var participantRole = await db.Roles.AsNoTracking()
             .Where(role => role.NormalizedName == PlatformRoles.Participant.ToUpperInvariant())
             .Select(role => (Guid?)role.Id).SingleOrDefaultAsync(token);
-        var user = await db.Users.SingleOrDefaultAsync(item =>
+        var user = await db.Users.WithoutAdmins(db).SingleOrDefaultAsync(item =>
             item.Id == userId && item.TenantId == tenant &&
             participantRole != null && db.UserRoles.Any(role => role.UserId == item.Id && role.RoleId == participantRole), token);
         return user is null

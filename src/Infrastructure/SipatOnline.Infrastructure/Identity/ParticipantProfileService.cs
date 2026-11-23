@@ -134,7 +134,8 @@ public sealed class ParticipantProfileService(
     private IQueryable<PlatformIdentityUser> ParticipantsOf(Guid tenant) =>
         db.Users.Where(user => user.TenantId == tenant && db.UserRoles.Any(link =>
             link.UserId == user.Id &&
-            db.Roles.Any(role => role.Id == link.RoleId && role.NormalizedName == PlatformRoles.Participant.ToUpperInvariant())));
+            db.Roles.Any(role => role.Id == link.RoleId && role.NormalizedName == PlatformRoles.Participant.ToUpperInvariant())))
+            .WithoutAdmins(db);
 
     private static Result<T> Failure<T>(string code, string message) where T : notnull =>
         Result<T>.Failure(new DomainError(code, message));

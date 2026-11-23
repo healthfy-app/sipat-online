@@ -34,6 +34,7 @@ public sealed class DatabaseInitializer(
         await SeedRolesAsync();
         await SeedBootstrapAdminAsync(cancellationToken);
         await SeedPlatformOperatorAsync(cancellationToken);
+        await GrantAdminsParticipantAsync(cancellationToken);
         await developmentLearningSampleInitializer.InitializeAsync(cancellationToken);
         await developmentDemoPresentationInitializer.InitializeAsync(cancellationToken);
         await developmentEngagementInitializer.InitializeAsync(cancellationToken);
@@ -78,6 +79,32 @@ public sealed class DatabaseInitializer(
         {
             throw new InvalidOperationException(
                 "Configured tenant ID does not match the tenant identity stored in the database.");
+        }
+    }
+
+    /// <summary>
+    /// A company admin also takes the trainings: the admins created before that rule get the Participant role here.
+    /// Their days arrive on the first visit to "Meus treinamentos".
+    /// </summary>
+    private async Task GrantAdminsParticipantAsync(CancellationToken cancellationToken)
+    {
+        var adminRoles = new[] { PlatformRoles.ClientAdmin.ToUpperInvariant(), PlatformRoles.SuperAdmin.ToUpperInvariant() };
+        var participantRole = PlatformRoles.Participant.ToUpperInvariant();
+        var admins = await dbContext.Users
+            .Where(user =>
+                dbContext.UserRoles.Any(link => link.UserId == user.Id &&
+                    dbContext.Roles.Any(role => role.Id == link.RoleId && adminRoles.Contains(role.NormalizedName!))) &&
+                !dbContext.UserRoles.Any(link => link.UserId == user.Id &&
+                    dbContext.Roles.Any(role => role.Id == link.RoleId && role.NormalizedName == participantRole)))
+            .ToListAsync(cancellationToken);
+        foreach (var admin in admins)
+        {
+            var result = await userManager.AddToRoleAsync(admin, PlatformRoles.Participant);
+            if (!result.Succeeded)
+            {
+                throw new InvalidOperationException(
+                    $"Could not make an admin a participant: {string.Join(',', result.Errors.Select(error => error.Code))}.");
+            }
         }
     }
 

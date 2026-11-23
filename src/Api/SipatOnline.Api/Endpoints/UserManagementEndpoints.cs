@@ -106,7 +106,7 @@ public static class UserManagementEndpoints
 
             var user = result.Value;
             // someone who arrives while a SIPAT is live starts with its days already there
-            if (request.Role == SipatOnline.BuildingBlocks.Application.PlatformRoles.Participant && tenantContext.CurrentTenantId is { IsEmpty: false } tenant)
+            if (request.Role is SipatOnline.BuildingBlocks.Application.PlatformRoles.Participant or SipatOnline.BuildingBlocks.Application.PlatformRoles.ClientAdmin or SipatOnline.BuildingBlocks.Application.PlatformRoles.SuperAdmin && tenantContext.CurrentTenantId is { IsEmpty: false } tenant)
             {
                 await distribution.EnsureAssignmentsAsync(tenant.Value, user.Id.Value, cancellationToken);
             }

@@ -40,7 +40,10 @@ public sealed class EfUserAccountStore(
                 return Result<User>.Failure(MapIdentityErrors(createResult));
             }
 
-            var roleResult = await userManager.AddToRoleAsync(identityUser, role);
+            // a company admin also takes the trainings, so it gets the Participant role too
+            var roleResult = role is PlatformRoles.ClientAdmin or PlatformRoles.SuperAdmin
+                ? await userManager.AddToRolesAsync(identityUser, [role, PlatformRoles.Participant])
+                : await userManager.AddToRoleAsync(identityUser, role);
             if (!roleResult.Succeeded)
             {
                 return Result<User>.Failure(
@@ -120,7 +123,8 @@ public sealed class EfUserAccountStore(
             .AsNoTracking()
             .Where(user => user.TenantId == tenantId.Value &&
                            dbContext.UserRoles.Any(role =>
-                               role.UserId == user.Id && role.RoleId == participantRoleId.Value));
+                               role.UserId == user.Id && role.RoleId == participantRoleId.Value))
+            .WithoutAdmins(dbContext);
         var totalCount = await participants.CountAsync(cancellationToken);
         var users = await participants
             .OrderBy(user => user.DisplayName)
