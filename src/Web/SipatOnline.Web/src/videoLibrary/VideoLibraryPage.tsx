@@ -160,7 +160,8 @@ export default function VideoLibraryPage() {
               placeholder="Buscar vídeo por nome" type="search" value={query} />
           </label>
           <span className="text-sm text-muted-foreground tabular-nums">
-            {query.trim() ? `${shown.length} de ${library.length}` : pluralize(library.length, 'vídeo', 'vídeos')}
+            <span>{query.trim() ? `${shown.length} de ${library.length}` : pluralize(library.length, 'vídeo', 'vídeos')}</span>
+            {totalBytes > 0 && <> · <span title="Soma do tamanho de todos os vídeos da biblioteca">{formatBytes(totalBytes)} no total</span></>}
           </span>
           <span className="ml-auto text-xs text-muted-foreground max-[640px]:hidden">Dica: arraste vídeos para esta página para enviar.</span>
         </div>

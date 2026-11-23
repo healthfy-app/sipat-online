@@ -51,6 +51,8 @@ describe('Video library page', () => {
     expect(await screen.findByText('Abertura')).toBeVisible();
     expect(screen.getByText('Encerramento')).toBeVisible();
     expect(screen.getByText(/2 vídeos · 2 KB|2 vídeos · 0 MB/)).toBeVisible();
+    // the sum of every video's size, shown next to the count on the search row
+    expect(screen.getByTitle('Soma do tamanho de todos os vídeos da biblioteca')).toHaveTextContent('0 MB no total');
     expect(screen.getByText(/1 sem assunto/)).toBeVisible();
   });
 
