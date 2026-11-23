@@ -157,7 +157,7 @@ export default function CourseCatalog({
   }
 
   const primaryAction = {
-    courses: <Button className="ops-primary" onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar assunto</Button>,
+    courses: <Button className="ops-primary" onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar treinamento</Button>,
     plans: undefined,
     videos: undefined,
     modules: <Button className="ops-primary" onClick={() => setDialog({ kind: 'game', module: null })}><Plus /> Novo jogo</Button>,
