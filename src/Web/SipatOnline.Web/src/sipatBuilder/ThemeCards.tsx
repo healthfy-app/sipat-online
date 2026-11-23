@@ -100,14 +100,14 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
           </NativeSelect>
         </>
         : <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo</h2>}
-      <span className="text-sm text-muted-foreground max-[640px]:hidden">
+      <span className="text-sm text-muted-foreground max-[1700px]:hidden">
         · {current !== 'videos' ? 'arraste para um dia e ele traz todos os vídeos e jogos' : training ? 'arraste um título ou um vídeo para um dia' : 'arraste um vídeo para um dia'}
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-2">
         {/* personalized grid: sending videos and tagging their assuntos both live in the library, so one link */}
         {canEditThemes && (canCustomizeGrid
-          ? <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank" title="Enviar vídeos e marcar os assuntos deles">
-            <CloudUpload aria-hidden="true" className="size-4" /> Gerenciar biblioteca
+          ? <a aria-label="Gerenciar biblioteca" className="grid size-9 place-items-center rounded-md text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank" title="Gerenciar biblioteca: enviar vídeos e marcar os assuntos deles">
+            <CloudUpload aria-hidden="true" className="size-4" />
           </a>
           : <>
             <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank">
@@ -119,7 +119,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
           </>)}
         <label className="relative">
           <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input aria-label={current === 'videos' ? 'Buscar vídeo' : 'Buscar assunto'} className="h-9 w-56 pl-8 max-[640px]:w-full" onChange={event => setQuery(event.target.value)}
+          <Input aria-label={current === 'videos' ? 'Buscar vídeo' : 'Buscar assunto'} className="h-9 w-44 pl-8 max-[640px]:w-full" onChange={event => setQuery(event.target.value)}
             placeholder={current === 'videos' ? 'Buscar vídeo' : 'Buscar assunto'} value={query} />
         </label>
       </div>

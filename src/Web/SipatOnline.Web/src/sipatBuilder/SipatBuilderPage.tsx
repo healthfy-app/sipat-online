@@ -250,11 +250,13 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     if (!checkIssues()) return null;
     setBusy(true); setError(''); setNotice('');
     try {
-      const first = days.find(day => day.date)?.date ?? startDate;
-      const last = [...days].reverse().find(day => day.date)?.date ?? first;
-      const schedule = { startsAt: `${first}T00:00:00.000Z`, endsAt: `${addDays(last, 1)}T00:00:00.000Z` };
       let current = sipat;
       if (!current) {
+        // only a new training needs a schedule; days without dates (Módulos) keep the one it has
+        const first = days.find(day => day.date)?.date ?? startDate;
+        if (!isValidDate(first)) { setError('Escolha a data de início do treinamento.'); return null; }
+        const last = [...days].reverse().find(day => day.date)?.date ?? first;
+        const schedule = { startsAt: `${first}T00:00:00.000Z`, endsAt: `${addDays(last, 1)}T00:00:00.000Z` };
         current = await createSipatEvent({ title: name.trim(), description: null, ...schedule });
       } else if (current.status === 'Draft' && current.title !== name.trim()) {
         current = await updateSipatEvent(current.id, { title: name.trim(), description: current.description, startsAt: current.startsAt, endsAt: current.endsAt });
