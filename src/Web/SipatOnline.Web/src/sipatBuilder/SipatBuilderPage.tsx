@@ -93,17 +93,28 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const [trainings, setTrainings] = useState<PlatformCourse[]>([]);
   const [training, setTraining] = useState('');
 
+  const applyContent = useCallback((content: Awaited<ReturnType<typeof getSipatCatalog>>) => {
+    // an <img> cannot send the company header the admin route needs: the operator loads the photo from the platform route
+    const courses = canEditThemes
+      ? content.courses.map(course => ({ ...course, coverUrl: course.coverUrl?.replace('/api/admin/sipat-catalog/courses/', '/api/platform/catalog/courses/') ?? null }))
+      : content.courses;
+    setCatalog(buildCatalog(courses, content.videos, content.games, content.categories ?? [], content.subjects ?? [], content.videoSubjects ?? []));
+    setTrainings(courses);
+  }, [canEditThemes]);
+
+  // back from the video editor (opened in another tab): the trainings and videos come again, the days being built stay as they are
+  useEffect(() => {
+    const refresh = () => { if (document.visibilityState === 'visible') getSipatCatalog().then(applyContent, () => undefined); };
+    document.addEventListener('visibilitychange', refresh);
+    return () => document.removeEventListener('visibilitychange', refresh);
+  }, [applyContent]);
+
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
       const [content, events, summaries] = await Promise.all([getSipatCatalog(), listSipatEvents(0, 100), listSipatPlans()]);
       getCompanyCapabilities().then(setCapabilities).catch(() => setCapabilities(null));
-      // an <img> cannot send the company header the admin route needs: the operator loads the photo from the platform route
-      const courses = canEditThemes
-        ? content.courses.map(course => ({ ...course, coverUrl: course.coverUrl?.replace('/api/admin/sipat-catalog/courses/', '/api/platform/catalog/courses/') ?? null }))
-        : content.courses;
-      setCatalog(buildCatalog(courses, content.videos, content.games, content.categories ?? [], content.subjects ?? [], content.videoSubjects ?? []));
-      setTrainings(courses);
+      applyContent(content);
       setPlans(summaries);
       setOthers(events.items);
       if (!isNew && params.sipatId) {
@@ -118,7 +129,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     } catch (failure) {
       setError(getErrorMessage(failure));
     } finally { setLoading(false); }
-  }, [isNew, params.sipatId]);
+  }, [isNew, params.sipatId, applyContent]);
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {

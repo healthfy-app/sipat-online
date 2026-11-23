@@ -186,8 +186,9 @@ function TrainingPanel({ training, rows, narrowed, usedIn, canEditThemes, onUse,
     <div className="flex flex-wrap items-center gap-2">
       <Step className="min-w-48 flex-1 text-primary" number={2}>Arraste cada título para um dia</Step>
       {onUse && <Button onClick={onUse} size="sm" title="Título 1 no dia 1, título 2 no dia 2…"><CalendarRange /> Usar como dias</Button>}
-      {canEditThemes && <a className="inline-flex h-8 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-card" href={`/platform/courses/${training.id}/edit`} rel="noreferrer" target="_blank">
-        Abrir no editor <ExternalLink aria-hidden="true" className="size-3.5" />
+      {canEditThemes && <a className="inline-flex h-8 items-center gap-1.5 rounded-md border border-primary/40 bg-card px-3 text-[0.8125rem] font-semibold text-primary shadow-card transition-colors hover:border-primary hover:bg-accent"
+        href={`/platform/courses/${training.id}/edit`} rel="noreferrer" target="_blank" title="Abre o editor de vídeos numa aba nova; ao voltar, os títulos se atualizam">
+        <Pencil aria-hidden="true" className="size-3.5" /> Editar no editor de vídeos <ExternalLink aria-hidden="true" className="size-3 opacity-70" />
       </a>}
       <Button aria-label={`Fechar ${training.title}`} onClick={onClose} size="icon-sm" title="Fechar treinamento" variant="ghost"><X /></Button>
     </div>
