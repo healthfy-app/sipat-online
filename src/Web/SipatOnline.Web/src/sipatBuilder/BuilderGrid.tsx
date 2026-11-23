@@ -1,16 +1,16 @@
-import { DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { Plus, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { extrasSuffix } from '@/courseEditor/courseFormat';
 import { cn } from '@/lib/utils';
 import { partWord } from '@/trainings/partWord';
 import {
-  addDays, dayDuration, dayVideoCounts, formatClock, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay,
-  type Catalog, type DaySlots, type TrainingTitle, type TrayTraining,
+  addDays, dayDuration, dayVideoCounts, formatClock, isGenericDayTitle, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay, withDayWord,
+  type Catalog, type CatalogVideo, type DaySlots, type Subject, type TrainingTitle, type TrayTraining,
 } from './model';
-import { DayBox, dropId, ThemeTray } from './ThemeCards';
+import { DayBox, DragPreview, dropId, ThemeTray } from './ThemeCards';
 import './builder.css';
 
 export { subjectColor };
@@ -63,11 +63,13 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
     scroller.current?.scrollTo?.({ left: scroller.current.scrollWidth, behavior: 'smooth' });
   }, [days.length]);
 
-  const patchDay = (index: number, patch: Partial<DaySlots>) => onChange(days.map((day, position) => (position === index ? { ...day, ...patch } : day)));
+  // every change keeps the untyped names in step with the word: a date set turns "Módulo 2" into "Dia 2"
+  const change = (next: DaySlots[]) => onChange(withDayWord(next, partWord(next.map(day => day.date))));
+  const patchDay = (index: number, patch: Partial<DaySlots>) => change(days.map((day, position) => (position === index ? { ...day, ...patch } : day)));
   const addDay = () => {
     const last = days[days.length - 1];
     addedAtEnd.current = true;
-    onChange([...days, newDay(days.length, last?.date ? addDays(last.date, 1) : '')]);
+    change([...days, newDay(days.length, last?.date ? addDays(last.date, 1) : '')]);
   };
   const removeDay = (index: number) => (onRemoveDay ? onRemoveDay(index) : onChange(days.filter((_, position) => position !== index)));
 
@@ -90,8 +92,11 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
     if (current.includes(videoId) || current.length >= maxVideoRows) return;
     patchDay(index, { videos: [...current, videoId] });
   };
-  const replace = (next: DaySlots[], message: string) => (onReplace ? onReplace(next, message) : onChange(next));
-  const generic = (title: string) => !title.trim() || /^(Dia|Módulo) [0-9]+$/.test(title.trim());
+  const replace = (raw: DaySlots[], message: string) => {
+    const next = withDayWord(raw, partWord(raw.map(day => day.date)));
+    if (onReplace) onReplace(next, message); else onChange(next);
+  };
+  const generic = isGenericDayTitle;
   /** A Título dropped on a day: the day becomes it, its videos in order (and its name, if the day had none of its own). */
   const titleOnDay = (day: DaySlots, title: TrainingTitle): DaySlots => {
     const videos = title.videoIds.filter(id => catalog.videos.has(id)).slice(0, maxVideoRows);
@@ -100,7 +105,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
   const applyTitle = (index: number, title: TrainingTitle) => {
     const had = filled(days[index].videos).length > 0;
     const next = days.map((day, position) => (position === index ? titleOnDay(day, title) : day));
-    if (had) replace(next, `"${title.title}" no ${lower} ${index + 1}.`); else onChange(next);
+    if (had) replace(next, `"${title.title}" no ${lower} ${index + 1}.`); else change(next);
   };
   /** The whole training on the days: Título 1 on day 1 and so on, adding days when it has more Títulos. */
   const layTraining = (training: TrayTraining) => {
@@ -122,8 +127,16 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
     return places;
   }, [days, word]);
   const looseVideos = useMemo(() => [...catalog.videos.values()].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [catalog]);
+  // the training picked in the list; an empty day offers its next Título that is on no day yet
+  const [trainingId, setTrainingId] = useState('');
+  const training = canCustomizeGrid ? trainings.find(item => item.id === trainingId) : undefined;
+  const nextTitle = training?.titles.find(title => title.videoIds.length > 0 && !title.videoIds.every(id => usedIn.has(id)));
+  // what is being dragged rides under the pointer until it is dropped
+  const [carried, setCarried] = useState<{ title?: TrainingTitle; video?: CatalogVideo; subject?: Subject } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
+  const onDragStart = ({ active }: DragStartEvent) => setCarried((active.data.current as typeof carried) ?? null);
   const onDragEnd = ({ active, over }: DragEndEvent) => {
+    setCarried(null);
     const subject = active.data.current?.subject as { id: string } | undefined;
     const video = active.data.current?.video as { id: string } | undefined;
     const title = active.data.current?.title as TrainingTitle | undefined;
@@ -135,10 +148,11 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
   };
   const column = (index: number, order: number): CSSProperties => ({ '--i': index, '--order': order } as CSSProperties);
 
-  return <DndContext onDragEnd={onDragEnd} sensors={sensors}>
+  return <DndContext onDragCancel={() => setCarried(null)} onDragEnd={onDragEnd} onDragStart={onDragStart} sensors={sensors}>
+    <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>{carried && <DragPreview data={carried} />}</DragOverlay>
     <div className="grid gap-4">
-      <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} onUseTraining={layTraining} subjects={themes}
-        trainings={trainings} usedIn={canCustomizeGrid ? usedIn : undefined} videos={looseVideos} />
+      <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} onTraining={setTrainingId} onUseTraining={layTraining} subjects={themes}
+        trainingId={trainingId} trainings={trainings} usedIn={canCustomizeGrid ? usedIn : undefined} videos={looseVideos} />
       <div className="builder-board-card ops-card overflow-hidden max-[760px]:overflow-visible max-[760px]:border-0! max-[760px]:bg-transparent! max-[760px]:shadow-none">
         <div className="builder-board-scroller overflow-x-auto max-[760px]:overflow-visible" ref={scroller}>
           <div className="builder-board grid min-w-full [grid-template-columns:var(--columns)] max-[760px]:flex max-[760px]:flex-col" role="table" style={layout}>
@@ -157,7 +171,8 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
                 <Input aria-label={`Data do ${lower} ${index + 1}`} className={cn('h-9 min-w-0 px-2 text-sm', phoneField)} onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
                 <Input aria-describedby={dayIssues ? `day-issues-${day.key}` : undefined} aria-invalid={!!dayIssues && !day.title.trim()}
                   aria-label={`Título do ${lower} ${index + 1}`} className={cn('font-medium', phoneField)} maxLength={160}
-                  onChange={event => patchDay(index, { title: event.target.value })} placeholder={`Slogan do ${lower}`} value={day.title} />
+                  onChange={event => patchDay(index, { title: event.target.value })} placeholder={`Slogan do ${lower}`}
+                  value={isGenericDayTitle(day.title) && day.title.trim() ? `${word} ${index + 1}` : day.title} />
                 {dayIssues && <ul className="m-0 grid list-none gap-0.5 p-0 text-xs font-semibold text-destructive" id={`day-issues-${day.key}`}>
                   {dayIssues.map(text => <li key={text}>{text}</li>)}
                 </ul>}
@@ -169,7 +184,8 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
               return <Cell index={index} key={`box-${day.key}`} order={index * 3 + 1} row={2}>
                 <DayBox canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} dayIndex={index}
                   onVideos={videoIds => patchDay(index, { videos: videoIds })} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
-                  onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)} />
+                  onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)}
+                  suggestion={nextTitle ? { title: nextTitle, onApply: () => applyTitle(index, nextTitle) } : undefined} />
               </Cell>;
             })}
 

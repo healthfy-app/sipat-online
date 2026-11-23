@@ -23,7 +23,7 @@ import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
 import { phaseLabel, sipatPhase } from './sipatPhase';
 import {
-  addDays, buildCatalog, dayDuration, dayFromTitle, maxDays, dayVideoCounts, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay,
+  addDays, buildCatalog, dayDuration, dayFromTitle, maxDays, dayVideoCounts, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay, withDayWord,
   type Catalog, type DaySlots, type TrayTraining,
 } from './model';
 
@@ -259,7 +259,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       } else if (current.status === 'Draft' && current.title !== name.trim()) {
         current = await updateSipatEvent(current.id, { title: name.trim(), description: current.description, startsAt: current.startsAt, endsAt: current.endsAt });
       }
-      const saved = await saveSipatPlan(current.id, days.map(toProgramDay));
+      // untyped names go out as the board shows them ("Módulo 2" without dates, "Dia 2" with)
+      const saved = await saveSipatPlan(current.id, withDayWord(days, partWord(days.map(day => day.date))).map(toProgramDay));
       setDays(saved.map(fromProgramDay)); setDirty(false); setSipat(current);
       setNotice('Rascunho salvo.');
       if (isNew) navigate(`${basePath}/${current.id}`, { replace: true });
@@ -358,7 +359,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
           {stage === 'grid' && sipat && sipat.status === 'Published' && <span className="text-xs text-muted-foreground">O nome fica fixo depois de publicado.</span>}
         </div>
         <p className="ops-hero-lead is-keep max-[760px]:text-[0.875rem]! max-[760px]:leading-[1.45]">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : <>
-          <span className="max-[760px]:hidden">Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.</span>
+          <span className="max-[760px]:hidden">{canCustomizeGrid
+            ? 'Cada coluna é um dia. Arraste um título ou vídeos da lista para cada dia e confira o tempo.'
+            : 'Cada coluna é um dia. Arraste um assunto para cada dia e confira os vídeos e os jogos.'}</span>
           <span className="hidden max-[760px]:inline">Escolha um assunto para cada dia e confira os vídeos e os jogos.</span>
         </>}</p>
         {stage === 'grid' && <ul aria-label="Resumo do treinamento" className="ops-hero-stats max-[760px]:mt-1! max-[760px]:grid! max-[760px]:basis-full max-[760px]:grid-cols-2 max-[760px]:gap-2! max-[760px]:*:min-w-0 max-[760px]:*:flex-wrap max-[760px]:*:rounded-xl max-[760px]:*:bg-muted max-[760px]:*:px-3 max-[760px]:*:py-2 max-[760px]:*:text-sm">

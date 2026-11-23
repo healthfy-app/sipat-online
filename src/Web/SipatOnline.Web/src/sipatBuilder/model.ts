@@ -71,6 +71,14 @@ export interface TrainingTitle { id: string; title: string; videoIds: string[] }
 /** A training of Conteúdo shown in the planner, with its Títulos in order (only the videos ready in the library). */
 export interface TrayTraining { id: string; title: string; coverUrl: string | null; titles: TrainingTitle[] }
 
+/** A name the operator never typed ("Dia 3", "Módulo 3"): it follows the word and the position of the day. */
+export const isGenericDayTitle = (title: string) => !title.trim() || /^(Dia|Módulo) [0-9]+$/.test(title.trim());
+
+/** Untyped day names said with the word the board uses ("Dia" with dates, "Módulo" without) and renumbered by position. */
+export function withDayWord<T extends { title: string }>(days: T[], word: string): T[] {
+  return days.map((day, index) => (isGenericDayTitle(day.title) ? { ...day, title: `${word} ${index + 1}` } : day));
+}
+
 /** A day while it is being edited: empty slots are kept so the grid keeps its shape. */
 export interface DaySlots {
   key: string;

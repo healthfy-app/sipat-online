@@ -1,5 +1,5 @@
-import { useDraggable, useDroppable } from '@dnd-kit/core';
-import { ArrowDown, ArrowUp, CalendarRange, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Pencil, Search, X } from 'lucide-react';
+import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
+import { ArrowDown, ArrowUp, CalendarRange, CirclePlus, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Pencil, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { isExtra, videoProvider } from '@/api';
 import { Button } from '@/components/ui/button';
@@ -32,7 +32,7 @@ const videoTime = (video: CatalogVideo) => (isExtra(video) && video.durationMs <
  * What goes onto the days. A plan that personalizes the grid sees the complete list of videos, narrowed by an assunto
  * (a filter); Bronze sees the ready trainings, each one a whole day.
  */
-export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, canEditThemes = false, trainings = [], usedIn, onUseTraining }: {
+export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, canEditThemes = false, trainings = [], usedIn, onUseTraining, trainingId = '', onTraining }: {
   subjects: Subject[]; videos?: CatalogVideo[]; canCustomizeGrid?: boolean; canEditThemes?: boolean;
   /** The trainings of Conteúdo: picking one puts its Títulos and their videos at the start of the list. */
   trainings?: TrayTraining[];
@@ -40,16 +40,18 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
   usedIn?: Map<string, string>;
   /** Lays the whole training on the days, Título 1 on day 1 and so on. */
   onUseTraining?: (training: TrayTraining) => void;
+  /** The picked training (empty for none); the board keeps it so the empty days can offer its next Título. */
+  trainingId?: string;
+  onTraining?: (trainingId: string) => void;
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
-  const [trainingId, setTrainingId] = useState('');
   // personalized grid: one complete list of videos, narrowed by an assunto
   const current = canCustomizeGrid ? 'videos' : 'subjects';
   const shownSubjects = useMemo(() => subjects.filter(subject => normalize(subject.title).includes(normalize(query))), [subjects, query]);
   const filterIds = subjects.find(item => item.id === filter)?.videoIds;
   const shownVideos = useMemo(() => videos.filter(video => normalize(video.title).includes(normalize(query)) && (!filterIds || filterIds.includes(video.id))), [videos, query, filterIds]);
-  // a picked training leads the same list: each Título, then its videos; every other video follows as avulsos
+  // a picked training leads the same list: each Título, then its videos; the rest of the library follows
   const training = canCustomizeGrid ? trainings.find(item => item.id === trainingId) : undefined;
   const shownById = useMemo(() => new Map(shownVideos.map(video => [video.id, video])), [shownVideos]);
   const inTraining = useMemo(() => new Set(training?.titles.flatMap(title => title.videoIds) ?? []), [training]);
@@ -60,18 +62,26 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
     .filter(group => !narrowed || group.videos.length > 0);
   const empty = groups.length === 0 && looseVideos.length === 0;
 
-  return <section aria-label={current === 'videos' ? 'Vídeos avulsos' : 'Assuntos do acervo'} className="builder-tray ops-card grid gap-3 p-4 max-[760px]:hidden">
+  return <section aria-label={current === 'videos' ? 'Biblioteca de vídeos' : 'Assuntos do acervo'} className="builder-tray ops-card grid gap-3 p-4 max-[760px]:hidden">
     <div className="flex flex-wrap items-center gap-2">
       {canCustomizeGrid
         ? <>
-          <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Film aria-hidden="true" className="size-4" /> Lista completa <span className="text-xs font-normal tabular-nums text-muted-foreground">{shownVideos.length}</span></h2>
-          {trainings.length > 0 && <span className="inline-flex items-center gap-1">
-            <NativeSelect aria-label="Treinamento" className={cn('h-9 w-auto max-w-64', training && 'border-primary bg-accent font-semibold text-primary')}
-              onChange={event => setTrainingId(event.target.value)} value={trainingId}>
-              <option value="">Treinamento</option>
-              {trainings.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
-            </NativeSelect>
-            {training && onUseTraining && <Button aria-label={`Usar ${training.title} como dias`} onClick={() => onUseTraining(training)} size="icon-sm" title="Usar como dias: título 1 no dia 1, título 2 no dia 2…" variant="ghost"><CalendarRange /></Button>}
+          <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Film aria-hidden="true" className="size-4" /> Lista completa
+            <span className="text-xs font-normal tabular-nums text-muted-foreground">{shownVideos.length}{training && ` · ${plural(groups.length, 'título', 'títulos')}`}</span></h2>
+          {trainings.length > 0 && <span className="inline-flex items-center gap-1.5">
+            {/* a pill that says what it is: "Treinamento:" then the name, whole on hover, with its own way out */}
+            <label className={cn('relative m-0 inline-flex h-9 max-w-80 items-center rounded-full border pr-1 pl-3 text-sm transition-colors',
+              training ? 'border-primary bg-accent text-primary' : 'border-input bg-background text-foreground hover:border-primary/60')} title={training?.title}>
+              <span className={cn('shrink-0 font-medium', training ? 'text-primary/75' : 'text-muted-foreground')}>Treinamento:</span>
+              <select aria-label="Treinamento" className={cn('h-full min-w-0 flex-1 cursor-pointer truncate border-0 bg-transparent py-0 pr-6 pl-1.5 text-sm outline-none', training ? 'font-bold text-primary' : 'text-foreground')}
+                onChange={event => onTraining?.(event.target.value)} value={training?.id ?? ''}>
+                <option value="">nenhum</option>
+                {trainings.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+              </select>
+              {training && <button aria-label="Tirar o treinamento da lista" className="absolute right-1 grid size-7 min-h-0 cursor-pointer place-items-center rounded-full border-0 bg-accent p-0 text-primary hover:bg-card"
+                onClick={event => { event.preventDefault(); onTraining?.(''); }} type="button"><X className="size-3.5" /></button>}
+            </label>
+            {training && onUseTraining && <Button onClick={() => onUseTraining(training)} size="sm" title="Título 1 no dia 1, título 2 no dia 2…" variant="outline"><CalendarRange /> Usar como dias</Button>}
             {training && canEditThemes && <a aria-label={`Editar ${training.title} no editor de vídeos`} className="grid size-8 place-items-center rounded-md text-primary hover:bg-accent"
               href={`/platform/courses/${training.id}/edit`} rel="noreferrer" target="_blank" title="Editar no editor de vídeos (abre numa aba nova)"><Pencil aria-hidden="true" className="size-4" /></a>}
           </span>}
@@ -85,14 +95,19 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
         · {current !== 'videos' ? 'arraste para um dia e ele traz todos os vídeos e jogos' : training ? 'arraste um título ou um vídeo para um dia' : 'arraste um vídeo para um dia'}
       </span>
       <div className="ml-auto flex flex-wrap items-center gap-2">
-        {canEditThemes && <>
-          <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank">
-            <CloudUpload aria-hidden="true" className="size-4" /> Enviar vídeos
+        {/* personalized grid: sending videos and tagging their assuntos both live in the library, so one link */}
+        {canEditThemes && (canCustomizeGrid
+          ? <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank" title="Enviar vídeos e marcar os assuntos deles">
+            <CloudUpload aria-hidden="true" className="size-4" /> Gerenciar biblioteca
           </a>
-          <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href={canCustomizeGrid ? '/platform/videos' : '/platform/courses'} rel="noreferrer" target="_blank">
-            <Pencil aria-hidden="true" className="size-4" /> Editar assuntos
-          </a>
-        </>}
+          : <>
+            <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank">
+              <CloudUpload aria-hidden="true" className="size-4" /> Enviar vídeos
+            </a>
+            <a className="inline-flex h-9 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] font-semibold text-primary hover:bg-accent" href="/platform/courses" rel="noreferrer" target="_blank">
+              <Pencil aria-hidden="true" className="size-4" /> Editar assuntos
+            </a>
+          </>)}
         <label className="relative">
           <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input aria-label={current === 'videos' ? 'Buscar vídeo' : 'Buscar assunto'} className="h-9 w-56 pl-8 max-[640px]:w-full" onChange={event => setQuery(event.target.value)}
@@ -103,9 +118,12 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
     {current === 'videos'
       ? empty
         ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.' : 'Nenhum vídeo encontrado.'}</p>
-        : <ul className="m-0 flex list-none items-start gap-2 overflow-x-auto p-0 pb-1">
+        : <ul className="m-0 flex list-none items-center gap-2 overflow-x-auto p-0 pb-1">
           {groups.map((group, index) => <TitleGroup index={index} key={group.title.id} title={group.title} usedIn={usedIn} videos={group.videos} />)}
-          {groups.length > 0 && looseVideos.length > 0 && <li aria-hidden="true" className="mx-1 w-px shrink-0 self-stretch border-l border-dashed border-border" />}
+          {/* after the training's Títulos, the rest of the library the company can use (videos private to other companies never come) */}
+          {groups.length > 0 && looseVideos.length > 0 && <li aria-hidden="true" className="ml-1 grid shrink-0 self-stretch place-content-center border-l border-dashed border-border pr-1 pl-3 text-[0.6875rem] leading-tight font-bold tracking-[0.06em] text-muted-foreground uppercase">
+            <span>Biblioteca</span><span>de vídeos</span><span className="font-semibold tracking-normal tabular-nums normal-case">{looseVideos.length}</span>
+          </li>}
           {looseVideos.map(video => <li className="shrink-0" key={video.id}><VideoCard place={usedIn?.get(video.id)} video={video} /></li>)}
         </ul>
       : shownSubjects.length === 0
@@ -144,13 +162,43 @@ function VideoCard({ video, place, dragId = `video:${video.id}` }: { video: Cata
 const plural = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`;
 
 /**
+ * What rides under the pointer while dragging: the same card, lifted (a little bigger, tilted, with a deep shadow), so
+ * the operator sees what is being carried the whole way to the day.
+ */
+export function DragPreview({ data }: { data: { title?: TrainingTitle; video?: CatalogVideo; subject?: Subject } }) {
+  const lifted = 'flex w-60 rotate-[-2deg] scale-[1.03] cursor-grabbing items-center gap-2 rounded-[0.875rem] border p-2 shadow-overlay motion-reduce:rotate-0 motion-reduce:scale-100';
+  if (data.title) return <div className={cn(lifted, 'border-primary bg-accent')}>
+    <span className="grid size-10 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground"><Layers aria-hidden="true" className="size-4" /></span>
+    <div className="grid min-w-0 flex-1 gap-0.5">
+      <strong className="line-clamp-2 text-[0.8125rem] leading-tight text-primary">{data.title.title}</strong>
+      <span className="text-xs text-muted-foreground">{plural(data.title.videoIds.length, 'vídeo', 'vídeos')}</span>
+    </div>
+  </div>;
+  if (data.video) return <div className={cn(lifted, 'border-primary bg-card')}>
+    <span className="grid size-10 shrink-0 place-items-center rounded-md bg-[#0b1f19] text-white/85"><Film aria-hidden="true" className="size-4" /></span>
+    <div className="grid min-w-0 flex-1 gap-0.5">
+      <strong className="line-clamp-2 text-[0.8125rem] leading-tight">{data.video.title}</strong>
+      <span className="text-xs tabular-nums text-muted-foreground">{videoTime(data.video)}</span>
+    </div>
+  </div>;
+  if (data.subject) return <div className={cn(lifted, 'border-primary bg-card')}>
+    <Cover className="size-10" subject={data.subject} />
+    <div className="grid min-w-0 flex-1 gap-0.5">
+      <strong className="truncate text-[0.8125rem] leading-tight">{data.subject.title}</strong>
+      <span className="text-xs text-muted-foreground">{summary(data.subject)}</span>
+    </div>
+  </div>;
+  return null;
+}
+
+/**
  * A Título of the picked training, inline in the list: a green card the size of a video card (dragging it builds a
- * day with all its videos), then its videos, held together by a thin line under the group.
+ * day with all its videos), then its videos, held together by a soft green ground behind the group.
  */
 function TitleGroup({ title, videos, index, usedIn }: { title: TrainingTitle; videos: CatalogVideo[]; index: number; usedIn?: Map<string, string> }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `title:${title.id}`, data: { title }, disabled: title.videoIds.length === 0 });
   const totalMs = videos.filter(video => !isExtra(video)).reduce((sum, video) => sum + video.durationMs, 0);
-  return <li aria-label={`${title.title}, ${plural(title.videoIds.length, 'vídeo', 'vídeos')}`} className="grid shrink-0 gap-1.5">
+  return <li aria-label={`${title.title}, ${plural(title.videoIds.length, 'vídeo', 'vídeos')}`} className="shrink-0 rounded-[1.125rem] bg-accent/60 p-1.5">
     <ul className="m-0 flex list-none gap-2 p-0">
       <li className="shrink-0">
         <div className={cn('flex w-60 items-center gap-2 rounded-[0.875rem] border border-primary bg-accent p-2 transition-[box-shadow,transform] hover:-translate-y-0.5 hover:shadow-card motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef}>
@@ -165,7 +213,6 @@ function TitleGroup({ title, videos, index, usedIn }: { title: TrainingTitle; vi
       </li>
       {videos.map(video => <li className="shrink-0" key={video.id}><VideoCard dragId={`video:${title.id}:${video.id}`} place={usedIn?.get(video.id)} video={video} /></li>)}
     </ul>
-    <span aria-hidden="true" className="mx-3 h-0.5 rounded-full bg-primary/30" />
   </li>;
 }
 
@@ -174,24 +221,39 @@ function TitleGroup({ title, videos, index, usedIn }: { title: TrainingTitle; vi
  * subject. With a plan that personalizes the grid the videos are the operator's: videos are dropped or picked one
  * by one, reordered and removed right here.
  */
-export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false }: {
+export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false, suggestion }: {
   dayIndex: number; subject: Subject | undefined; themes: Subject[]; catalog: Catalog; videoIds: string[]; gameIds: string[];
   onChoose: (title: string) => void; onClear: () => void; canEditThemes?: boolean;
   canCustomizeGrid?: boolean;
   /** The new list of videos of the day; only with canCustomizeGrid. */
   onVideos?: (videoIds: string[]) => void;
+  /** The next Título of the picked training not on any day yet, offered on an empty day as one click. */
+  suggestion?: { title: TrainingTitle; onApply: () => void };
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId(dayIndex) });
+  const { active } = useDndContext();
   const editable = canCustomizeGrid && !!onVideos;
   const full = videoIds.length >= maxVideoRows;
   const empty = !subject && videoIds.length === 0;
+  // while something is dragged every day shows it can take it; the one under the pointer says what the drop will do
+  const dragged = active?.data.current as { title?: TrainingTitle; video?: CatalogVideo; subject?: Subject } | undefined;
+  const preview = !isOver || !dragged ? '' : dragged.title
+    ? videoIds.length > 0 ? `Troca ${plural(videoIds.length, 'vídeo', 'vídeos')} por ${dragged.title.title}` : `${dragged.title.title} · ${plural(dragged.title.videoIds.length, 'vídeo', 'vídeos')}`
+    : dragged.video
+      ? videoIds.includes(dragged.video.id) ? 'Já está neste dia' : full ? `Dia cheio (${maxVideoRows} vídeos)` : '+ 1 vídeo'
+      : dragged.subject ? dragged.subject.title : '';
   // on the phone the day card is the frame: no box inside the box, the chooser under the subject, then the videos and games
-  const frame = cn('grid content-start gap-2 rounded-[0.875rem] border p-2 transition-colors', isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : 'border-border bg-card',
+  const frame = cn('relative grid content-start gap-2 rounded-[0.875rem] border p-2 transition-[border-color,background-color,box-shadow] duration-150',
+    isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : dragged ? 'border-dashed border-primary/60 bg-accent/30' : 'border-border bg-card',
     'max-[760px]:min-h-0 max-[760px]:content-start max-[760px]:justify-stretch max-[760px]:gap-3 max-[760px]:rounded-none max-[760px]:border-0 max-[760px]:bg-transparent max-[760px]:p-0 max-[760px]:text-left max-[760px]:ring-0');
+  const dropBadge = dragged && <span aria-hidden="true" className={cn('pointer-events-none absolute -top-2.5 left-1/2 z-10 max-w-[90%] -translate-x-1/2 truncate rounded-full px-2.5 py-0.5 text-[0.6875rem] font-bold whitespace-nowrap shadow-card transition-colors max-[760px]:hidden',
+    isOver ? 'bg-primary text-primary-foreground' : 'bg-card text-primary')}>{preview || 'Solte aqui'}</span>;
   const phoneSelect = 'max-[760px]:h-12 max-[760px]:rounded-xl max-[760px]:px-3.5 max-[760px]:text-base max-[760px]:focus-visible:outline-3 max-[760px]:focus-visible:outline-offset-2 max-[760px]:focus-visible:outline-primary/40';
-  const chooser = <select aria-label={`Assunto do dia ${dayIndex + 1}`} className={cn('h-9 w-full rounded-md border border-input bg-background px-2 text-sm', phoneSelect, 'max-[760px]:order-1',
+  // personalized grid: the assunto only narrows "+ Adicionar vídeo"; on the computer the list above does that, so it shows on the phone only
+  const chooser = <select aria-label={editable ? `Filtrar os vídeos do dia ${dayIndex + 1} por assunto` : `Assunto do dia ${dayIndex + 1}`} className={cn('h-9 w-full rounded-md border border-input bg-background px-2 text-sm', phoneSelect, 'max-[760px]:order-1',
+    editable && !subject && 'min-[761px]:hidden',
     empty ? 'max-[760px]:border-[1.5px] max-[760px]:border-primary max-[760px]:bg-accent max-[760px]:font-bold max-[760px]:text-primary' : 'max-[760px]:border-border max-[760px]:bg-card max-[760px]:font-semibold max-[760px]:text-foreground')} onChange={event => onChoose(event.target.value)} value={subject?.id ?? ''}>
-    <option value="">{subject ? 'Trocar assunto' : 'Escolher assunto'}</option>
+    <option value="">{editable ? (subject ? 'Todos os assuntos' : 'Filtrar por assunto') : subject ? 'Trocar assunto' : 'Escolher assunto'}</option>
     {themes.map(item => <option key={item.id} value={item.id}>{themeLabel(item)}</option>)}
   </select>;
   // the subject of the day filters the picker: only its videos are offered
@@ -215,13 +277,21 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
 
   if (empty) {
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
+      {dropBadge}
       {editable ? <Film aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" /> : <Layers aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" />}
-      <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{editable ? 'Arraste vídeos ou um assunto para este dia' : 'Arraste um assunto para este dia'}</p>
+      <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{editable ? 'Arraste um título ou vídeos para este dia' : 'Arraste um assunto para este dia'}</p>
+      {editable && suggestion && <button className="mx-auto inline-flex max-w-full min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-primary/40 bg-accent px-3 text-[0.8125rem] font-semibold text-primary transition-colors hover:border-primary hover:bg-accent/70 max-[760px]:hidden"
+        onClick={suggestion.onApply} title={`Coloca ${suggestion.title.title} neste dia`} type="button">
+        <CirclePlus aria-hidden="true" className="size-4 shrink-0" />
+        <span className="truncate">{suggestion.title.title}</span>
+        <span className="shrink-0 font-normal text-primary/70">· {plural(suggestion.title.videoIds.length, 'vídeo', 'vídeos')}</span>
+      </button>}
       {chooser}
       {videoPicker}
     </div>;
   }
   return <div className={frame} ref={setNodeRef}>
+    {dropBadge}
     {chooser}
     {subject
       ? <div className="flex items-center gap-2.5">
