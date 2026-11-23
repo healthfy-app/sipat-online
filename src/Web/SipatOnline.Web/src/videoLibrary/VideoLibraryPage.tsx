@@ -1,8 +1,12 @@
-import { CloudUpload, Plus, Search } from 'lucide-react';
+import { CloudUpload, Link2, Plus, Search, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { deletePlatformVideo, listPlatformCourses, listPlatformLibraryVideos, listVideoSubjects, setVideoSubjects, type PlatformLibraryVideo } from '@/api';
+import {
+  deletePlatformVideo, listPlatformCompanies, listPlatformCourses, listPlatformLibraryVideos, listVideoCompanies, listVideoSubjects, setVideoSubjects,
+  type PlatformLibraryVideo,
+} from '@/api';
 import type { SubjectOption } from '@/courseCatalog/VideoLibraryPanel';
+import AssociateVideosDialog, { type Choice } from './AssociateVideosDialog';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { Input, NativeSelect } from '@/components/ui/input';
@@ -35,6 +39,10 @@ export default function VideoLibraryPage() {
   const [videoSubjects, setVideoSubjectMap] = useState<Map<string, string[]>>(new Map());
   // '' every video, 'none' those without an assunto, or one assunto
   const subjectFilter = params.get('assunto') ?? '';
+  const [companies, setCompanies] = useState<Choice[]>([]);
+  const [videoCompanies, setVideoCompanyMap] = useState<Map<string, string[]>>(new Map());
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [associating, setAssociating] = useState(false);
 
   const refresh = useCallback(async () => {
     setError('');
@@ -43,6 +51,10 @@ export default function VideoLibraryPage() {
       Promise.all([listPlatformCourses(), listVideoSubjects()]).then(([courses, links]) => {
         setSubjects(courses.map(course => ({ id: course.id, title: course.title })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
         setVideoSubjectMap(new Map(links.map(item => [item.videoId, item.subjectIds])));
+      }, () => undefined);
+      Promise.all([listPlatformCompanies(), listVideoCompanies()]).then(([list, rows]) => {
+        setCompanies(list.map(company => ({ id: company.id, title: company.name })).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')));
+        setVideoCompanyMap(new Map(rows.map(item => [item.videoId, item.companyIds])));
       }, () => undefined);
       setLibrary(await listPlatformLibraryVideos());
     } catch (loadError) {
@@ -81,6 +93,12 @@ export default function VideoLibraryPage() {
     const ids = videoSubjects.get(item.video.id) ?? [];
     return subjectFilter === 'none' ? ids.length === 0 : ids.includes(subjectFilter);
   }), [library, query, subjectFilter, videoSubjects]);
+
+  const allShownSelected = shown.length > 0 && shown.every((item) => selected.has(item.video.id));
+  const privateTo = useMemo(() => {
+    const names = new Map(companies.map((company) => [company.id, company.title]));
+    return new Map([...videoCompanies].map(([videoId, ids]) => [videoId, ids.map((id) => names.get(id) ?? 'empresa removida')]));
+  }, [companies, videoCompanies]);
 
   async function changeSubjects(videoId: string, subjectIds: string[]) {
     const before = videoSubjects.get(videoId) ?? [];
@@ -205,11 +223,38 @@ export default function VideoLibraryPage() {
         </div>
       )}
 
+      {shown.length > 0 && (
+        <div className="sticky top-0 z-20 flex flex-wrap items-center gap-2.5 rounded-lg border border-border bg-card px-3 py-2 shadow-card max-[640px]:-mx-1">
+          <label className="m-0 flex cursor-pointer items-center gap-2 text-sm font-semibold">
+            <input aria-label="Selecionar todos os vídeos" checked={allShownSelected} className="size-5 accent-[var(--brand-primary)]"
+              onChange={(event) => setSelected(event.target.checked ? new Set(shown.map((item) => item.video.id)) : new Set())} type="checkbox" />
+            {selected.size > 0 ? pluralize(selected.size, 'selecionado', 'selecionados') : 'Selecionar todos'}
+          </label>
+          {selected.size > 0 && <Button aria-label="Limpar seleção" onClick={() => setSelected(new Set())} size="icon-sm" title="Limpar seleção" variant="ghost"><X /></Button>}
+          <Button className="ml-auto max-[640px]:w-full" disabled={selected.size === 0} onClick={() => setAssociating(true)}>
+            <Link2 /> Associar a assunto ou empresa
+          </Button>
+        </div>
+      )}
+
       {isLoading
         ? <LoadingState className="list-state">Carregando vídeos...</LoadingState>
         : <VideoLibraryPanel busy={isDeleting} hasVideos={library.length > 0} library={shown}
             onClearFilters={() => { setQuery(''); setSubjectFilter(''); }} onDelete={(item) => void removeVideo(item)} onUpload={() => setUpload({ files: [] })}
-            onSubjects={(videoId, ids) => void changeSubjects(videoId, ids)} subjects={subjects} videoSubjects={videoSubjects} />}
+            onSubjects={(videoId, ids) => void changeSubjects(videoId, ids)} subjects={subjects} videoSubjects={videoSubjects}
+            onSelect={(videoId, checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(videoId); else next.delete(videoId); return next; })}
+            privateTo={privateTo} selected={selected} />}
+
+      {associating && (
+        <AssociateVideosDialog companies={companies} onClose={() => setAssociating(false)} subjects={subjects}
+          videoCompanies={videoCompanies} videoIds={[...selected]} videoSubjects={videoSubjects}
+          onSaved={async (message) => {
+            setAssociating(false);
+            setSelected(new Set());
+            await refresh();
+            setNotice(message);
+          }} />
+      )}
 
       {isDragging && (
         <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-40 grid place-items-center bg-primary/10 p-6 backdrop-blur-[2px]">

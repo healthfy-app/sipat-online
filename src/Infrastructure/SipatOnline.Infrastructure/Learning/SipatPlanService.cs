@@ -174,6 +174,7 @@ public sealed class SipatPlanService(
         var allowedVideos = available.SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
         var blockedVideos = (await catalog.ListAsync(token)).Where(course => hidden.Contains(course.Id))
             .SelectMany(course => course.Videos.Select(video => video.Id)).Where(id => !allowedVideos.Contains(id)).ToHashSet();
+        blockedVideos.UnionWith(await plans.HiddenVideosAsync(token));
         var outside = cleaned.Value.FirstOrDefault(day => day.VideoIds.Any(blockedVideos.Contains));
         if (outside is not null)
             return Failure<IReadOnlyList<ProgramDay>>("sipat.subject_not_allowed", $"O dia \"{outside.Title}\" usa um assunto que não está disponível para a sua empresa.");

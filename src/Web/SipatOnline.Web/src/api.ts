@@ -799,6 +799,20 @@ export function setVideoSubjects(videoId: string, subjectIds: string[]): Promise
   return requestJson<VideoSubjects>(`/api/platform/catalog/videos/${videoId}/subjects`, { method: 'PUT', body: JSON.stringify({ subjectIds }) });
 }
 
+/** Many videos at once: `add` is put on every one, `remove` taken from every one, the rest stays. */
+export interface BulkVideoChange { videoIds: string[]; add: string[]; remove: string[] }
+export function changeVideosSubjects(change: BulkVideoChange): Promise<void> {
+  return request('/api/platform/catalog/videos/subjects', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
+}
+/** The companies a video is private to; a video that is not listed is public. */
+export interface VideoCompanies { videoId: string; companyIds: string[] }
+export function listVideoCompanies(): Promise<VideoCompanies[]> {
+  return requestJson<VideoCompanies[]>('/api/platform/catalog/video-companies');
+}
+export function changeVideosCompanies(change: BulkVideoChange): Promise<void> {
+  return request('/api/platform/catalog/videos/companies', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
+}
+
 export function listPlatformCourses(): Promise<PlatformCourse[]> {
   return requestJson<PlatformCourse[]>('/api/platform/catalog/courses');
 }

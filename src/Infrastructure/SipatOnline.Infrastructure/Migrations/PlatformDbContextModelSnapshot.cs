@@ -1328,6 +1328,21 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("CompanySubjects", "tenancy");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.CompanyVideoEntity", b =>
+                {
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("VideoId", "TenantId");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("CompanyVideos", "tenancy");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity", b =>
                 {
                     b.Property<int>("Plan")

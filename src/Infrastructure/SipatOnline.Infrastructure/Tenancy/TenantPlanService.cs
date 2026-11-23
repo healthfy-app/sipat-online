@@ -46,6 +46,14 @@ public sealed class TenantPlanService(PlatformDbContext db, ITenantContext tenan
             ? await HiddenSubjectsAsync(tenant.Value, await GetAsync(tenant.Value, token), token)
             : new HashSet<Guid>();
 
+    /// <summary>The videos made private to other companies (nothing when there is no company).</summary>
+    public async Task<IReadOnlySet<Guid>> HiddenVideosAsync(CancellationToken token)
+    {
+        if (tenantContext.CurrentTenantId is not { IsEmpty: false } tenant) return new HashSet<Guid>();
+        var rows = await db.CompanyVideos.AsNoTracking().ToListAsync(token);
+        return rows.GroupBy(row => row.VideoId).Where(group => group.All(row => row.TenantId != tenant.Value)).Select(group => group.Key).ToHashSet();
+    }
+
     /// <summary>The operator makes an assunto belong to one company (its internal videos), or gives it back to everyone.</summary>
     public async Task<Result<bool>> SetSubjectCompanyAsync(Guid courseId, Guid? tenantId, CancellationToken token)
     {

@@ -1,4 +1,4 @@
-import { LoaderCircle, Tags, Trash2 } from 'lucide-react';
+import { LoaderCircle, Lock, Tags, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { isExtra, videoProvider, type PlatformLibraryVideo } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +42,9 @@ export default function VideoLibraryPanel({
   subjects = [],
   videoSubjects,
   onSubjects,
+  selected,
+  onSelect,
+  privateTo,
 }: {
   library: PlatformLibraryVideo[];
   hasVideos?: boolean;
@@ -52,6 +55,11 @@ export default function VideoLibraryPanel({
   subjects?: SubjectOption[];
   videoSubjects?: Map<string, string[]>;
   onSubjects?: (videoId: string, subjectIds: string[]) => void;
+  /** Checked videos, for associating many at once; without it there are no checkboxes. */
+  selected?: Set<string>;
+  onSelect?: (videoId: string, checked: boolean) => void;
+  /** The names of the companies each private video belongs to. */
+  privateTo?: Map<string, string[]>;
 }) {
   return (
     <section aria-label="Vídeos cadastrados" className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4">
@@ -64,7 +72,11 @@ export default function VideoLibraryPanel({
           {library.map((item) => {
             const { video, courseCount } = item;
             return (
-            <article className="flex min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-card" key={video.id}>
+            <article className={cn('relative flex min-w-0 flex-col overflow-hidden rounded-lg bg-card shadow-card', selected?.has(video.id) && 'ring-2 ring-primary')} key={video.id}>
+              {selected && onSelect && <label className="absolute left-2 top-2 z-10 m-0 grid size-9 cursor-pointer place-items-center rounded-md bg-card/90 shadow-card">
+                <input aria-label={`Selecionar ${video.title}`} checked={selected.has(video.id)} className="size-5 accent-[var(--brand-primary)]"
+                  onChange={event => onSelect(video.id, event.target.checked)} type="checkbox" />
+              </label>}
               <div className="aspect-video bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
                 {video.status === 'Ready' ? (
                   isExtra(video)
@@ -92,6 +104,9 @@ export default function VideoLibraryPanel({
                       : formatBytes(video.sizeBytes)}
                 </p>
                 {isExtra(video) && <ExternalVideoOutside video={video} />}
+                {(privateTo?.get(video.id)?.length ?? 0) > 0 && <p className="m-0 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-warning">
+                  <Lock aria-hidden="true" className="size-3.5 shrink-0" /><span className="min-w-0 truncate">Privado: {privateTo!.get(video.id)!.join(', ')}</span>
+                </p>}
                 {videoSubjects && onSubjects && <SubjectPicker onChange={ids => onSubjects(video.id, ids)} selected={videoSubjects.get(video.id) ?? []} subjects={subjects} title={video.title} />}
                 <div className="mt-1 flex items-center justify-between gap-2">
                   {video.status === 'Processing' ? <Badge variant="warning">Processando</Badge>
