@@ -61,14 +61,23 @@ public sealed class CatalogVideoPlaybackProvider(
         await db.SaveChangesAsync(cancellationToken);
 
         var linkLifetime = SessionLifetime + StorageLinkMargin;
+        var media = $"/api/learning/lessons/{lessonId:D}/media";
         var hd = await storage.GetPlaybackUrlAsync(videoId, VideoRendition.Hd720, linkLifetime, cancellationToken);
-        var hdUrl = hd?.ToString() ?? $"/api/learning/lessons/{lessonId:D}/media";
-        PlaybackSource[] sources = [new(hdUrl, video.HasSd480 ? "720p" : null)];
+        var hdUrl = hd?.ToString() ?? media;
+        var several = video.HasSd480 || video.HasFhd1080;
+        // Best first. R2 signs a link even for a missing object, so a version is offered only once it exists.
+        var sources = new List<PlaybackSource>(3);
+        if (video.HasFhd1080)
+        {
+            var fhd = await storage.GetPlaybackUrlAsync(videoId, VideoRendition.Fhd1080, linkLifetime, cancellationToken);
+            sources.Add(new(fhd?.ToString() ?? $"{media}?quality=1080p", "1080p"));
+        }
+
+        sources.Add(new(hdUrl, several ? "720p" : null));
         if (video.HasSd480)
         {
-            // R2 signs a link even for a missing object, so the 480p is offered only once it exists.
             var sd = await storage.GetPlaybackUrlAsync(videoId, VideoRendition.Sd480, linkLifetime, cancellationToken);
-            sources = [sources[0], new(sd?.ToString() ?? $"/api/learning/lessons/{lessonId:D}/media?quality=480p", "480p")];
+            sources.Add(new(sd?.ToString() ?? $"{media}?quality=480p", "480p"));
         }
 
         return Result<PlaybackSession>.Success(

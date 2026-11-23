@@ -28,6 +28,7 @@ public sealed class CatalogPlaybackApiTests
     private static readonly byte[] WebmBytes = [0x1A, 0x45, 0xDF, 0xA3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     // Different from VideoBytes so a test can tell which rendition was served.
     private static readonly byte[] Sd480Bytes = [0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 9, 9, 9, 9, 8, 8, 8, 8];
+    private static readonly byte[] Fhd1080Bytes = [0, 0, 0, 24, 102, 116, 121, 112, 105, 115, 111, 109, 7, 7, 7, 7, 6, 6, 6, 6];
 
     [DockerFact]
     public async Task Plays_a_catalog_video_outside_the_development_provider()
@@ -81,6 +82,32 @@ public sealed class CatalogPlaybackApiTests
             using var ranged = await participant.SendAsync(request);
             Assert.Equal(HttpStatusCode.PartialContent, ranged.StatusCode);
             Assert.Equal(Sd480Bytes[..8], await ranged.Content.ReadAsByteArrayAsync());
+        }
+        finally { await Cleanup(factory, seed); }
+    }
+
+    [DockerFact]
+    public async Task Offers_1080p_first_then_720p_for_a_new_upload()
+    {
+        await using var postgres = await StartPostgres();
+        await using var factory = CatalogFactory(postgres.GetConnectionString());
+        var seed = await Seed(factory, hasFhd1080: true, webm: true);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{seed.TrackId}/lessons/{seed.LessonId}/playback", HttpMethod.Post, new { });
+            var sources = playback.GetProperty("sources").EnumerateArray().ToArray();
+            Assert.Equal(["1080p", "720p"], sources.Select(source => source.GetProperty("quality").GetString()));
+            Assert.Equal($"/api/learning/lessons/{seed.LessonId}/media?quality=1080p", sources[0].GetProperty("url").GetString());
+            // The session's main url stays the 720p, the file every video has.
+            Assert.Equal($"/api/learning/lessons/{seed.LessonId}/media", playback.GetProperty("url").GetString());
+            using var fhd = await participant.GetAsync(sources[0].GetProperty("url").GetString());
+            Assert.Equal(HttpStatusCode.OK, fhd.StatusCode);
+            Assert.Equal("video/mp4", fhd.Content.Headers.ContentType?.MediaType);
+            Assert.Equal(Fhd1080Bytes, await fhd.Content.ReadAsByteArrayAsync());
+            using var missing = await participant.GetAsync($"/api/learning/lessons/{seed.LessonId}/media?quality=480p");
+            Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         }
         finally { await Cleanup(factory, seed); }
     }
@@ -211,6 +238,19 @@ public sealed class CatalogPlaybackApiTests
             Assert.Equal(HttpStatusCode.NotFound, missing.StatusCode);
         }
         finally { await Cleanup(factory, onlyHd); }
+
+        var full = await Seed(factory, hasFhd1080: true);
+        try
+        {
+            using var participant = Client(factory);
+            await Login(participant, "participant-demo");
+            var playback = await Call(participant, $"/api/learning/tracks/{full.TrackId}/lessons/{full.LessonId}/playback", HttpMethod.Post, new { });
+            var sources = playback.GetProperty("sources").EnumerateArray().ToArray();
+            Assert.Equal(["1080p", "720p"], sources.Select(source => source.GetProperty("quality").GetString()));
+            Assert.EndsWith($"/videos/{full.VideoId:N}/1080p.mp4", new Uri(sources[0].GetProperty("url").GetString()!).AbsolutePath);
+            Assert.EndsWith($"/videos/{full.VideoId:N}/720p.mp4", new Uri(sources[1].GetProperty("url").GetString()!).AbsolutePath);
+        }
+        finally { await Cleanup(factory, full); }
     }
 
     [DockerFact]
@@ -452,7 +492,7 @@ public sealed class CatalogPlaybackApiTests
         new SipatOnlineApiFactory(connectionString, developmentSampleEnabled: true)
             .WithWebHostBuilder(builder => builder.UseSetting("SipatOnline:Learning:Playback:Provider", "Catalog"));
 
-    private static async Task<Seeded> Seed(WebApplicationFactory<Program> factory, string? secondParticipant = null, bool hasSd480 = false, bool webm = false)
+    private static async Task<Seeded> Seed(WebApplicationFactory<Program> factory, string? secondParticipant = null, bool hasSd480 = false, bool webm = false, bool hasFhd1080 = false)
     {
         await using var scope = factory.Services.CreateAsyncScope();
         await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
@@ -494,6 +534,17 @@ public sealed class CatalogPlaybackApiTests
             finally { File.Delete(path); }
         }
 
+        if (hasFhd1080)
+        {
+            var path = Path.GetTempFileName();
+            try
+            {
+                await File.WriteAllBytesAsync(path, Fhd1080Bytes);
+                await storage.SaveRenditionAsync(videoId, VideoRendition.Fhd1080, path, CancellationToken.None);
+            }
+            finally { File.Delete(path); }
+        }
+
         db.PlatformCourseVideos.Add(new PlatformCourseVideoEntity
         {
             Id = videoId,
@@ -502,6 +553,7 @@ public sealed class CatalogPlaybackApiTests
             SizeBytes = sourceBytes.Length,
             DurationMilliseconds = 1000,
             HasSd480 = hasSd480,
+            HasFhd1080 = hasFhd1080,
             CreatedAt = DateTimeOffset.UtcNow
         });
         await db.SaveChangesAsync();

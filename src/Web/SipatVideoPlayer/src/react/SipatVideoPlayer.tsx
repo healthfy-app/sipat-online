@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type ReactNode, type Ref, type RefObject } from 'react';
 import { attachPlayer, type AttachedPlayer } from '../core/attach';
-import { chooseSource, readConnection, readQualityPreference, saveQualityPreference, type QualityPreference, type VideoSource } from '../core/sources';
+import { availableQualities, chooseSource, readConnection, readQualityPreference, saveQualityPreference, type QualityPreference, type VideoSource } from '../core/sources';
 import type { Checkpoint } from '../core/checkpoints';
 import type { PlayerEvent, PlayerEventHandler, SaveReason } from '../core/events';
 import type { QualityLabel } from '../core/quality';
@@ -148,7 +148,7 @@ export default function SipatVideoPlayer({
 
   return <PlayerChrome
     locked={!!watchInOrder} markers={markers} onSeek={seconds => attached.current?.seekTo(seconds)}
-    controls={sources.length > 1 ? <QualityMenu current={current.quality} onChoose={chooseQuality} preference={preference} /> : undefined}
+    controls={sources.length > 1 ? <QualityMenu available={availableQualities(sources)} current={current.quality} onChoose={chooseQuality} preference={preference} /> : undefined}
     overlay={overlay} unlocked={() => attached.current?.unlocked() ?? 0} videoRef={video}>
     <video
       aria-label={title} className="sipat-player-video" disablePictureInPicture playsInline preload={preload} slot="media"

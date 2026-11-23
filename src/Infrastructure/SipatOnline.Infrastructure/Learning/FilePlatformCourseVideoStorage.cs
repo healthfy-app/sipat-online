@@ -208,7 +208,12 @@ public sealed class FilePlatformCourseVideoStorage(
     private static string GetFilePath(string storagePath, Guid videoId, VideoRendition rendition) =>
         Path.Combine(
             storagePath,
-            rendition == VideoRendition.Sd480 ? $"{videoId:N}.480p.video" : $"{videoId:N}.video");
+            rendition switch
+            {
+                VideoRendition.Sd480 => $"{videoId:N}.480p.video",
+                VideoRendition.Fhd1080 => $"{videoId:N}.1080p.video",
+                _ => $"{videoId:N}.video"
+            });
 
     private static bool HasExpectedSignature(byte[] header, int headerLength, string contentType) =>
         contentType switch

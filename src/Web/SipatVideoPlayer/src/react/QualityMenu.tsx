@@ -1,23 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import { Settings } from 'lucide-react';
-import type { QualityPreference, SourceQuality } from '../core/sources';
+import { QUALITY_ORDER, type QualityPreference, type SourceQuality } from '../core/sources';
 import { texts } from './texts';
 
-const options: Array<{ value: QualityPreference; label: string }> = [
-  { value: 'auto', label: texts.qualityAuto },
-  { value: '720p', label: '720p' },
-  { value: '480p', label: '480p' },
-];
-
-/** The quality button of the control bar and its menu: Automática, 720p, 480p. */
-export default function QualityMenu({ preference, current, onChoose }: {
+/** The quality button of the control bar and its menu: Automática, then the versions this video has, best first. */
+export default function QualityMenu({ preference, current, available = ['720p', '480p'], onChoose }: {
   preference: QualityPreference;
   /** The rendition playing now. */
   current: SourceQuality | undefined;
+  /** The versions this video has. */
+  available?: readonly SourceQuality[];
   onChoose: (value: QualityPreference) => void;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLSpanElement>(null);
+  const options: Array<{ value: QualityPreference; label: string }> = [
+    { value: 'auto', label: texts.qualityAuto },
+    ...QUALITY_ORDER.filter(quality => available.includes(quality)).map(quality => ({ value: quality, label: quality })),
+  ];
   const label = preference === 'auto'
     ? `${texts.quality}: ${texts.qualityAuto}${current ? ` (${current})` : ''}`
     : `${texts.quality}: ${preference}`;

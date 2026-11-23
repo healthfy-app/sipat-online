@@ -44,7 +44,7 @@ public sealed record PlaybackQualityReport(
     private const int MaxQualitySwitches = 1000;
     private const double MaxDownlinkMbps = 10_000;
 
-    private static readonly string[] Qualities = ["single", "720p", "480p"];
+    private static readonly string[] Qualities = ["single", "1080p", "720p", "480p"];
     private static readonly string[] ConnectionTypes = ["slow-2g", "2g", "3g", "4g"];
 
     public static Result<PlaybackQualityReport> Create(

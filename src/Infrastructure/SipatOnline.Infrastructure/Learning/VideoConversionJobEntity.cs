@@ -3,7 +3,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 
 namespace SipatOnline.Infrastructure.Learning;
 
-/// <summary>One conversion of a library video to 720p and 480p, run by whichever worker claims it.</summary>
+/// <summary>One conversion of a library video (720p and 1080p, or a 480p for an older video), run by whichever worker claims it.</summary>
 public sealed class VideoConversionJobEntity
 {
     public const string Pending = "Pending";
