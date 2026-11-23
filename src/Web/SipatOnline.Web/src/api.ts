@@ -1364,8 +1364,15 @@ export interface ProfileRules {
 export interface CompanyRegistry { units: RegistryItem[]; sectors: RegistryItem[]; rules: ProfileRules }
 export type RegistryKind = 'units' | 'sectors';
 
-export function getCompanyRegistry(): Promise<CompanyRegistry> {
-  return requestJson<CompanyRegistry>('/api/admin/registry');
+/**
+ * The header that runs one company-administration call for the company the platform operator is looking at, without
+ * switching the whole portal into that company (the server accepts it only from the operator, on the platform host).
+ */
+const forCompany = (companyId?: string): HeadersInit | undefined =>
+  companyId ? { 'X-Sipat-Company': companyId } : undefined;
+
+export function getCompanyRegistry(companyId?: string): Promise<CompanyRegistry> {
+  return requestJson<CompanyRegistry>('/api/admin/registry', { headers: forCompany(companyId) });
 }
 
 export function addRegistryItems(kind: RegistryKind, names: string[]): Promise<CompanyRegistry> {
@@ -1412,8 +1419,8 @@ export interface ImportResult {
  * Reads the HR sheet on the server; with `dryRun` nothing is written. With `createOnly` (the form of one person) a line that
  * names someone who already exists is refused instead of updating them.
  */
-export function importParticipants(dryRun: boolean, rows: ImportRow[], options?: { createOnly?: boolean }): Promise<ImportResult> {
+export function importParticipants(dryRun: boolean, rows: ImportRow[], options?: { createOnly?: boolean; companyId?: string }): Promise<ImportResult> {
   return requestJson<ImportResult>('/api/admin/users/import', {
-    method: 'POST', body: JSON.stringify({ dryRun, rows, createOnly: options?.createOnly ?? false }),
+    method: 'POST', body: JSON.stringify({ dryRun, rows, createOnly: options?.createOnly ?? false }), headers: forCompany(options?.companyId),
   });
 }
