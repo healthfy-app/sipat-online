@@ -400,10 +400,15 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
           </DropdownMenuContent>
         </DropdownMenu>
         <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
-        {canEditThemes && <Button className={cn(phoneAction, 'max-[760px]:hidden')} disabled={busy || days.length === 0} onClick={() => void editWeek()}
-          title="Abre todos os dias no editor de vídeos: cada dia é um título. Ao salvar lá, os dias voltam atualizados." variant="outline">
-          <Pencil /> Editar a semana no editor
-        </Button>}
+        {/* highlighted: every day of the week in the video editor, as a copy, so Conteúdo stays as it is */}
+        {canEditThemes && <button className={cn('m-0 inline-flex min-h-0 cursor-pointer items-center gap-2.5 rounded-xl border-2 border-primary bg-accent py-1.5 pr-4 pl-2.5 text-left text-primary shadow-card transition-[background-color,transform] hover:bg-accent/70 active:scale-[0.98] disabled:cursor-default disabled:opacity-50 max-[760px]:hidden')}
+          disabled={busy || days.length === 0} onClick={() => void editWeek()} type="button">
+          <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground"><Pencil className="size-4" /></span>
+          <span className="grid leading-tight">
+            <strong className="text-sm">Editar a semana no editor de vídeos</strong>
+            <span className="text-xs font-normal text-primary/75">Cada dia vira um título · o treinamento original do Conteúdo não muda</span>
+          </span>
+        </button>}
         <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
       </div>}
     </header>

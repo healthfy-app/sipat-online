@@ -86,7 +86,7 @@ export default function CourseEditorFrame({
               <span aria-hidden="true">·</span>
               <span className="truncate">{week.sipatTitle} · {week.companyName}</span>
             </span>
-            <span className="text-xs text-muted-foreground">Cada título é um dia. O que você salvar aqui aparece nos dias da semana.</span>
+            <span className="text-xs text-muted-foreground">Cada título é um dia. O que você salvar aqui vai para os dias da semana; o treinamento original do Conteúdo não muda.</span>
           </div>
         ) : <nav aria-label="Etapas do treinamento" className="flex items-start gap-6 max-[860px]:col-span-full max-[860px]:row-start-2 max-[860px]:justify-center">
           {stages.map((stage, index) => {

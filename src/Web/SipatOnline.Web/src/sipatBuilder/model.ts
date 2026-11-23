@@ -8,7 +8,11 @@ export const maxGameRows = 5;
 export const maxDays = 14;
 
 /** `durationMs` of an extra is only what the operator typed: it never enters a sum. */
-export interface CatalogVideo { id: string; title: string; durationMs: number; code: string | null; provider?: VideoProvider }
+export interface CatalogVideo {
+  id: string; title: string; durationMs: number; code: string | null; provider?: VideoProvider;
+  /** The library video itself, so the planner can play it. */
+  source?: PlatformLibraryVideo['video'];
+}
 export interface Subject { id: string; title: string; videoIds: string[]; totalMs: number; extraCount?: number; coverUrl: string | null; gameIds: string[]; option: string | null }
 export interface Catalog {
   videos: Map<string, CatalogVideo>;
@@ -41,7 +45,7 @@ export function buildCatalog(courses: PlatformCourse[], library: PlatformLibrary
   for (const item of library) {
     if (item.video.status !== 'Ready') continue;
     const title = item.video.libraryTitle ?? item.video.title;
-    videos.set(item.video.id, { id: item.video.id, title, durationMs: item.video.durationMilliseconds, code: videoCode(title), provider: videoProvider(item.video) });
+    videos.set(item.video.id, { id: item.video.id, title, durationMs: item.video.durationMilliseconds, code: videoCode(title), provider: videoProvider(item.video), source: item.video });
   }
   const used = new Set<string>();
   const subjects: Subject[] = [];
@@ -177,6 +181,11 @@ export function normalize(text: string): string {
 }
 
 const palette = ['#2563eb', '#d97706', '#059669', '#7c3aed', '#dc2626', '#0d9488', '#db2777', '#4f46e5'];
+
+/** Each Título of a training by its place: Título 1, 2, 3… never share a color side by side. */
+export function titleColor(index: number): string {
+  return palette[index % palette.length];
+}
 
 /** The same theme always gets the same color, like the colored blocks of the sheet. */
 export function subjectColor(subject: string): string {
