@@ -13,6 +13,7 @@ FROM nginx:1.28-alpine
 COPY deploy/nginx/http.conf /etc/nginx/sipat-online-http.conf
 COPY deploy/nginx/https.conf /etc/nginx/sipat-online-https.conf
 COPY deploy/nginx/security-headers.conf /etc/nginx/sipat-online-security-headers.conf
+COPY deploy/nginx/gzip.conf /etc/nginx/conf.d/sipat-online-gzip.conf
 COPY deploy/nginx/entrypoint.sh /usr/local/bin/sipat-online-entrypoint
 COPY --from=frontend-build /app/SipatOnline.Web/dist/ /usr/share/nginx/html/
 RUN chmod 0755 /usr/local/bin/sipat-online-entrypoint \
