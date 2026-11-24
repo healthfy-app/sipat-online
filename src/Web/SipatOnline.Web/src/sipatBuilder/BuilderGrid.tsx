@@ -1,4 +1,5 @@
-import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
+import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type Modifier } from '@dnd-kit/core';
+import { getEventCoordinates } from '@dnd-kit/utilities';
 import { Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,24 @@ import { DayBox, DragPreview, dropId, ThemeTray } from './ThemeCards';
 import './builder.css';
 
 export { subjectColor };
+
+/**
+ * The carried card is smaller than what was grabbed (a whole Título bar is far wider), and it starts at the grabbed
+ * element's top-left corner: grabbed from the middle, the card would trail far from the pointer. This keeps the card's
+ * icon under the pointer wherever the bar was grabbed. The keyboard has no pointer, so it keeps the plain movement.
+ */
+const pointerGrip = 28;
+const followPointer: Modifier = ({ activatorEvent, draggingNodeRect, transform }) => {
+  const pointer = activatorEvent && draggingNodeRect ? getEventCoordinates(activatorEvent) : null;
+  if (!pointer || !draggingNodeRect || activatorEvent instanceof KeyboardEvent) {
+    return transform;
+  }
+  return {
+    ...transform,
+    x: transform.x + pointer.x - draggingNodeRect.left - pointerGrip,
+    y: transform.y + pointer.y - draggingNodeRect.top - draggingNodeRect.height / 2,
+  };
+};
 
 /**
  * Phone (up to 760px): the columns would be too thin to read, so the days stack one below the other, each one a card of
@@ -149,7 +168,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
   const column = (index: number, order: number): CSSProperties => ({ '--i': index, '--order': order } as CSSProperties);
 
   return <DndContext onDragCancel={() => setCarried(null)} onDragEnd={onDragEnd} onDragStart={onDragStart} sensors={sensors}>
-    <DragOverlay dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>{carried && <DragPreview data={carried} />}</DragOverlay>
+    <DragOverlay modifiers={[followPointer]} dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>{carried && <DragPreview data={carried} />}</DragOverlay>
     <div className="grid gap-4">
       <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} onTraining={setTrainingId} onUseTraining={layTraining} subjects={themes}
         trainingId={trainingId} trainings={trainings} usedIn={canCustomizeGrid ? usedIn : undefined} videos={looseVideos} />
