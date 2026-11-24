@@ -263,6 +263,8 @@ export default function CourseEditor({
       {step === 'publish' && (
         <CoursePublishStep
           busy={busy}
+          dirty={dirty}
+          isSaving={isSaving}
           course={course}
           description={values.description}
           gamificationEnabled={values.gamificationEnabled}
