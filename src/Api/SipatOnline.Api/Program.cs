@@ -27,9 +27,21 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         var developmentProxyHost =
             builder.Configuration["SipatOnline:DevelopmentProxy:Host"] ?? "localhost";
-        foreach (var address in Dns.GetHostAddresses(developmentProxyHost))
+        // In Docker the proxy is the web container; when it is stopped its name does not resolve,
+        // and the API must still start (it just trusts no forwarded headers until the next start).
+        try
         {
-            options.KnownProxies.Add(address);
+            foreach (var address in Dns.GetHostAddresses(developmentProxyHost))
+            {
+                options.KnownProxies.Add(address);
+            }
+        }
+        catch (System.Net.Sockets.SocketException exception)
+        {
+            Log.Warning(
+                "Development proxy host {Host} could not be resolved ({Error}); forwarded headers are not trusted",
+                developmentProxyHost,
+                exception.Message);
         }
 
         return;
