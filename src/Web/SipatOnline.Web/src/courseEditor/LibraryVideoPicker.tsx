@@ -68,7 +68,7 @@ export default function LibraryVideoPicker({ videos, value, onChange }: {
         {subjects.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
       </NativeSelect>}
     </div>
-    <div aria-label="Vincular da biblioteca" className="grid max-h-[46vh] grid-cols-3 content-start gap-2 overflow-y-auto pr-0.5 max-[640px]:grid-cols-2" role="listbox">
+    <div aria-label="Vincular da biblioteca" className="grid max-h-[46vh] auto-rows-max grid-cols-3 content-start gap-2 overflow-y-auto pr-0.5 max-[640px]:grid-cols-2" role="listbox">
       {shown.length === 0 && <p className="col-span-full m-0 py-4 text-center text-sm text-muted-foreground">Nenhum vídeo encontrado.</p>}
       {shown.map(item => {
         const picked = item.video.id === value;
