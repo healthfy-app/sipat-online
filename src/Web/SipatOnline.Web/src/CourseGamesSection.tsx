@@ -1,7 +1,7 @@
 import { ChevronRight, Clapperboard, Eye, Plus, Puzzle, Trash2 } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 import {
-  isExtra,
+  isExternal,
   setPlatformCourseModules,
   setVideoCheckpoints,
   type CourseModulePlacement,
@@ -180,7 +180,7 @@ export default function CourseGamesSection({
           </p>
         ) : (
           <div className="grid gap-2">
-            {course.videos.map((video, index) => isExtra(video) ? null : (
+            {course.videos.map((video, index) => isExternal(video) ? null : (
               <CheckpointEditor
                 key={video.id}
                 modules={modules}

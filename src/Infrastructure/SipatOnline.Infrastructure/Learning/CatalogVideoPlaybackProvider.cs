@@ -26,6 +26,12 @@ public sealed class CatalogVideoPlaybackProvider(
         Guid lessonId,
         CancellationToken cancellationToken)
     {
+        if (participantId != Guid.Empty && lessonId != Guid.Empty &&
+            LessonReference.TryParseExternal(providerAssetReference, out var provider, out var externalId))
+        {
+            return await CreateExternalSessionAsync(provider, externalId, participantId, lessonId, cancellationToken);
+        }
+
         if (participantId == Guid.Empty || lessonId == Guid.Empty ||
             !providerAssetReference.StartsWith(Prefix, StringComparison.Ordinal) ||
             !Guid.TryParse(providerAssetReference[Prefix.Length..], out var videoId))
@@ -82,6 +88,38 @@ public sealed class CatalogVideoPlaybackProvider(
 
         return Result<PlaybackSession>.Success(
             new PlaybackSession(hdUrl, video.ContentType, expiresAt, grant.Id, false, sources));
+    }
+
+    /// <summary>
+    /// A YouTube or Vimeo video that counts: no file to sign, only the grant whose ranges the browser reports from the
+    /// provider's player, checked like ours (inside the length, no faster than the clock allows).
+    /// </summary>
+    private async Task<Result<PlaybackSession>> CreateExternalSessionAsync(
+        VideoProvider provider, string externalId, Guid participantId, Guid lessonId, CancellationToken cancellationToken)
+    {
+        var name = provider.ToString();
+        var video = await db.PlatformCourseVideos.AsNoTracking()
+            .SingleOrDefaultAsync(item => item.Provider == name && item.ExternalId == externalId, cancellationToken);
+        if (video is null || video.DurationMilliseconds <= 0)
+        {
+            return Unavailable();
+        }
+
+        var now = clock.GetUtcNow();
+        var expiresAt = now.Add(SessionLifetime);
+        var grant = new PlaybackGrantEntity
+        {
+            Id = Guid.NewGuid(),
+            ParticipantId = participantId,
+            LessonId = lessonId,
+            VideoId = video.Id,
+            DurationMilliseconds = video.DurationMilliseconds,
+            StartedAt = now,
+            ExpiresAt = expiresAt
+        };
+        db.PlaybackGrants.Add(grant);
+        await db.SaveChangesAsync(cancellationToken);
+        return Result<PlaybackSession>.Success(new PlaybackSession(string.Empty, null, expiresAt, grant.Id, false, []));
     }
 
     public async Task<Result<bool>> VerifyRangeAsync(

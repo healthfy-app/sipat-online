@@ -1,6 +1,6 @@
 import { LoaderCircle, Lock, Tags, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isExtra, videoProvider, type PlatformLibraryVideo } from '@/api';
+import { isExternal, isExtra, videoProvider, type PlatformLibraryVideo } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/page';
@@ -94,7 +94,7 @@ export default function VideoLibraryPanel({
               {isChecked && <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 z-[5] aspect-video bg-primary/15" />}
               <div className="aspect-video bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
                 {video.status === 'Ready' ? (
-                  isExtra(video)
+                  isExternal(video)
                     ? <ExternalVideoFrame title={`Prévia de ${video.title}`} video={video} />
                     : <VideoPreview preload="metadata" src={video.fileUrl} title={`Prévia de ${video.title}`} />
                 ) : video.status === 'Processing' ? (
@@ -114,13 +114,13 @@ export default function VideoLibraryPanel({
               <div className="flex flex-1 flex-col gap-1.5 px-4 pb-4 pt-3.5">
                 <h3 className="m-0 line-clamp-2 min-h-[2.7em] text-[0.9375rem] font-semibold leading-[1.35]" title={video.title}>{video.title}{isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</h3>
                 <p className="m-0 text-[0.8125rem] tabular-nums text-muted-foreground">
-                  {isExtra(video)
+                  {isExternal(video)
                     ? `${videoProvider(video)}${video.durationMilliseconds > 0 ? ` · ${formatDuration(video.durationMilliseconds)}` : ''}`
                     : video.status === 'Ready'
                       ? `${formatDuration(video.durationMilliseconds)} · ${formatBytes(video.sizeBytes)}`
                       : formatBytes(video.sizeBytes)}
                 </p>
-                {isExtra(video) && <ExternalVideoOutside video={video} />}
+                {isExternal(video) && <ExternalVideoOutside video={video} />}
                 {(privateTo?.get(video.id)?.length ?? 0) > 0 && <p className="m-0 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-warning">
                   <Lock aria-hidden="true" className="size-3.5 shrink-0" /><span className="min-w-0 truncate">Privado: {privateTo!.get(video.id)!.join(', ')}</span>
                 </p>}

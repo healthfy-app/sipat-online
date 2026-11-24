@@ -1,7 +1,7 @@
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { ArrowDown, ArrowUp, CalendarRange, ChevronDown, CirclePlus, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Pencil, Play, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { isExtra, videoProvider } from '@/api';
+import { isExternal, isExtra, videoProvider } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { ExternalVideoFrame } from '@/ExternalVideoPreview';
@@ -141,7 +141,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
         : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">{shownSubjects.map(subject => <li className="shrink-0" key={subject.id}><TrayCard subject={subject} /></li>)}</ul>}
     {playing?.source && <Dialog description={<>{videoTime(playing)}{usedIn?.get(playing.id) && <> · já está no {usedIn.get(playing.id)}</>}</>} onClose={() => setPlaying(null)} size="lg" title={playing.title}>
       <div className="aspect-video overflow-hidden rounded-xl bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
-        {isExtra(playing.source)
+        {isExternal(playing.source)
           ? <ExternalVideoFrame title={playing.title} video={playing.source} />
           : <VideoPreview preload="metadata" src={playing.source.fileUrl} title={playing.title} />}
       </div>

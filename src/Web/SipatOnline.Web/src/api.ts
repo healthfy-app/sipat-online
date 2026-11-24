@@ -302,15 +302,23 @@ export interface PlatformCourseVideo {
   externalId?: string | null;
 }
 
-export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo' | 'Smartplayer';
+export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo';
 
 export function videoProvider(video: { provider?: VideoProvider }): VideoProvider {
   return video.provider ?? 'Sipat';
 }
 
-/** A YouTube or Vimeo video: an appendix of the Assunto that never counts for progress or the certificate. */
-export function isExtra(video: { provider?: string }): boolean {
+/** A YouTube or Vimeo video: no file of ours, played in the provider's player, without questions in the middle. */
+export function isExternal(video: { provider?: string }): boolean {
   return (video.provider ?? 'Sipat') !== 'Sipat';
+}
+
+/**
+ * An external video without a known length: an appendix that never counts for progress or the certificate.
+ * A YouTube or Vimeo video with its length counts like ours (the participant watches it in order).
+ */
+export function isExtra(video: { provider?: string; durationMilliseconds?: number; durationMs?: number }): boolean {
+  return isExternal(video) && !((video.durationMilliseconds ?? video.durationMs ?? 0) > 0);
 }
 
 export interface PlatformLibraryVideo {
@@ -533,7 +541,7 @@ export interface LearningLessonProgress {
   watchedMilliseconds?: number;
   /** An extra (YouTube or Vimeo): never counts for progress. Missing in payloads from before external videos. */
   isBonus?: boolean;
-  provider?: 'YouTube' | 'Vimeo' | 'Smartplayer' | null;
+  provider?: 'YouTube' | 'Vimeo' | null;
   externalId?: string | null;
 }
 
@@ -1123,7 +1131,7 @@ export async function putUploadPart(url: string, part: Blob, options: UploadProg
 }
 
 export function createExternalPlatformVideo(data: {
-  provider: 'YouTube' | 'Vimeo' | 'Smartplayer';
+  provider: 'YouTube' | 'Vimeo';
   url: string;
   title: string;
   durationMilliseconds: number | null;

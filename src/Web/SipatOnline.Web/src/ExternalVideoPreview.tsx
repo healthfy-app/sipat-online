@@ -3,12 +3,12 @@ import type { PlatformCourseVideo } from '@/api';
 
 type ExternalVideo = Pick<PlatformCourseVideo, 'provider' | 'externalId'>;
 
-const providerOf = (video: ExternalVideo) => (video.provider === 'Vimeo' || video.provider === 'Smartplayer' ? video.provider : 'YouTube');
+const providerOf = (video: ExternalVideo) => (video.provider === 'Vimeo' ? 'Vimeo' : 'YouTube');
 
-/** The provider frame in the same sized box as the house preview. */
-export function ExternalVideoFrame({ video, title }: { video: ExternalVideo; title: string }) {
+/** The provider frame in the same sized box as the house preview; `onDuration` gets the real length once it plays. */
+export function ExternalVideoFrame({ video, title, onDuration }: { video: ExternalVideo; title: string; onDuration?: (seconds: number) => void }) {
   return <div className="video-preview">
-    <ExternalVideoPlayer externalId={video.externalId ?? ''} provider={providerOf(video)} title={title} />
+    <ExternalVideoPlayer externalId={video.externalId ?? ''} onDuration={onDuration} provider={providerOf(video)} title={title} />
   </div>;
 }
 
@@ -17,9 +17,9 @@ export function ExternalVideoOutside({ video }: { video: ExternalVideo }) {
   return <ExternalVideoLink externalId={video.externalId ?? ''} provider={providerOf(video)} />;
 }
 
-export default function ExternalVideoPreview({ video, title }: { video: ExternalVideo; title: string }) {
+export default function ExternalVideoPreview({ video, title, onDuration }: { video: ExternalVideo; title: string; onDuration?: (seconds: number) => void }) {
   return <>
-    <ExternalVideoFrame title={title} video={video} />
+    <ExternalVideoFrame onDuration={onDuration} title={title} video={video} />
     <ExternalVideoOutside video={video} />
   </>;
 }
