@@ -5,7 +5,6 @@ public enum VideoProvider
     Sipat = 0,
     YouTube = 1,
     Vimeo = 2,
-    Smartplayer = 3,
 }
 
 public static class ExternalVideoLink
@@ -22,17 +21,12 @@ public static class ExternalVideoLink
         "vimeo.com", "www.vimeo.com", "m.vimeo.com", "player.vimeo.com",
     };
 
-    /// <summary>The longest Smartplayer address kept: the lesson reference holds 256 characters with its prefix.</summary>
-    public const int MaximumSmartplayerLength = 240;
+    /// <summary>The longest external id kept (the column and the lesson reference, with its prefix, allow it).</summary>
+    public const int MaximumIdLength = 240;
 
     public static bool TryParse(VideoProvider provider, string? url, out string externalId)
     {
         externalId = string.Empty;
-        if (provider == VideoProvider.Smartplayer)
-        {
-            return TryParseSmartplayer(url, out externalId);
-        }
-
         if (string.IsNullOrWhiteSpace(url)
             || !Uri.TryCreate(url.Trim(), UriKind.Absolute, out var uri)
             || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
@@ -96,52 +90,6 @@ public static class ExternalVideoLink
         return id is not null && id.Length > 0 && id.All(char.IsAsciiDigit) ? id : null;
     }
 
-    private static readonly System.Text.RegularExpressions.Regex IframeSource =
-        new("""<iframe\b[^>]*\bsrc\s*=\s*["']([^"']+)["']""", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-
-    /// <summary>
-    /// A Smartplayer video: its link or the iframe code copied from Smartplayer ("Detalhes" › "Código Embed").
-    /// Smartplayer does not publish its address format, so any https address on smartplayer.ai or one of its
-    /// subdomains is accepted; it is kept without the scheme ("player.smartplayer.ai/…") and always played over https.
-    /// </summary>
-    private static bool TryParseSmartplayer(string? input, out string externalId)
-    {
-        externalId = string.Empty;
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return false;
-        }
-
-        var text = input.Trim();
-        var iframe = IframeSource.Match(text);
-        if (iframe.Success)
-        {
-            text = System.Net.WebUtility.HtmlDecode(iframe.Groups[1].Value).Trim();
-        }
-
-        if (!Uri.TryCreate(text, UriKind.Absolute, out var uri)
-            || uri.Scheme != Uri.UriSchemeHttps
-            || !IsSmartplayerHost(uri.Host)
-            || PathSegments(uri).Length == 0
-            || !string.IsNullOrEmpty(uri.UserInfo))
-        {
-            return false;
-        }
-
-        var kept = uri.Host.ToLowerInvariant() + uri.PathAndQuery;
-        if (kept.Length > MaximumSmartplayerLength)
-        {
-            return false;
-        }
-
-        externalId = kept;
-        return true;
-    }
-
-    public static bool IsSmartplayerHost(string host) =>
-        host.Equals("smartplayer.ai", StringComparison.OrdinalIgnoreCase)
-        || host.EndsWith(".smartplayer.ai", StringComparison.OrdinalIgnoreCase);
-
     private static string[] PathSegments(Uri uri) =>
         uri.AbsolutePath.Split('/', StringSplitOptions.RemoveEmptyEntries);
 
@@ -168,13 +116,11 @@ public static class LessonReference
     private const string CatalogPrefix = "catalog:";
     private const string YouTubePrefix = "youtube:";
     private const string VimeoPrefix = "vimeo:";
-    private const string SmartplayerPrefix = "smartplayer:";
 
     public static string For(Guid id, VideoProvider provider, string? externalId) => provider switch
     {
         VideoProvider.YouTube => YouTubePrefix + externalId,
         VideoProvider.Vimeo => VimeoPrefix + externalId,
-        VideoProvider.Smartplayer => SmartplayerPrefix + externalId,
         _ => $"{CatalogPrefix}{id:D}",
     };
 
@@ -197,11 +143,6 @@ public static class LessonReference
         {
             provider = VideoProvider.Vimeo;
             externalId = reference[VimeoPrefix.Length..];
-        }
-        else if (reference.StartsWith(SmartplayerPrefix, StringComparison.Ordinal))
-        {
-            provider = VideoProvider.Smartplayer;
-            externalId = reference[SmartplayerPrefix.Length..];
         }
 
         if (externalId.Length == 0)
