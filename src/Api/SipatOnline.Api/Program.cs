@@ -9,10 +9,23 @@ using SipatOnline.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Host.UseSerilog((context, loggerConfiguration) => loggerConfiguration
-    .MinimumLevel.Information()
-    .Enrich.FromLogContext()
-    .WriteToSipatSinks(context.Configuration, context.HostingEnvironment.EnvironmentName));
+builder.Host.UseSerilog((context, loggerConfiguration) =>
+{
+    loggerConfiguration
+        .MinimumLevel.Information()
+        .Enrich.FromLogContext()
+        .WriteToSipatSinks(context.Configuration, context.HostingEnvironment.EnvironmentName);
+    if (!context.HostingEnvironment.IsDevelopment())
+    {
+        // Outside Development only warnings and errors of the frameworks: every SQL command, every endpoint step
+        // and every R2 call at Information would write several lines per request (a save every 10 s per viewer).
+        // The one line per request of the request logging stays.
+        loggerConfiguration
+            .MinimumLevel.Override("Microsoft.EntityFrameworkCore", Serilog.Events.LogEventLevel.Warning)
+            .MinimumLevel.Override("Microsoft.AspNetCore", Serilog.Events.LogEventLevel.Warning)
+            .MinimumLevel.Override("System.Net.Http.HttpClient", Serilog.Events.LogEventLevel.Warning);
+    }
+});
 builder.AddSipatObservability();
 
 builder.Services.AddOpenApi();
@@ -27,9 +40,27 @@ builder.Services.Configure<ForwardedHeadersOptions>(options =>
     {
         var developmentProxyHost =
             builder.Configuration["SipatOnline:DevelopmentProxy:Host"] ?? "localhost";
-        foreach (var address in Dns.GetHostAddresses(developmentProxyHost))
+        // In Docker the proxy is the web container: stopped, its name does not resolve, and restarted it may come
+        // back with another address. So the private networks a local Docker uses are trusted too (Development only),
+        // and the API starts and keeps working whichever order the containers come up in.
+        try
         {
-            options.KnownProxies.Add(address);
+            foreach (var address in Dns.GetHostAddresses(developmentProxyHost))
+            {
+                options.KnownProxies.Add(address);
+            }
+        }
+        catch (System.Net.Sockets.SocketException exception)
+        {
+            Log.Warning(
+                "Development proxy host {Host} could not be resolved ({Error}); trusting the private networks",
+                developmentProxyHost,
+                exception.Message);
+        }
+
+        foreach (var network in new[] { "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16" })
+        {
+            options.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(network));
         }
 
         return;

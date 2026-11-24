@@ -109,8 +109,10 @@ export default function VideoLibraryPanel({
                   </p>
                 )}
               </div>
-              <div className="grid gap-1.5 px-4 pb-4 pt-3.5">
-                <h3 className="m-0 line-clamp-2 text-[0.9375rem] font-semibold leading-[1.35]" title={video.title}>{video.title}{isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</h3>
+              {/* Cards of a row share one height: the title keeps room for two lines and the subject and usage sit at the
+                  bottom, so a card with an extra line (the YouTube link, Privado) does not push them out of line with its neighbours. */}
+              <div className="flex flex-1 flex-col gap-1.5 px-4 pb-4 pt-3.5">
+                <h3 className="m-0 line-clamp-2 min-h-[2.7em] text-[0.9375rem] font-semibold leading-[1.35]" title={video.title}>{video.title}{isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</h3>
                 <p className="m-0 text-[0.8125rem] tabular-nums text-muted-foreground">
                   {isExtra(video)
                     ? `${videoProvider(video)}${video.durationMilliseconds > 0 ? ` · ${formatDuration(video.durationMilliseconds)}` : ''}`
@@ -122,6 +124,7 @@ export default function VideoLibraryPanel({
                 {(privateTo?.get(video.id)?.length ?? 0) > 0 && <p className="m-0 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-warning">
                   <Lock aria-hidden="true" className="size-3.5 shrink-0" /><span className="min-w-0 truncate">Privado: {privateTo!.get(video.id)!.join(', ')}</span>
                 </p>}
+                <div className="mt-auto grid gap-1.5 pt-1">
                 {videoSubjects && onSubjects && <SubjectPicker onChange={ids => onSubjects(video.id, ids)} selected={videoSubjects.get(video.id) ?? []} subjects={subjects} title={video.title} />}
                 <div className="mt-1 flex items-center justify-between gap-2">
                   {video.status === 'Processing' ? <Badge variant="warning">Processando</Badge>
@@ -132,6 +135,7 @@ export default function VideoLibraryPanel({
                       </Badge>
                     )}
                   <Button aria-label={`Excluir vídeo ${video.title}`} disabled={busy} onClick={() => onDelete(item)} size="icon-sm" title="Excluir vídeo" variant="ghost"><Trash2 /></Button>
+                </div>
                 </div>
               </div>
             </article>
