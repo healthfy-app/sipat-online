@@ -1,3 +1,4 @@
+import { saveFile } from '@/lib/saveFile';
 import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, MoreHorizontal, Pencil, Rocket, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
@@ -31,11 +32,7 @@ import {
 const phoneAction = 'max-[760px]:h-auto max-[760px]:min-h-11 max-[760px]:text-[0.9375rem]';
 
 function download(name: string, text: string) {
-  const url = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
-  const link = document.createElement('a');
-  link.href = url; link.download = name;
-  document.body.append(link); link.click(); link.remove();
-  URL.revokeObjectURL(url);
+  saveFile(new Blob([text], { type: 'text/csv;charset=utf-8' }), name);
 }
 
 /** What still blocks saving, per day (by position) and for the name, in short phrases shown on the day itself. */

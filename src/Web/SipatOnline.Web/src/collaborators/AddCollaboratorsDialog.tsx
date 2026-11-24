@@ -45,6 +45,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [makingTemplate, setMakingTemplate] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileError, setFileError] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -220,7 +221,13 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
               e-mail, matrícula, setor e unidade empresarial são opcionais. Até {MAX_IMPORT_ROWS} linhas.
               Antes de gravar, mostramos o que vai acontecer.
             </p>
-            <Button disabled={!registry} onClick={() => registry && void downloadTemplate(registry)} size="sm" variant="outline"><FileSpreadsheet /> Baixar modelo</Button>
+            <Button disabled={!registry || makingTemplate} onClick={() => {
+              if (!registry) return;
+              setMakingTemplate(true); setFileError('');
+              downloadTemplate(registry)
+                .catch(() => setFileError('Não foi possível gerar o modelo. Recarregue a página e tente de novo.'))
+                .finally(() => setMakingTemplate(false));
+            }} size="sm" variant="outline"><FileSpreadsheet /> {makingTemplate ? 'Gerando…' : 'Baixar modelo'}</Button>
           </div>
           {!result && <Field hint="Célula vazia não apaga o que já está cadastrado." htmlFor="add-sheet" label="Planilha">
             <input accept=".csv,.xlsx" disabled={busy} id="add-sheet" onChange={event => void chooseFile(event)} type="file" />
