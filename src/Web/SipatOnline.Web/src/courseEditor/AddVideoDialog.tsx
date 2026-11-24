@@ -6,18 +6,17 @@ import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/courseCatalog/SegmentedControl';
 import ExternalVideoPreview from '@/ExternalVideoPreview';
-import { getErrorMessage } from './courseFormat';
+import { formatDuration, getErrorMessage } from './courseFormat';
 import { externalIdFromLink } from './externalLink';
 import { VideoUploadForm } from './CourseMediaForms';
 import LibraryVideoPicker from './LibraryVideoPicker';
 
-type Source = 'house' | 'YouTube' | 'Vimeo' | 'Smartplayer';
+type Source = 'house' | 'YouTube' | 'Vimeo';
 
 const sources: { value: Source; label: string }[] = [
   { value: 'house', label: 'Nosso vídeo' },
   { value: 'YouTube', label: 'YouTube' },
   { value: 'Vimeo', label: 'Vimeo' },
-  { value: 'Smartplayer', label: 'Smartplayer' },
 ];
 
 export default function AddVideoDialog({
@@ -73,7 +72,7 @@ export default function AddVideoDialog({
 }
 
 function ExternalVideoForm({ provider, busy, onBusyChange, onError, onLink }: {
-  provider: 'YouTube' | 'Vimeo' | 'Smartplayer';
+  provider: 'YouTube' | 'Vimeo';
   busy: boolean;
   onBusyChange: (busy: boolean) => void;
   onError: (message: string) => void;
@@ -82,11 +81,14 @@ function ExternalVideoForm({ provider, busy, onBusyChange, onError, onLink }: {
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [minutes, setMinutes] = useState('');
+  // the real length, read from the provider's player in the preview; the minutes are only a fallback
+  const [readMs, setReadMs] = useState<number | null>(null);
   const [linkError, setLinkError] = useState('');
   const submitting = useRef(false);
   const externalId = externalIdFromLink(provider, url);
-  const minutesValid = minutes === '' || /^[1-9]\d*$/.test(minutes);
-  const canAdd = !!externalId && title.trim() !== '' && minutesValid && !busy;
+  const minutesValid = /^[1-9]\d*$/.test(minutes);
+  const durationMs = readMs ?? (minutesValid ? Number(minutes) * 60000 : null);
+  const canAdd = !!externalId && title.trim() !== '' && durationMs !== null && !busy;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -101,7 +103,7 @@ function ExternalVideoForm({ provider, busy, onBusyChange, onError, onLink }: {
         provider,
         url: url.trim(),
         title: title.trim(),
-        durationMilliseconds: minutes === '' ? null : Number(minutes) * 60000,
+        durationMilliseconds: durationMs,
       });
     } catch (failure) {
       submitting.current = false;
@@ -115,20 +117,25 @@ function ExternalVideoForm({ provider, busy, onBusyChange, onError, onLink }: {
 
   return (
     <form className="grid gap-4" onSubmit={(event) => void submit(event)}>
-      <Field error={linkError} htmlFor="external-video-url" label={provider === 'Smartplayer' ? 'Link ou código embed (iframe)' : 'Link do vídeo'}>
-        <Input aria-invalid={linkError ? true : undefined} id="external-video-url" onChange={(event) => { setUrl(event.target.value); setLinkError(''); }}
-          placeholder={provider === 'YouTube' ? 'https://www.youtube.com/watch?v=…' : provider === 'Vimeo' ? 'https://vimeo.com/…' : 'Cole o código embed do Smartplayer'} value={url} />
+      <Field error={linkError} htmlFor="external-video-url" label="Link do vídeo">
+        <Input aria-invalid={linkError ? true : undefined} id="external-video-url" onChange={(event) => { setUrl(event.target.value); setLinkError(''); setReadMs(null); }}
+          placeholder={provider === 'YouTube' ? 'https://www.youtube.com/watch?v=…' : 'https://vimeo.com/…'} value={url} />
       </Field>
       {externalId && (
-        <ExternalVideoPreview title={`Prévia de ${title.trim() || 'vídeo'}`} video={{ provider, externalId }} />
+        <ExternalVideoPreview key={externalId} onDuration={(seconds) => setReadMs(Math.round(seconds * 1000))}
+          title={`Prévia de ${title.trim() || 'vídeo'}`} video={{ provider, externalId }} />
       )}
       <Field htmlFor="external-video-title" label="Título">
         <Input id="external-video-title" maxLength={160} onChange={(event) => setTitle(event.target.value)} value={title} />
       </Field>
-      <Field error={minutesValid ? undefined : 'Informe os minutos em número inteiro.'} htmlFor="external-video-minutes" label="Duração (min)">
-        <Input id="external-video-minutes" inputMode="numeric" onChange={(event) => setMinutes(event.target.value)} value={minutes} />
-      </Field>
-      <p className="m-0 text-xs leading-relaxed text-muted-foreground">Vídeo extra: não conta no progresso nem no certificado.</p>
+      {readMs !== null
+        ? <p className="m-0 text-sm">Duração: <strong>{formatDuration(readMs)}</strong> <span className="text-muted-foreground">(lida do vídeo)</span></p>
+        : (
+          <Field error={minutes === '' || minutesValid ? undefined : 'Informe os minutos em número inteiro.'} htmlFor="external-video-minutes" label="Duração (min)">
+            <Input id="external-video-minutes" inputMode="numeric" onChange={(event) => setMinutes(event.target.value)} value={minutes} />
+          </Field>
+        )}
+      <p className="m-0 text-xs leading-relaxed text-muted-foreground">Conta no progresso e no certificado: o participante assiste em sequência, sem pular.</p>
       <Button className="justify-self-start" disabled={!canAdd} type="submit">Adicionar</Button>
     </form>
   );

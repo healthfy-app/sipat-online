@@ -1,7 +1,7 @@
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { ArrowDown, ArrowUp, CalendarRange, ChevronDown, CirclePlus, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Pencil, Play, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { isExtra, videoProvider } from '@/api';
+import { isExternal, isExtra, videoProvider } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { ExternalVideoFrame } from '@/ExternalVideoPreview';
@@ -100,10 +100,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
           </NativeSelect>
         </>
         : <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo</h2>}
-      <span className="text-sm text-muted-foreground max-[1700px]:hidden">
-        · {current !== 'videos' ? 'arraste para um dia e ele traz todos os vídeos e jogos' : training ? 'arraste um título ou um vídeo para um dia' : 'arraste um vídeo para um dia'}
-      </span>
-      <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         {/* personalized grid: sending videos and tagging their assuntos both live in the library, so one link */}
         {canEditThemes && (canCustomizeGrid
           ? <a aria-label="Gerenciar biblioteca" className="grid size-9 place-items-center rounded-md text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank" title="Gerenciar biblioteca: enviar vídeos e marcar os assuntos deles">
@@ -124,6 +121,10 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
         </label>
       </div>
     </div>
+    {/* the hint gets its own quiet line: next to the filters it pushed the search to a row of its own */}
+    <p className="-mt-1 m-0 text-[0.8125rem] text-muted-foreground">
+      {current !== 'videos' ? 'Arraste para um dia e ele traz todos os vídeos e jogos.' : training ? 'Arraste um título ou um vídeo para um dia.' : 'Arraste um vídeo para um dia.'}
+    </p>
     {current === 'videos'
       ? empty
         ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.'
@@ -141,7 +142,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
         : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">{shownSubjects.map(subject => <li className="shrink-0" key={subject.id}><TrayCard subject={subject} /></li>)}</ul>}
     {playing?.source && <Dialog description={<>{videoTime(playing)}{usedIn?.get(playing.id) && <> · já está no {usedIn.get(playing.id)}</>}</>} onClose={() => setPlaying(null)} size="lg" title={playing.title}>
       <div className="aspect-video overflow-hidden rounded-xl bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
-        {isExtra(playing.source)
+        {isExternal(playing.source)
           ? <ExternalVideoFrame title={playing.title} video={playing.source} />
           : <VideoPreview preload="metadata" src={playing.source.fileUrl} title={playing.title} />}
       </div>

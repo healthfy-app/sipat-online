@@ -317,32 +317,6 @@ public sealed class PlatformCourseCatalogApiTests
     }
 
     [DockerFact]
-    public async Task Creates_a_smartplayer_video_from_its_embed_code()
-    {
-        await using var env = await ExternalEnvironment.StartAsync();
-        // longer than the 32 characters a YouTube or Vimeo id needed: the column was widened for it
-        const string embed = "<iframe src=\"https://player.smartplayer.ai/embed/7f3a9c2e-1b4d-4e8f-9a6b-2c5d8e1f0a3b?autoplay=0\" allowfullscreen></iframe>";
-
-        using var response = await SendAsync(
-            env.Operator,
-            HttpMethod.Post,
-            "/api/platform/catalog/videos/external",
-            new { provider = "Smartplayer", url = embed, title = "Combate a incêndios", durationMilliseconds = 300_000L });
-
-        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
-        var video = await ReadAsync(response);
-        Assert.Equal("Smartplayer", video.GetProperty("provider").GetString());
-        Assert.Equal("player.smartplayer.ai/embed/7f3a9c2e-1b4d-4e8f-9a6b-2c5d8e1f0a3b?autoplay=0", video.GetProperty("externalId").GetString());
-
-        using var refused = await SendAsync(
-            env.Operator,
-            HttpMethod.Post,
-            "/api/platform/catalog/videos/external",
-            new { provider = "Smartplayer", url = "https://evil.com/embed/x", title = "Falso", durationMilliseconds = 1000L });
-        Assert.Equal(HttpStatusCode.BadRequest, refused.StatusCode);
-    }
-
-    [DockerFact]
     public async Task Same_link_twice_returns_the_same_video()
     {
         await using var env = await ExternalEnvironment.StartAsync();

@@ -4,7 +4,7 @@ import { Field } from '@/components/ui/field';
 import { Input, Textarea } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { editorPanel } from './CourseOutlinePanel';
-import { isExtra } from '@/api';
+import { isExternal, isExtra } from '@/api';
 import { durationLabel, pluralize } from './courseFormat';
 import ExtraBadge from './ExtraBadge';
 import { gameTypeLabel, type LessonGroup, type TrackItem } from './courseTrack';
@@ -89,10 +89,12 @@ export default function CoursePropertiesPanel({
           )}
           <div className="grid grid-cols-2 gap-3">
             <PropField label="Duração">{durationLabel(item.video)}</PropField>
-            {!isExtra(item.video) && <PropField label="Perguntas">{item.video.checkpoints.length}</PropField>}
+            {!isExternal(item.video) && <PropField label="Perguntas">{item.video.checkpoints.length}</PropField>}
           </div>
-          {isExtra(item.video)
-            ? <p className="m-0 text-xs leading-relaxed text-muted-foreground">Vídeo extra: não conta no progresso nem no certificado.</p>
+          {isExternal(item.video)
+            ? <p className="m-0 text-xs leading-relaxed text-muted-foreground">{isExtra(item.video)
+              ? 'Vídeo extra: sem duração, não conta no progresso nem no certificado.'
+              : `Vídeo do ${item.video.provider}: conta no progresso e no certificado.`}</p>
             : <Button disabled={busy} onClick={actions.onManageActivities} variant="outline">Editar perguntas do vídeo</Button>}
           <Button disabled={busy} onClick={() => actions.onRemoveVideo(item.video.id)} variant="ghost">Remover do treinamento</Button>
         </>}

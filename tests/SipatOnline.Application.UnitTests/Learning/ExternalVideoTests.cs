@@ -13,9 +13,6 @@ public sealed class ExternalVideoTests
     [InlineData(VideoProvider.YouTube, "http://youtube.com/watch?v=dQw4w9WgXcQ", "dQw4w9WgXcQ")]
     [InlineData(VideoProvider.Vimeo, "https://vimeo.com/76979871", "76979871")]
     [InlineData(VideoProvider.Vimeo, "https://player.vimeo.com/video/76979871?h=x", "76979871")]
-    [InlineData(VideoProvider.Smartplayer, "https://player.smartplayer.ai/v/AbC123?autoplay=0", "player.smartplayer.ai/v/AbC123?autoplay=0")]
-    [InlineData(VideoProvider.Smartplayer, "https://smartplayer.ai/embed/xyz", "smartplayer.ai/embed/xyz")]
-    [InlineData(VideoProvider.Smartplayer, "<iframe src=\"https://app.smartplayer.ai/embed/9f8e\" width=\"640\" allowfullscreen></iframe>", "app.smartplayer.ai/embed/9f8e")]
     public void Parses(VideoProvider provider, string url, string expectedId)
     {
         Assert.True(ExternalVideoLink.TryParse(provider, url, out var id));
@@ -34,11 +31,6 @@ public sealed class ExternalVideoTests
     [InlineData(VideoProvider.Vimeo, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")]
     [InlineData(VideoProvider.Sipat, "https://www.youtube.com/watch?v=dQw4w9WgXcQ")]
     [InlineData(VideoProvider.YouTube, "javascript:alert(1)")]
-    [InlineData(VideoProvider.Smartplayer, "http://player.smartplayer.ai/v/AbC123")]
-    [InlineData(VideoProvider.Smartplayer, "https://smartplayer.ai.evil.com/v/AbC123")]
-    [InlineData(VideoProvider.Smartplayer, "https://evilsmartplayer.ai/v/AbC123")]
-    [InlineData(VideoProvider.Smartplayer, "https://smartplayer.ai/")]
-    [InlineData(VideoProvider.Smartplayer, "<iframe src=\"https://evil.com/x\"></iframe>")]
     public void Refuses(VideoProvider provider, string? url)
     {
         Assert.False(ExternalVideoLink.TryParse(provider, url, out var id));
@@ -53,7 +45,6 @@ public sealed class ExternalVideoTests
         Assert.Equal($"catalog:{id:D}", LessonReference.For(id, VideoProvider.Sipat, null));
         Assert.Equal("youtube:abc", LessonReference.For(id, VideoProvider.YouTube, "abc"));
         Assert.Equal("vimeo:123", LessonReference.For(id, VideoProvider.Vimeo, "123"));
-        Assert.Equal("smartplayer:player.smartplayer.ai/v/1", LessonReference.For(id, VideoProvider.Smartplayer, "player.smartplayer.ai/v/1"));
     }
 
     [Fact]
@@ -78,7 +69,6 @@ public sealed class ExternalVideoTests
 
         Assert.False(LessonReference.TryParseExternal($"catalog:{Guid.NewGuid():D}", out _, out _));
         Assert.True(LessonReference.TryParseExternal("smartplayer:player.smartplayer.ai/v/1", out provider, out id));
-        Assert.Equal(VideoProvider.Smartplayer, provider);
         Assert.Equal("player.smartplayer.ai/v/1", id);
 
         Assert.False(LessonReference.TryParseExternal("youtube:", out _, out _));

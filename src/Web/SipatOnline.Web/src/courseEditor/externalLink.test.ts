@@ -36,16 +36,3 @@ describe('externalIdFromLink', () => {
     expect(externalIdFromLink(provider, link)).toBeNull();
   });
 });
-
-describe('Smartplayer links', () => {
-  it('reads a link or the copied iframe code', () => {
-    expect(externalIdFromLink('Smartplayer', 'https://player.smartplayer.ai/v/AbC123')).toBe('player.smartplayer.ai/v/AbC123');
-    expect(externalIdFromLink('Smartplayer', '<iframe src="https://app.smartplayer.ai/embed/9f8e" width="640"></iframe>')).toBe('app.smartplayer.ai/embed/9f8e');
-  });
-
-  it('refuses anything that is not https on smartplayer.ai', () => {
-    expect(externalIdFromLink('Smartplayer', 'http://player.smartplayer.ai/v/1')).toBeNull();
-    expect(externalIdFromLink('Smartplayer', 'https://smartplayer.ai.evil.com/v/1')).toBeNull();
-    expect(externalIdFromLink('Smartplayer', 'https://smartplayer.ai/')).toBeNull();
-  });
-});

@@ -51,6 +51,11 @@ function extraLabel(lesson: LearningLessonProgress): string {
   return lesson.provider ? `Extra · ${lesson.provider}` : 'Extra';
 }
 
+/** A YouTube or Vimeo video that counts: played in the provider's player, followed like ours. */
+function isExternalLesson(lesson: LearningLessonProgress): boolean {
+  return !lesson.isBonus && !!lesson.provider && !!lesson.externalId;
+}
+
 export default function LearningTrackPage({
   resumeLessonId,
   setSummary,
@@ -306,7 +311,9 @@ export default function LearningTrackPage({
     const clamp = (value: number) => Math.min(lesson.durationMilliseconds, Math.max(0, value));
     const positionMilliseconds = clamp(positionMs);
     const rangeStart = range === null ? null : clamp(range.startMs);
-    const rangeEnd = range === null ? null : clamp(range.endMs);
+    // a provider video that ended was watched to its end, even when the length typed in the editor was a bit longer
+    const rangeEnd = range === null ? null
+      : reason === 'ended' && isExternalLesson(lesson) ? lesson.durationMilliseconds : clamp(range.endMs);
     // a range that clamping leaves under 1 ms is saved as a position only
     const hasRange = rangeStart !== null && rangeEnd !== null && rangeEnd - rangeStart >= 1;
     if (!hasRange && Math.abs(positionMilliseconds - lastSavePositionRef.current) < 1) {
@@ -590,6 +597,19 @@ export default function LearningTrackPage({
                   <h2>Vídeo indisponível</h2>
                   <p>Este vídeo extra não pôde ser aberto. Siga para o próximo.</p>
                 </div>
+            ) : activeSession && selectedLesson && isExternalLesson(selectedLesson) ? (
+              <ExternalVideoPlayer
+                externalId={selectedLesson.externalId!}
+                // aula já concluída pode ser revista livremente; as demais só andam até onde a pessoa já assistiu
+                furthest={selectedLesson.isCompleted ? Number.POSITIVE_INFINITY : selectedLesson.lastPlaybackPositionMilliseconds / 1000}
+                key={`${selectedLesson.id}-${activeSession.sessionId}`}
+                onEvent={handlePlayerEvent}
+                provider={selectedLesson.provider!}
+                ref={playerRef}
+                resumeAt={selectedLesson.lastPlaybackPositionMilliseconds / 1000}
+                rules={{ watchInOrder: true, fixedSpeed: true }}
+                title={selectedLesson.title}
+              />
             ) : activeSession && selectedLesson ? (
               <>
                 <SipatVideoPlayer

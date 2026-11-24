@@ -326,8 +326,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var entity = await db.LearningContentSnapshots.SingleAsync(item => item.RevisionId == revisionId, token);
         var current = await db.LearningLessons.Where(item => item.RevisionId == revisionId).ToListAsync(token);
         var fresh = current.Count == course.Videos.Count
-            && current.OrderBy(item => item.Position).Select(item => item.ProviderAssetReference)
-                .SequenceEqual(course.Videos.Select(LessonReference.For));
+            && current.OrderBy(item => item.Position).Select(item => (item.ProviderAssetReference, item.IsBonus))
+                .SequenceEqual(course.Videos.Select(video => (LessonReference.For(video), IsBonus(video))));
 
         track.Title = course.Title;
         track.Description = course.Description;
@@ -370,7 +370,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var nextReferences = next.Select(LessonReference.For).ToArray();
         if (old.Count == 0 || oldReferences.SequenceEqual(nextReferences)) return false;
         if (oldReferences.Distinct().Count() != old.Count || nextReferences.Distinct().Count() != next.Count) return false;
-        if (old.Any(item => item.IsBonus != LessonReference.IsBonus(item.ProviderAssetReference))) return false;
+        if (old.Any(item => item.IsBonus && !LessonReference.IsBonus(item.ProviderAssetReference))) return false;
         var oldHouse = Enumerable.Range(0, old.Count).Where(index => !old[index].IsBonus).ToArray();
         var nextHouse = Enumerable.Range(0, next.Count).Where(index => !IsBonus(next[index])).ToArray();
         if (!oldHouse.Select(index => oldReferences[index]).SequenceEqual(nextHouse.Select(index => nextReferences[index]))) return false;
@@ -502,7 +502,11 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             course.Videos.Select(item => new SnapshotVideo(item.Id, item.Checkpoints)).ToArray()));
     }
 
-    private static bool IsBonus(PlatformCourseVideo video) => video.Provider != VideoProvider.Sipat;
+    /// <summary>
+    /// An extra never counts: a YouTube or Vimeo video without a known length. With its length it counts like ours,
+    /// watched in order through the provider's player.
+    /// </summary>
+    private static bool IsBonus(PlatformCourseVideo video) => video.Provider != VideoProvider.Sipat && video.DurationMilliseconds <= 0;
 
     private static bool HasHouseVideo(IReadOnlyList<PlatformCourseVideo> videos) => videos.Any(video => !IsBonus(video));
 

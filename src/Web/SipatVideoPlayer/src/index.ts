@@ -14,3 +14,5 @@ export * from './core/checkpoints';
 export * from './core/attach';
 export * from './core/sources';
 export * from './core/external';
+export * from './core/externalApi';
+export * from './core/attachExternal';
