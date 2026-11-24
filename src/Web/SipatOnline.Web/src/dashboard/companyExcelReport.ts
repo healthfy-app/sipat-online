@@ -1,3 +1,4 @@
+import { saveFile, XLSX_TYPE } from '@/lib/saveFile';
 import type { Borders, Cell, Fill, Font, Workbook, Worksheet } from 'exceljs';
 import type { LearningParticipantProgress } from '../api';
 import { participantProgressStatuses, type CompanyLearningOverview, type ParticipantProgressStatus } from '../participantProgress';
@@ -54,16 +55,7 @@ export async function downloadCompanyExcelReport(input: CompanyExcelReportInput)
   const workbook = await buildCompanyExcelReport(input);
   const buffer = await workbook.xlsx.writeBuffer();
   const fileName = excelReportFileName(input.companyName, input.generatedAt ?? new Date(), input.trainingTitle);
-  const url = URL.createObjectURL(new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveFile(new Blob([buffer], { type: XLSX_TYPE }), fileName);
   return fileName;
 }
 
