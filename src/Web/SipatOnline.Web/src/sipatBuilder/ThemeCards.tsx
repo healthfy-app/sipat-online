@@ -100,10 +100,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
           </NativeSelect>
         </>
         : <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo</h2>}
-      <span className="text-sm text-muted-foreground max-[1700px]:hidden">
-        · {current !== 'videos' ? 'arraste para um dia e ele traz todos os vídeos e jogos' : training ? 'arraste um título ou um vídeo para um dia' : 'arraste um vídeo para um dia'}
-      </span>
-      <div className="ml-auto flex flex-wrap items-center gap-2">
+      <div className="ml-auto flex shrink-0 items-center gap-2">
         {/* personalized grid: sending videos and tagging their assuntos both live in the library, so one link */}
         {canEditThemes && (canCustomizeGrid
           ? <a aria-label="Gerenciar biblioteca" className="grid size-9 place-items-center rounded-md text-primary hover:bg-accent" href="/platform/videos" rel="noreferrer" target="_blank" title="Gerenciar biblioteca: enviar vídeos e marcar os assuntos deles">
@@ -124,6 +121,10 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
         </label>
       </div>
     </div>
+    {/* the hint gets its own quiet line: next to the filters it pushed the search to a row of its own */}
+    <p className="-mt-1 m-0 text-[0.8125rem] text-muted-foreground">
+      {current !== 'videos' ? 'Arraste para um dia e ele traz todos os vídeos e jogos.' : training ? 'Arraste um título ou um vídeo para um dia.' : 'Arraste um vídeo para um dia.'}
+    </p>
     {current === 'videos'
       ? empty
         ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.'
