@@ -223,6 +223,10 @@ public sealed class CompanyPlanApiTests
         await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Parte do módulo", first) } }, HttpStatusCode.BadRequest);
         await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } }, HttpStatusCode.BadRequest);
         Assert.NotEqual("#123456", (await Get(admin, "/api/tenant/branding")).GetProperty("primaryColor").GetString());
+        // the personalized certificate (the company's logo on it) is Ouro's too: below it the operation cannot set one
+        var certificateLogo = $"/api/platform/companies/{companyId}/learning/certificate-logo";
+        using (var refused = await Raw(operatorClient, HttpMethod.Put, certificateLogo, new { }))
+            Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
         await Send(admin, HttpMethod.Put, "/api/tenant/branding", new { logoReference = (string?)null, primaryColor = "#123456", secondaryColor = "#FFFFFF" }, HttpStatusCode.Forbidden);
 
         // Prata: the grid of videos is personalized
@@ -241,6 +245,9 @@ public sealed class CompanyPlanApiTests
         // Ouro: its logo and colors show
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Ouro" });
         Assert.Equal("#123456", (await Get(admin, "/api/tenant/branding")).GetProperty("primaryColor").GetString());
+        // and the certificate logo is accepted for it (this body is not an image, so it is refused for that, not for the plan)
+        using (var accepted = await Raw(operatorClient, HttpMethod.Put, certificateLogo, new { }))
+            Assert.NotEqual(HttpStatusCode.Forbidden, accepted.StatusCode);
 
         // Diamante: its internal videos, for it only
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Diamante" });
