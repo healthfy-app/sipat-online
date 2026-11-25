@@ -607,13 +607,10 @@ function ProtectedPortal({
   }
 
   // the same links serve the desktop sidebar and the phone menu
-  const operatorInWorkspace = isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId !== null;
-  const unitMenu = <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />;
   const sidebarNav = (
     <>
       {/* the unit the company is looked at through: it sits above the menu it filters, in the side bar and in the phone's menu */}
-      {/* the operator inside a company has its unit menu under the company's name, in the company's own menu */}
-      {companyPages && !operatorInWorkspace && unitMenu}
+      {companyPages && <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
       {session.roles.includes('Participant') && !isPlatformCompanyContext && (
         <>
           <p className="sidebar-label">APRENDIZAGEM</p>
@@ -636,7 +633,7 @@ function ProtectedPortal({
           </NavLink>
         </>
       )}
-      {operatorInWorkspace && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} unitSlot={unitMenu} />}
+      {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}
       {isPlatformOperator && !isPlatformCompanyContext && !companyWorkspaceId && (
         <>
           <p className="sidebar-label sidebar-label-spaced">OPERAÇÃO</p>

@@ -19,16 +19,14 @@ describe('company sidebar', () => {
     expect(screen.getByRole('link', { name: 'Administradores' })).toHaveAttribute('href', '/platform/companies/c-1/administradores');
   });
 
-  it('puts the unit menu under the company name, above the links it filters, never above the way back', async () => {
-    vi.mocked(api.getPlatformDashboard).mockResolvedValue([{ id: 'c-1', name: 'Acme', key: 'acme', isActive: true, employeeCount: 1, administratorCount: 1, totalUserCount: 2 }] as never);
-    render(<MemoryRouter initialEntries={['/platform/companies/c-1/treinamentos']}><CompanyNav companyId="c-1" unitSlot={<button type="button">Unidade: Todas as unidades</button>} /></MemoryRouter>);
+  it('breaks a long company name at its dash, in lines of even length, and keeps it whole in the tooltip', async () => {
+    vi.mocked(api.getPlatformDashboard).mockResolvedValue([{ id: 'c-1', name: 'Damare - Laticínios Resende', key: 'damare', isActive: true, employeeCount: 1, administratorCount: 1, totalUserCount: 2 }] as never);
+    render(<MemoryRouter initialEntries={['/platform/companies/c-1/treinamentos']}><CompanyNav companyId="c-1" /></MemoryRouter>);
 
-    const back = await screen.findByRole('link', { name: /Todas as empresas/ });
-    const name = screen.getByText('Acme');
-    const unit = screen.getByRole('button', { name: 'Unidade: Todas as unidades' });
-    const first = screen.getByRole('link', { name: 'Treinamentos' });
-    const follows = (a: Element, b: Element) => Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
-    expect(follows(back, name) && follows(name, unit) && follows(unit, first)).toBe(true);
+    const name = await screen.findByTitle('Damare - Laticínios Resende');
+    // the dash stays with the word before it, so the line can only break after it: "Damare -" / "Laticínios Resende"
+    expect(name.textContent).toBe('Damare - Laticínios Resende');
+    expect(name).toHaveClass('text-balance');
   });
 
   it('links to the video quality of the company', async () => {

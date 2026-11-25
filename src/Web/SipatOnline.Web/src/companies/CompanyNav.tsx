@@ -1,18 +1,20 @@
 import { ArrowLeft } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { getPlatformDashboard, type CompanyPlan } from '@/api';
 import CompanyPlanButton from './CompanyPlanButton';
 
 /**
+ * A name like "Damare - Laticínios Resende" should break after its dash, not strand the dash or one last word: the
+ * separator is glued to the word before it (a space that does not break), so the only break left there is after it.
+ */
+const breakAtSeparator = (name: string) => name.replace(/\s+([-–—|/·])\s+/g, ' $1 ');
+
+/**
  * The sidebar while the operator works inside one company: everything here is about that company only.
  * It replaces the platform menu until the operator goes back to all companies.
  */
-export default function CompanyNav({ companyId, unitSlot }: {
-  companyId: string;
-  /** The unit menu, shown under the company's name and plan and above its links: it filters what those links open. */
-  unitSlot?: ReactNode;
-}) {
+export default function CompanyNav({ companyId }: { companyId: string }) {
   const [name, setName] = useState('');
   const [plan, setPlan] = useState<CompanyPlan | null>(null);
   const { pathname } = useLocation();
@@ -35,9 +37,9 @@ export default function CompanyNav({ companyId, unitSlot }: {
   return <>
     <NavLink className="sidebar-link" end to="/platform"><ArrowLeft aria-hidden="true" className="mr-1.5 inline size-3.5" />Todas as empresas</NavLink>
     <p className="sidebar-label sidebar-label-spaced">EMPRESA</p>
-    <strong className="px-3 pb-1 text-sm font-semibold [overflow-wrap:anywhere]">{name || 'Carregando...'}</strong>
+    {/* two even lines instead of a long one and a leftover word; the whole name is in the tooltip */}
+    <strong className="px-3 pb-1 text-sm font-semibold leading-snug text-balance [overflow-wrap:anywhere]" title={name || undefined}>{name ? breakAtSeparator(name) : 'Carregando...'}</strong>
     {plan && <div className="px-3 pb-2"><CompanyPlanButton companyId={companyId} onChanged={setPlan} plan={plan} /></div>}
-    {unitSlot && <div className="mt-1">{unitSlot}</div>}
     <NavLink className={link(inSipat)} to={`${base}/treinamentos`}>Treinamentos</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/participantes`}>Participantes</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/administradores`}>Administradores</NavLink>
