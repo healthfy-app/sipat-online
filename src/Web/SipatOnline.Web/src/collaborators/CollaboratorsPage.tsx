@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { TrainingSelect } from '@/trainings/TrainingSelect';
+import { useUnitScope } from '@/trainings/unitScope';
 import { filterByTraining, useTrainingFilter } from '@/trainings/useTrainingFilter';
 import {
   changeUserStatus, getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles,
@@ -68,7 +69,17 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   const [adding, setAdding] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, ParticipantProfile> | null>(null);
   const [registry, setRegistry] = useState<CompanyRegistry | null>(null);
-  const [unitFilter, setUnitFilter] = useState<PlacementFilter>('all');
+  // the unit comes from the switch at the top when the company has one (two units or more); "sem unidade" is asked here
+  const unitScope = useUnitScope();
+  const [ownUnitFilter, setOwnUnitFilter] = useState<PlacementFilter>('all');
+  const unitFilter: PlacementFilter = unitScope.active && ownUnitFilter !== 'none' ? unitScope.unitId ?? 'all' : ownUnitFilter;
+  const setUnitFilter = (value: PlacementFilter) => {
+    // people with no unit are of no unit: looking for them goes back to every unit
+    if (unitScope.active && value === 'none') unitScope.setUnitId(null);
+    setOwnUnitFilter(value);
+  };
+  // choosing a unit at the top leaves "sem unidade" behind
+  useEffect(() => { if (unitScope.unitId !== null) setOwnUnitFilter('all'); }, [unitScope.unitId]);
   const [sectorFilter, setSectorFilter] = useState<PlacementFilter>('all');
   const [placing, setPlacing] = useState(false);
 
@@ -95,6 +106,11 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   const trainingRows = useMemo(() => filterByTraining(rows, training.selectedId), [training.selectedId, rows]);
   const summaries = useMemo(() => summarizeParticipants(people ?? [], trainingRows), [people, trainingRows]);
   const showPlacement = !!profiles && !!registry;
+  // the report follows the unit chosen at the top
+  const inScope = useMemo(
+    () => unitScope.unitId && profiles ? (people ?? []).filter(person => profiles.get(person.id)?.unitId === unitScope.unitId) : people ?? [],
+    [people, profiles, unitScope.unitId],
+  );
   const placed = useMemo(
     () => (profiles ? new Set(filterByPlacement(people ?? [], profiles, unitFilter, sectorFilter).map(person => person.id)) : null),
     [people, profiles, unitFilter, sectorFilter],
@@ -125,7 +141,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       running: scope.filter(item => item.status === 'in-progress').length,
     };
   }, [summaries, placed]);
-  const narrowed = search.trim() !== '' || filter !== 'all' || unitFilter !== 'all' || sectorFilter !== 'all';
+  const narrowed = search.trim() !== '' || filter !== 'all' || ownUnitFilter !== 'all' || sectorFilter !== 'all';
   const clearFilters = () => { setSearch(''); setFilter('all'); setUnitFilter('all'); setSectorFilter('all'); };
 
   const ids = visible.map(item => item.participant.id);
@@ -154,7 +170,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   return <Page>
     <PageHeader
       actions={<>
-        <Button disabled={!people?.length} onClick={() => downloadCsv(reportFileName('empresa'), companyReportCsv(people ?? [], trainingRows))} variant="outline">Baixar relatório (CSV)</Button>
+        <Button disabled={!people?.length} onClick={() => downloadCsv(reportFileName('empresa'), companyReportCsv(inScope, trainingRows))} variant="outline">Baixar relatório (CSV)</Button>
         {!readOnly && <Button onClick={() => setAdding(true)}><UserPlus /> Adicionar colaboradores</Button>}
       </>}
       description="Todos os colaboradores da empresa e até onde cada um chegou em cada treinamento."
@@ -183,7 +199,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
         {filters.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
       </NativeSelect>
       {/* unit and sector are always there: a company that has none yet sees where they would be, and how to add them */}
-      {showPlacement && <NativeSelect aria-label="Filtrar por unidade" className={cn('w-auto min-w-44', unitFilter !== 'all' && 'border-primary bg-accent font-semibold text-primary')} onChange={event => setUnitFilter(event.target.value)} value={unitFilter}>
+      {showPlacement && !unitScope.active && <NativeSelect aria-label="Filtrar por unidade" className={cn('w-auto min-w-44', unitFilter !== 'all' && 'border-primary bg-accent font-semibold text-primary')} onChange={event => setUnitFilter(event.target.value)} value={unitFilter}>
         <option value="all">Todas as unidades</option>
         {registry.units.length === 0
           ? <option disabled value="empty">Nenhuma unidade cadastrada</option>

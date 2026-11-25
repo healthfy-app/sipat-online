@@ -31,6 +31,7 @@ import { Sheet } from './components/ui/sheet';
 import SipatsPage from './sipatBuilder/SipatsPage';
 import { LegacySipatRedirect } from './trainings/LegacySipatRedirect';
 import CompanyContext from './companies/CompanyContext';
+import { UnitBar, UnitScopeProvider } from './trainings/unitScope';
 import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
 import CollaboratorsPage from './collaborators/CollaboratorsPage';
@@ -581,6 +582,11 @@ function ProtectedPortal({
   const companyWorkspaceId = /^\/platform\/companies\/([^/]+)/.exec(location.pathname)?.[1] ?? null;
   // inside the company workspace the operator keeps the workspace menu, even though the company is set for the calls to its admin routes
   const isPlatformCompanyContext = isCompanyPanelMode(isPlatformOperator, location.pathname, getCompanyAdministrationId());
+  // the pages of one company (its administrator's, or the operation's while it looks at a company): they follow the unit chosen at the top
+  const companyPages = isPlatformOperator
+    ? isPlatformCompanyContext ? location.pathname.startsWith('/admin') : companyWorkspaceId !== null
+    : canViewCompany(session) && location.pathname.startsWith('/admin');
+  const unitScopeCompany = isPlatformOperator ? (isPlatformCompanyContext ? getCompanyAdministrationId() : companyWorkspaceId) : null;
 
   async function handleSignOut() {
     setError('');
@@ -790,10 +796,14 @@ function ProtectedPortal({
           tabIndex={-1}
         >
           {error && <p className="form-error" role="alert">{error}</p>}
+          <UnitScopeProvider companyId={isPlatformOperator && !isPlatformCompanyContext ? companyWorkspaceId ?? undefined : undefined} enabled={companyPages}
+            scopeKey={unitScopeCompany ? `company:${unitScopeCompany}` : tenant.tenantKey}>
+          {companyPages && <UnitBar />}
           {/* an administrator who also takes trainings keeps the admin menu, and the participant pages keep their look */}
           {!isLearnerOnly && location.pathname.startsWith('/learning')
             ? <div className="portal-layout-learner contents"><Outlet /></div>
             : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
+          </UnitScopeProvider>
         </section>
       </div>
     </div>

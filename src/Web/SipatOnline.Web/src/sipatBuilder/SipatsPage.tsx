@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 import { phaseLabel, sipatPhase, type SipatPhase } from './sipatPhase';
 import { audienceLabel } from '@/trainings/audienceLabel';
 import { copyTrainingLink } from '@/trainings/trainingLink';
+import { trainingInUnit, useUnitScope } from '@/trainings/unitScope';
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 const fullDateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
@@ -45,6 +46,7 @@ const iconAction = 'grid size-9 min-h-0 cursor-pointer place-items-center rounde
  */
 export default function SipatsPage({ basePath, operator = false }: { basePath: string; operator?: boolean }) {
   const navigate = useNavigate();
+  const unitScope = useUnitScope();
   const [viewOnly, setViewOnly] = useState(false);
   const [events, setEvents] = useState<SipatEvent[] | null>(null);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
@@ -70,13 +72,18 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
   const summaryOf = (event: SipatEvent) => plans.find(item => item.sipatEventId === event.id);
   const phaseOf = (event: SipatEvent) => sipatPhase(event, summaryOf(event)?.days ?? 0);
 
+  // with a unit chosen at the top: its trainings and the ones of the whole company
+  const inScope = useMemo(
+    () => (events ?? []).filter(event => trainingInUnit(plans.find(item => item.sipatEventId === event.id), unitScope.unitId)),
+    [events, plans, unitScope.unitId],
+  );
   const shown = useMemo(() => {
     const text = query.trim().toLocaleLowerCase('pt-BR');
-    return (events ?? []).filter(event => (phase === 'all' || phaseOf(event) === phase)
+    return inScope.filter(event => (phase === 'all' || phaseOf(event) === phase)
       && (!text || event.title.toLocaleLowerCase('pt-BR').includes(text)));
     // phaseOf reads the summaries
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [events, plans, query, phase]);
+  }, [inScope, plans, query, phase]);
 
   const years = useMemo(() => {
     const byYear = new Map<number, SipatEvent[]>();
@@ -139,7 +146,7 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
     });
   };
 
-  const total = events?.length ?? 0;
+  const total = inScope.length;
   const filtered = query.trim() !== '' || phase !== 'all';
   const create = viewOnly ? undefined : <Link className={buttonVariants()} to={`${basePath}/nova`}><Plus /> Novo treinamento</Link>;
   return <Page>

@@ -3,7 +3,7 @@ import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2,
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, listCompanyVideos, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
+  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, listCompanyVideos, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,7 @@ import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
 import AudienceRow from '@/trainings/AudienceRow';
+import { useUnitScope } from '@/trainings/unitScope';
 import { copyTrainingLink } from '@/trainings/trainingLink';
 import { checkVideoFile, enqueueUploads, isActive, onVideoUploaded, titleFromFileName, useUploadQueue } from '@/videoUploads/uploadQueue';
 
@@ -62,6 +63,13 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const navigate = useNavigate();
   const params = useParams();
   const [search] = useSearchParams();
+  const unitScope = useUnitScope();
+  // a training made while a unit is chosen at the top is born for that unit (it can be changed in "Para quem")
+  const createTraining = async (data: Parameters<typeof createSipatEvent>[0]) => {
+    const created = await createSipatEvent(data);
+    if (unitScope.unitId) await saveTrainingAudience(created.id, { targets: [{ unitId: unitScope.unitId, sectorId: null }] }).catch(() => undefined);
+    return created;
+  };
   const isNew = params.sipatId === 'nova';
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [others, setOthers] = useState<SipatEvent[]>([]);
@@ -264,7 +272,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         if (!isValidDate(first)) { setError('Escolha a data de início do treinamento.'); return null; }
         const last = [...days].reverse().find(day => day.date)?.date ?? first;
         const schedule = { startsAt: `${first}T00:00:00.000Z`, endsAt: `${addDays(last, 1)}T00:00:00.000Z` };
-        current = await createSipatEvent({ title: name.trim(), description: null, ...schedule });
+        current = await createTraining({ title: name.trim(), description: null, ...schedule });
       } else if (current.status === 'Draft' && current.title !== name.trim()) {
         current = await updateSipatEvent(current.id, { title: name.trim(), description: current.description, startsAt: current.startsAt, endsAt: current.endsAt });
       }
@@ -382,7 +390,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       let target = sipat?.id;
       if (!target) {
         const first = isValidDate(startDate) ? startDate : new Date().toISOString().slice(0, 10);
-        const created = await createSipatEvent({ title: name.trim() || `SIPAT ${new Date().getFullYear()}`, description: null, startsAt: `${first}T00:00:00.000Z`, endsAt: `${addDays(first, 1)}T00:00:00.000Z` });
+        const created = await createTraining({ title: name.trim() || `SIPAT ${new Date().getFullYear()}`, description: null, startsAt: `${first}T00:00:00.000Z`, endsAt: `${addDays(first, 1)}T00:00:00.000Z` });
         setSipat(created); target = created.id;
       }
       const copied = (await copySipatPlan(target, sourceId)).map(fromProgramDay);

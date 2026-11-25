@@ -1,7 +1,7 @@
 import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { listAllParticipants, listLearningParticipation, type LearningParticipantProgress } from './api';
+import { listAllParticipants, listLearningParticipation, listParticipantProfiles, type LearningParticipantProgress, type ParticipantProfile } from './api';
 import {
   participantProgressStatuses,
   summarizeCompanyProgress,
@@ -29,6 +29,7 @@ import { activeParticipantsByDay, totalWatchedMilliseconds } from './dashboard/a
 import { ColumnChart, Donut, type ColumnPoint } from './dashboard/charts';
 import LoadingState from './LoadingState';
 import { TrainingSelect } from './trainings/TrainingSelect';
+import { inUnit, useUnitScope } from './trainings/unitScope';
 import { filterByTraining, useTrainingFilter } from './trainings/useTrainingFilter';
 
 const PAGE_SIZE = 8;
@@ -60,16 +61,22 @@ export default function TenantLearningDashboardPage({
 }: { readOnly?: boolean; companyName?: string; brandColor?: string }) {
   const [loaded, setLoaded] = useState<{ participants: Awaited<ReturnType<typeof listAllParticipants>>; participation: LearningParticipantProgress[] } | null>(null);
   const training = useTrainingFilter(loaded?.participation ?? noRows);
+  // with a unit chosen at the top, every number is about its people (where each one is comes apart: without it, the whole company)
+  const unitScope = useUnitScope();
+  const [profiles, setProfiles] = useState<ReadonlyMap<string, ParticipantProfile> | null>(null);
+  useEffect(() => { listParticipantProfiles().then(list => setProfiles(Array.isArray(list) ? new Map(list.map(item => [item.id, item])) : null), () => setProfiles(null)); }, []);
   // every number of the page is about the training chosen, so one person's finished SIPAT does not hide a fire drill not started
   const data = useMemo<DashboardData | null>(() => {
     if (!loaded) return null;
-    const participation = filterByTraining(loaded.participation, training.selectedId);
+    const ofUnit = inUnit(profiles ?? new Map(), profiles ? unitScope.unitId : null);
+    const participants = loaded.participants.filter(person => ofUnit(person.id));
+    const participation = filterByTraining(loaded.participation, training.selectedId).filter(row => ofUnit(row.participantId));
     return {
-      overview: summarizeCompanyProgress(loaded.participants, participation),
-      rows: toParticipantRows(summarizeParticipants(loaded.participants, participation)),
+      overview: summarizeCompanyProgress(participants, participation),
+      rows: toParticipantRows(summarizeParticipants(participants, participation)),
       participation,
     };
-  }, [loaded, training.selectedId]);
+  }, [loaded, training.selectedId, profiles, unitScope.unitId]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [exportState, setExportState] = useState<{ busy: boolean; message: string }>({ busy: false, message: '' });
@@ -94,7 +101,7 @@ export default function TenantLearningDashboardPage({
     setExportState({ busy: true, message: '' });
     try {
       const { downloadCompanyExcelReport } = await import('./dashboard/companyExcelReport');
-      const fileName = await downloadCompanyExcelReport({ companyName, brandColor, ...data, trainingTitle: training.selected?.title });
+      const fileName = await downloadCompanyExcelReport({ companyName, brandColor, ...data, trainingTitle: [training.selected?.title, unitScope.unit?.name].filter(Boolean).join(' · ') || undefined });
       setExportState({ busy: false, message: `Relatório ${fileName} baixado.` });
     } catch (exportError) {
       setExportState({

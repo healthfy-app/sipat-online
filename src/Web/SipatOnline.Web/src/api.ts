@@ -1681,17 +1681,20 @@ export function getCompanyRegistry(companyId?: string): Promise<CompanyRegistry>
   return requestJson<CompanyRegistry>('/api/admin/registry', { headers: forCompany(companyId) });
 }
 
-export function addRegistryItems(kind: RegistryKind, names: string[]): Promise<CompanyRegistry> {
-  return requestJson<CompanyRegistry>(`/api/admin/registry/${kind}`, { method: 'POST', body: JSON.stringify({ names }) });
+/** Tells the unit switcher at the top that the lists changed (see trainings/unitScope). */
+const registryChanged = <T,>(value: T): T => { try { window.dispatchEvent(new Event('sipat:registry-changed')); } catch { /* no window: nothing to tell */ } return value; };
+
+export async function addRegistryItems(kind: RegistryKind, names: string[]): Promise<CompanyRegistry> {
+  return registryChanged(await requestJson<CompanyRegistry>(`/api/admin/registry/${kind}`, { method: 'POST', body: JSON.stringify({ names }) }));
 }
 
-export function updateRegistryItem(kind: RegistryKind, id: string, change: { name?: string; isActive?: boolean }): Promise<RegistryItem> {
-  return requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) });
+export async function updateRegistryItem(kind: RegistryKind, id: string, change: { name?: string; isActive?: boolean }): Promise<RegistryItem> {
+  return registryChanged(await requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) }));
 }
 
 /** Takes a unit or sector off the list: deleted when nobody uses it, only put away (`deleted: false`) when in use. */
-export function removeRegistryItem(kind: RegistryKind, id: string): Promise<{ deleted: boolean }> {
-  return requestJson<{ deleted: boolean }>(`/api/admin/registry/${kind}/${id}`, { method: 'DELETE' });
+export async function removeRegistryItem(kind: RegistryKind, id: string): Promise<{ deleted: boolean }> {
+  return registryChanged(await requestJson<{ deleted: boolean }>(`/api/admin/registry/${kind}/${id}`, { method: 'DELETE' }));
 }
 
 /**

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '@/api';
+import { UnitScopeProvider } from '@/trainings/unitScope';
 import CollaboratorsPage from './CollaboratorsPage';
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -176,6 +177,20 @@ describe('collaborators', () => {
     await screen.findByRole('table', { name: 'Colaboradores da empresa' });
     expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
     expect(within(screen.getByLabelText('Filtrar por unidade')).getByRole('option', { name: 'Nenhuma unidade cadastrada' })).toBeDisabled();
+  });
+
+  it('with a unit chosen at the top, lists only its people and drops its own unit filter', async () => {
+    localStorage.setItem('sipat:unit:acme', 'u-1');
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({ ...registry(), units: [item('u-1', 'Matriz'), item('u-2', 'Filial')] });
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-1', 'u-1', null), profile('p-2', 'u-2', null)]);
+    render(<MemoryRouter><UnitScopeProvider enabled scopeKey="acme"><CollaboratorsPage /></UnitScopeProvider></MemoryRouter>);
+
+    const table = await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    await waitFor(() => expect(within(table).queryByText('José Maria Santos')).not.toBeInTheDocument());
+    expect(within(table).getByText('Maria José Oliveira')).toBeVisible();
+    expect(screen.queryByLabelText('Filtrar por unidade')).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
+    localStorage.clear();
   });
 
   it('moves two selected people to a sector from the one "Unidade e setor" button', async () => {
