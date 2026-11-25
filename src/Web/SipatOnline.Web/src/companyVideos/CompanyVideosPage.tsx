@@ -78,20 +78,20 @@ export default function CompanyVideosPage() {
     {data && !data.canSend && <EmptyState description="Enviar vídeos da própria empresa faz parte do plano Diamante. Fale com a operação para mudar de plano." title="Disponível no plano Diamante" />}
 
     {data?.canSend && (data.termsAccepted
-      ? <DropZone onFiles={send} />
+      ? <DropZone compact={sending.length > 0 || data.videos.length > 0} onFiles={send} />
       : <section className="grid justify-items-start gap-3 rounded-3xl border border-border bg-card p-6">
         <p className="m-0 max-w-prose text-[0.9375rem] leading-relaxed">Os vídeos que você enviar são da sua empresa: ela tem o direito de usá-los e a autorização de imagem de quem aparece neles.</p>
         <Button onClick={() => void agree()}>Concordo, quero enviar</Button>
       </section>)}
 
-    {data && (sending.length > 0 || data.videos.length > 0) && <ul className="m-0 grid list-none gap-5 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+    {data && (sending.length > 0 || data.videos.length > 0) && <ul className="m-0 grid list-none gap-x-5 gap-y-6 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
       {sending.map(item => <li key={item.id}><SendingCard item={item} /></li>)}
       {data.videos.map(item => <li key={item.video.id}>
         <VideoCard item={item} onPlay={() => setPlaying(item)} onRemove={() => void remove(item)} onRename={title => void rename(item, title)} />
       </li>)}
     </ul>}
 
-    {data?.canSend && <footer aria-label="Espaço usado" className="mt-2 grid max-w-xs gap-1.5">
+    {data?.canSend && <footer aria-label="Espaço usado" className="grid max-w-[14rem] gap-1.5">
       <div aria-hidden="true" className="h-1 overflow-hidden rounded-full bg-muted">
         <div className={cn('h-full rounded-full transition-[width] duration-500', used > 0.9 ? 'bg-destructive' : 'bg-primary/60')} style={{ width: `${Math.min(100, Math.max(used > 0 ? 2 : 0, used * 100))}%` }} />
       </div>
@@ -107,7 +107,7 @@ export default function CompanyVideosPage() {
 }
 
 /** The one thing on top of the page: drop the files, or pick them. */
-function DropZone({ onFiles }: { onFiles: (files: FileList | File[] | null) => void }) {
+function DropZone({ onFiles, compact = false }: { onFiles: (files: FileList | File[] | null) => void; compact?: boolean }) {
   const [over, setOver] = useState(false);
   const depth = useRef(0);
   const drop = (event: DragEvent<HTMLLabelElement>) => {
@@ -117,20 +117,25 @@ function DropZone({ onFiles }: { onFiles: (files: FileList | File[] | null) => v
     onFiles(event.dataTransfer.files);
   };
   return <label
-    className={cn('m-0 grid cursor-pointer justify-items-center gap-2 rounded-3xl border-2 border-dashed px-6 py-12 text-center transition-colors duration-150 focus-within:border-primary',
+    className={cn('m-0 cursor-pointer border-dashed transition-[border-color,background-color,padding] duration-200 focus-within:border-primary',
+      compact ? 'flex items-center gap-3 rounded-2xl border px-4 py-3 text-left' : 'grid justify-items-center gap-2 rounded-3xl border-2 px-6 py-12 text-center',
       over ? 'border-primary bg-accent' : 'border-border bg-card hover:border-primary/60')}
     onDragEnter={event => { event.preventDefault(); depth.current += 1; setOver(true); }}
     onDragLeave={() => { depth.current -= 1; if (depth.current <= 0) setOver(false); }}
     onDragOver={event => event.preventDefault()}
     onDrop={drop}>
-    <CloudUpload aria-hidden="true" className={cn('size-8 transition-colors', over ? 'text-primary' : 'text-muted-foreground')} />
-    <strong className="text-lg font-semibold tracking-tight">{over ? 'Pode soltar' : 'Arraste seus vídeos aqui'}</strong>
-    <span className="text-sm text-muted-foreground">ou <span className="font-semibold text-primary underline-offset-2 hover:underline">escolha do computador</span> · MP4 ou WebM, até 2 GB cada</span>
+    <CloudUpload aria-hidden="true" className={cn('shrink-0 transition-colors', compact ? 'size-5' : 'size-8', over ? 'text-primary' : 'text-muted-foreground')} />
+    {compact
+      ? <span className="min-w-0 flex-1 text-sm text-muted-foreground"><strong className="font-semibold text-foreground">{over ? 'Pode soltar' : 'Enviar mais vídeos'}</strong> · arraste aqui ou <span className="font-semibold text-primary underline-offset-2 hover:underline">escolha do computador</span></span>
+      : <>
+        <strong className="text-lg font-semibold tracking-tight">{over ? 'Pode soltar' : 'Arraste seus vídeos aqui'}</strong>
+        <span className="text-sm text-muted-foreground">ou <span className="font-semibold text-primary underline-offset-2 hover:underline">escolha do computador</span> · MP4 ou WebM, até 2 GB cada</span>
+      </>}
     <input accept="video/mp4,video/webm,.mp4,.webm" className="sr-only" multiple onChange={event => { onFiles(event.target.files); event.target.value = ''; }} type="file" />
   </label>;
 }
 
-const tile = 'relative grid aspect-video place-items-center overflow-hidden rounded-2xl bg-[#12332c] text-white';
+const tile = 'relative grid aspect-video place-items-center overflow-hidden rounded-xl bg-[#12332c] text-white';
 
 /** A video on its way: how far it is, or what went wrong with a way to try again. */
 function SendingCard({ item }: { item: UploadItem }) {
