@@ -18,7 +18,9 @@ public sealed record ImportRejection(int Row, string? Login, string Message);
 /// <summary>Someone the import creates (or would create, in the preview). The front joins it with the password it sent.</summary>
 public sealed record ImportCredential(int Row, string Name, string Login);
 
-public sealed record ImportResult(int Created, int Updated, int Unchanged, IReadOnlyList<ImportRejection> Rejected, IReadOnlyList<ImportCredential> Credentials);
+/// <summary><c>NewUnits</c>/<c>NewSectors</c>: names the sheet brings that the company did not have; the import adds them to its lists.</summary>
+public sealed record ImportResult(int Created, int Updated, int Unchanged, IReadOnlyList<ImportRejection> Rejected, IReadOnlyList<ImportCredential> Credentials,
+    IReadOnlyList<string>? NewUnits = null, IReadOnlyList<string>? NewSectors = null);
 
 /// <summary>
 /// The HR sheet of participants: each line updates the participant it names (by login, or registration when there is no login)
@@ -57,8 +59,15 @@ public sealed class ParticipantImportService(
 
         var company = await LoadAsync(tenant.Value, request.DryRun, token);
         var plan = await PlanAsync(rows, company, request.CreateOnly, token);
+        // only what an accepted line uses: a refused line adds nothing to the lists
+        var people = plan.Creates.Select(item => item.User).Concat(company.People.Values.Select(person => person.User)).ToArray();
+        var usedUnits = people.Select(user => user.UnitId).OfType<Guid>().ToHashSet();
+        var usedSectors = people.Select(user => user.SectorId).OfType<Guid>().ToHashSet();
+        var newUnits = company.Units.Added.Where(item => usedUnits.Contains(item.Id)).ToArray();
+        var newSectors = company.Sectors.Added.Where(item => usedSectors.Contains(item.Id)).ToArray();
         var result = new ImportResult(plan.Creates.Count, plan.Updated, plan.Unchanged, plan.Rejected,
-            plan.Creates.Select(item => item.Credential).ToArray());
+            plan.Creates.Select(item => item.Credential).ToArray(),
+            newUnits.Select(item => item.Name).ToArray(), newSectors.Select(item => item.Name).ToArray());
         if (request.DryRun) return Result<ImportResult>.Success(result);
 
         if (plan.Creates.Count > 0 && company.ParticipantRoleId is null) return Failed();
@@ -68,6 +77,19 @@ public sealed class ParticipantImportService(
         {
             try
             {
+                var now = clock.GetUtcNow();
+                foreach (var (id, name, reactivate) in newUnits)
+                {
+                    if (reactivate) await db.CompanyUnits.Where(item => item.Id == id).ExecuteUpdateAsync(set => set.SetProperty(item => item.IsActive, true), token);
+                    else db.CompanyUnits.Add(new CompanyUnitEntity { Id = id, TenantId = tenant.Value, Name = name, NameKey = ProfileText.CatalogKey(name), IsActive = true, CreatedAt = now });
+                }
+
+                foreach (var (id, name, reactivate) in newSectors)
+                {
+                    if (reactivate) await db.CompanySectors.Where(item => item.Id == id).ExecuteUpdateAsync(set => set.SetProperty(item => item.IsActive, true), token);
+                    else db.CompanySectors.Add(new CompanySectorEntity { Id = id, TenantId = tenant.Value, Name = name, NameKey = ProfileText.CatalogKey(name), IsActive = true, CreatedAt = now });
+                }
+
                 foreach (var create in plan.Creates)
                 {
                     db.Users.Add(create.User);
@@ -221,21 +243,19 @@ public sealed class ParticipantImportService(
                     ? $"Login repetido: a linha {firstRow} já usa esse login."
                     : $"Nome repetido: a linha {firstRow} já tem esse nome. Informe o login para diferenciar.");
 
-        // 3. unit and sector, only from the active lists of this company
+        // 3. unit and sector: a name the company does not have yet joins its list with the import
         Guid? unitId = null;
         if (!IsBlank(row.Unit))
         {
-            if (!company.Units.TryGetValue(ProfileText.CatalogKey(row.Unit!), out var id))
-                return new Rejected(shownLogin, $"Unidade \"{row.Unit!.Trim()}\" não está na lista da empresa.");
-            unitId = id;
+            unitId = company.Units.Resolve(row.Unit!);
+            if (unitId is null) return new Rejected(shownLogin, $"O nome da unidade pode ter até {Catalog.MaximumNameLength} caracteres.");
         }
 
         Guid? sectorId = null;
         if (!IsBlank(row.Sector))
         {
-            if (!company.Sectors.TryGetValue(ProfileText.CatalogKey(row.Sector!), out var id))
-                return new Rejected(shownLogin, $"Setor \"{row.Sector!.Trim()}\" não está na lista da empresa.");
-            sectorId = id;
+            sectorId = company.Sectors.Resolve(row.Sector!);
+            if (sectorId is null) return new Rejected(shownLogin, $"O nome do setor pode ter até {Catalog.MaximumNameLength} caracteres.");
         }
 
         // 4. update: only what the line informs; the login, the password and the active flag stay as they are
@@ -354,10 +374,10 @@ public sealed class ParticipantImportService(
         var nameKeys = people.Where(user => participantIds.Contains(user.Id))
             .Select(user => ProfileText.CatalogKey(ProfileText.PersonName(user.DisplayName))).ToHashSet(StringComparer.Ordinal);
 
-        var units = await db.CompanyUnits.AsNoTracking().Where(item => item.TenantId == tenant && item.IsActive)
-            .ToDictionaryAsync(item => item.NameKey, item => item.Id, StringComparer.Ordinal, token);
-        var sectors = await db.CompanySectors.AsNoTracking().Where(item => item.TenantId == tenant && item.IsActive)
-            .ToDictionaryAsync(item => item.NameKey, item => item.Id, StringComparer.Ordinal, token);
+        var units = new Catalog(await db.CompanyUnits.AsNoTracking().Where(item => item.TenantId == tenant)
+            .Select(item => new CatalogItem(item.Id, item.NameKey, item.IsActive)).ToListAsync(token));
+        var sectors = new Catalog(await db.CompanySectors.AsNoTracking().Where(item => item.TenantId == tenant)
+            .Select(item => new CatalogItem(item.Id, item.NameKey, item.IsActive)).ToListAsync(token));
         // a registration number stored on two people (data from before the import existed) belongs to no one in particular
         var registrations = byLogin.Values.Where(person => person.IsParticipant && person.User.RegistrationNumber is not null)
             .GroupBy(person => person.User.RegistrationNumber!, StringComparer.Ordinal)
@@ -391,9 +411,40 @@ public sealed class ParticipantImportService(
         IReadOnlyDictionary<string, Person> People,
         IReadOnlySet<string> ParticipantNameKeys,
         IReadOnlyDictionary<string, RegistrationOwner> Registrations,
-        IReadOnlyDictionary<string, Guid> Units,
-        IReadOnlyDictionary<string, Guid> Sectors,
+        Catalog Units,
+        Catalog Sectors,
         ProfileRules Rules);
+
+    private sealed record CatalogItem(Guid Id, string NameKey, bool IsActive);
+
+    /// <summary>The units (or sectors) of the company. A name it does not have is added; one that was deactivated comes back.</summary>
+    private sealed class Catalog(IReadOnlyList<CatalogItem> items)
+    {
+        public const int MaximumNameLength = 100;
+        private readonly Dictionary<string, CatalogItem> byKey = items.ToDictionary(item => item.NameKey, StringComparer.Ordinal);
+
+        /// <summary>What the import adds (Reactivate: it existed, deactivated), in the order the sheet first names them.</summary>
+        public List<(Guid Id, string Name, bool Reactivate)> Added { get; } = [];
+
+        public Guid? Resolve(string raw)
+        {
+            var name = string.Join(' ', raw.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+            if (name.Length > MaximumNameLength) return null;
+            var key = ProfileText.CatalogKey(name);
+            if (byKey.TryGetValue(key, out var known))
+            {
+                if (known.IsActive) return known.Id;
+                Added.Add((known.Id, name, true));
+                byKey[key] = known with { IsActive = true };
+                return known.Id;
+            }
+
+            var id = Guid.NewGuid();
+            Added.Add((id, name, false));
+            byKey[key] = new CatalogItem(id, key, true);
+            return id;
+        }
+    }
 
     private abstract record Outcome
     {

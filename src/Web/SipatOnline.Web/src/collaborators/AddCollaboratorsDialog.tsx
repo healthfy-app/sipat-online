@@ -31,6 +31,7 @@ const stopMessage = (row: number) =>
 const sum = (total: ImportResult | null, part: ImportResult): ImportResult => total === null ? part : {
   created: total.created + part.created, updated: total.updated + part.updated, unchanged: total.unchanged + part.unchanged,
   rejected: [...total.rejected, ...part.rejected], credentials: [...total.credentials, ...part.credentials],
+  newUnits: [...(total.newUnits ?? []), ...(part.newUnits ?? [])], newSectors: [...(total.newSectors ?? []), ...(part.newSectors ?? [])],
 };
 
 /**
@@ -240,6 +241,12 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
             <p className="m-0 text-sm">
               <strong>{counts.created}</strong> serão criados · <strong>{counts.updated}</strong> atualizados · <strong>{counts.unchanged}</strong> sem mudança · <strong>{rejected.length}</strong> recusados
             </p>
+            {(counts.newUnits?.length ?? 0) > 0 && <p className="m-0 text-sm text-muted-foreground">
+              {counts.newUnits!.length === 1 ? 'Unidade nova, será criada' : `${counts.newUnits!.length} unidades novas serão criadas`}: <strong className="text-foreground">{counts.newUnits!.join(', ')}</strong>
+            </p>}
+            {(counts.newSectors?.length ?? 0) > 0 && <p className="m-0 text-sm text-muted-foreground">
+              {counts.newSectors!.length === 1 ? 'Setor novo, será criado' : `${counts.newSectors!.length} setores novos serão criados`}: <strong className="text-foreground">{counts.newSectors!.join(', ')}</strong>
+            </p>}
             {rejected.length > 0 && <ul className="m-0 grid max-h-32 list-none gap-0.5 overflow-auto p-0 text-xs text-warning">
               {rejected.slice(0, 8).map(item => <li key={item.row}>Linha {item.row}{item.login ? ` · ${item.login}` : ''}: {item.message}</li>)}
               {rejected.length > 8 && <li>e mais {rejected.length - 8}</li>}

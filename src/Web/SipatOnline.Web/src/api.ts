@@ -1621,6 +1621,8 @@ export interface ImportResult {
   created: number; updated: number; unchanged: number;
   rejected: { row: number; login: string | null; message: string }[];
   credentials: { row: number; name: string; login: string }[];
+  /** Units and sectors the sheet brings that the company did not have: the import adds them. */
+  newUnits?: string[] | null; newSectors?: string[] | null;
 }
 
 /**
