@@ -359,8 +359,8 @@ describe('tenant portal', () => {
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Treinamentos' })).toHaveAttribute('href', '/admin/treinamentos');
     expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
-    // the page's own calls, plus the units for the switch at the top and where each person is (the overview by unit)
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(10));
+    // the page's own calls, plus the units for the switch at the top, and where each person is and the lists of the company (the overview by unit)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(11));
   });
 
   it('shows the learner portal without the administration sidebar for participants', async () => {
