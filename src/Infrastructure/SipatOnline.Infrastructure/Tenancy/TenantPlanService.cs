@@ -51,7 +51,13 @@ public sealed class TenantPlanService(PlatformDbContext db, ITenantContext tenan
     {
         if (tenantContext.CurrentTenantId is not { IsEmpty: false } tenant) return new HashSet<Guid>();
         var rows = await db.CompanyVideos.AsNoTracking().ToListAsync(token);
-        return rows.GroupBy(row => row.VideoId).Where(group => group.All(row => row.TenantId != tenant.Value)).Select(group => group.Key).ToHashSet();
+        var hidden = rows.GroupBy(row => row.VideoId).Where(group => group.All(row => row.TenantId != tenant.Value)).Select(group => group.Key).ToHashSet();
+        // a video a company sent is its own: nobody else's, and the company's only while its plan has internal videos
+        var ownVideos = CompanyCapabilities.For(await GetAsync(tenant.Value, token)).InternalVideos;
+        hidden.UnionWith(await db.PlatformCourseVideos.AsNoTracking()
+            .Where(video => video.OwnerTenantId != null && (video.OwnerTenantId != tenant.Value || !ownVideos))
+            .Select(video => video.Id).ToListAsync(token));
+        return hidden;
     }
 
     /// <summary>The operator makes an assunto belong to one company (its internal videos), or gives it back to everyone.</summary>

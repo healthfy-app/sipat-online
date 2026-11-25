@@ -1020,6 +1020,8 @@ namespace SipatOnline.Infrastructure.Migrations
 
                     b.HasIndex("CreatedAt");
 
+                    b.HasIndex("OwnerTenantId");
+
                     b.HasIndex("Provider", "ExternalId")
                         .IsUnique()
                         .HasFilter("\"ExternalId\" IS NOT NULL");
@@ -1449,6 +1451,12 @@ namespace SipatOnline.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(7)
                         .HasColumnType("character varying(7)");
+
+                    b.Property<long?>("VideoQuotaBytes")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTimeOffset?>("VideoTermsAcceptedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
 

@@ -57,6 +57,7 @@ public sealed class PlatformCourseVideoEntityConfiguration :
         builder.Property(video => video.Provider).HasMaxLength(16).IsRequired().HasDefaultValue("Sipat");
         builder.Property(video => video.ExternalId).HasMaxLength(ExternalVideoLink.MaximumIdLength);
         builder.HasIndex(video => video.CreatedAt);
+        builder.HasIndex(video => video.OwnerTenantId);
         builder.HasIndex(video => new { video.Provider, video.ExternalId })
             .IsUnique()
             .HasFilter("\"ExternalId\" IS NOT NULL");

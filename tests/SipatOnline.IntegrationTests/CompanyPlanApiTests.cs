@@ -232,6 +232,10 @@ public sealed class CompanyPlanApiTests
         await Send(admin, HttpMethod.Put, structure, Lessons(first, other));
         await Send(admin, HttpMethod.Put, structure, Lessons(internalVideo), HttpStatusCode.BadRequest);
         await Send(admin, HttpMethod.Put, $"/api/admin/training-editor/courses/{courseId}/modules", new { items = Array.Empty<object>() }, HttpStatusCode.Forbidden);
+        // sending its own videos is Diamante's
+        var upload = new { contentType = "video/mp4", sizeBytes = 1_000L };
+        Assert.Equal("sipat.plan_required", (await Send(admin, HttpMethod.Post, "/api/admin/company-videos/uploads", upload, HttpStatusCode.Forbidden)).GetProperty("code").GetString());
+        Assert.False((await Get(admin, "/api/admin/company-videos/")).GetProperty("canSend").GetBoolean());
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } }, HttpStatusCode.BadRequest);
 
         // Ouro: its logo and colors show
@@ -243,6 +247,36 @@ public sealed class CompanyPlanApiTests
         Assert.Equal(["Ergonomia", "Higiene mental", "Vídeos da Acme"], Titles(await Get(admin, "/api/admin/sipat-catalog")));
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } });
         await Send(admin, HttpMethod.Put, $"/api/admin/training-editor/courses/{courseId}/modules", new { items = Array.Empty<object>() });
+
+        // its own videos: the terms once, then inside the room it has (the operation sets it)
+        Assert.Equal("company_videos.terms_required", (await Send(admin, HttpMethod.Post, "/api/admin/company-videos/uploads", upload, HttpStatusCode.Conflict)).GetProperty("code").GetString());
+        await Send(admin, HttpMethod.Post, "/api/admin/company-videos/terms", new { }, HttpStatusCode.NoContent);
+        await Send(admin, HttpMethod.Post, "/api/admin/company-videos/uploads", upload);
+        Assert.Equal(20L * 1024 * 1024 * 1024, (await Get(admin, "/api/admin/company-videos/")).GetProperty("quotaBytes").GetInt64());
+        await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/video-quota", new { gigabytes = 1 });
+        var tooBig = await Send(admin, HttpMethod.Post, "/api/admin/company-videos/uploads", new { contentType = "video/mp4", sizeBytes = 1_500_000_000L }, HttpStatusCode.Conflict);
+        Assert.Equal("company_videos.quota_exceeded", tooBig.GetProperty("code").GetString());
+        await Send(admin, HttpMethod.Put, $"/api/platform/companies/{companyId}/video-quota", new { gigabytes = 50 }, HttpStatusCode.NotFound);
+
+        // a video a company sent is its own: on its list and in its days, and nobody else's
+        Guid ownVideo, foreignVideo;
+        var otherCompany = dashboard.EnumerateArray().Single(item => item.GetProperty("key").GetString() == "outra-regras").GetProperty("id").GetGuid();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            ownVideo = await AddVideoAsync(db, "Fala do diretor da Acme");
+            foreignVideo = await AddVideoAsync(db, "Vídeo da Outra");
+            await db.PlatformCourseVideos.Where(video => video.Id == ownVideo).ExecuteUpdateAsync(update => update.SetProperty(video => video.OwnerTenantId, (Guid?)companyId));
+            await db.PlatformCourseVideos.Where(video => video.Id == foreignVideo).ExecuteUpdateAsync(update => update.SetProperty(video => video.OwnerTenantId, (Guid?)otherCompany));
+        }
+        Assert.Equal(ownVideo, Assert.Single((await Get(admin, "/api/admin/company-videos/")).GetProperty("videos").EnumerateArray()).GetProperty("video").GetProperty("id").GetGuid());
+        var offered = (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("videos").EnumerateArray().Select(item => item.GetProperty("video").GetProperty("id").GetGuid()).ToArray();
+        Assert.Contains(ownVideo, offered);
+        Assert.DoesNotContain(foreignVideo, offered);
+        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Da outra", foreignVideo) } }, HttpStatusCode.BadRequest);
+        await Send(admin, HttpMethod.Put, $"/api/admin/company-videos/{ownVideo}", new { title = "Fala do diretor" }, HttpStatusCode.NoContent);
+        await Send(admin, HttpMethod.Put, $"/api/admin/company-videos/{foreignVideo}", new { title = "Minha agora" }, HttpStatusCode.NotFound);
+        await Send(admin, HttpMethod.Delete, $"/api/admin/company-videos/{foreignVideo}", new { }, HttpStatusCode.NotFound);
         using (var outra = Client(factory, "outra-regras.localhost"))
         {
             await Send(outra, HttpMethod.Post, "/api/identity/login", new LoginRequest("outra-admin", "AdminPassword123"), HttpStatusCode.NoContent);

@@ -739,6 +739,33 @@ export function companyEditorLinks<T>(value: T): T {
   return JSON.parse(JSON.stringify(value).replaceAll(`${platformCatalog}/`, `${trainingEditor}/`)) as T;
 }
 
+const companyVideos = '/api/admin/company-videos';
+let uploadBase = `${platformCatalog}/videos`;
+/**
+ * Where videos are sent: the operation's library, or the company's own videos (private to it, inside its room).
+ * It follows who is signed in, so the app sets it once and the upload queue sends to the right place.
+ */
+export function setUploadScope(scope: 'platform' | 'company'): void {
+  uploadBase = scope === 'company' ? companyVideos : `${platformCatalog}/videos`;
+}
+
+/** A video the company sent, and the company's trainings that have it. */
+export interface CompanyVideo { video: PlatformCourseVideo; trainings: string[] }
+export interface CompanyVideos { videos: CompanyVideo[]; usedBytes: number; quotaBytes: number; termsAccepted: boolean; canSend: boolean }
+export async function listCompanyVideos(): Promise<CompanyVideos> {
+  return companyEditorLinks(await requestJson<CompanyVideos>(`${companyVideos}/`));
+}
+/** The company says, once, that what it sends is its own to use. */
+export async function acceptCompanyVideoTerms(): Promise<void> {
+  await request(`${companyVideos}/terms`, { method: 'POST', body: '{}' });
+}
+export async function renameCompanyVideo(videoId: string, title: string): Promise<void> {
+  await request(`${companyVideos}/${videoId}`, { method: 'PUT', body: JSON.stringify({ title }) });
+}
+export async function deleteCompanyVideo(videoId: string): Promise<void> {
+  await request(`${companyVideos}/${videoId}`, { method: 'DELETE' });
+}
+
 /** What the company's plan lets it change in one of its trainings. */
 export interface TrainingAccess { editDetails: boolean; editGrid: boolean; editActivities: boolean; uploadVideo: boolean; plan: string }
 export interface TrainingEditorData { course: PlatformCourse; access: TrainingAccess; sipatId: string; sipatTitle: string; sipatStatus: string }
@@ -944,7 +971,7 @@ export type VideoUploadStart =
 
 async function startVideoUpload(file: File): Promise<VideoUploadStart> {
   try {
-    return await requestJson<VideoUploadStart>('/api/platform/catalog/videos/uploads', {
+    return await requestJson<VideoUploadStart>(`${uploadBase}/uploads`, {
       method: 'POST',
       body: JSON.stringify({ contentType: file.type, sizeBytes: file.size }),
     });
@@ -1025,7 +1052,7 @@ async function uploadVideoMultipart(
   formData.append('video', file);
   const path = courseId
     ? `/api/platform/catalog/courses/${courseId}/videos`
-    : '/api/platform/catalog/videos';
+    : uploadBase;
   if (!options.onProgress) {
     return requestJson<PlatformCourseVideo>(path, { method: 'POST', body: formData, signal: options.signal });
   }
@@ -1076,7 +1103,7 @@ export async function uploadPlatformVideo(
   }
 
   return requestJson<PlatformCourseVideo>(
-    `/api/platform/catalog/videos/uploads/${start.videoId}/complete`,
+    `${uploadBase}/uploads/${start.videoId}/complete`,
     {
       method: 'POST',
       body: JSON.stringify({ title, durationMilliseconds, courseId: courseId ?? null }),
@@ -1098,7 +1125,7 @@ export interface ChunkedVideoUpload {
 /** Null: this environment has no direct upload (or the API is older), send with uploadPlatformVideo. */
 export async function startChunkedVideoUpload(contentType: string, sizeBytes: number): Promise<ChunkedVideoUpload | null> {
   try {
-    const start = await requestJson<ChunkedVideoUpload | { mode: 'multipart' }>('/api/platform/catalog/videos/uploads/chunked', {
+    const start = await requestJson<ChunkedVideoUpload | { mode: 'multipart' }>(`${uploadBase}/uploads/chunked`, {
       method: 'POST',
       body: JSON.stringify({ contentType, sizeBytes }),
     });
@@ -1115,7 +1142,7 @@ export async function signChunkedUploadParts(
   partNumbers: number[],
 ): Promise<{ partNumber: number; url: string }[]> {
   const response = await requestJson<{ parts: { partNumber: number; url: string }[] }>(
-    `/api/platform/catalog/videos/uploads/${videoId}/parts`,
+    `${uploadBase}/uploads/${videoId}/parts`,
     { method: 'POST', body: JSON.stringify({ uploadId, partNumbers }) },
   );
   return response.parts;
@@ -1126,21 +1153,21 @@ export async function listChunkedUploadParts(
   uploadId: string,
 ): Promise<{ partNumber: number; sizeBytes: number }[]> {
   const response = await requestJson<{ parts: { partNumber: number; sizeBytes: number }[] }>(
-    `/api/platform/catalog/videos/uploads/${videoId}/parts/list`,
+    `${uploadBase}/uploads/${videoId}/parts/list`,
     { method: 'POST', body: JSON.stringify({ uploadId }) },
   );
   return response.parts;
 }
 
 export async function finishChunkedUpload(videoId: string, uploadId: string): Promise<void> {
-  await request(`/api/platform/catalog/videos/uploads/${videoId}/finish`, {
+  await request(`${uploadBase}/uploads/${videoId}/finish`, {
     method: 'POST',
     body: JSON.stringify({ uploadId }),
   });
 }
 
 export async function abortChunkedUpload(videoId: string, uploadId: string): Promise<void> {
-  await request(`/api/platform/catalog/videos/uploads/${videoId}/abort`, {
+  await request(`${uploadBase}/uploads/${videoId}/abort`, {
     method: 'POST',
     body: JSON.stringify({ uploadId }),
   });
@@ -1152,7 +1179,7 @@ export function completeUploadedVideo(
   durationMilliseconds: number,
   courseId?: string,
 ): Promise<PlatformCourseVideo> {
-  return requestJson<PlatformCourseVideo>(`/api/platform/catalog/videos/uploads/${videoId}/complete`, {
+  return requestJson<PlatformCourseVideo>(`${uploadBase}/uploads/${videoId}/complete`, {
     method: 'POST',
     body: JSON.stringify({ title, durationMilliseconds, courseId: courseId ?? null }),
   });

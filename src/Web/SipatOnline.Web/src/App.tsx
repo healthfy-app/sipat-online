@@ -16,6 +16,7 @@ import {
   ApiError,
   configureCompanyAdministration,
   getCompanyCapabilities,
+  setUploadScope,
   type CompanyCapabilities,
   getCompanyAdministrationId,
   getSession,
@@ -43,6 +44,7 @@ import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
 import TrainingEditorPage from './trainings/TrainingEditorPage';
+import CompanyVideosPage from './companyVideos/CompanyVideosPage';
 import CompanyNav from './companies/CompanyNav';
 import PlanMedal from './companies/PlanMedal';
 import PlaybackQualityPage from './quality/PlaybackQualityPage';
@@ -215,6 +217,10 @@ export default function App() {
             <Route
               path="/admin/treinamentos/:sipatId"
               element={state.session && hasAdminRole(state.session) ? <SipatBuilderPage basePath="/admin/treinamentos" canEditThemes={false} /> : <AccessDenied />}
+            />
+            <Route
+              path="/admin/videos"
+              element={state.session && hasAdminRole(state.session) ? <CompanyVideosPage /> : <AccessDenied />}
             />
             <Route
               path="/admin/treinamentos/:sipatId/editar"
@@ -555,6 +561,8 @@ function ProtectedPortal({
     getCompanyCapabilities().then(result => { if (current) setCapabilities(result); }).catch(() => undefined);
     return () => { current = false; };
   }, [session]);
+  // videos go to the operation's library or to the company's own, by who is signed in; the upload queue follows it
+  setUploadScope(session && !session.roles.includes('PlatformOperator') ? 'company' : 'platform');
   // the phone menu (sheet) closes whenever the page changes, including after tapping one of its links
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
@@ -607,6 +615,7 @@ function ProtectedPortal({
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
           {hasAdminRole(session) && <>
             <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
+            {capabilities?.internalVideos && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/videos">Vídeos da empresa</NavLink>}
             {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
           </>}
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">

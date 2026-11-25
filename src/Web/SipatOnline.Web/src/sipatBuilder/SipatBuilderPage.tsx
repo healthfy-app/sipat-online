@@ -417,7 +417,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
       : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
         onChange={cancelled || viewOnly ? () => undefined : edit} onRemoveDay={cancelled ? undefined : removeDay}
-        onUpload={canEditThemes && !cancelled ? () => setSending(true) : undefined} />}
+        // the operation sends right here; a company with its own videos (Diamante) sends in its page, and comes back to find them in the list
+        onUpload={cancelled ? undefined : canEditThemes ? () => setSending(true) : capabilities?.internalVideos ? () => window.open('/admin/videos', '_blank', 'noopener') : undefined} />}
 
     {sending && <Dialog description="Os vídeos entram na lista assim que terminam de ser preparados. Você pode continuar montando os dias enquanto isso." onClose={() => setSending(false)} size="lg" title="Enviar vídeo">
       <VideoUploadForm onQueued={() => { setSending(false); setNotice('Envio iniciado. O vídeo aparece na lista quando estiver pronto.'); }} />

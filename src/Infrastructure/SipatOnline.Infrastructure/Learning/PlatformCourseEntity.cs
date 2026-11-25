@@ -87,7 +87,7 @@ public sealed class PlatformCourseVideoEntity
     /// <summary>The video id at the external provider; null for uploaded files.</summary>
     public string? ExternalId { get; set; }
 
-    /// <summary>Reserved for videos owned by a company; always null for now.</summary>
+    /// <summary>The company that sent the video (its own, private to it); null for the operation's library.</summary>
     public Guid? OwnerTenantId { get; set; }
 
     public ICollection<PlatformCourseVideoLinkEntity> CourseLinks { get; set; } = [];

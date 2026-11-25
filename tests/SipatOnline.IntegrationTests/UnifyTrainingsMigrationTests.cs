@@ -3,7 +3,6 @@ using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Migrations;
 using SipatOnline.Infrastructure;
 using SipatOnline.Infrastructure.Learning;
-using SipatOnline.Infrastructure.Tenancy;
 using Testcontainers.PostgreSql;
 
 namespace SipatOnline.IntegrationTests;
@@ -35,17 +34,12 @@ public sealed class UnifyTrainingsMigrationTests
         await using (var db = new PlatformDbContext(options))
         {
             await db.GetService<IMigrator>().MigrateAsync(Before);
+            // the company goes in by hand: its table gained columns after this point, which the current model would try to write
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO tenancy."Tenants" ("Id", "Key", "Name", "PrimaryColor", "SecondaryColor", "CreatedAt", "IsActive", "Plan")
+                VALUES ({tenant}, 'damare', 'Damare', '#123456', '#654321', now(), true, 3)
+                """);
             // these tables did not change: the current model writes them
-            db.Tenants.Add(new TenantEntity
-            {
-                Id = tenant,
-                Key = "damare",
-                Name = "Damare",
-                PrimaryColor = "#123456",
-                SecondaryColor = "#654321",
-                CreatedAt = DateTimeOffset.UtcNow,
-                IsActive = true
-            });
             db.PlatformCourseVideos.AddRange(Video(v1, "Um"), Video(v2, "Dois"), Video(v3, "Três"));
             db.GameModules.Add(new GameModuleEntity { Id = game, Title = "Quiz", CreatedAt = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();
