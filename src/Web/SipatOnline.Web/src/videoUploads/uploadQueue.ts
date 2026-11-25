@@ -37,6 +37,8 @@ export interface UploadItem {
   file: File;
   title: string;
   courseId?: string;
+  /** Where the page that sent it wants it (a day of the training being built); the queue only carries it. */
+  tag?: string;
   status: UploadStatus;
   sentBytes: number;
   totalBytes: number;
@@ -272,7 +274,7 @@ export function discardAllInterrupted() {
 
 // ---------- commands ----------
 
-export function enqueueUploads(entries: { file: File; title: string }[], courseId?: string) {
+export function enqueueUploads(entries: { file: File; title: string }[], courseId?: string, tag?: string) {
   const queued = new Set(state.items.filter((item) => isActive(item.status)).map((item) => item.key));
   const saved = readSaved();
   const added: UploadItem[] = [];
@@ -288,6 +290,7 @@ export function enqueueUploads(entries: { file: File; title: string }[], courseI
       file: problem ? file : typedFile(file),
       title: title.trim() || previous?.title || titleFromFileName(file.name) || file.name,
       courseId: courseId ?? previous?.courseId,
+      tag,
       status: problem ? 'failed' : 'waiting',
       sentBytes: 0,
       totalBytes: file.size,

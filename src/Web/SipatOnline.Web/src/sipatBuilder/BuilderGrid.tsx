@@ -49,7 +49,7 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, onUpload, canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false }: {
+export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, onUpload, onSendToDay, arriving, canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false }: {
   /** The days came whole from a ready SIPAT (Bronze): their videos stay as they are, and no day is added or taken out. */
   locked?: boolean;
   /** Nothing can be changed: the company only views what the operation built. */
@@ -57,6 +57,10 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   days: DaySlots[]; catalog: Catalog; onChange: (days: DaySlots[]) => void; canEditThemes?: boolean;
   /** Opens the sending of videos (who may send them); the list above the days shows the button. */
   onUpload?: () => void;
+  /** Sends videos to a day (by its key): they join the company's videos and come onto that day when ready. */
+  onSendToDay?: (dayKey: string, files: File[]) => void;
+  /** What is on its way to each day, by its key. */
+  arriving?: Map<string, { id: string; title: string; status: string }[]>;
   /** The plan personalizes the grid (Prata and above): standalone videos go onto the days one by one. */
   canCustomizeGrid?: boolean;
   /** Removes a day; the page offers to undo it. Without it the day is simply dropped. */
@@ -171,7 +175,8 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
               return <Cell index={index} key={`box-${day.key}`} order={index * 3 + 1} row={2}>
                 <DayBox canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} dayIndex={index} locked={locked}
                   onVideos={videoIds => patchDay(index, { videos: videoIds })} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
-                  onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)} />
+                  onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)}
+                  arriving={arriving?.get(day.key)} onSend={onSendToDay && !readOnly ? files => onSendToDay(day.key, files) : undefined} />
               </Cell>;
             })}
 

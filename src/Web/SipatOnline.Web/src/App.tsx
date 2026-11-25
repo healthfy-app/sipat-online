@@ -563,7 +563,8 @@ function ProtectedPortal({
     return () => { current = false; };
   }, [session]);
   // videos go to the operation's library or to the company's own, by who is signed in; the upload queue follows it
-  setUploadScope(session && !session.roles.includes('PlatformOperator') ? 'company' : 'platform');
+  // (the operation, while inside a company, sends for that company)
+  setUploadScope(session && (!session.roles.includes('PlatformOperator') || getCompanyAdministrationId() !== null) ? 'company' : 'platform');
   // the phone menu (sheet) closes whenever the page changes, including after tapping one of its links
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);

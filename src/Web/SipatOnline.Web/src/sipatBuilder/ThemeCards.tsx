@@ -163,7 +163,11 @@ export function DragPreview({ data }: { data: { video?: CatalogVideo; subject?: 
  * subject. With a plan that personalizes the grid the videos are the operator's: videos are dropped or picked one
  * by one, reordered and removed right here.
  */
-export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false, locked = false }: {
+export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false, locked = false, onSend, arriving = [] }: {
+  /** Sends videos to this day: they join the company's videos and come onto the day when ready. */
+  onSend?: (files: File[]) => void;
+  /** The videos on their way to this day: sending, or being prepared. */
+  arriving?: { id: string; title: string; status: string }[];
   /** The day came from a ready SIPAT: its videos are shown as they are, nothing to pick or change. */
   locked?: boolean;
   dayIndex: number; subject: Subject | undefined; themes: Subject[]; catalog: Catalog; videoIds: string[]; gameIds: string[];
@@ -176,7 +180,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
   const { active } = useDndContext();
   const editable = canCustomizeGrid && !!onVideos && !locked;
   const full = videoIds.length >= maxVideoRows;
-  const empty = !subject && videoIds.length === 0;
+  const empty = !subject && videoIds.length === 0 && arriving.length === 0;
   // while something is dragged every day shows it can take it; the one under the pointer says what the drop will do
   const dragged = active?.data.current as { video?: CatalogVideo; subject?: Subject } | undefined;
   const preview = !isOver || !dragged ? ''
@@ -210,6 +214,21 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     {subject && available.length > 1 && <option value="all">Todos os vídeos de {subject.title} ({available.length})</option>}
     {available.map(video => <option key={video.id} value={video.id}>{video.title}</option>)}
   </select>;
+  // its own button and what is on its way, at the foot of the day
+  const sendRow = <>
+    {arriving.length > 0 && <ul aria-label={`Vídeos a caminho do dia ${dayIndex + 1}`} className="m-0 grid list-none gap-1 p-0 max-[760px]:order-3">
+      {arriving.map(item => <li className="flex items-center gap-2 rounded-lg border border-dashed border-primary/40 bg-accent/40 px-2 py-1.5" key={item.id}>
+        <span aria-hidden="true" className="size-2 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
+        <span className="min-w-0 flex-1 truncate text-xs font-medium" title={item.title}>{item.title}</span>
+        <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{item.status}</span>
+      </li>)}
+    </ul>}
+    {onSend && !full && <label className="m-0 flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-input px-2 text-[0.8125rem] font-semibold text-primary transition-colors hover:border-primary hover:bg-accent focus-within:border-primary max-[760px]:order-3 max-[760px]:min-h-12">
+      <CloudUpload aria-hidden="true" className="size-4" /> Enviar vídeo
+      <input accept="video/mp4,video/webm,.mp4,.webm" aria-label={`Enviar vídeo para o dia ${dayIndex + 1}`} className="sr-only" multiple
+        onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ''; if (files.length > 0) onSend(files); }} type="file" />
+    </label>}
+  </>;
   const move = (from: number, to: number) => {
     const next = [...videoIds];
     const [item] = next.splice(from, 1);
@@ -224,6 +243,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{locked ? 'Este dia ainda não tem vídeos' : editable ? 'Arraste vídeos da lista para este dia' : 'Arraste um assunto para este dia'}</p>
       {chooser}
       {videoPicker}
+      {sendRow}
     </div>;
   }
   return <div className={frame} ref={setNodeRef}>
@@ -269,5 +289,6 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       </ul>}
     </div>
     {videoPicker}
+    {sendRow}
   </div>;
 }

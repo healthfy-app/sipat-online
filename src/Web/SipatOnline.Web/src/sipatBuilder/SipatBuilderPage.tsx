@@ -3,7 +3,7 @@ import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2,
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
-  cancelSipatEvent, copySipatPlan, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
+  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, listCompanyVideos, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -23,8 +23,10 @@ import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
 import { copyTrainingLink } from '@/trainings/trainingLink';
-import { VideoUploadForm } from '@/courseEditor/CourseMediaForms';
-import { onVideoUploaded } from '@/videoUploads/uploadQueue';
+import { checkVideoFile, enqueueUploads, isActive, onVideoUploaded, titleFromFileName, useUploadQueue } from '@/videoUploads/uploadQueue';
+
+/** The tag of an upload sent from a day: the day's key follows it. */
+const dayTag = 'day:';
 import { phaseLabel, sipatPhase } from './sipatPhase';
 import {
   addDays, buildCatalog, dayDuration, dayFromTitle, maxDays, dayVideoCounts, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay, withDayWord,
@@ -83,8 +85,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
   // the last day removed, kept for a few seconds so it can be put back
   const [removed, setRemoved] = useState<{ day: DaySlots; index: number } | null>(null);
-  // sending videos, for who may send them: they join the list above the days when ready
-  const [sending, setSending] = useState(false);
+  // videos sent from a day, already with the company, waiting to be prepared: they come onto that day when ready
+  const [preparing, setPreparing] = useState<{ videoId: string; dayKey: string; title: string }[]>([]);
+  const uploads = useUploadQueue();
   // problems are only shown after a save or publish attempt, then they update live as they get fixed
   const [showIssues, setShowIssues] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
@@ -169,8 +172,32 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     return () => window.clearTimeout(timer);
   }, [removed]);
 
-  // a video that finished sending joins the list quietly, the days being built stay as they are
-  useEffect(() => onVideoUploaded(() => { getSipatCatalog().then(applyContent, () => undefined); }), [applyContent]);
+  // a video that finished sending is the company's now; sent from a day, it waits here to be prepared
+  useEffect(() => onVideoUploaded(item => {
+    const video = item.video;
+    if (video && item.tag?.startsWith(dayTag)) setPreparing(current => [...current, { videoId: video.id, dayKey: item.tag!.slice(dayTag.length), title: item.title }]);
+    getSipatCatalog().then(applyContent, () => undefined);
+  }), [applyContent]);
+  // while one is being prepared, look again quietly
+  useEffect(() => {
+    if (preparing.length === 0) return;
+    const timer = window.setInterval(() => { getSipatCatalog().then(applyContent, () => undefined); }, 8000);
+    return () => window.clearInterval(timer);
+  }, [preparing.length, applyContent]);
+  // ready: it goes onto the day it was sent from
+  useEffect(() => {
+    if (!catalog) return;
+    const ready = preparing.filter(item => catalog.videos.has(item.videoId));
+    if (ready.length === 0) return;
+    setDays(current => current.map(day => {
+      const placed = day.videos.filter((id): id is string => !!id);
+      const mine = ready.filter(item => item.dayKey === day.key && !placed.includes(item.videoId)).map(item => item.videoId);
+      return mine.length === 0 ? day : { ...day, videos: [...placed, ...mine] };
+    }));
+    setDirty(true);
+    setPreparing(current => current.filter(item => !catalog.videos.has(item.videoId)));
+    setNotice(ready.length === 1 ? `"${ready[0].title}" entrou no dia. Salve para guardar.` : `${ready.length} vídeos entraram nos dias. Salve para guardar.`);
+  }, [catalog, preparing]);
 
   const totals = useMemo(() => !catalog ? { videos: 0, extras: 0, games: 0, time: 0 } : {
     videos: days.reduce((sum, day) => sum + dayVideoCounts(day.videos.filter((id): id is string => !!id), catalog).house, 0),
@@ -267,6 +294,32 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       setBusy(false);
     }
   }
+
+  /** Sends videos from a day: they become the company's, and come onto that day when they are ready. */
+  async function sendToDay(dayKey: string, files: File[]) {
+    setError('');
+    try {
+      if (!(await listCompanyVideos()).termsAccepted) {
+        if (!window.confirm('Os vídeos que você enviar são da sua empresa: ela tem o direito de usá-los e a autorização de imagem de quem aparece neles. Concorda?')) return;
+        await acceptCompanyVideoTerms();
+      }
+      const refused = files.map(file => ({ file, problem: checkVideoFile(file) })).find(item => item.problem);
+      if (refused) setError(`${refused.file.name}: ${refused.problem}`);
+      enqueueUploads(files.filter(file => !checkVideoFile(file)).map(file => ({ file, title: titleFromFileName(file.name) })), undefined, `${dayTag}${dayKey}`);
+    } catch (failure) { setError(getErrorMessage(failure)); }
+  }
+
+  // what is on its way to each day: still sending, or with the company and being prepared
+  const arriving = new Map<string, { id: string; title: string; status: string }[]>();
+  const onItsWay = (dayKey: string, row: { id: string; title: string; status: string }) => arriving.set(dayKey, [...(arriving.get(dayKey) ?? []), row]);
+  for (const item of uploads.items) {
+    if (!item.tag?.startsWith(dayTag) || !(isActive(item.status) || item.status === 'failed')) continue;
+    onItsWay(item.tag.slice(dayTag.length), {
+      id: item.id, title: item.title,
+      status: item.status === 'failed' ? 'não enviado' : `${item.totalBytes > 0 ? Math.round((item.sentBytes / item.totalBytes) * 100) : 0}%`,
+    });
+  }
+  for (const item of preparing) onItsWay(item.dayKey, { id: item.videoId, title: item.title, status: 'preparando…' });
 
   /** The link to hand to the people who will take the training: they sign in and land on it. */
   async function share() {
@@ -430,12 +483,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
       : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
         onChange={cancelled || viewOnly ? () => undefined : edit} onRemoveDay={cancelled ? undefined : removeDay}
-        // the operation sends right here; a company with its own videos (Diamante) sends in its page, and comes back to find them in the list
-        onUpload={cancelled ? undefined : canEditThemes ? () => setSending(true) : capabilities?.internalVideos ? () => window.open('/admin/videos', '_blank', 'noopener') : undefined} />}
-
-    {sending && <Dialog description="Os vídeos entram na lista assim que terminam de ser preparados. Você pode continuar montando os dias enquanto isso." onClose={() => setSending(false)} size="lg" title="Enviar vídeo">
-      <VideoUploadForm onQueued={() => { setSending(false); setNotice('Envio iniciado. O vídeo aparece na lista quando estiver pronto.'); }} />
-    </Dialog>}
+        // every day has its own "Enviar vídeo", for a company that has its own videos (Diamante)
+        arriving={arriving} onSendToDay={capabilities?.internalVideos && !cancelled ? (dayKey, files) => void sendToDay(dayKey, files) : undefined} />}
 
     {importing && <ImportDialog catalog={catalog} hasPlan={stage === 'grid' && days.some(day => day.videos.some(Boolean))} onClose={() => setImporting(false)}
       onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${pluralize(imported.length, 'dia importado', 'dias importados')}. Revise e salve.`); }}
