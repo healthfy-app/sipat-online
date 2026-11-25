@@ -45,7 +45,7 @@ import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
 import TrainingEditorPage from './trainings/TrainingEditorPage';
 import { linkedTraining } from './trainings/trainingLink';
-import CompanyVideosPage from './companyVideos/CompanyVideosPage';
+
 import CompanyNav from './companies/CompanyNav';
 import PlanMedal from './companies/PlanMedal';
 import PlaybackQualityPage from './quality/PlaybackQualityPage';
@@ -221,7 +221,7 @@ export default function App() {
             />
             <Route
               path="/admin/videos"
-              element={state.session && hasAdminRole(state.session) ? <CompanyVideosPage /> : <AccessDenied />}
+              element={state.session && hasAdminRole(state.session) ? <VideoLibraryPage company /> : <AccessDenied />}
             />
             <Route
               path="/admin/treinamentos/:sipatId/editar"
@@ -790,7 +790,10 @@ function ProtectedPortal({
           tabIndex={-1}
         >
           {error && <p className="form-error" role="alert">{error}</p>}
-          <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />
+          {/* an administrator who also takes trainings keeps the admin menu, and the participant pages keep their look */}
+          {!isLearnerOnly && location.pathname.startsWith('/learning')
+            ? <div className="portal-layout-learner contents"><Outlet /></div>
+            : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
         </section>
       </div>
     </div>
