@@ -30,7 +30,11 @@ public sealed record PlatformCourse(
     string? CoverContentType = null,
     DateTimeOffset? CoverUpdatedAt = null,
     IReadOnlyList<PlatformCourseLesson>? Lessons = null,
-    Guid? CategoryId = null);
+    Guid? CategoryId = null,
+    // the company the training belongs to; null for a model of the operation
+    Guid? TenantId = null,
+    // a model offered whole as a ready SIPAT (what a Bronze company picks)
+    bool IsReadySipat = false);
 
 /// <summary>Aula de um curso, com os vídeos na ordem de exibição.</summary>
 public sealed record PlatformCourseLesson(Guid Id, string Title, string? Description, IReadOnlyList<Guid> VideoIds);

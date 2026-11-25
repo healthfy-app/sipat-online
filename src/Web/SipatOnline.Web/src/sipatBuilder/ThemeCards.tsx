@@ -251,7 +251,9 @@ function TitleGroup({ title, videos, index, usedIn, onPlay }: { title: TrainingT
  * subject. With a plan that personalizes the grid the videos are the operator's: videos are dropped or picked one
  * by one, reordered and removed right here.
  */
-export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false, suggestion }: {
+export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false, suggestion, locked = false }: {
+  /** The day came from a ready SIPAT: its videos are shown as they are, nothing to pick or change. */
+  locked?: boolean;
   dayIndex: number; subject: Subject | undefined; themes: Subject[]; catalog: Catalog; videoIds: string[]; gameIds: string[];
   onChoose: (title: string) => void; onClear: () => void; canEditThemes?: boolean;
   canCustomizeGrid?: boolean;
@@ -262,7 +264,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId(dayIndex) });
   const { active } = useDndContext();
-  const editable = canCustomizeGrid && !!onVideos;
+  const editable = canCustomizeGrid && !!onVideos && !locked;
   const full = videoIds.length >= maxVideoRows;
   const empty = !subject && videoIds.length === 0;
   // while something is dragged every day shows it can take it; the one under the pointer says what the drop will do
@@ -280,7 +282,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     isOver ? 'bg-primary text-primary-foreground' : 'bg-card text-primary')}>{preview || 'Solte aqui'}</span>;
   const phoneSelect = 'max-[760px]:h-12 max-[760px]:rounded-xl max-[760px]:px-3.5 max-[760px]:text-base max-[760px]:focus-visible:outline-3 max-[760px]:focus-visible:outline-offset-2 max-[760px]:focus-visible:outline-primary/40';
   // personalized grid: the assunto only narrows "+ Adicionar vídeo"; on the computer the list above does that, so it shows on the phone only
-  const chooser = <select aria-label={editable ? `Filtrar os vídeos do dia ${dayIndex + 1} por assunto` : `Assunto do dia ${dayIndex + 1}`} className={cn('h-9 w-full rounded-md border border-input bg-background px-2 text-sm', phoneSelect, 'max-[760px]:order-1',
+  const chooser = locked ? null : <select aria-label={editable ? `Filtrar os vídeos do dia ${dayIndex + 1} por assunto` : `Assunto do dia ${dayIndex + 1}`} className={cn('h-9 w-full rounded-md border border-input bg-background px-2 text-sm', phoneSelect, 'max-[760px]:order-1',
     editable && !subject && 'min-[761px]:hidden',
     empty ? 'max-[760px]:border-[1.5px] max-[760px]:border-primary max-[760px]:bg-accent max-[760px]:font-bold max-[760px]:text-primary' : 'max-[760px]:border-border max-[760px]:bg-card max-[760px]:font-semibold max-[760px]:text-foreground')} onChange={event => onChoose(event.target.value)} value={subject?.id ?? ''}>
     <option value="">{editable ? (subject ? 'Todos os assuntos' : 'Filtrar por assunto') : subject ? 'Trocar assunto' : 'Escolher assunto'}</option>
@@ -309,7 +311,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
       {dropBadge}
       {editable ? <Film aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" /> : <Layers aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" />}
-      <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{editable ? 'Arraste um título ou vídeos para este dia' : 'Arraste um assunto para este dia'}</p>
+      <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{locked ? 'Este dia ainda não tem vídeos' : editable ? 'Arraste um título ou vídeos para este dia' : 'Arraste um assunto para este dia'}</p>
       {editable && suggestion && <button className="mx-auto inline-flex max-w-full min-h-9 cursor-pointer items-center gap-1.5 rounded-full border border-primary/40 bg-accent px-3 text-[0.8125rem] font-semibold text-primary transition-colors hover:border-primary hover:bg-accent/70 max-[760px]:hidden"
         onClick={suggestion.onApply} title={`Coloca ${suggestion.title.title} neste dia`} type="button">
         <CirclePlus aria-hidden="true" className="size-4 shrink-0" />
@@ -323,7 +325,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
   return <div className={frame} ref={setNodeRef}>
     {dropBadge}
     {chooser}
-    {subject
+    {locked ? null : subject
       ? <div className="flex items-center gap-2.5">
         <Cover className="size-11" subject={subject} />
         <div className="grid min-w-0 flex-1 gap-0.5">

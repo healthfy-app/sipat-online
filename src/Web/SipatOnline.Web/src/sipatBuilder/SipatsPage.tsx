@@ -1,7 +1,7 @@
 import { CalendarDays, Film, Plus, RotateCcw } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { listSipatEvents, listSipatPlans, reactivateSipatEvent, type SipatEvent, type SipatPlanSummary } from '@/api';
+import { getCompanyCapabilities, listSipatEvents, listSipatPlans, reactivateSipatEvent, type SipatEvent, type SipatPlanSummary } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
@@ -24,7 +24,9 @@ function periodLabel(startsAt: string, endsAt: string): string {
 }
 
 /** The trainings of a company, newest year first. Several can be published at the same time. */
-export default function SipatsPage({ basePath }: { basePath: string }) {
+/** `operator`: the operation, inside a company. On a plan that only views (Bronze) it is the one that builds the trainings. */
+export default function SipatsPage({ basePath, operator = false }: { basePath: string; operator?: boolean }) {
+  const [viewOnly, setViewOnly] = useState(false);
   const [events, setEvents] = useState<SipatEvent[] | null>(null);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
   const [error, setError] = useState('');
@@ -33,11 +35,12 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
 
   useEffect(() => {
     let current = true;
+    if (!operator) getCompanyCapabilities().then(capabilities => { if (current) setViewOnly(!capabilities.customizeGrid); }, () => undefined);
     Promise.all([listSipatEvents(0, 100), listSipatPlans()])
       .then(([page, summaries]) => { if (current) { setEvents(page.items); setPlans(summaries); } })
       .catch((failure: unknown) => { if (current) setError(getErrorMessage(failure)); });
     return () => { current = false; };
-  }, []);
+  }, [operator]);
 
   const years = useMemo(() => {
     const byYear = new Map<number, SipatEvent[]>();
@@ -59,13 +62,15 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
     } finally { setReactivating(null); }
   }
 
-  const create = <Link className={buttonVariants()} to={`${basePath}/nova`}><Plus /> Novo treinamento</Link>;
+  const create = viewOnly ? undefined : <Link className={buttonVariants()} to={`${basePath}/nova`}><Plus /> Novo treinamento</Link>;
   return <Page>
     <PageHeader actions={create} description="Cada treinamento tem os seus dias ou módulos. Vários podem estar publicados ao mesmo tempo; os anteriores continuam no histórico." eyebrow="Programação" title="Treinamentos" />
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
     {!events && !error && <LoadingState>Carregando os treinamentos...</LoadingState>}
-    {events && events.length === 0 && <EmptyState action={<Link className={buttonVariants()} to={`${basePath}/nova`}>Criar o primeiro treinamento</Link>} description="Defina a data de início, quantos dias e o assunto de cada dia." title="Nenhum treinamento ainda." />}
+    {events && events.length === 0 && (viewOnly
+      ? <EmptyState description="No seu plano a operação monta o treinamento. Quando ele estiver pronto, aparece aqui." title="Nenhum treinamento ainda." />
+      : <EmptyState action={<Link className={buttonVariants()} to={`${basePath}/nova`}>Criar o primeiro treinamento</Link>} description="Defina a data de início, quantos dias e o assunto de cada dia." title="Nenhum treinamento ainda." />)}
     {years.map(([year, items]) => <section aria-label={`Treinamentos de ${year}`} className="grid gap-3" key={year}>
       <h2 className="m-0 text-sm font-semibold tracking-wide text-muted-foreground">{year}</h2>
       <ul className="m-0 grid list-none gap-5 p-0 md:grid-cols-2 xl:grid-cols-3">
@@ -96,11 +101,11 @@ export default function SipatsPage({ basePath }: { basePath: string }) {
             {cancelled
               ? <div aria-disabled="true" aria-label={`${event.title} (encerrada)`} className={cn(card, 'border-dashed border-border bg-muted/40 text-muted-foreground')} role="group">
                 <div className="flex flex-1 flex-col opacity-60 grayscale">{details}</div>
-                <footer className="mt-1 border-t border-[#dfe6e3] px-4 py-3">
+                {!viewOnly && <footer className="mt-1 border-t border-[#dfe6e3] px-4 py-3">
                   <Button disabled={reactivating === event.id} onClick={() => void reactivate(event)} size="sm" variant="outline">
                     <RotateCcw /> {reactivating === event.id ? 'Reativando...' : 'Reativar'}
                   </Button>
-                </footer>
+                </footer>}
               </div>
               : <Link aria-label={`Abrir ${event.title}`} className={cn(card, 'text-foreground no-underline shadow-[0_1px_2px_rgb(18_51_44/0.05)] transition-[box-shadow,transform,border-color] duration-200 ease-out-soft hover:-translate-y-1 hover:border-[#12332c] hover:shadow-[0_18px_34px_-18px_rgb(18_51_44/0.5)] motion-reduce:hover:translate-y-0',
                 event.status === 'Published' && new Date(event.endsAt) > new Date() ? 'border-primary/40' : 'border-[#dfe6e3]')} to={`${basePath}/${event.id}`}>

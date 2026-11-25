@@ -49,7 +49,11 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onReplace, issues, trainings = [], canEditThemes = true, canCustomizeGrid = false }: {
+export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onReplace, issues, trainings = [], canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false }: {
+  /** The days came whole from a ready SIPAT (Bronze): their videos stay as they are, and no day is added or taken out. */
+  locked?: boolean;
+  /** Nothing can be changed: the company only views what the operation built. */
+  readOnly?: boolean;
   days: DaySlots[]; catalog: Catalog; onChange: (days: DaySlots[]) => void; canEditThemes?: boolean;
   /** The trainings of Conteúdo, opened in the list so their Títulos go onto the days. */
   trainings?: TrayTraining[];
@@ -67,7 +71,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
   const addedAtEnd = useRef(false);
   // personalized grid: the assuntos of the videos are only filters; Bronze picks a ready training per day
   const themes = canCustomizeGrid ? (catalog.filters ?? []) : catalog.subjects.filter(subject => subject.id !== 'none');
-  const canAddDay = days.length < maxDays;
+  const canAddDay = days.length < maxDays && !locked;
   // "Dia" when the training has dates, "Módulo" when none of its parts has one
   const word = partWord(days.map(day => day.date));
   const lower = word.toLowerCase();
@@ -170,8 +174,8 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
   return <DndContext onDragCancel={() => setCarried(null)} onDragEnd={onDragEnd} onDragStart={onDragStart} sensors={sensors}>
     <DragOverlay modifiers={[followPointer]} dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>{carried && <DragPreview data={carried} />}</DragOverlay>
     <div className="grid gap-4">
-      <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} onTraining={setTrainingId} onUseTraining={layTraining} subjects={themes}
-        trainingId={trainingId} trainings={trainings} usedIn={canCustomizeGrid ? usedIn : undefined} videos={looseVideos} />
+      {!locked && <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} onTraining={setTrainingId} onUseTraining={layTraining} subjects={themes}
+        trainingId={trainingId} trainings={trainings} usedIn={canCustomizeGrid ? usedIn : undefined} videos={looseVideos} />}
       <div className="builder-board-card ops-card overflow-hidden max-[760px]:overflow-visible max-[760px]:border-0! max-[760px]:bg-transparent! max-[760px]:shadow-none">
         <div className="builder-board-scroller overflow-x-auto max-[760px]:overflow-visible" ref={scroller}>
           <div className="builder-board grid min-w-full [grid-template-columns:var(--columns)] max-[760px]:flex max-[760px]:flex-col" role="table" style={layout}>
@@ -185,11 +189,11 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
                   <span className="rounded-full px-2.5 py-0.5 text-xs max-[760px]:px-3 max-[760px]:py-1 max-[760px]:tracking-[0.04em] font-extrabold tracking-wide text-white" style={{ backgroundColor: color }}>{word.toUpperCase()} {index + 1}</span>
                   {/* the date field shows day/month; only the weekday is added here. The time of the day lives in the column footer. */}
                   <span className="mr-auto text-xs font-semibold text-muted-foreground capitalize max-[760px]:text-[0.9375rem] max-[760px]:text-foreground">{shortDate(day.date).split(' ')[0]}</span>
-                  <Button aria-label={`Remover o ${lower} ${index + 1}`} className="max-[760px]:-my-1.5 max-[760px]:-mr-2.5 max-[760px]:size-11 max-[760px]:min-h-11" disabled={days.length === 1} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
+                  <Button aria-label={`Remover o ${lower} ${index + 1}`} className="max-[760px]:-my-1.5 max-[760px]:-mr-2.5 max-[760px]:size-11 max-[760px]:min-h-11" disabled={days.length === 1} hidden={locked} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </div>
-                <Input aria-label={`Data do ${lower} ${index + 1}`} className={cn('h-9 min-w-0 px-2 text-sm', phoneField)} onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
+                <Input aria-label={`Data do ${lower} ${index + 1}`} disabled={readOnly} className={cn('h-9 min-w-0 px-2 text-sm', phoneField)} onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
                 <Input aria-describedby={dayIssues ? `day-issues-${day.key}` : undefined} aria-invalid={!!dayIssues && !day.title.trim()}
-                  aria-label={`Título do ${lower} ${index + 1}`} className={cn('font-medium', phoneField)} maxLength={160}
+                  disabled={readOnly} aria-label={`Título do ${lower} ${index + 1}`} className={cn('font-medium', phoneField)} maxLength={160}
                   onChange={event => patchDay(index, { title: event.target.value })} placeholder={`Slogan do ${lower}`}
                   value={isGenericDayTitle(day.title) && day.title.trim() ? `${word} ${index + 1}` : day.title} />
                 {dayIssues && <ul className="m-0 grid list-none gap-0.5 p-0 text-xs font-semibold text-destructive" id={`day-issues-${day.key}`}>
@@ -201,7 +205,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, onRe
             {days.map((day, index) => {
               const subject = themeOfDay(themes, day);
               return <Cell index={index} key={`box-${day.key}`} order={index * 3 + 1} row={2}>
-                <DayBox canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} dayIndex={index}
+                <DayBox canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} dayIndex={index} locked={locked}
                   onVideos={videoIds => patchDay(index, { videos: videoIds })} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
                   onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)}
                   suggestion={nextTitle ? { title: nextTitle, onApply: () => applyTitle(index, nextTitle) } : undefined} />

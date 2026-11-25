@@ -54,6 +54,7 @@ public static class SipatPlanEndpoints
             var result = await service.SaveAsync(sipatId, days, token);
             return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
         })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("SaveSipatPlan");
 
         // the week in the video editor: a copy training of this SIPAT whose Títulos are its days (made once, then kept in step)
@@ -71,6 +72,7 @@ public static class SipatPlanEndpoints
             var result = await service.CopyAsync(sipatId, sourceId, token);
             return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
         })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("CopySipatPlan");
 
         group.MapPost("/sipats/{sipatId:guid}/plan/launch", async (
@@ -81,6 +83,7 @@ public static class SipatPlanEndpoints
                 ? Results.Ok(new { days = result.Value.Days, created = result.Value.Created, updated = result.Value.Updated, kept = result.Value.Kept })
                 : ToProblem(result.Error);
         })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("LaunchSipat");
 
         return endpoints;

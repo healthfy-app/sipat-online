@@ -109,6 +109,22 @@ public static class PlatformCourseCatalogEndpoints
             Results.Ok(await plans.WeeksAsync(cancellationToken)))
         .WithName("ListSipatWeeks");
 
+        // a model offered whole as a ready SIPAT: what a Bronze company picks its training from
+        catalog.MapPut("/courses/{courseId:guid}/ready-sipat", async (
+            Guid courseId, SetReadySipatRequest request, SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+        {
+            var course = await db.PlatformCourses.SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
+            if (course is null) return Results.NotFound();
+            if (course.TenantId is not null)
+                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "learning.platform_course.company_training",
+                    detail: "Só um modelo do Conteúdo pode ser oferecido como SIPAT pronta.",
+                    extensions: new Dictionary<string, object?> { ["code"] = "learning.platform_course.company_training" });
+            course.IsReadySipat = request.Ready;
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("SetPlatformCourseReadySipat");
+
         // assunto is a classification of the videos (like a genre): a video can be in several, from the operator's fixed list
         catalog.MapGet("/subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
             Results.Ok(await db.VideoSubjects.AsNoTracking().OrderBy(item => item.Name)
@@ -866,7 +882,9 @@ public static class PlatformCourseCatalogEndpoints
             (course.Lessons ?? [])
                 .Select(lesson => new PlatformCourseLessonDto(lesson.Id, lesson.Title, lesson.Description, lesson.VideoIds))
                 .ToArray(),
-            course.CategoryId);
+            course.CategoryId,
+            course.TenantId,
+            course.IsReadySipat);
 
     private static PlatformCourseVideoResponse ToResponse(PlatformCourseVideo video) =>
         new(
@@ -952,6 +970,8 @@ public static class PlatformCourseCatalogEndpoints
     }
 
 }
+
+public sealed record SetReadySipatRequest(bool Ready);
 
 public sealed record CreatePlatformCourseRequest(
     string? Title,
@@ -1049,7 +1069,9 @@ public sealed record PlatformCourseResponse(
     IReadOnlyList<CourseModulePlacementDto> Modules,
     string? CoverUrl,
     IReadOnlyList<PlatformCourseLessonDto>? Lessons = null,
-    Guid? CategoryId = null);
+    Guid? CategoryId = null,
+    Guid? TenantId = null,
+    bool IsReadySipat = false);
 
 public sealed record PlatformCourseLessonDto(Guid Id, string Title, string? Description, IReadOnlyList<Guid> VideoIds);
 

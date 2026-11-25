@@ -74,6 +74,10 @@ export interface PlatformCourse {
   coverUrl: string | null;
   lessons?: PlatformCourseLesson[];
   categoryId?: string | null;
+  /** The company the training belongs to; absent or null for a model of Conteúdo. */
+  tenantId?: string | null;
+  /** A model offered whole as a ready SIPAT: what a Bronze company picks. */
+  isReadySipat?: boolean;
 }
 
 export interface PlatformCourseLesson {
@@ -1513,6 +1517,10 @@ export async function renameCourseCategory(id: string, name: string): Promise<vo
 
 export async function deleteCourseCategory(id: string): Promise<void> {
   await request(`/api/platform/catalog/categories/${id}`, { method: 'DELETE' });
+}
+
+export async function setCourseReadySipat(courseId: string, ready: boolean): Promise<void> {
+  await request(`/api/platform/catalog/courses/${courseId}/ready-sipat`, { method: 'PUT', body: JSON.stringify({ ready }) });
 }
 
 export async function setCourseCategory(courseId: string, categoryId: string | null): Promise<void> {

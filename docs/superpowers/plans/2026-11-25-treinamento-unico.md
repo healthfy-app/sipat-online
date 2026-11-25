@@ -80,9 +80,9 @@
 
 ## Etapas seguintes (cada uma ganha as suas tarefas detalhadas quando a anterior fechar)
 
-2. **Permissão por plano num lugar só** — `TrainingAccessService.For(actor, course) → TrainingAccess(View, EditDetails, EditGrid, UploadVideo, EditActivities, Publish, Delete)`; `ApplyPlanAsync` passa a morar nele; Bronze = SIPAT pronta (`IsReadySipat`, sai o teste pelo texto "Opção N").
+2. **Bronze só visualiza; SIPAT pronta** *(feita)* — marca "Disponível como SIPAT pronta" no modelo (`IsReadySipat`, `PUT /api/platform/catalog/courses/{id}/ready-sipat`). No Bronze a empresa só visualiza (`TrainingEditing.RequireEditor` recusa criar, salvar, publicar, cancelar e reativar com `sipat.view_only`); a operação, dentro da empresa, cria o treinamento a partir de uma SIPAT pronta, ajusta datas e nomes e publica. O servidor confere que os dias do Bronze são os de uma SIPAT pronta inteira. Um treinamento Bronze já publicado antes disso continua aceitando "um módulo pronto por dia".
 3. **Perguntas por treinamento e jogos com dono** — `PlatformVideoCheckpoints.CourseId`; `GameModules.TenantId`; copiar de modelo copia as perguntas.
-4. **Editor aberto ao administrador** — endpoints do editor com a permissão da etapa 2; rota `/admin/treinamentos/:sipatId/editar`; data no título; controles desligados com o plano que libera.
+4. **Permissão por plano num lugar só e editor aberto ao administrador** — `TrainingAccessService.For(actor, course) → TrainingAccess(View, EditDetails, EditGrid, UploadVideo, EditActivities, Publish, Delete)`, com `ApplyPlanAsync` e `TrainingEditing` morando nele; endpoints do editor com essa permissão; rota `/admin/treinamentos/:sipatId/editar`; data no título; controles desligados com o plano que libera.
 5. **Lista única** — mesmo componente no Conteúdo e na empresa: busca, filtros, capa, lápis, copiar link, duplicar, excluir; "Novo treinamento" com origem (SIPAT pronta, modelo, anterior, zero).
 6. **Tela de dias** — sai o seletor "Treinamento:", upload no topo, lápis no lugar do cartão "Editar a semana".
 7. **Conteúdo com todas as empresas** — filtro por empresa, nome da empresa no card, marca "Disponível como SIPAT pronta".

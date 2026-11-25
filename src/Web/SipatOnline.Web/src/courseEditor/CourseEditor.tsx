@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   setCourseCategory,
+  setCourseReadySipat,
   setPlatformCourseModules,
   setPlatformCourseStructure,
   type CourseLessonDraft,
@@ -34,12 +35,13 @@ function settingsFrom(course: PlatformCourse): CourseSettingsValues {
     gamificationEnabled: course.gamificationEnabled,
     gameType: course.gameType,
     categoryId: course.categoryId ?? null,
+    readySipat: course.isReadySipat ?? false,
   };
 }
 
 const sameSettings = (a: CourseSettingsValues, b: CourseSettingsValues) =>
   a.title === b.title && a.description === b.description
-  && a.gamificationEnabled === b.gamificationEnabled && a.gameType === b.gameType && a.categoryId === b.categoryId;
+  && a.gamificationEnabled === b.gamificationEnabled && a.gameType === b.gameType && a.categoryId === b.categoryId && a.readySipat === b.readySipat;
 
 export default function CourseEditor({
   course,
@@ -110,7 +112,8 @@ export default function CourseEditor({
         gameType: values.gameType,
       });
       if ((saved.categoryId ?? null) !== values.categoryId) await setCourseCategory(course.id, values.categoryId);
-      const next = settingsFrom({ ...saved, categoryId: values.categoryId });
+      if (!course.tenantId && (saved.isReadySipat ?? false) !== values.readySipat) await setCourseReadySipat(course.id, values.readySipat);
+      const next = settingsFrom({ ...saved, categoryId: values.categoryId, isReadySipat: values.readySipat });
       setValues(next);
       setSavedValues(next);
       setStatus(saved.status);

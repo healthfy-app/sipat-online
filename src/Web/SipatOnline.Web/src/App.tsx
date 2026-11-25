@@ -218,7 +218,7 @@ export default function App() {
             <Route
               path="/platform/companies/:companyId/treinamentos"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/treinamentos`} />}</CompanyContext>
+                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/treinamentos`} operator />}</CompanyContext>
                 : <AccessDenied />}
             />
             <Route

@@ -542,7 +542,9 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             GameType = (int)course.GameType,
             CoverContentType = course.CoverContentType,
             CoverUpdatedAt = course.CoverUpdatedAt,
-            CategoryId = course.CategoryId
+            CategoryId = course.CategoryId,
+            TenantId = course.TenantId,
+            IsReadySipat = course.IsReadySipat
         };
 
     private static PlatformCourse ToDomain(PlatformCourseEntity entity)
@@ -589,7 +591,9 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             entity.CoverContentType,
             entity.CoverUpdatedAt,
             lessons,
-            entity.CategoryId);
+            entity.CategoryId,
+            entity.TenantId,
+            entity.IsReadySipat);
     }
 
     private static PlatformCourseVideo ToDomain(PlatformCourseVideoLinkEntity link, Guid lessonId) =>

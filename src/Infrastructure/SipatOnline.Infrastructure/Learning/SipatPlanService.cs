@@ -207,7 +207,7 @@ public sealed class SipatPlanService(
         if (sipat.Status == SipatEventStatus.Cancelled)
             return Failure<IReadOnlyList<ProgramDay>>("sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado.");
 
-        var cleaned = await ApplyPlanAsync(days, token, allowEmptyDays: true);
+        var cleaned = await ApplyPlanAsync(days, token, allowEmptyDays: true, legacyModules: sipat.Status == SipatEventStatus.Published);
         if (!cleaned.IsSuccess) return cleaned;
 
         // a training holds each video once
@@ -262,7 +262,7 @@ public sealed class SipatPlanService(
         if (saved.Count == 0)
             return Failure<ProgramApplication>("sipat.plan_empty", "Monte os dias do treinamento antes de publicar.");
         // the plan may have changed since the days were saved: what goes live is what the plan allows today
-        var allowed = await ApplyPlanAsync(saved, token);
+        var allowed = await ApplyPlanAsync(saved, token, legacyModules: sipat.Status == SipatEventStatus.Published);
         if (!allowed.IsSuccess) return Result<ProgramApplication>.Failure(allowed.Error);
         var days = allowed.Value;
 
@@ -279,11 +279,12 @@ public sealed class SipatPlanService(
 
     /// <summary>
     /// The rules of the company's plan (sipatonline.com.br/plans.html) applied to the days:
-    /// every plan picks among the ready modules (the assuntos its plan can use); Bronze takes each assunto whole, one per day,
-    /// and Prata and above personalize the grid of videos; the quiz at the end of each module is Diamante only, and so are
+    /// every plan picks among the ready modules (the assuntos its plan can use); Bronze takes one ready SIPAT whole (a model
+    /// the operation marked as one), each of its Títulos a day;
+    /// Prata and above personalize the grid of videos; the quiz at the end of each module is Diamante only, and so are
     /// the company's internal videos (the assuntos that belong to it).
     /// </summary>
-    private async Task<Result<IReadOnlyList<ProgramDay>>> ApplyPlanAsync(IReadOnlyList<ProgramDay>? days, CancellationToken token, bool allowEmptyDays = false)
+    private async Task<Result<IReadOnlyList<ProgramDay>>> ApplyPlanAsync(IReadOnlyList<ProgramDay>? days, CancellationToken token, bool allowEmptyDays = false, bool legacyModules = false)
     {
         var capabilities = await plans.CapabilitiesAsync(token);
         if (!capabilities.Quizzes && days is not null)
@@ -311,7 +312,21 @@ public sealed class SipatPlanService(
 
         if (capabilities.CustomizeGrid) return cleaned;
 
-        // Bronze: a day is one ready module as it is, all of its videos in its order
+        // Bronze: the training is one ready SIPAT, whole — each of its Títulos a day, with all of its videos in its order
+        if (cleaned.Value.All(day => day.VideoIds.Count == 0)) return cleaned;
+        foreach (var model in available.Where(course => course.IsReadySipat))
+        {
+            var ready = model.Videos.Where(video => video.Status == PlatformVideoStatus.Ready).Select(video => video.Id).ToHashSet();
+            var titles = (model.Lessons ?? []).Select(lesson => lesson.VideoIds.Where(ready.Contains).ToArray()).Where(videos => videos.Length > 0).ToArray();
+            if (titles.Length != cleaned.Value.Count) continue;
+            if (!titles.Zip(cleaned.Value).All(pair => pair.First.Length == pair.Second.VideoIds.Count && pair.First.All(pair.Second.VideoIds.Contains))) continue;
+            return Result<IReadOnlyList<ProgramDay>>.Success(cleaned.Value.Select((day, index) => day with { VideoIds = titles[index] }).ToArray());
+        }
+        // a training published before the ready SIPATs existed keeps what it had: each day one ready module
+        if (!legacyModules)
+            return Failure<IReadOnlyList<ProgramDay>>("sipat.grid_not_customizable",
+                "No seu plano o treinamento é uma SIPAT pronta, inteira, com todos os seus dias e vídeos. Escolha uma SIPAT pronta ao criar o treinamento; a personalização da grade começa no plano Prata.");
+
         var result = new List<ProgramDay>(cleaned.Value.Count);
         foreach (var day in cleaned.Value)
         {
