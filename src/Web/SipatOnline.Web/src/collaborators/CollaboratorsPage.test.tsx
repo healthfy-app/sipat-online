@@ -170,12 +170,12 @@ describe('collaborators', () => {
     expect(within(table).queryByText('Maria José Oliveira')).not.toBeInTheDocument();
   });
 
-  it('shows no unit filter when the company has no units', async () => {
+  it('keeps the unit filter in its place when the company has no units, saying there are none', async () => {
     vi.mocked(api.getCompanyRegistry).mockResolvedValue({ ...registry(), units: [] });
     renderPage();
     await screen.findByRole('table', { name: 'Colaboradores da empresa' });
     expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
-    expect(screen.queryByLabelText('Filtrar por unidade')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Filtrar por unidade')).getByRole('option', { name: 'Nenhuma unidade cadastrada' })).toBeDisabled();
   });
 
   it('moves two selected people to a sector with changePlacement', async () => {

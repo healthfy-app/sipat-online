@@ -1,6 +1,7 @@
 import { Pencil, Search, UserPlus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { TrainingSelect } from '@/trainings/TrainingSelect';
 import { filterByTraining, useTrainingFilter } from '@/trainings/useTrainingFilter';
 import {
@@ -114,12 +115,18 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       .filter(item => item.count > 0);
   }, [people, profiles, registry]);
   const nameOf = (items: { id: string; name: string }[] | undefined, id: string | null | undefined) => items?.find(item => item.id === id)?.name ?? '—';
-  const counts = useMemo(() => ({
-    total: summaries.length,
-    active: summaries.filter(item => item.participant.isActive).length,
-    completed: summaries.filter(item => item.status === 'completed').length,
-    running: summaries.filter(item => item.status === 'in-progress').length,
-  }), [summaries]);
+  // the numbers on top follow the unit and the sector picked, so a unit or a sector is read at a glance
+  const counts = useMemo(() => {
+    const scope = placed ? summaries.filter(item => placed.has(item.participant.id)) : summaries;
+    return {
+      total: scope.length,
+      active: scope.filter(item => item.participant.isActive).length,
+      completed: scope.filter(item => item.status === 'completed').length,
+      running: scope.filter(item => item.status === 'in-progress').length,
+    };
+  }, [summaries, placed]);
+  const narrowed = search.trim() !== '' || filter !== 'all' || unitFilter !== 'all' || sectorFilter !== 'all';
+  const clearFilters = () => { setSearch(''); setFilter('all'); setUnitFilter('all'); setSectorFilter('all'); };
 
   const ids = visible.map(item => item.participant.id);
   const allSelected = ids.length > 0 && ids.every(id => selected.has(id));
@@ -186,17 +193,33 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       <NativeSelect aria-label="Situação" className="w-auto min-w-44" onChange={event => setFilter(event.target.value as ParticipantProgressFilter)} value={filter}>
         {filters.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
       </NativeSelect>
-      {showPlacement && registry.units.length > 0 && <NativeSelect aria-label="Filtrar por unidade" className="w-auto min-w-44" onChange={event => setUnitFilter(event.target.value)} value={unitFilter}>
+      {/* unit and sector are always there: a company that has none yet sees where they would be, and how to add them */}
+      {showPlacement && <NativeSelect aria-label="Filtrar por unidade" className={cn('w-auto min-w-44', unitFilter !== 'all' && 'border-primary bg-accent font-semibold text-primary')} onChange={event => setUnitFilter(event.target.value)} value={unitFilter}>
         <option value="all">Todas as unidades</option>
-        <option value="none">Sem unidade</option>
-        {registry.units.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        {registry.units.length === 0
+          ? <option disabled value="empty">Nenhuma unidade cadastrada</option>
+          : <>
+            <option value="none">Sem unidade</option>
+            {registry.units.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </>}
       </NativeSelect>}
-      {showPlacement && registry.sectors.length > 0 && <NativeSelect aria-label="Filtrar por setor" className="w-auto min-w-44" onChange={event => setSectorFilter(event.target.value)} value={sectorFilter}>
+      {showPlacement && <NativeSelect aria-label="Filtrar por setor" className={cn('w-auto min-w-44', sectorFilter !== 'all' && 'border-primary bg-accent font-semibold text-primary')} onChange={event => setSectorFilter(event.target.value)} value={sectorFilter}>
         <option value="all">Todos os setores</option>
-        <option value="none">Sem setor</option>
-        {registry.sectors.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        {registry.sectors.length === 0
+          ? <option disabled value="empty">Nenhum setor cadastrado</option>
+          : <>
+            <option value="none">Sem setor</option>
+            {registry.sectors.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </>}
       </NativeSelect>}
+      {narrowed && <Button onClick={clearFilters} size="sm" variant="ghost">Limpar</Button>}
+      {people && <span aria-live="polite" className="ml-auto text-sm tabular-nums text-muted-foreground max-sm:ml-0">
+        {narrowed ? `${visible.length} de ${summaries.length}` : `${summaries.length} ${summaries.length === 1 ? 'colaborador' : 'colaboradores'}`}
+      </span>}
     </section>
+    {showPlacement && !readOnly && registry.units.length === 0 && registry.sectors.length === 0 && <p className="-mt-1 m-0 text-[0.8125rem] text-muted-foreground">
+      Para acompanhar por unidade e setor, <Link className="font-semibold text-primary underline-offset-2 hover:underline" to="/admin/cadastro">cadastre as unidades e os setores da empresa</Link>.
+    </p>}
     {missing.length > 0 && <ul aria-label="Cadastros incompletos" className="m-0 grid list-none gap-1.5 p-0">
       {missing.map(item => <li className="flex flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm" key={item.rule}>
         <span>{pluralize(item.count, 'pessoa', 'pessoas')} sem {item.label}</span>
