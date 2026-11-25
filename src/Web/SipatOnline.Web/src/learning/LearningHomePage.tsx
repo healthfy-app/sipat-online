@@ -1,5 +1,6 @@
 import { useEffect, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { chosenTrainingKey, clearLinkedTraining, linkedTraining } from '@/trainings/trainingLink';
 import { getCourseCover } from '@/courseCover';
 import {
   getAssignedLearningTrack,
@@ -40,7 +41,6 @@ import './LearningHero.css';
 
 const firstArrivalKey = 'sipat:learning-arrived';
 // the training the participant picked stays picked for the session, also after opening a day and coming back
-const chosenTrainingKey = 'sipat:learning-training';
 
 function readSessionFlag(key: string): string | null {
   try { return sessionStorage.getItem(key); } catch { return null; }
@@ -57,6 +57,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
   const [allTracks, setTracks] = useState<LearningTrackCard[]>([]);
   const [chosenSipat, setChosenSipatState] = useState<string | null>(() => readSessionFlag(chosenTrainingKey));
   const setChosenSipat = (id: string) => { setChosenSipatState(id); writeSessionFlag(chosenTrainingKey, id); };
+  // the training a link asked for, when this session started from one
+  const [linked] = useState(() => linkedTraining());
   const [resumeExperience, setResumeExperience] = useState<LearningExperience | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingResume, setIsLoadingResume] = useState(false);
@@ -87,6 +89,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   // the one shown first: among those running, the one that started first; then the next to start; then the most recent
   const currentSipat = sipats.find(item => item.id === chosenSipat) ?? pickDefaultTraining(sipats);
+  // the link is for a training this person does not have (ended, cancelled, another company's): the home says so once
+  const linkUnavailable = !!linked && !isLoading && !error && !sipats.some(item => item.id === linked);
+  useEffect(() => { if (linked && !isLoading && !error) clearLinkedTraining(); }, [linked, isLoading, error]);
   const tracks = sipats.length > 1 && currentSipat ? allTracks.filter(track => track.sipatEventId === currentSipat.id) : allTracks;
   const overallProgress = getOverallProgress(tracks);
   const isFormationComplete = overallProgress >= 100;
@@ -325,6 +330,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
       </header>}
 
       {isLoading && <LoadingState className="learning-state">Carregando o seu treinamento...</LoadingState>}
+      {linkUnavailable && <p className="m-0 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground" role="status">O treinamento deste link não está disponível para você. Aqui estão os seus treinamentos.</p>}
       {error && (
         <div className="learning-state learning-error" role="alert">
           <p>{error}</p>

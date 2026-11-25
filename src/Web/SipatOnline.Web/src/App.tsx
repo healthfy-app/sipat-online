@@ -44,6 +44,7 @@ import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
 import TrainingEditorPage from './trainings/TrainingEditorPage';
+import { linkedTraining } from './trainings/trainingLink';
 import CompanyVideosPage from './companyVideos/CompanyVideosPage';
 import CompanyNav from './companies/CompanyNav';
 import PlanMedal from './companies/PlanMedal';
@@ -853,6 +854,11 @@ function clearCompanyAdministration(): void {
 }
 
 function getLandingPage(session: IdentitySession): string {
+  // arrived by the link of a training: after signing in, straight to it
+  if (session.roles.includes('Participant') && linkedTraining()) {
+    return '/learning';
+  }
+
   if (session.roles.includes('PlatformOperator')) {
     return '/platform';
   }

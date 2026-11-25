@@ -1,4 +1,4 @@
-import { CalendarDays, Copy, Film, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, Copy, Film, Link2, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
@@ -13,6 +13,7 @@ import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import { cn } from '@/lib/utils';
 import { phaseLabel, sipatPhase, type SipatPhase } from './sipatPhase';
+import { copyTrainingLink } from '@/trainings/trainingLink';
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 const fullDateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
@@ -109,6 +110,12 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
     navigate(`${basePath}/${copy.id}`);
   });
 
+  /** The link to hand to the people who will take the training: they sign in and land on it. */
+  const share = (event: SipatEvent) => run(event, async () => {
+    const { link, copied } = await copyTrainingLink(event.id, basePath, operator);
+    setNotice(copied ? `Link de "${event.title}" copiado. Quem abrir entra com o seu login e cai neste treinamento.` : `Link de "${event.title}": ${link}`);
+  });
+
   const remove = (event: SipatEvent) => {
     if (!window.confirm(`Excluir "${event.title}"? Os dias montados e a capa são apagados. Isso não pode ser desfeito.`)) return;
     void run(event, async () => {
@@ -198,6 +205,7 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
                 <footer className="mt-1 flex items-center gap-1 border-t border-[#dfe6e3] px-4 py-3">
                   <Link aria-hidden="true" className="mr-auto inline-block whitespace-nowrap rounded-full bg-[#12332c] px-3.5 py-1.5 text-[0.8125rem] font-bold text-white no-underline transition-colors hover:bg-[#0f7a3d]" tabIndex={-1} to={`${basePath}/${event.id}`}>Abrir →</Link>
                   <button aria-label={`${viewOnly ? 'Ver' : 'Editar'} ${event.title} no editor de vídeos`} className={cn(iconAction, 'max-[760px]:hidden')} disabled={busy} onClick={() => void edit(event)} title={viewOnly ? 'Ver no editor' : 'Editar treinamento'} type="button"><Pencil aria-hidden="true" /></button>
+                  {event.status === 'Published' && <button aria-label={`Copiar o link de ${event.title}`} className={iconAction} disabled={busy} onClick={() => void share(event)} title="Copiar link para os participantes" type="button"><Link2 aria-hidden="true" /></button>}
                   {!viewOnly && <button aria-label={`Duplicar ${event.title}`} className={iconAction} disabled={busy} onClick={() => void duplicate(event)} title="Duplicar" type="button"><Copy aria-hidden="true" /></button>}
                   {/* only what was never delivered can go; a published training is ended from its own page */}
                   {!viewOnly && event.status === 'Draft' && <button aria-label={`Excluir ${event.title}`} className={cn(iconAction, 'hover:text-destructive')} disabled={busy} onClick={() => remove(event)} title="Excluir" type="button"><Trash2 aria-hidden="true" /></button>}

@@ -1,5 +1,5 @@
 import { saveFile } from '@/lib/saveFile';
-import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, MoreHorizontal, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, MoreHorizontal, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
@@ -22,6 +22,7 @@ import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
+import { copyTrainingLink } from '@/trainings/trainingLink';
 import { VideoUploadForm } from '@/courseEditor/CourseMediaForms';
 import { onVideoUploaded } from '@/videoUploads/uploadQueue';
 import { phaseLabel, sipatPhase } from './sipatPhase';
@@ -267,6 +268,16 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     }
   }
 
+  /** The link to hand to the people who will take the training: they sign in and land on it. */
+  async function share() {
+    if (!sipat) return;
+    setError('');
+    try {
+      const { link, copied } = await copyTrainingLink(sipat.id, basePath, canEditThemes);
+      setNotice(copied ? 'Link copiado. Quem abrir entra com o seu login e cai neste treinamento.' : `Link do treinamento: ${link}`);
+    } catch (failure) { setError(getErrorMessage(failure)); }
+  }
+
   async function publish() {
     setConfirmingLaunch(false);
     const id = await save();
@@ -388,10 +399,12 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         </DropdownMenu>
         <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
         {/* the pencil: this same training in the video editor (títulos, player, questions, cover) */}
+        {published && <Button className={phoneAction} disabled={busy} onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
         <Button className={cn(phoneAction, 'max-[760px]:hidden')} disabled={busy || days.length === 0} onClick={() => void editWeek()} variant="outline"><Pencil /> Editar treinamento</Button>
         <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
       </div>}
       {stage === 'grid' && viewOnly && sipat && <div className="ops-hero-actions max-[760px]:hidden">
+        {published && <Button onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
         <Button onClick={() => navigate(`${basePath}/${sipat.id}/editar`)} variant="outline"><Play /> Ver no editor</Button>
       </div>}
     </header>
