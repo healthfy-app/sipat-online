@@ -23,7 +23,7 @@ public static class TrainingAudienceEndpoints
             Guid sipatId, TrainingAudienceRequest request, TrainingAudienceService service, LearningDistributionService distribution,
             SipatOnline.BuildingBlocks.Application.ITenantContext tenantContext, CancellationToken token) =>
         {
-            var result = await service.SaveAsync(sipatId, request.UnitIds, request.SectorIds, token);
+            var result = await service.SaveAsync(sipatId, request.Targets, token);
             if (!result.IsSuccess) return ToProblem(result.Error);
             // a live training follows its new audience at once: newcomers receive it, those left out who never opened it lose it
             if (tenantContext.CurrentTenantId is { IsEmpty: false } tenant)
@@ -36,7 +36,7 @@ public static class TrainingAudienceEndpoints
         // how many people an audience reaches, before it is saved
         group.MapPost("/registry/audience-count", async (TrainingAudienceRequest request, TrainingAudienceService service, CancellationToken token) =>
         {
-            var result = await service.CountAsync(request.UnitIds, request.SectorIds, token);
+            var result = await service.CountAsync(request.Targets, token);
             return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
         })
         .WithName("CountTrainingAudience");
@@ -49,4 +49,4 @@ public static class TrainingAudienceEndpoints
         title: error.Code, detail: error.Message, extensions: new Dictionary<string, object?> { ["code"] = error.Code });
 }
 
-public sealed record TrainingAudienceRequest(IReadOnlyList<Guid>? UnitIds, IReadOnlyList<Guid>? SectorIds);
+public sealed record TrainingAudienceRequest(IReadOnlyList<SipatOnline.Learning.Application.AudienceTarget>? Targets);

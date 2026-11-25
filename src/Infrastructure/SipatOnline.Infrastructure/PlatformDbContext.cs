@@ -30,9 +30,7 @@ public sealed class PlatformDbContext(
 
     public DbSet<SipatEventEntity> SipatEvents => Set<SipatEventEntity>();
 
-    public DbSet<SipatEventUnitEntity> SipatEventUnits => Set<SipatEventUnitEntity>();
-
-    public DbSet<SipatEventSectorEntity> SipatEventSectors => Set<SipatEventSectorEntity>();
+    public DbSet<SipatEventTargetEntity> SipatEventTargets => Set<SipatEventTargetEntity>();
 
     public DbSet<LearningTrackEntity> LearningTracks => Set<LearningTrackEntity>();
 

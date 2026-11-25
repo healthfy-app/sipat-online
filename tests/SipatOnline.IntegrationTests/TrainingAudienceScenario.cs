@@ -84,8 +84,21 @@ internal sealed class TrainingAudienceScenario : IAsyncDisposable
         await Send(HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = plan });
     }
 
-    public Task<JsonElement> AudienceAsync(Guid sipatId, Guid[] unitIds, Guid[]? sectorIds = null, HttpStatusCode expected = HttpStatusCode.OK) =>
-        Send(HttpMethod.Put, $"/api/admin/sipats/{sipatId}/audience", new { unitIds, sectorIds = sectorIds ?? [] }, expected);
+    /// <summary>Marks who the training is for: each group is a unit, a sector of a unit, or (no unit) a sector in every unit.</summary>
+    public Task<JsonElement> AudienceAsync(Guid sipatId, (Guid? Unit, Guid? Sector)[] targets, HttpStatusCode expected = HttpStatusCode.OK) =>
+        Send(HttpMethod.Put, $"/api/admin/sipats/{sipatId}/audience", Body(targets), expected);
+
+    public Task<JsonElement> CountAsync(params (Guid? Unit, Guid? Sector)[] targets) =>
+        Send(HttpMethod.Post, "/api/admin/registry/audience-count", Body(targets));
+
+    public static (Guid? Unit, Guid? Sector)[] Targets(JsonElement audience) =>
+        audience.GetProperty("targets").EnumerateArray().Select(item => (Optional(item, "unitId"), Optional(item, "sectorId"))).ToArray();
+
+    private static object Body((Guid? Unit, Guid? Sector)[] targets) =>
+        new { targets = targets.Select(target => new { unitId = target.Unit, sectorId = target.Sector }).ToArray() };
+
+    private static Guid? Optional(JsonElement item, string property) =>
+        item.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetGuid() : null;
 
     public Task LaunchAsync(Guid sipatId) => Send(HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { });
 

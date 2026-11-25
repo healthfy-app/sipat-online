@@ -4,46 +4,34 @@ using SipatOnline.Infrastructure.Identity;
 
 namespace SipatOnline.Infrastructure.Sipats;
 
-/// <summary>A unit a training is for. A training with no unit and no sector is for the whole company.</summary>
-public sealed class SipatEventUnitEntity
+/// <summary>
+/// One group a training is for: a unit, narrowed or not to a sector of it; or a sector in every unit. A training with
+/// no group is for the whole company.
+/// </summary>
+public sealed class SipatEventTargetEntity
 {
+    public Guid Id { get; set; }
+
     public Guid SipatEventId { get; set; }
 
-    public Guid UnitId { get; set; }
-
     public Guid TenantId { get; set; }
+
+    public Guid? UnitId { get; set; }
+
+    public Guid? SectorId { get; set; }
 }
 
-/// <summary>A sector a training is for.</summary>
-public sealed class SipatEventSectorEntity
+public sealed class SipatEventTargetEntityConfiguration : IEntityTypeConfiguration<SipatEventTargetEntity>
 {
-    public Guid SipatEventId { get; set; }
-
-    public Guid SectorId { get; set; }
-
-    public Guid TenantId { get; set; }
-}
-
-public sealed class SipatEventUnitEntityConfiguration : IEntityTypeConfiguration<SipatEventUnitEntity>
-{
-    public void Configure(EntityTypeBuilder<SipatEventUnitEntity> builder)
+    public void Configure(EntityTypeBuilder<SipatEventTargetEntity> builder)
     {
-        builder.ToTable("SipatEventUnits", "sipats");
-        builder.HasKey(link => new { link.SipatEventId, link.UnitId });
-        builder.Property(link => link.TenantId).IsRequired();
-        builder.HasOne<SipatEventEntity>().WithMany().HasForeignKey(link => link.SipatEventId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne<CompanyUnitEntity>().WithMany().HasForeignKey(link => link.UnitId).OnDelete(DeleteBehavior.Restrict);
-    }
-}
-
-public sealed class SipatEventSectorEntityConfiguration : IEntityTypeConfiguration<SipatEventSectorEntity>
-{
-    public void Configure(EntityTypeBuilder<SipatEventSectorEntity> builder)
-    {
-        builder.ToTable("SipatEventSectors", "sipats");
-        builder.HasKey(link => new { link.SipatEventId, link.SectorId });
-        builder.Property(link => link.TenantId).IsRequired();
-        builder.HasOne<SipatEventEntity>().WithMany().HasForeignKey(link => link.SipatEventId).OnDelete(DeleteBehavior.Cascade);
-        builder.HasOne<CompanySectorEntity>().WithMany().HasForeignKey(link => link.SectorId).OnDelete(DeleteBehavior.Restrict);
+        builder.ToTable("SipatEventTargets", "sipats", table =>
+            table.HasCheckConstraint("CK_SipatEventTargets_Names", "\"UnitId\" IS NOT NULL OR \"SectorId\" IS NOT NULL"));
+        builder.HasKey(target => target.Id);
+        builder.Property(target => target.Id).ValueGeneratedNever();
+        builder.Property(target => target.TenantId).IsRequired();
+        builder.HasOne<SipatEventEntity>().WithMany().HasForeignKey(target => target.SipatEventId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<CompanyUnitEntity>().WithMany().HasForeignKey(target => target.UnitId).OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<CompanySectorEntity>().WithMany().HasForeignKey(target => target.SectorId).OnDelete(DeleteBehavior.Restrict);
     }
 }

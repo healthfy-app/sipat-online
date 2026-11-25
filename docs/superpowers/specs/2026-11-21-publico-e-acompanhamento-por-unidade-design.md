@@ -1,5 +1,7 @@
 # Público e acompanhamento por unidade e setor
 
+> Substituído em 2026-11-25 por `2026-11-25-treinamentos-por-unidade-design.md`.
+
 Data: 2026-11-21 · Projeto 3 de 5 · Depende de: projeto 1 (seletor de treinamento) e projeto 2 (unidade e setor no cadastro)
 
 ## Por quê

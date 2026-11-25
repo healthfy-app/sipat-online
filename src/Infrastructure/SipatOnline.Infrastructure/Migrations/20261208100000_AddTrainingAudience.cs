@@ -7,8 +7,8 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace SipatOnline.Infrastructure.Migrations
 {
     /// <summary>
-    /// Who a training is for: the units and the sectors marked on it. A training with nothing marked is for the whole
-    /// company, so the ones that already exist stay as they are.
+    /// Who a training is for: the groups marked on it, each a unit (narrowed or not to a sector of it) or a sector in
+    /// every unit. A training with no group is for the whole company, so the ones that already exist stay as they are.
     /// </summary>
     [DbContext(typeof(PlatformDbContext))]
     [Migration("20261208100000_AddTrainingAudience")]
@@ -18,48 +18,36 @@ namespace SipatOnline.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
-                name: "SipatEventUnits",
+                name: "SipatEventTargets",
                 schema: "sipats",
                 columns: table => new
                 {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
                     SipatEventId = table.Column<Guid>(type: "uuid", nullable: false),
-                    UnitId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false)
+                    TenantId = table.Column<Guid>(type: "uuid", nullable: false),
+                    UnitId = table.Column<Guid>(type: "uuid", nullable: true),
+                    SectorId = table.Column<Guid>(type: "uuid", nullable: true)
                 },
                 constraints: table =>
                 {
-                    table.PrimaryKey("PK_SipatEventUnits", x => new { x.SipatEventId, x.UnitId });
-                    table.ForeignKey(name: "FK_SipatEventUnits_SipatEvents_SipatEventId", column: x => x.SipatEventId,
+                    table.PrimaryKey("PK_SipatEventTargets", x => x.Id);
+                    table.CheckConstraint("CK_SipatEventTargets_Names", "\"UnitId\" IS NOT NULL OR \"SectorId\" IS NOT NULL");
+                    table.ForeignKey(name: "FK_SipatEventTargets_SipatEvents_SipatEventId", column: x => x.SipatEventId,
                         principalSchema: "sipats", principalTable: "SipatEvents", principalColumn: "Id", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(name: "FK_SipatEventUnits_CompanyUnits_UnitId", column: x => x.UnitId,
+                    table.ForeignKey(name: "FK_SipatEventTargets_CompanyUnits_UnitId", column: x => x.UnitId,
                         principalSchema: "identity", principalTable: "CompanyUnits", principalColumn: "Id", onDelete: ReferentialAction.Restrict);
-                });
-            migrationBuilder.CreateTable(
-                name: "SipatEventSectors",
-                schema: "sipats",
-                columns: table => new
-                {
-                    SipatEventId = table.Column<Guid>(type: "uuid", nullable: false),
-                    SectorId = table.Column<Guid>(type: "uuid", nullable: false),
-                    TenantId = table.Column<Guid>(type: "uuid", nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_SipatEventSectors", x => new { x.SipatEventId, x.SectorId });
-                    table.ForeignKey(name: "FK_SipatEventSectors_SipatEvents_SipatEventId", column: x => x.SipatEventId,
-                        principalSchema: "sipats", principalTable: "SipatEvents", principalColumn: "Id", onDelete: ReferentialAction.Cascade);
-                    table.ForeignKey(name: "FK_SipatEventSectors_CompanySectors_SectorId", column: x => x.SectorId,
+                    table.ForeignKey(name: "FK_SipatEventTargets_CompanySectors_SectorId", column: x => x.SectorId,
                         principalSchema: "identity", principalTable: "CompanySectors", principalColumn: "Id", onDelete: ReferentialAction.Restrict);
                 });
-            migrationBuilder.CreateIndex(name: "IX_SipatEventUnits_UnitId", schema: "sipats", table: "SipatEventUnits", column: "UnitId");
-            migrationBuilder.CreateIndex(name: "IX_SipatEventSectors_SectorId", schema: "sipats", table: "SipatEventSectors", column: "SectorId");
+            migrationBuilder.CreateIndex(name: "IX_SipatEventTargets_SipatEventId", schema: "sipats", table: "SipatEventTargets", column: "SipatEventId");
+            migrationBuilder.CreateIndex(name: "IX_SipatEventTargets_UnitId", schema: "sipats", table: "SipatEventTargets", column: "UnitId");
+            migrationBuilder.CreateIndex(name: "IX_SipatEventTargets_SectorId", schema: "sipats", table: "SipatEventTargets", column: "SectorId");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(name: "SipatEventSectors", schema: "sipats");
-            migrationBuilder.DropTable(name: "SipatEventUnits", schema: "sipats");
+            migrationBuilder.DropTable(name: "SipatEventTargets", schema: "sipats");
         }
     }
 }

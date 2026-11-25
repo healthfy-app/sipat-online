@@ -1372,40 +1372,35 @@ namespace SipatOnline.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventSectorEntity", b =>
+            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventTargetEntity", b =>
                 {
-                    b.Property<Guid>("SipatEventId")
+                    b.Property<Guid>("Id")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid>("SectorId")
+                    b.Property<Guid?>("SectorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SipatEventId")
                         .HasColumnType("uuid");
 
                     b.Property<Guid>("TenantId")
                         .HasColumnType("uuid");
 
-                    b.HasKey("SipatEventId", "SectorId");
+                    b.Property<Guid?>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
 
                     b.HasIndex("SectorId");
 
-                    b.ToTable("SipatEventSectors", "sipats");
-                });
-
-            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventUnitEntity", b =>
-                {
-                    b.Property<Guid>("SipatEventId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("UnitId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid>("TenantId")
-                        .HasColumnType("uuid");
-
-                    b.HasKey("SipatEventId", "UnitId");
+                    b.HasIndex("SipatEventId");
 
                     b.HasIndex("UnitId");
 
-                    b.ToTable("SipatEventUnits", "sipats");
+                    b.ToTable("SipatEventTargets", "sipats", t =>
+                        {
+                            t.HasCheckConstraint("CK_SipatEventTargets_Names", "\"UnitId\" IS NOT NULL OR \"SectorId\" IS NOT NULL");
+                        });
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity", b =>
@@ -1804,23 +1799,13 @@ namespace SipatOnline.Infrastructure.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventSectorEntity", b =>
+            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventTargetEntity", b =>
                 {
                     b.HasOne("SipatOnline.Infrastructure.Identity.CompanySectorEntity", null)
                         .WithMany()
                         .HasForeignKey("SectorId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
-                    b.HasOne("SipatOnline.Infrastructure.Sipats.SipatEventEntity", null)
-                        .WithMany()
-                        .HasForeignKey("SipatEventId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
-            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventUnitEntity", b =>
-                {
                     b.HasOne("SipatOnline.Infrastructure.Sipats.SipatEventEntity", null)
                         .WithMany()
                         .HasForeignKey("SipatEventId")
@@ -1830,8 +1815,7 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasOne("SipatOnline.Infrastructure.Identity.CompanyUnitEntity", null)
                         .WithMany()
                         .HasForeignKey("UnitId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", b =>

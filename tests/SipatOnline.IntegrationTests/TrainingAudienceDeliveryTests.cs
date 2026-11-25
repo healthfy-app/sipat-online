@@ -31,12 +31,38 @@ public sealed class TrainingAudienceDeliveryTests
         var production = await company.Scenario.SectorAsync("Produção");
         await company.Scenario.PersonAsync("davi", company.SaoPaulo, production);
         var training = await company.Scenario.TrainingAsync("Produção SP");
-        await company.Scenario.AudienceAsync(training, [company.SaoPaulo], [production]);
+        await company.Scenario.AudienceAsync(training, [(company.SaoPaulo, production)]);
         await company.Scenario.LaunchAsync(training);
 
         Assert.Equal(2, await company.Scenario.DaysAsync("davi", training));
         Assert.Equal(0, await company.Scenario.DaysAsync("ana", training)); // São Paulo, no sector
         Assert.Equal(0, await company.Scenario.DaysAsync("bia", training));
+    }
+
+    [DockerFact]
+    public async Task The_hr_of_one_unit_and_the_it_of_another_reach_those_two_and_not_the_other_crossings()
+    {
+        await using var company = await Company.StartAsync();
+        var minas = await company.Scenario.UnitAsync("Minas Gerais");
+        var hr = await company.Scenario.SectorAsync("RH");
+        var it = await company.Scenario.SectorAsync("TI");
+        await company.Scenario.PersonAsync("lucia", minas, hr);
+        await company.Scenario.PersonAsync("marcos", minas, it);
+        await company.Scenario.PersonAsync("paula", company.SaoPaulo, it);
+        await company.Scenario.PersonAsync("rita", company.SaoPaulo, hr);
+        var training = await company.Scenario.TrainingAsync("LGPD");
+        await company.Scenario.AudienceAsync(training, [(minas, hr), (company.SaoPaulo, it)]);
+        await company.Scenario.LaunchAsync(training);
+
+        Assert.Equal(2, await company.Scenario.DaysAsync("lucia", training)); // the HR of Minas
+        Assert.Equal(2, await company.Scenario.DaysAsync("paula", training)); // the IT of São Paulo
+        Assert.Equal(0, await company.Scenario.DaysAsync("marcos", training)); // Minas, but IT
+        Assert.Equal(0, await company.Scenario.DaysAsync("rita", training)); // São Paulo, but HR
+        Assert.Equal(0, await company.Scenario.DaysAsync("ana", training)); // São Paulo, no sector
+
+        // Lúcia moves to the IT of Minas: she never opened it, so it leaves her
+        await company.Scenario.PlaceAsync("sector", it, "lucia");
+        Assert.Equal(0, await company.Scenario.DaysAsync("lucia", training));
     }
 
     [DockerFact]
@@ -131,7 +157,7 @@ public sealed class TrainingAudienceDeliveryTests
         await company.Scenario.LaunchAsync(general);
         await company.Scenario.StartWatchingAsync("ana", general);
 
-        await company.Scenario.AudienceAsync(general, [company.Rio]);
+        await company.Scenario.AudienceAsync(general, [(company.Rio, null)]);
 
         Assert.Equal(2, await company.Scenario.DaysAsync("ana", general)); // São Paulo, but already started
         Assert.Equal(2, await company.Scenario.DaysAsync("bia", general)); // Rio: still hers
@@ -143,7 +169,7 @@ public sealed class TrainingAudienceDeliveryTests
     {
         await using var company = await Company.StartAsync();
 
-        await company.Scenario.AudienceAsync(company.Training, [company.SaoPaulo, company.Rio]);
+        await company.Scenario.AudienceAsync(company.Training, [(company.SaoPaulo, null), (company.Rio, null)]);
 
         Assert.Equal(2, await company.Scenario.DaysAsync("bia", company.Training));
         Assert.Equal(0, await company.Scenario.DaysAsync("caio", company.Training));
@@ -154,7 +180,7 @@ public sealed class TrainingAudienceDeliveryTests
     {
         await using var company = await Company.StartAsync();
         var draft = await company.Scenario.TrainingAsync("Incêndio SP");
-        await company.Scenario.AudienceAsync(draft, [company.SaoPaulo]);
+        await company.Scenario.AudienceAsync(draft, [(company.SaoPaulo, null)]);
         await company.Scenario.Send(HttpMethod.Put, $"/api/admin/registry/units/{company.SaoPaulo}", new { isActive = false });
 
         await company.Scenario.LaunchAsync(draft);
@@ -183,7 +209,7 @@ public sealed class TrainingAudienceDeliveryTests
             await scenario.PersonAsync("bia", rio);
             await scenario.PersonAsync("caio");
             var training = await scenario.TrainingAsync("SIPAT SP");
-            await scenario.AudienceAsync(training, [saoPaulo]);
+            await scenario.AudienceAsync(training, [(saoPaulo, null)]);
             await scenario.LaunchAsync(training);
             return new Company(scenario, saoPaulo, rio, training);
         }

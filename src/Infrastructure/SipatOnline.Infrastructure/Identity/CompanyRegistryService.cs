@@ -137,9 +137,9 @@ public sealed class CompanyRegistryService(
 
         var inUse = isUnit
             ? await db.Users.AnyAsync(user => user.TenantId == tenant && user.UnitId == id, token) ||
-              await db.SipatEventUnits.AnyAsync(link => link.UnitId == id, token)
+              await db.SipatEventTargets.AnyAsync(target => target.UnitId == id, token)
             : await db.Users.AnyAsync(user => user.TenantId == tenant && user.SectorId == id, token) ||
-              await db.SipatEventSectors.AnyAsync(link => link.SectorId == id, token);
+              await db.SipatEventTargets.AnyAsync(target => target.SectorId == id, token);
         if (inUse)
         {
             if (item is CompanyUnitEntity unit) unit.IsActive = false;

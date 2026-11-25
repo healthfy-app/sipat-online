@@ -312,12 +312,12 @@ public sealed class CompanyRegistryApiTests
         await using var company = await TrainingAudienceScenario.StartAsync();
         var saoPaulo = await company.UnitAsync("São Paulo");
         var training = await company.TrainingAsync("SIPAT SP");
-        await company.AudienceAsync(training, [saoPaulo]);
+        await company.AudienceAsync(training, [(saoPaulo, null)]);
 
         var removal = await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{saoPaulo}", new { });
 
         Assert.False(removal.GetProperty("deleted").GetBoolean());
-        Assert.Equal([saoPaulo], TrainingAudienceScenario.Ids(await company.Get($"/api/admin/sipats/{training}/audience"), "unitIds"));
+        Assert.Equal([(saoPaulo, null)], TrainingAudienceScenario.Targets(await company.Get($"/api/admin/sipats/{training}/audience")));
     }
 
     [DockerFact]
