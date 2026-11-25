@@ -152,6 +152,11 @@ public sealed class PlatformVideoCheckpointEntityConfiguration :
             .WithMany()
             .HasForeignKey(checkpoint => checkpoint.ModuleId)
             .OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<PlatformCourseEntity>()
+            .WithMany()
+            .HasForeignKey(checkpoint => checkpoint.CourseId)
+            .OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(checkpoint => new { checkpoint.VideoId, checkpoint.TimeMilliseconds });
+        builder.HasIndex(checkpoint => new { checkpoint.CourseId, checkpoint.VideoId });
     }
 }

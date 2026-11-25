@@ -76,10 +76,11 @@ public sealed class DevelopmentEngagementInitializer(PlatformDbContext db, IConf
                             Order = index,
                             AfterVideoCount = 1
                         });
-                    if (!await db.PlatformVideoCheckpoints.AnyAsync(item => item.VideoId == course.Videos[0].Id, token))
+                    if (!await db.PlatformVideoCheckpoints.AnyAsync(item => item.CourseId == course.Id && item.VideoId == course.Videos[0].Id, token))
                         db.PlatformVideoCheckpoints.Add(new PlatformVideoCheckpointEntity
                         {
                             Id = DevelopmentDemoPresentationInitializer.StableId("demo-video-checkpoint"),
+                            CourseId = course.Id,
                             VideoId = course.Videos[0].Id,
                             ModuleId = moduleIds[0],
                             TimeMilliseconds = 2000

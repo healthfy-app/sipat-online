@@ -79,7 +79,7 @@ Em `SipatPlanService.ApplyPlanAsync`, ao salvar e ao publicar os dias:
 - Uma SIPAT pronta é reconhecida hoje pelo texto da descrição ("Opção 1", "Opção 2", "Opção 3"). Passa a ser uma marca no modelo: "Disponível como SIPAT pronta".
 - Logo, cores e certificado personalizado (Ouro) não foram conferidos. O trabalho inclui conferir e corrigir.
 
-- **No Bronze a empresa só visualiza** *(dito pelo usuário em 2026-11-25: "o ops cria um curso e associa a empresa em modo vista")*. A empresa Bronze não cria, não edita e não publica treinamento: a operação, dentro da empresa, cria a partir de uma SIPAT pronta, acerta datas e nomes dos dias e publica. Isso vale mais que as linhas do Bronze na tabela abaixo: para a empresa Bronze, só "ver" e "copiar o link" continuam. *Decisão minha, em aberto com o usuário:* a operação também fica presa a uma SIPAT pronta inteira no Bronze.
+- **No Bronze a empresa só visualiza** *(dito pelo usuário em 2026-11-25: "o ops cria um curso e associa a empresa em modo vista")*. A empresa Bronze não cria, não edita e não publica treinamento: a operação, dentro da empresa, cria a partir de uma SIPAT pronta, acerta datas e nomes dos dias e publica. Isso vale mais que as linhas do Bronze na tabela abaixo: para a empresa Bronze, só "ver" e "copiar o link" continuam. A operação também fica presa a uma SIPAT pronta inteira no Bronze *(confirmado pelo usuário em 2026-11-25)*.
 
 ### O que cada plano faz
 

@@ -1193,11 +1193,13 @@ export function setPlatformCourseModules(
   });
 }
 
+/** The games in the middle of a video, in one training: the same video in another training keeps its own. */
 export function setVideoCheckpoints(
+  courseId: string,
   videoId: string,
   items: VideoCheckpoint[],
 ): Promise<PlatformCourseVideo> {
-  return requestJson<PlatformCourseVideo>(`/api/platform/catalog/videos/${videoId}/checkpoints`, {
+  return requestJson<PlatformCourseVideo>(`/api/platform/catalog/courses/${courseId}/videos/${videoId}/checkpoints`, {
     method: 'PUT',
     body: JSON.stringify({ items }),
   });

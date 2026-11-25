@@ -134,9 +134,13 @@ public sealed class PlatformCourseModuleLinkEntity
     public GameModuleEntity Module { get; set; } = null!;
 }
 
+/// <summary>A game in the middle of a video, inside one training: the same video in another training has its own.</summary>
 public sealed class PlatformVideoCheckpointEntity
 {
     public Guid Id { get; set; }
+
+    /// <summary>The training the stop belongs to.</summary>
+    public Guid CourseId { get; set; }
 
     public Guid VideoId { get; set; }
 

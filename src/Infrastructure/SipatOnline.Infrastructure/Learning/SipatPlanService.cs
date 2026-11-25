@@ -164,6 +164,10 @@ public sealed class SipatPlanService(
                 link.Position = position++;
             }
         db.PlatformCourseVideoLinks.RemoveRange(links.Where(link => !placed.Contains(link.VideoId)));
+        // a video new in the training brings the games in the middle it has in the models; one taken out leaves its own
+        await TrainingCheckpoints.BringFromModelsAsync(db, courseId, placed.Where(id => !byVideo.ContainsKey(id)).ToArray(), token);
+        db.PlatformVideoCheckpoints.RemoveRange(await db.PlatformVideoCheckpoints
+            .Where(checkpoint => checkpoint.CourseId == courseId && !placed.Contains(checkpoint.VideoId)).ToListAsync(token));
 
         db.PlatformCourseModuleLinks.RemoveRange(modules);
         var start = 0;
@@ -274,7 +278,7 @@ public sealed class SipatPlanService(
                 sipatId.ToString("D"), clock.GetUtcNow()), token);
         }
 
-        return await distribution.ApplyDaysAsync(sipat.TenantId, sipatId, days, sipatId, "learning.sipat.launched", "sipat_event", token);
+        return await distribution.ApplyDaysAsync(sipat.TenantId, sipatId, days, sipatId, "learning.sipat.launched", "sipat_event", token, sipat.CourseId);
     }
 
     /// <summary>

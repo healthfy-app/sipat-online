@@ -116,7 +116,7 @@ public sealed class LearningEngagementApiTests
             }, HttpStatusCode.BadRequest);
             await Call(platform, $"/api/platform/catalog/courses/{courseId}/modules", HttpMethod.Put,
                 new { items = moduleIds.Select(id => new { moduleId = id, afterVideoCount = 0 }) });
-            await Call(platform, $"/api/platform/catalog/videos/{videoId}/checkpoints", HttpMethod.Put,
+            await Call(platform, $"/api/platform/catalog/courses/{courseId}/videos/{videoId}/checkpoints", HttpMethod.Put,
                 new { items = new[] { new { moduleId = moduleIds[0], timeMilliseconds = 500 } } });
             await Call(platform, $"/api/platform/catalog/courses/{courseId}", HttpMethod.Put,
                 new { title = "Curso integrado", description = "Curso do teste", status = "Published", gamificationEnabled = true });

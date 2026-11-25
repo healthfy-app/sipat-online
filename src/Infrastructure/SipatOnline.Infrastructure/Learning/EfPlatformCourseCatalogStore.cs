@@ -316,6 +316,18 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
 
         dbContext.PlatformCourses.Add(entity);
         await dbContext.SaveChangesAsync(cancellationToken);
+        // the games in the middle of its videos come along: the copy has its own from now on
+        dbContext.PlatformVideoCheckpoints.AddRange((await dbContext.PlatformVideoCheckpoints.AsNoTracking()
+                .Where(checkpoint => checkpoint.CourseId == sourceCourseId).ToListAsync(cancellationToken))
+            .Select(checkpoint => new PlatformVideoCheckpointEntity
+            {
+                Id = Guid.NewGuid(),
+                CourseId = entity.Id,
+                VideoId = checkpoint.VideoId,
+                ModuleId = checkpoint.ModuleId,
+                TimeMilliseconds = checkpoint.TimeMilliseconds
+            }));
+        await dbContext.SaveChangesAsync(cancellationToken);
 
         var sourceCover = await dbContext.PlatformCourseCovers.AsNoTracking()
             .SingleOrDefaultAsync(item => item.CourseId == sourceCourseId, cancellationToken);
@@ -458,6 +470,7 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
 
         dbContext.PlatformCourseLessons.RemoveRange(oldLessons.Where(lesson => !kept.Contains(lesson.Id)));
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PruneCheckpointsAsync(dbContext, courseId, cancellationToken);
         return true;
     }
 
@@ -496,6 +509,7 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
+        await PruneCheckpointsAsync(dbContext, courseId, cancellationToken);
         return true;
     }
 
@@ -596,15 +610,23 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             entity.IsReadySipat);
     }
 
+    /// <summary>A video taken out of a training takes its games in the middle with it (put back, it starts without them).</summary>
+    internal static Task<int> PruneCheckpointsAsync(PlatformDbContext dbContext, Guid courseId, CancellationToken cancellationToken) =>
+        dbContext.PlatformVideoCheckpoints
+            .Where(checkpoint => checkpoint.CourseId == courseId
+                && !dbContext.PlatformCourseVideoLinks.Any(link => link.CourseId == courseId && link.VideoId == checkpoint.VideoId))
+            .ExecuteDeleteAsync(cancellationToken);
+
     private static PlatformCourseVideo ToDomain(PlatformCourseVideoLinkEntity link, Guid lessonId) =>
-        ToDomain(link.Video) with
+        ToDomain(link.Video, link.CourseId) with
         {
             Title = link.TitleOverride ?? link.Video.Title,
             LessonId = lessonId,
             LibraryTitle = link.Video.Title
         };
 
-    private static PlatformCourseVideo ToDomain(PlatformCourseVideoEntity entity) =>
+    /// <summary>A video; its games in the middle are the ones it has in the given training (none outside a training).</summary>
+    private static PlatformCourseVideo ToDomain(PlatformCourseVideoEntity entity, Guid? courseId = null) =>
         new(
             entity.Id,
             entity.Title,
@@ -613,6 +635,7 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             entity.DurationMilliseconds,
             entity.CreatedAt,
             entity.Checkpoints
+                .Where(checkpoint => courseId is not null && checkpoint.CourseId == courseId)
                 .OrderBy(checkpoint => checkpoint.TimeMilliseconds)
                 .Select(checkpoint => new VideoCheckpoint(checkpoint.TimeMilliseconds, checkpoint.ModuleId))
                 .ToArray(),

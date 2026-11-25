@@ -19,7 +19,9 @@ public interface IGameModuleStore
         IReadOnlyList<CourseModulePlacement> placements,
         CancellationToken cancellationToken);
 
+    /// <summary>The games in the middle of a video inside one training.</summary>
     Task SetVideoCheckpointsAsync(
+        Guid courseId,
         Guid videoId,
         IReadOnlyList<VideoCheckpoint> checkpoints,
         CancellationToken cancellationToken);

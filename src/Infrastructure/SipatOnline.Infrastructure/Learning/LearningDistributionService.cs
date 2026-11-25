@@ -152,10 +152,14 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
     /// its videos, and the day's games come after the last video. Safe to repeat: a day nobody started is refreshed.
     /// </summary>
     public async Task<Result<ProgramApplication>> ApplyDaysAsync(Guid tenantId, Guid sipatId, IReadOnlyList<ProgramDay> days,
-        Guid auditSubjectId, string auditAction, string auditSubjectType, CancellationToken token)
+        Guid auditSubjectId, string auditAction, string auditSubjectType, CancellationToken token, Guid? contentCourseId = null)
     {
         // build and check every day before touching anything, so a SIPAT is never delivered halfway
         var now = clock.GetUtcNow();
+        // the games in the middle of each video: the training's own, or (a program, with no training) the models'
+        var fromModels = contentCourseId is null
+            ? await TrainingCheckpoints.FromModelsAsync(db, days.SelectMany(day => day.VideoIds ?? []).Distinct().ToArray(), token)
+            : null;
         var courses = new List<PlatformCourse>(days.Count);
         foreach (var day in days)
         {
@@ -168,7 +172,10 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
                 var video = await catalog.FindVideoAsync(videoId, token);
                 if (video is null)
                     return Failure<ProgramApplication>("learning.program_video_invalid", $"Um vídeo do dia \"{day.Title}\" não existe mais. Revise o programa.");
-                videos.Add(video);
+                var checkpoints = contentCourseId is { } courseId
+                    ? await TrainingCheckpoints.InAsync(db, courseId, videoId, token)
+                    : fromModels!.GetValueOrDefault(videoId) ?? [];
+                videos.Add(video with { Checkpoints = checkpoints });
             }
             if (!HasHouseVideo(videos))
                 return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra o treinamento em Treinamentos, escolha um assunto para cada dia e salve.");

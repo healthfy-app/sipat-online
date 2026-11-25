@@ -664,7 +664,9 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("SetCourseModules");
 
-        catalog.MapPut("/videos/{videoId:guid}/checkpoints", async (
+        // the games in the middle of a video belong to the training: the same video elsewhere keeps its own
+        catalog.MapPut("/courses/{courseId:guid}/videos/{videoId:guid}/checkpoints", async (
+            Guid courseId,
             Guid videoId,
             SetVideoCheckpointsRequest request,
             HttpContext context,
@@ -672,6 +674,7 @@ public static class PlatformCourseCatalogEndpoints
             CancellationToken cancellationToken) =>
         {
             var result = await moduleService.SetVideoCheckpointsAsync(
+                courseId,
                 videoId,
                 request.Items?.Select(item => new VideoCheckpoint(item.TimeMilliseconds, item.ModuleId)).ToArray(),
                 cancellationToken);

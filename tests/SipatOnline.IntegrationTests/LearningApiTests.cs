@@ -485,9 +485,9 @@ public sealed class LearningApiTests
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
         var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
-        await scenario.PlaceCheckpointAsync(b);
         var courseId = await scenario.CreateCourseAsync();
         await SetStructureAsync([a], [b]);
+        await scenario.PlaceCheckpointAsync(b, courseId);
         await scenario.DeliverAsync(courseId);
         var trackId = scenario.TrackId;
         var before = await scenario.LessonIdsAsync();

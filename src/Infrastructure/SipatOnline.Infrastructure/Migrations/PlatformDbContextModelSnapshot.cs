@@ -1092,6 +1092,9 @@ namespace SipatOnline.Infrastructure.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("CourseId")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("ModuleId")
                         .HasColumnType("uuid");
 
@@ -1104,6 +1107,8 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ModuleId");
+
+                    b.HasIndex("CourseId", "VideoId");
 
                     b.HasIndex("VideoId", "TimeMilliseconds");
 
@@ -1687,6 +1692,12 @@ namespace SipatOnline.Infrastructure.Migrations
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoCheckpointEntity", b =>
                 {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseEntity", null)
+                        .WithMany()
+                        .HasForeignKey("CourseId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
                     b.HasOne("SipatOnline.Infrastructure.Learning.GameModuleEntity", "Module")
                         .WithMany()
                         .HasForeignKey("ModuleId")

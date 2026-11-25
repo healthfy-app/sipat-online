@@ -22,6 +22,9 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
     private readonly PostgreSqlContainer postgres;
     private Guid programId;
     private Guid dayId;
+    // a model of Conteúdo holding the videos with games in the middle: a program (no training of its own) takes them from there
+    private Guid stopsModelId;
+    private readonly List<Guid> stopsModelVideos = [];
 
     private BonusLessonScenario(PostgreSqlContainer postgres, SipatOnlineApiFactory factory)
     {
@@ -134,10 +137,20 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
     }
 
     /// <summary>Puts a quiz in the middle of a house video (a checkpoint game).</summary>
-    public async Task PlaceCheckpointAsync(Guid videoId)
+    public async Task PlaceCheckpointAsync(Guid videoId, Guid? inCourse = null)
     {
         var module = await CreateQuizAsync("Jogo no meio do vídeo");
-        await Call(Platform, $"/api/platform/catalog/videos/{videoId}/checkpoints", HttpMethod.Put,
+        if (inCourse is { } courseId)
+        {
+            // the games in the middle belong to the training: put it there
+            await Call(Platform, $"/api/platform/catalog/courses/{courseId}/videos/{videoId}/checkpoints", HttpMethod.Put,
+                new { items = new[] { new { moduleId = module, timeMilliseconds = HouseDuration / 2 } } });
+            return;
+        }
+        if (stopsModelId == Guid.Empty) stopsModelId = await CreateCourseAsync();
+        if (!stopsModelVideos.Contains(videoId)) stopsModelVideos.Add(videoId);
+        await Call(Platform, $"/api/platform/catalog/courses/{stopsModelId}/videos", HttpMethod.Put, new { videoIds = stopsModelVideos });
+        await Call(Platform, $"/api/platform/catalog/courses/{stopsModelId}/videos/{videoId}/checkpoints", HttpMethod.Put,
             new { items = new[] { new { moduleId = module, timeMilliseconds = HouseDuration / 2 } } });
     }
 

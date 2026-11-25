@@ -70,6 +70,10 @@ public sealed class UnifyTrainingsMigrationTests
                 [{"id":"{{editedDay1}}","title":"Dia 1","date":"2026-12-01","subject":"Ergonomia","videoIds":["{{v1}}"],"gameIds":[]},
                  {"id":"{{editedDay2}}","title":"Dia 2","date":"2026-12-02","subject":null,"videoIds":["{{v2}}"],"gameIds":[]}]
                 """);
+            // a game in the middle of video 1, from before the games belonged to a training
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO learning."PlatformVideoCheckpoints" ("Id", "VideoId", "ModuleId", "TimeMilliseconds") VALUES ({Guid.NewGuid()}, {v1}, {game}, 30000)
+                """);
             // never opened in the editor: a video on two days, a game, a video that no longer exists, a list left null
             await AddPlanAsync(db, planned, tenant, $$"""
                 [{"id":"{{plannedDay1}}","title":"Abertura","date":"2026-12-07","subject":"Segurança","videoIds":["{{v1}}","{{v2}}"],"gameIds":["{{game}}"]},
@@ -117,6 +121,10 @@ public sealed class UnifyTrainingsMigrationTests
             // the copy that was deleted from Conteúdo: the days make a new training
             Assert.Equal([orphanDay], (await LessonsAsync(db, events[orphan].CourseId)).Select(lesson => lesson.Id));
             Assert.Equal([(v3, (Guid?)orphanDay)], await LinksAsync(db, events[orphan].CourseId));
+
+            // every training that has video 1 keeps its game in the middle, as its own
+            var stops = await db.PlatformVideoCheckpoints.AsNoTracking().Where(stop => stop.VideoId == v1).Select(stop => stop.CourseId).ToListAsync();
+            Assert.Equal(new[] { editedCourse, plannedCourse }.Order(), stops.Order());
 
             var left = await db.Database.SqlQueryRaw<int>("""
                 SELECT COUNT(*)::int AS "Value" FROM information_schema.tables

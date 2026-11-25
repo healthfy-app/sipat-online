@@ -157,7 +157,9 @@ public sealed class GameModuleService(
             : Result<PlatformCourse>.Success(refreshed);
     }
 
+    /// <summary>The games in the middle of a video, in one training: the same video elsewhere keeps its own.</summary>
     public async Task<Result<PlatformCourseVideo>> SetVideoCheckpointsAsync(
+        Guid courseId,
         Guid videoId,
         IReadOnlyList<VideoCheckpoint>? checkpoints,
         CancellationToken cancellationToken)
@@ -168,12 +170,13 @@ public sealed class GameModuleService(
             return Result<PlatformCourseVideo>.Failure(permission.Error);
         }
 
-        var video = await catalogStore.FindVideoAsync(videoId, cancellationToken);
+        var course = await catalogStore.FindCourseAsync(courseId, cancellationToken);
+        var video = course?.Videos.FirstOrDefault(item => item.Id == videoId);
         if (video is null)
         {
             return Failure<PlatformCourseVideo>(
                 "learning.platform_course.video_not_found",
-                "O vídeo não foi encontrado.");
+                "O vídeo não está neste treinamento.");
         }
 
         if (video.Provider != VideoProvider.Sipat)
@@ -198,7 +201,7 @@ public sealed class GameModuleService(
 
         var ordered = checkpoints.OrderBy(item => item.TimeMilliseconds).ToArray();
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
-        await moduleStore.SetVideoCheckpointsAsync(videoId, ordered, cancellationToken);
+        await moduleStore.SetVideoCheckpointsAsync(courseId, videoId, ordered, cancellationToken);
         await WriteAuditAsync("learning.platform_course.video_checkpoints_changed", "platform_course_video", videoId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Result<PlatformCourseVideo>.Success(video with { Checkpoints = ordered });
