@@ -38,7 +38,7 @@ function ChoiceRow({ choice, mark, mode, group, someLabel, removeLabel, disabled
  * A list to mark: search it, mark several (or one), add what is missing right there and take out what is not wanted,
  * asking once before. The videos' assuntos, a training's units and a person's unit and sector are all picked with it.
  */
-export function ChoiceList({ choices, marks, onToggle, mode = 'multi', noun, someLabel = '(em parte dos vídeos)', onCreate, onRemove, removeNote, removeVerb = 'Apagar', removeLabel, disabled }: {
+export function ChoiceList({ choices, marks, onToggle, mode = 'multi', noun, someLabel = '(em parte dos vídeos)', onCreate, onRemove, removeNote, removeVerb = 'Apagar', removeLabel, canRemove, disabled }: {
   choices: Choice[];
   marks: ReadonlyMap<string, Mark>;
   onToggle: (id: string) => void;
@@ -54,6 +54,8 @@ export function ChoiceList({ choices, marks, onToggle, mode = 'multi', noun, som
   removeNote?: (choice: Choice) => string;
   removeVerb?: string;
   removeLabel?: (choice: Choice) => string;
+  /** Which ones can be removed (all of them when not given). */
+  canRemove?: (choice: Choice) => boolean;
   disabled?: boolean;
 }) {
   const [query, setQuery] = useState('');
@@ -104,7 +106,7 @@ export function ChoiceList({ choices, marks, onToggle, mode = 'multi', noun, som
             </div>
           </div>
           : <ChoiceRow choice={item} disabled={disabled} group={group} key={item.id} mark={marks.get(item.id) ?? 'none'} mode={mode}
-            onRemove={onRemove && !disabled ? () => setConfirming(item.id) : undefined} onToggle={() => onToggle(item.id)}
+            onRemove={onRemove && !disabled && (canRemove?.(item) ?? true) ? () => setConfirming(item.id) : undefined} onToggle={() => onToggle(item.id)}
             removeLabel={labelOf(item)} someLabel={someLabel} />)}
     </div>
   </>;

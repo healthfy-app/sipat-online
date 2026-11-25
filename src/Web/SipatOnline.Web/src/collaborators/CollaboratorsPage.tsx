@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { TrainingSelect } from '@/trainings/TrainingSelect';
 import { filterByTraining, useTrainingFilter } from '@/trainings/useTrainingFilter';
 import {
-  changePlacement, changeUserStatus, getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles,
+  changeUserStatus, getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles,
   type CompanyRegistry, type LearningParticipantProgress, type ParticipantAccount, type ParticipantProfile,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -70,7 +70,7 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   const [registry, setRegistry] = useState<CompanyRegistry | null>(null);
   const [unitFilter, setUnitFilter] = useState<PlacementFilter>('all');
   const [sectorFilter, setSectorFilter] = useState<PlacementFilter>('all');
-  const [placing, setPlacing] = useState<'unit' | 'sector' | null>(null);
+  const [placing, setPlacing] = useState(false);
 
   const load = useCallback(async () => {
     setError('');
@@ -148,17 +148,6 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
     await load();
   }
 
-  async function place(field: 'unit' | 'sector', valueId: string | null) {
-    const items = field === 'unit' ? registry?.units : registry?.sectors;
-    const result = await changePlacement([...selected], field, valueId);
-    const word = field === 'unit' ? 'unidade' : 'setor';
-    const count = pluralize(result.changed, 'colaborador', 'colaboradores');
-    setPlacing(null); setSelected(new Set()); setError('');
-    setNotice(valueId === null
-      ? `${count} ${result.changed === 1 ? 'ficou sem' : 'ficaram sem'} ${word}.`
-      : `${count} ${result.changed === 1 ? 'passou' : 'passaram'} para ${nameOf(items, valueId)}.`);
-    await load();
-  }
 
   const refreshWith = async (message: string) => { setEditing(null); setAdding(false); if (message) setNotice(message); await load(); };
 
@@ -232,8 +221,8 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       <strong className="text-sm">{selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}</strong>
       {(people ?? []).some(person => selected.has(person.id) && !person.isActive) && <Button disabled={busy} onClick={() => void setStatus(true)} size="sm" variant="outline">Reativar</Button>}
       {(people ?? []).some(person => selected.has(person.id) && person.isActive) && <Button disabled={busy} onClick={() => void setStatus(false)} size="sm" variant="outline">Inativar</Button>}
-      {showPlacement && registry.units.length > 0 && <Button disabled={busy} onClick={() => setPlacing('unit')} size="sm" variant="outline">Mudar unidade</Button>}
-      {showPlacement && registry.sectors.length > 0 && <Button disabled={busy} onClick={() => setPlacing('sector')} size="sm" variant="outline">Mudar setor</Button>}
+      {/* always there: a company with no unit yet makes the first one right in the dialog */}
+      {showPlacement && <Button disabled={busy} onClick={() => setPlacing(true)} size="sm" variant="outline">Unidade e setor</Button>}
       <Button disabled={busy} onClick={() => setSelected(new Set())} size="sm" variant="ghost">Limpar seleção</Button>
     </div>}
 
@@ -290,8 +279,8 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
     </>}
 
     {editing && <EditCollaboratorDialog onClose={() => setEditing(null)} onSaved={refreshWith} person={editing} profiles={profiles ? [...profiles.values()] : []} profile={profiles ? (profiles.get(editing.id) ?? { id: editing.id, registrationNumber: null, email: null, phone: null, unitId: null, sectorId: null }) : undefined} registry={registry} />}
-    {placing && registry && <PlacementDialog count={selected.size} field={placing} items={placing === 'unit' ? registry.units : registry.sectors}
-      onClose={() => setPlacing(null)} onConfirm={valueId => place(placing, valueId)} />}
+    {placing && registry && profiles && <PlacementDialog onClose={() => setPlacing(false)} onRegistryChanged={setRegistry} people={[...selected]} profiles={profiles} registry={registry}
+      onSaved={async message => { setPlacing(false); setSelected(new Set()); setError(''); setNotice(message); await load(); }} />}
     {viewing && <ProgressDialog onClose={() => setViewing(null)} person={viewing} trainingId={training.selectedId} />}
     {adding && <AddCollaboratorsDialog onClose={() => setAdding(false)} onCreated={refreshWith} />}
   </Page>;

@@ -178,34 +178,52 @@ describe('collaborators', () => {
     expect(within(screen.getByLabelText('Filtrar por unidade')).getByRole('option', { name: 'Nenhuma unidade cadastrada' })).toBeDisabled();
   });
 
-  it('moves two selected people to a sector with changePlacement', async () => {
+  it('moves two selected people to a sector from the one "Unidade e setor" button', async () => {
     const user = userEvent.setup();
     vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
-    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 2 });
+    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 2, added: 0, removed: 0, receivedTrainings: [] });
     renderPage();
 
     await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Maria José Oliveira' }));
     await user.click(screen.getByRole('checkbox', { name: 'Selecionar José Maria Santos' }));
-    await user.click(screen.getByRole('button', { name: 'Mudar setor' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Mudar setor' });
-    expect(within(dialog).queryByRole('option', { name: 'Antigo' })).not.toBeInTheDocument();
-    await user.selectOptions(within(dialog).getByLabelText('Setor'), 's-1');
-    await user.click(within(dialog).getByRole('button', { name: 'Mudar setor' }));
+    expect(screen.queryByRole('button', { name: 'Mudar setor' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Unidade e setor' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unidade e setor' });
+    await user.click(within(dialog).getByRole('tab', { name: 'Setores' }));
+    expect(within(dialog).queryByRole('radio', { name: /Antigo/ })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('radio', { name: /Produção/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(api.changePlacement).toHaveBeenCalledWith(['p-1', 'p-2'], 'sector', 's-1'));
     expect(await screen.findByRole('status')).toHaveTextContent('2 colaboradores passaram para Produção.');
   });
 
+  it('says which trainings the people received for moving to a unit', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
+    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 1, added: 5, removed: 0, receivedTrainings: ['SIPAT Matriz'] });
+    renderPage();
+    await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Maria José Oliveira' }));
+    await user.click(screen.getByRole('button', { name: 'Unidade e setor' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unidade e setor' });
+    await user.click(within(dialog).getByRole('radio', { name: /Matriz/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(api.changePlacement).toHaveBeenCalledWith(['p-1'], 'unit', 'u-1'));
+    expect(await screen.findByRole('status')).toHaveTextContent('1 colaborador passou para Matriz e recebeu SIPAT Matriz.');
+  });
+
   it('takes the sector away from the selected people', async () => {
     const user = userEvent.setup();
     vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
-    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 1 });
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-1', null, 's-1')]);
+    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 1, added: 0, removed: 0, receivedTrainings: [] });
     renderPage();
     await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Maria José Oliveira' }));
-    await user.click(screen.getByRole('button', { name: 'Mudar setor' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Mudar setor' });
-    await user.selectOptions(within(dialog).getByLabelText('Setor'), 'none');
-    await user.click(within(dialog).getByRole('button', { name: 'Mudar setor' }));
+    await user.click(screen.getByRole('button', { name: 'Unidade e setor' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unidade e setor' });
+    await user.click(within(dialog).getByRole('tab', { name: 'Setores' }));
+    await user.click(within(dialog).getByRole('radio', { name: 'Sem setor' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
     await waitFor(() => expect(api.changePlacement).toHaveBeenCalledWith(['p-1'], 'sector', null));
     expect(await screen.findByRole('status')).toHaveTextContent('1 colaborador ficou sem setor.');
   });
