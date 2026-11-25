@@ -265,24 +265,52 @@ describe('collaborators', () => {
     expect(screen.queryByText(/sem setor/)).not.toBeInTheDocument();
   });
 
-  it('edits registration and sector of a collaborator with a single save, typing the sector name', async () => {
+  it('edits unit and sector by choosing: the sectors offered are only the ones of the unit chosen', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
-    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-3', null, 's-3')]);
-    vi.mocked(api.saveParticipantProfile).mockResolvedValue(profile('p-3', null, 's-1'));
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({
+      ...registry(), units: [item('u-1', 'Matriz'), item('u-2', 'Filial')],
+      unitSectors: [{ unitId: 'u-1', sectorId: 's-1', peopleCount: 0 }, { unitId: 'u-2', sectorId: 's-2', peopleCount: 0 }],
+    });
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-3', null, null)]);
+    vi.mocked(api.saveParticipantProfile).mockResolvedValue(profile('p-3', 'u-1', 's-1'));
     renderPage();
 
     await user.click(await screen.findByRole('button', { name: 'Editar Ana Lima' }));
     const dialog = await screen.findByRole('dialog', { name: 'Editar colaborador' });
-    expect(within(dialog).getByLabelText('Setor')).toHaveValue('Antigo');
+    // nothing to type, so nothing to get wrong: with no unit, there is no sector to choose yet
+    expect(within(dialog).getByLabelText('Setor')).toBeDisabled();
     await user.type(within(dialog).getByLabelText('Matrícula'), '123');
-    await user.clear(within(dialog).getByLabelText('Setor'));
-    await user.type(within(dialog).getByLabelText('Setor'), 'produção');
+    await user.selectOptions(within(dialog).getByLabelText('Unidade'), 'Matriz');
+    const sector = within(dialog).getByLabelText('Setor');
+    expect(within(sector).getByRole('option', { name: 'Produção' })).toBeInTheDocument();
+    expect(within(sector).queryByRole('option', { name: 'Manutenção' })).not.toBeInTheDocument();
+    expect(within(sector).queryByRole('option', { name: 'Antigo' })).not.toBeInTheDocument();
+    await user.selectOptions(sector, 'Produção');
     await user.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }));
 
     await waitFor(() => expect(api.saveParticipantProfile).toHaveBeenCalledTimes(1));
-    expect(api.saveParticipantProfile).toHaveBeenCalledWith('p-3', { registrationNumber: '123', email: null, phone: null, unitId: null, sectorId: 's-1' });
+    expect(api.saveParticipantProfile).toHaveBeenCalledWith('p-3', { registrationNumber: '123', email: null, phone: null, unitId: 'u-1', sectorId: 's-1' });
     expect(await screen.findByRole('status')).toHaveTextContent('Dados de Ana Lima atualizados (cadastro).');
+  });
+
+  it('changing the unit of a collaborator drops a sector the new unit does not have', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({
+      ...registry(), units: [item('u-1', 'Matriz'), item('u-2', 'Filial')],
+      unitSectors: [{ unitId: 'u-1', sectorId: 's-1', peopleCount: 1 }, { unitId: 'u-2', sectorId: 's-2', peopleCount: 0 }],
+    });
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-3', 'u-1', 's-1')]);
+    vi.mocked(api.saveParticipantProfile).mockResolvedValue(profile('p-3', 'u-2', null));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Editar Ana Lima' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar colaborador' });
+    expect(within(dialog).getByLabelText('Unidade')).toHaveDisplayValue('Matriz');
+    expect(within(dialog).getByLabelText('Setor')).toHaveDisplayValue('Produção');
+    await user.selectOptions(within(dialog).getByLabelText('Unidade'), 'Filial');
+    expect(within(dialog).getByLabelText('Setor')).toHaveDisplayValue('Sem setor');
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }));
+    await waitFor(() => expect(api.saveParticipantProfile).toHaveBeenCalledWith('p-3', { registrationNumber: null, email: null, phone: null, unitId: 'u-2', sectorId: null }));
   });
 
   it('marks the fields the company made required in the edit dialog', async () => {

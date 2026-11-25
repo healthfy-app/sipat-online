@@ -11,6 +11,7 @@ import { serializeCredentialCsv } from '@/participantCsv';
 import { cn } from '@/lib/utils';
 import { useUnitScope } from '@/trainings/unitScope';
 import { downloadCsv } from './csvFile';
+import { sectorsOfUnit } from './unitSectors';
 import { downloadTemplate, IMPORT_SAVE_CHUNK, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, missingInRow, readSheet } from './importSheet';
 
 const emptyForm = { name: '', registrationNumber: '', login: '', email: '', phone: '', unit: '', sector: '', password: '' };
@@ -73,7 +74,13 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
     value: form[key],
   });
   const activeUnits = registry?.units.filter(unit => unit.isActive) ?? [];
-  const activeSectors = registry?.sectors.filter(sector => sector.isActive) ?? [];
+  // the sectors offered are the ones of the unit chosen: with no unit, there is none to choose
+  const formUnitId = activeUnits.find(unit => unit.name === form.unit)?.id ?? null;
+  const activeSectors = sectorsOfUnit(registry, formUnitId);
+  // a sector the new unit does not have does not follow the choice of another unit
+  useEffect(() => {
+    setForm(current => current.sector && !sectorsOfUnit(registry, formUnitId).some(sector => sector.name === current.sector) ? { ...current, sector: '' } : current);
+  }, [formUnitId, registry]);
 
   async function createOne(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -211,8 +218,8 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
                 {activeUnits.map(unit => <option key={unit.id} value={unit.name}>{unit.name}</option>)}
               </NativeSelect>
             </Field>}
-            {activeSectors.length > 0 && <Field htmlFor="add-sector" label="Setor">
-              <NativeSelect id="add-sector" {...field('sector')}>
+            {activeUnits.length > 0 && <Field hint={!formUnitId ? 'Escolha a unidade para ver os setores dela.' : activeSectors.length === 0 ? 'Esta unidade ainda não tem setores. Crie em Cadastro.' : undefined} htmlFor="add-sector" label="Setor">
+              <NativeSelect disabled={activeSectors.length === 0} id="add-sector" {...field('sector')}>
                 <option value="">Sem setor</option>
                 {activeSectors.map(sector => <option key={sector.id} value={sector.name}>{sector.name}</option>)}
               </NativeSelect>
