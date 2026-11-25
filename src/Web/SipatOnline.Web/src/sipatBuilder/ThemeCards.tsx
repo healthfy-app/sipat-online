@@ -294,7 +294,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       if (value === 'all') onVideos!([...videoIds, ...available.map(video => video.id)].slice(0, maxVideoRows));
       else if (value) onVideos!([...videoIds, value]);
     }} value="">
-    <option value="">+ Adicionar vídeo</option>
+    <option value="">Selecionar da Biblioteca</option>
     {subject && available.length > 1 && <option value="all">Todos os vídeos de {subject.title} ({available.length})</option>}
     {available.map(video => <option key={video.id} value={video.id}>{video.title}</option>)}
   </select>;
