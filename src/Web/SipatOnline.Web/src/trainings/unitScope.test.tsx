@@ -2,7 +2,8 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '@/api';
-import { UnitScopeProvider, UnitSwitcher, inUnit, trainingInUnit, useUnitScope } from './unitScope';
+import { MemoryRouter } from 'react-router-dom';
+import { UnitBar, UnitScopeProvider, UnitSwitcher, inUnit, trainingInUnit, useUnitScope } from './unitScope';
 
 vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api')>()), getCompanyRegistry: vi.fn() }));
 
@@ -20,11 +21,19 @@ beforeEach(() => { localStorage.clear(); });
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
 describe('the unit chosen at the top', () => {
-  it('does not show for a company with fewer than two units', async () => {
+  it('is always there for a company: with one unit, and with none, where it leads to making the first', async () => {
     vi.mocked(api.getCompanyRegistry).mockResolvedValue(company(unit('sp', 'São Paulo'), unit('old', 'Antiga', false)));
-    mount();
-    await waitFor(() => expect(api.getCompanyRegistry).toHaveBeenCalled());
-    expect(screen.queryByRole('radiogroup', { name: 'Unidade' })).not.toBeInTheDocument();
+    render(<MemoryRouter><UnitScopeProvider enabled scopeKey="acme"><UnitBar manageHref="/admin/cadastro" /><Probe /></UnitScopeProvider></MemoryRouter>);
+    expect(await screen.findByRole('radio', { name: 'Todas' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'São Paulo' })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: 'Antiga' })).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Unidades e setores' })).toHaveAttribute('href', '/admin/cadastro');
+    cleanup();
+
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(company());
+    render(<MemoryRouter><UnitScopeProvider enabled scopeKey="acme"><UnitBar manageHref="/admin/cadastro" /><Probe /></UnitScopeProvider></MemoryRouter>);
+    expect(await screen.findByRole('radio', { name: 'Todas' })).toBeChecked();
+    expect(screen.getByRole('link', { name: 'Criar unidades' })).toHaveAttribute('href', '/admin/cadastro');
     expect(screen.getByTestId('scope')).toHaveTextContent('todas');
   });
 

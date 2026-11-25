@@ -798,7 +798,7 @@ function ProtectedPortal({
           {error && <p className="form-error" role="alert">{error}</p>}
           <UnitScopeProvider companyId={isPlatformOperator && !isPlatformCompanyContext ? companyWorkspaceId ?? undefined : undefined} enabled={companyPages}
             scopeKey={unitScopeCompany ? `company:${unitScopeCompany}` : tenant.tenantKey}>
-          {companyPages && <UnitBar />}
+          {companyPages && <UnitBar manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
           {/* an administrator who also takes trainings keeps the admin menu, and the participant pages keep their look */}
           {!isLearnerOnly && location.pathname.startsWith('/learning')
             ? <div className="portal-layout-learner contents"><Outlet /></div>

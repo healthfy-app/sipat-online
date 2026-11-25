@@ -1,5 +1,6 @@
 import { Check, ChevronDown, MapPin } from 'lucide-react';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { getCompanyRegistry, type AudienceTarget, type RegistryItem } from '@/api';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
@@ -15,7 +16,7 @@ interface UnitScope {
   unit: RegistryItem | null;
   /** The active units of the company. */
   units: RegistryItem[];
-  /** True when there is something to choose (two units or more): the switcher shows and the pages follow it. */
+  /** True once the units of the company are known: the switcher shows (even with one unit, or none yet) and the pages follow it. */
   active: boolean;
   setUnitId: (id: string | null) => void;
 }
@@ -64,7 +65,7 @@ export function UnitScopeProvider({ scopeKey, companyId, enabled, children }: {
   const setUnitId = useCallback((id: string | null) => { setChosen(id); write(scopeKey, id); }, [scopeKey]);
   const value = useMemo<UnitScope>(() => {
     const list = units ?? [];
-    const active = list.length >= 2;
+    const active = units !== null;
     const unit = active ? list.find(item => item.id === chosen) ?? null : null;
     return { unitId: unit?.id ?? null, unit, units: list, active, setUnitId };
   }, [units, chosen, setUnitId]);
@@ -84,13 +85,19 @@ export function inUnit(profiles: ReadonlyMap<string, { unitId: string | null }>,
   return personId => unitId === null || profiles.get(personId)?.unitId === unitId;
 }
 
-/** The switcher in its place at the top of the company's pages, with its caption. Nothing when there is nothing to choose. */
-export function UnitBar() {
-  const { active } = useUnitScope();
+/**
+ * The switcher in its place at the top of the company's pages, with its caption. It is always there for a company, so
+ * the way the company is organized is in sight from the first day: with no unit yet, it leads to making the first.
+ */
+export function UnitBar({ manageHref }: { /** Where units and sectors are made, for who can make them. */ manageHref?: string }) {
+  const { active, units } = useUnitScope();
   if (!active) return null;
   return <div className="mb-5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1.5 max-[760px]:mb-4" data-slot="unit-bar">
     <span className="text-[0.6875rem] font-semibold uppercase tracking-[0.08em] text-muted-foreground">Unidade</span>
     <UnitSwitcher />
+    {manageHref && <Link className="text-[0.8125rem] font-semibold text-primary underline-offset-2 hover:underline" to={manageHref}>
+      {units.length === 0 ? 'Criar unidades' : 'Unidades e setores'}
+    </Link>}
   </div>;
 }
 
