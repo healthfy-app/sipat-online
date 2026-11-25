@@ -8,7 +8,7 @@ using SipatOnline.Sipats.Domain.Sipats;
 namespace SipatOnline.Infrastructure.Learning;
 
 /// <summary>A company's training as Conteúdo and the editor need it: which training, of which company, it is.</summary>
-public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName);
+public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName, string SipatStatus);
 
 /// <summary>A training as its card shows it: how much it has, how long it runs, and its cover (the version changes with the photo).</summary>
 public sealed record SipatPlanSummary(Guid SipatEventId, int Days, int Videos, Guid CourseId, long DurationMilliseconds, long? CoverVersion);
@@ -50,12 +50,14 @@ public sealed class SipatPlanService(
         return Result<Guid>.Success(found.Value.CourseId);
     }
 
-    /// <summary>Every company's training with its company: the editor shows where it belongs, Conteúdo leaves them out.</summary>
+    /// <summary>Every company's training with its company and where it stands: Conteúdo lists them beside the models and says whose each is.</summary>
     public async Task<IReadOnlyList<SipatWeekInfo>> WeeksAsync(CancellationToken token) =>
-        await (from sipat in db.SipatEvents.AsNoTracking()
-               join tenant in db.Tenants.AsNoTracking() on sipat.TenantId equals tenant.Id
-               select new SipatWeekInfo(sipat.CourseId, sipat.Id, sipat.TenantId, sipat.Title, tenant.Name))
-            .ToListAsync(token);
+        (await (from sipat in db.SipatEvents.AsNoTracking()
+                join tenant in db.Tenants.AsNoTracking() on sipat.TenantId equals tenant.Id
+                select new { sipat.CourseId, sipat.Id, sipat.TenantId, sipat.Title, tenant.Name, sipat.Status })
+            .ToListAsync(token))
+        .Select(row => new SipatWeekInfo(row.CourseId, row.Id, row.TenantId, row.Title, row.Name, row.Status.ToString()))
+        .ToArray();
 
     /// <summary>The trainings that belong to a company, kept out of every list of models to pick from.</summary>
     public async Task<IReadOnlySet<Guid>> WeekCourseIdsAsync(CancellationToken token) =>

@@ -870,7 +870,7 @@ export function changeVideosCompanies(change: BulkVideoChange): Promise<void> {
 }
 
 /** A SIPAT's week opened in the video editor: a copy training whose Títulos are the days of that SIPAT. */
-export interface SipatWeek { courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string }
+export interface SipatWeek { courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string; sipatStatus?: 'Draft' | 'Published' | 'Cancelled' }
 export function listSipatWeeks(): Promise<SipatWeek[]> {
   return requestJson<SipatWeek[]>('/api/platform/catalog/sipat-weeks');
 }

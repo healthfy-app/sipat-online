@@ -194,6 +194,12 @@ public sealed class CompanyPlanApiTests
         var sipatId = (await Send(inCompany, HttpMethod.Post, "/api/admin/sipats", new { title = "SIPAT 2026", description = (string?)null, startsAt = start, endsAt = start.AddDays(1) },
             HttpStatusCode.Created)).GetProperty("id").GetGuid();
         var plan = $"/api/admin/sipats/{sipatId}/plan";
+        // Conteúdo lists the companies' trainings beside the models: whose each is, and where it stands
+        var listed = Assert.Single((await Get(operatorClient, "/api/platform/catalog/sipat-weeks")).EnumerateArray(), item => item.GetProperty("sipatEventId").GetGuid() == sipatId);
+        Assert.Equal("Acme Regras", listed.GetProperty("companyName").GetString());
+        Assert.Equal("Draft", listed.GetProperty("sipatStatus").GetString());
+        Assert.Contains((await Get(operatorClient, "/api/platform/catalog/courses")).EnumerateArray(), item =>
+            item.GetProperty("id").GetGuid() == listed.GetProperty("courseId").GetGuid() && item.GetProperty("tenantId").GetGuid() == companyId);
         string[] Titles(JsonElement catalog) => catalog.GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()!).Order().ToArray();
 
         // Bronze: one ready SIPAT whole (a model the operation marked as one), no own identity, no internal videos

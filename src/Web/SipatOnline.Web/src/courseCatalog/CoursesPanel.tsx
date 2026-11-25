@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import type { CourseOwner } from './catalogFilters';
 import type { CourseCategory, PlatformCourse } from '@/api';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/page';
@@ -7,6 +8,7 @@ import CourseCard from './CourseCard';
 /** The subjects of the library as cards. The list arrives already filtered by the toolbar above the tabs. */
 export default function CoursesPanel({
   courses,
+  owners,
   categories,
   onClearFilters,
   busy,
@@ -15,6 +17,7 @@ export default function CoursesPanel({
   onDelete,
 }: {
   courses: PlatformCourse[];
+  owners?: Map<string, CourseOwner>;
   categories: CourseCategory[];
   onClearFilters: () => void;
   busy: boolean;
@@ -34,7 +37,7 @@ export default function CoursesPanel({
       ) : (
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
           {courses.map((course) => (
-            <CourseCard busy={busy} categoryName={course.categoryId ? categoryNames.get(course.categoryId) : null} course={course} key={course.id}
+            <CourseCard busy={busy} categoryName={course.categoryId ? categoryNames.get(course.categoryId) : null} course={course} key={course.id} owner={owners?.get(course.id)}
               onDelete={() => onDelete(course)} onDuplicate={() => onDuplicate(course)} onOpen={() => onOpen(course)} />
           ))}
         </div>
