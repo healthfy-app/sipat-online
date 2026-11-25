@@ -291,7 +291,7 @@ public sealed class SipatPlanService(
         if (sipat.Status == SipatEventStatus.Cancelled)
             return Failure<IReadOnlyList<ProgramDay>>("sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado.");
 
-        var cleaned = await ApplyPlanAsync(days, token);
+        var cleaned = await ApplyPlanAsync(days, token, allowEmptyDays: true);
         if (!cleaned.IsSuccess) return cleaned;
 
         var now = clock.GetUtcNow();
@@ -372,13 +372,13 @@ public sealed class SipatPlanService(
     /// and Prata and above personalize the grid of videos; the quiz at the end of each module is Diamante only, and so are
     /// the company's internal videos (the assuntos that belong to it).
     /// </summary>
-    private async Task<Result<IReadOnlyList<ProgramDay>>> ApplyPlanAsync(IReadOnlyList<ProgramDay>? days, CancellationToken token)
+    private async Task<Result<IReadOnlyList<ProgramDay>>> ApplyPlanAsync(IReadOnlyList<ProgramDay>? days, CancellationToken token, bool allowEmptyDays = false)
     {
         var capabilities = await plans.CapabilitiesAsync(token);
         if (!capabilities.Quizzes && days is not null)
             days = days.Select(day => day with { GameIds = [] }).ToArray();
 
-        var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token);
+        var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token, allowEmptyDays);
         if (!cleaned.IsSuccess) return cleaned;
 
         var hidden = await plans.HiddenSubjectsAsync(token);
@@ -401,6 +401,7 @@ public sealed class SipatPlanService(
         var result = new List<ProgramDay>(cleaned.Value.Count);
         foreach (var day in cleaned.Value)
         {
+            if (day.VideoIds.Count == 0) { result.Add(day); continue; }
             var picked = day.VideoIds.ToHashSet();
             var module = available
                 .Select(course => course.Videos.Where(video => video.Status == PlatformVideoStatus.Ready).Select(video => video.Id).ToArray())

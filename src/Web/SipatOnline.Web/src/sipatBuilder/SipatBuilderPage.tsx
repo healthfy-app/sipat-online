@@ -243,8 +243,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   }
 
   /** Saves the SIPAT (creating it the first time) and its days; returns its id. */
-  async function save(): Promise<string | null> {
-    if (!checkIssues()) return null;
+  // the video editor fills the days itself, so opening it skips the grid's content checks
+  async function save(skipChecks = false): Promise<string | null> {
+    if (!skipChecks && !checkIssues()) return null;
     setBusy(true); setError(''); setNotice('');
     try {
       let current = sipat;
@@ -272,7 +273,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
 
   /** All the days in the video editor: saves them if needed, writes them into the week's títulos and opens it there. */
   async function editWeek() {
-    const id = dirty || !sipat ? await save() : sipat.id;
+    const id = dirty || !sipat ? await save(true) : sipat.id;
     if (!id) return;
     setBusy(true); setError('');
     try {
