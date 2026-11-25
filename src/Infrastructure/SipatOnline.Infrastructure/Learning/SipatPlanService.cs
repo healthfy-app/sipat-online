@@ -1,4 +1,3 @@
-using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Application;
 using SipatOnline.BuildingBlocks.Domain;
@@ -8,67 +7,17 @@ using SipatOnline.Sipats.Domain.Sipats;
 
 namespace SipatOnline.Infrastructure.Learning;
 
-/// <summary>The days of a SIPAT, kept with it: one row per SIPAT, read and written whole.</summary>
-public sealed class SipatPlanEntity
-{
-    public Guid SipatEventId { get; set; }
-
-    public Guid TenantId { get; set; }
-
-    public string DaysJson { get; set; } = "[]";
-
-    public DateTimeOffset UpdatedAt { get; set; }
-}
-
-public sealed class SipatPlanEntityConfiguration : Microsoft.EntityFrameworkCore.IEntityTypeConfiguration<SipatPlanEntity>
-{
-    public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<SipatPlanEntity> builder)
-    {
-        builder.ToTable("SipatPlans", "learning");
-        builder.HasKey(plan => plan.SipatEventId);
-        builder.Property(plan => plan.SipatEventId).ValueGeneratedNever();
-        builder.Property(plan => plan.TenantId).IsRequired();
-        builder.Property(plan => plan.DaysJson).IsRequired();
-        builder.Property(plan => plan.UpdatedAt).IsRequired();
-        builder.HasIndex(plan => plan.TenantId);
-    }
-}
-
-/// <summary>
-/// The week of a SIPAT opened in the video editor: a training of its own (a copy, never a training of Conteúdo) whose
-/// Títulos are the days, in order, with the days' names, videos and activities. The two stay one: saving the days
-/// rewrites the Títulos, and reading the days takes them from the Títulos, so the last save on either side is what both show.
-/// </summary>
-public sealed class SipatWeekCourseEntity
-{
-    public Guid SipatEventId { get; set; }
-
-    public Guid TenantId { get; set; }
-
-    public Guid CourseId { get; set; }
-}
-
-public sealed class SipatWeekCourseEntityConfiguration : Microsoft.EntityFrameworkCore.IEntityTypeConfiguration<SipatWeekCourseEntity>
-{
-    public void Configure(Microsoft.EntityFrameworkCore.Metadata.Builders.EntityTypeBuilder<SipatWeekCourseEntity> builder)
-    {
-        builder.ToTable("SipatWeekCourses", "learning");
-        builder.HasKey(week => week.SipatEventId);
-        builder.Property(week => week.SipatEventId).ValueGeneratedNever();
-        builder.HasIndex(week => week.CourseId).IsUnique();
-        builder.HasIndex(week => week.TenantId);
-    }
-}
-
-/// <summary>A week copy as the editor and Conteúdo need it: which SIPAT, of which company, it belongs to.</summary>
+/// <summary>A company's training as Conteúdo and the editor need it: which training, of which company, it is.</summary>
 public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName);
 
 public sealed record SipatPlanSummary(Guid SipatEventId, int Days, int Videos);
 
 /// <summary>
-/// A company's SIPAT is one week of training: a start date, some days, and a theme (videos and games) for each day.
-/// It is built as a draft, then launched: that publishes it (several trainings can be published at once) and delivers
-/// each day to the participants as a track. The company's administrator and the operator use the same service.
+/// A company's training: some days, each with its date, its videos and its activities. Its content is a training of
+/// its own (the company's, never a model of Conteúdo): the days are that training's Títulos, so the planner of days and
+/// the video editor read and write the same thing. It is built as a draft, then launched: that publishes it (several
+/// trainings can be published at once) and delivers each day to the participants as a track. The company's
+/// administrator and the operator use the same service.
 /// </summary>
 public sealed class SipatPlanService(
     PlatformDbContext db,
@@ -81,160 +30,123 @@ public sealed class SipatPlanService(
     IAuditTrail audit,
     TimeProvider clock)
 {
-    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-
     public async Task<Result<IReadOnlyList<ProgramDay>>> GetAsync(Guid sipatId, CancellationToken token)
     {
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<IReadOnlyList<ProgramDay>>.Failure(found.Error);
-        var plan = await db.SipatPlans.SingleOrDefaultAsync(item => item.SipatEventId == sipatId, token);
-        IReadOnlyList<ProgramDay> days = plan is null ? [] : Read(plan);
-        // the week was edited in the video editor: its Títulos are the days (the dates and the day ids stay the plan's)
-        var week = await db.SipatWeekCourses.AsNoTracking().SingleOrDefaultAsync(item => item.SipatEventId == sipatId, token);
-        if (week is not null)
-        {
-            var fromWeek = await DaysFromWeekAsync(week.CourseId, days, token);
-            var json = JsonSerializer.Serialize(fromWeek, JsonOptions);
-            if (fromWeek.Count > 0 && (plan is null || plan.DaysJson != json))
-            {
-                if (plan is null)
-                {
-                    plan = new SipatPlanEntity { SipatEventId = sipatId, TenantId = found.Value.TenantId };
-                    db.SipatPlans.Add(plan);
-                }
-                plan.DaysJson = json;
-                plan.UpdatedAt = clock.GetUtcNow();
-                await db.SaveChangesAsync(token);
-                days = fromWeek;
-            }
-        }
-        return Result<IReadOnlyList<ProgramDay>>.Success(days);
+        return Result<IReadOnlyList<ProgramDay>>.Success(await ReadDaysAsync(found.Value.CourseId, token));
     }
 
-    /// <summary>
-    /// Opens the week in the video editor: makes (once) the SIPAT's own copy training, writes the days into it as Títulos
-    /// and gives back its id. Only the operation edits trainings, so only the operation opens it.
-    /// </summary>
+    /// <summary>The training to open in the video editor. Only the operation edits trainings there, so only the operation opens it.</summary>
     public async Task<Result<Guid>> OpenWeekAsync(Guid sipatId, CancellationToken token)
     {
         if (!actor.IsInRole(SipatOnline.BuildingBlocks.Application.PlatformRoles.PlatformOperator))
             return Failure<Guid>("sipat.week.forbidden", "Só a operação edita a semana no editor de vídeos.");
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<Guid>.Failure(found.Error);
-        var sipat = found.Value;
-        if (sipat.Status == SipatEventStatus.Cancelled)
+        if (found.Value.Status == SipatEventStatus.Cancelled)
             return Failure<Guid>("sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado.");
-        var current = await GetAsync(sipatId, token);
-        if (!current.IsSuccess) return Result<Guid>.Failure(current.Error);
-
-        var now = clock.GetUtcNow();
-        var week = await db.SipatWeekCourses.SingleOrDefaultAsync(item => item.SipatEventId == sipatId, token);
-        if (week is null || !await db.PlatformCourses.AnyAsync(course => course.Id == week.CourseId, token))
-        {
-            var title = sipat.Title.Trim();
-            var course = new PlatformCourseEntity
-            {
-                Id = Guid.NewGuid(),
-                Title = title.Length > 200 ? title[..200] : title,
-                CreatedAt = now,
-                Status = (int)PlatformCourseStatus.Draft,
-                GamificationEnabled = false,
-            };
-            db.PlatformCourses.Add(course);
-            if (week is null)
-            {
-                week = new SipatWeekCourseEntity { SipatEventId = sipatId, TenantId = sipat.TenantId, CourseId = course.Id };
-                db.SipatWeekCourses.Add(week);
-            }
-            else week.CourseId = course.Id;
-            await db.SaveChangesAsync(token);
-        }
-        await WriteWeekAsync(week.CourseId, current.Value, token);
-        await db.SaveChangesAsync(token);
-        await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(sipat.TenantId), "sipat.week.opened", "sipat_event",
-            sipatId.ToString("D"), now), token);
-        return Result<Guid>.Success(week.CourseId);
+        return Result<Guid>.Success(found.Value.CourseId);
     }
 
-    /// <summary>Every week copy with its SIPAT and company: the editor shows where it belongs, Conteúdo leaves them out.</summary>
+    /// <summary>Every company's training with its company: the editor shows where it belongs, Conteúdo leaves them out.</summary>
     public async Task<IReadOnlyList<SipatWeekInfo>> WeeksAsync(CancellationToken token) =>
-        await (from week in db.SipatWeekCourses.AsNoTracking()
-               join sipat in db.SipatEvents.AsNoTracking() on week.SipatEventId equals sipat.Id
-               join tenant in db.Tenants.AsNoTracking() on week.TenantId equals tenant.Id
-               select new SipatWeekInfo(week.CourseId, week.SipatEventId, week.TenantId, sipat.Title, tenant.Name))
+        await (from sipat in db.SipatEvents.AsNoTracking()
+               join tenant in db.Tenants.AsNoTracking() on sipat.TenantId equals tenant.Id
+               select new SipatWeekInfo(sipat.CourseId, sipat.Id, sipat.TenantId, sipat.Title, tenant.Name))
             .ToListAsync(token);
 
-    /// <summary>The ids of the week copies, kept out of every list of trainings to pick from.</summary>
+    /// <summary>The trainings that belong to a company, kept out of every list of models to pick from.</summary>
     public async Task<IReadOnlySet<Guid>> WeekCourseIdsAsync(CancellationToken token) =>
-        (await db.SipatWeekCourses.AsNoTracking().Select(week => week.CourseId).ToListAsync(token)).ToHashSet();
+        (await db.PlatformCourses.AsNoTracking().Where(course => course.TenantId != null).Select(course => course.Id).ToListAsync(token)).ToHashSet();
 
     /// <summary>
-    /// The days read from the week's Títulos: one day per Título, its name, its videos in order and the activities placed
-    /// among them. A day keeps its id, date and assunto by position; a Título added in the editor becomes a day the day
-    /// after the last one. A week with no Títulos (the copy was emptied or deleted) leaves the days as they are.
+    /// The days of a training: one per Título, with its name, date and assunto, its videos in order and the activities
+    /// placed among them. A day's id is its Título's id.
     /// </summary>
-    private async Task<IReadOnlyList<ProgramDay>> DaysFromWeekAsync(Guid courseId, IReadOnlyList<ProgramDay> days, CancellationToken token)
+    private async Task<IReadOnlyList<ProgramDay>> ReadDaysAsync(Guid courseId, CancellationToken token)
     {
         var lessons = await db.PlatformCourseLessons.AsNoTracking().Where(lesson => lesson.CourseId == courseId)
-            .OrderBy(lesson => lesson.Position).ToListAsync(token);
-        if (lessons.Count == 0) return days;
+            .OrderBy(lesson => lesson.Position).ThenBy(lesson => lesson.Id).ToListAsync(token);
+        if (lessons.Count == 0) return [];
         var links = await db.PlatformCourseVideoLinks.AsNoTracking().Where(link => link.CourseId == courseId)
             .OrderBy(link => link.Position).ToListAsync(token);
         var modules = await db.PlatformCourseModuleLinks.AsNoTracking().Where(link => link.CourseId == courseId)
             .OrderBy(link => link.AfterVideoCount).ThenBy(link => link.Order).ToListAsync(token);
 
         var result = new List<ProgramDay>(lessons.Count);
-        var start = 0;
-        for (var index = 0; index < lessons.Count; index++)
+        foreach (var range in Ranges(lessons, links))
         {
-            var lesson = lessons[index];
-            var videoIds = links.Where(link => link.LessonId == lesson.Id).Select(link => link.VideoId).ToArray();
-            var end = start + videoIds.Length;
-            var first = index == 0;
-            var last = index == lessons.Count - 1;
-            // an activity after video N belongs to the Título that holds video N (before the first video: the first Título)
-            var gameIds = modules
-                .Where(link => (link.AfterVideoCount > start || (first && link.AfterVideoCount == 0)) && (link.AfterVideoCount <= end || last))
-                .Select(link => link.ModuleId).Distinct().ToArray();
-            var existing = index < days.Count ? days[index] : null;
-            var previousDate = result.Count > 0 ? result[^1].Date : null;
-            result.Add(new ProgramDay(
-                existing?.Id ?? Guid.NewGuid(),
-                lesson.Title,
-                existing?.Date ?? previousDate?.AddDays(1),
-                existing?.Subject,
-                videoIds,
-                gameIds));
-            start = end;
+            var gameIds = modules.Where(link => range.Holds(link.AfterVideoCount)).Select(link => link.ModuleId).Distinct().ToArray();
+            result.Add(new ProgramDay(range.Lesson.Id, range.Lesson.Title, range.Lesson.Date, range.Lesson.Subject, range.VideoIds, gameIds));
         }
         return result;
     }
 
-    /// <summary>
-    /// Writes the days into the week's Títulos (same Títulos by position, so the editor keeps its place), the videos in
-    /// order and each day's activities after its last video. A video's own name in the editor stays. A video on two days
-    /// goes on the first one only: a training holds each video once.
-    /// </summary>
-    private async Task WriteWeekAsync(Guid courseId, IReadOnlyList<ProgramDay> days, CancellationToken token)
+    /// <summary>Where each Título sits among the training's videos: it holds the videos from Start (exclusive count) to End.</summary>
+    private sealed record LessonRange(PlatformCourseLessonEntity Lesson, Guid[] VideoIds, int Start, int End, bool First, bool Last)
     {
-        var lessons = await db.PlatformCourseLessons.Where(lesson => lesson.CourseId == courseId).OrderBy(lesson => lesson.Position).ToListAsync(token);
-        var links = await db.PlatformCourseVideoLinks.Where(link => link.CourseId == courseId).ToListAsync(token);
+        /// <summary>An activity after video N belongs to the Título that holds video N (before the first video: the first Título).</summary>
+        public bool Holds(int afterVideoCount) =>
+            (afterVideoCount > Start || (First && afterVideoCount == 0)) && (afterVideoCount <= End || Last);
+    }
+
+    private static List<LessonRange> Ranges(IReadOnlyList<PlatformCourseLessonEntity> lessons, IReadOnlyList<PlatformCourseVideoLinkEntity> links)
+    {
+        var ranges = new List<LessonRange>(lessons.Count);
+        var start = 0;
+        for (var index = 0; index < lessons.Count; index++)
+        {
+            var lesson = lessons[index];
+            // a video left without a Título (old trainings) counts in the first one
+            var videoIds = links.Where(link => link.LessonId == lesson.Id || (index == 0 && link.LessonId is null)).Select(link => link.VideoId).ToArray();
+            ranges.Add(new LessonRange(lesson, videoIds, start, start + videoIds.Length, index == 0, index == lessons.Count - 1));
+            start += videoIds.Length;
+        }
+        return ranges;
+    }
+
+    /// <summary>
+    /// Writes the days as the training's Títulos: a day that was there keeps its Título (same id), a new one gets its own,
+    /// one taken out goes away. The videos follow in order, with the name each has in this training. An activity that was
+    /// already on the day stays as far from the day's first video as it was; a new one comes after the day's last video.
+    /// </summary>
+    private async Task WriteDaysAsync(Guid courseId, IReadOnlyList<ProgramDay> days, CancellationToken token)
+    {
+        var lessons = await db.PlatformCourseLessons.Where(lesson => lesson.CourseId == courseId)
+            .OrderBy(lesson => lesson.Position).ThenBy(lesson => lesson.Id).ToListAsync(token);
+        var links = await db.PlatformCourseVideoLinks.Where(link => link.CourseId == courseId).OrderBy(link => link.Position).ToListAsync(token);
         var modules = await db.PlatformCourseModuleLinks.Where(link => link.CourseId == courseId).ToListAsync(token);
+
+        // how far into its day each activity was, before anything moves
+        var offsets = new Dictionary<(Guid LessonId, Guid ModuleId), int>();
+        foreach (var range in Ranges(lessons, links))
+            foreach (var link in modules.Where(link => range.Holds(link.AfterVideoCount)))
+                offsets.TryAdd((range.Lesson.Id, link.ModuleId), Math.Clamp(link.AfterVideoCount - range.Start, 0, range.VideoIds.Length));
+
+        var byId = lessons.ToDictionary(lesson => lesson.Id);
+        var wanted = days.Select(day => day.Id).ToArray();
+        // a day's id is its Título's id: one that is already a Título of another training cannot be used here
+        var taken = (await db.PlatformCourseLessons.AsNoTracking()
+            .Where(lesson => wanted.Contains(lesson.Id) && lesson.CourseId != courseId).Select(lesson => lesson.Id).ToListAsync(token)).ToHashSet();
 
         var kept = new List<PlatformCourseLessonEntity>(days.Count);
         for (var index = 0; index < days.Count; index++)
         {
-            var lesson = index < lessons.Count ? lessons[index] : null;
-            if (lesson is null)
+            var day = days[index];
+            if (!byId.TryGetValue(day.Id, out var lesson))
             {
-                lesson = new PlatformCourseLessonEntity { Id = Guid.NewGuid(), CourseId = courseId };
+                lesson = new PlatformCourseLessonEntity { Id = taken.Contains(day.Id) ? Guid.NewGuid() : day.Id, CourseId = courseId };
                 db.PlatformCourseLessons.Add(lesson);
             }
-            var name = days[index].Title.Trim();
+            var name = day.Title.Trim();
             lesson.Title = name.Length == 0 ? $"Dia {index + 1}" : name.Length > 200 ? name[..200] : name;
             lesson.Position = index;
+            lesson.Date = day.Date;
+            lesson.Subject = day.Subject;
             kept.Add(lesson);
         }
+        db.PlatformCourseLessons.RemoveRange(lessons.Where(lesson => !kept.Contains(lesson)));
 
         var byVideo = links.ToDictionary(link => link.VideoId);
         var placed = new HashSet<Guid>();
@@ -252,13 +164,12 @@ public sealed class SipatPlanService(
                 link.Position = position++;
             }
         db.PlatformCourseVideoLinks.RemoveRange(links.Where(link => !placed.Contains(link.VideoId)));
-        db.PlatformCourseLessons.RemoveRange(lessons.Skip(days.Count));
 
         db.PlatformCourseModuleLinks.RemoveRange(modules);
-        var after = 0;
+        var start = 0;
         for (var index = 0; index < days.Count; index++)
         {
-            after += days[index].VideoIds.Count(id => placed.Contains(id) && days.Take(index).All(day => !day.VideoIds.Contains(id)));
+            var count = days[index].VideoIds.Count;
             var order = 0;
             foreach (var moduleId in days[index].GameIds.Distinct())
                 db.PlatformCourseModuleLinks.Add(new PlatformCourseModuleLinkEntity
@@ -266,9 +177,10 @@ public sealed class SipatPlanService(
                     Id = Guid.NewGuid(),
                     CourseId = courseId,
                     ModuleId = moduleId,
-                    AfterVideoCount = after,
+                    AfterVideoCount = start + (offsets.TryGetValue((kept[index].Id, moduleId), out var offset) ? Math.Min(offset, count) : count),
                     Order = order++,
                 });
+            start += count;
         }
     }
 
@@ -276,13 +188,17 @@ public sealed class SipatPlanService(
     {
         var tenant = Tenant();
         if (!tenant.IsSuccess) return Result<IReadOnlyList<SipatPlanSummary>>.Failure(tenant.Error);
-        var plans = await db.SipatPlans.AsNoTracking().Where(item => item.TenantId == tenant.Value).ToListAsync(token);
-        return Result<IReadOnlyList<SipatPlanSummary>>.Success(plans
-            .Select(plan => { var days = Read(plan); return new SipatPlanSummary(plan.SipatEventId, days.Count, days.Sum(day => day.VideoIds.Count)); })
-            .ToArray());
+        var summaries = await db.SipatEvents.AsNoTracking().Where(sipat => sipat.TenantId == tenant.Value)
+            .Select(sipat => new SipatPlanSummary(
+                sipat.Id,
+                db.PlatformCourseLessons.Count(lesson => lesson.CourseId == sipat.CourseId),
+                db.PlatformCourseVideoLinks.Count(link => link.CourseId == sipat.CourseId)))
+            .ToListAsync(token);
+        // as before, a training whose days were never built is not in the list
+        return Result<IReadOnlyList<SipatPlanSummary>>.Success(summaries.Where(summary => summary.Days > 0).ToArray());
     }
 
-    /// <summary>Saves the days. The SIPAT's dates follow the dates of its days, so a week is always what the table says.</summary>
+    /// <summary>Saves the days. The training's dates follow the dates of its days, so a week is always what the table says.</summary>
     public async Task<Result<IReadOnlyList<ProgramDay>>> SaveAsync(Guid sipatId, IReadOnlyList<ProgramDay>? days, CancellationToken token)
     {
         var found = await FindEventAsync(sipatId, token);
@@ -294,20 +210,17 @@ public sealed class SipatPlanService(
         var cleaned = await ApplyPlanAsync(days, token, allowEmptyDays: true);
         if (!cleaned.IsSuccess) return cleaned;
 
-        var now = clock.GetUtcNow();
-        var plan = await db.SipatPlans.SingleOrDefaultAsync(item => item.SipatEventId == sipatId, token);
-        if (plan is null)
+        // a training holds each video once
+        var repeated = cleaned.Value.SelectMany(day => day.VideoIds).GroupBy(id => id).FirstOrDefault(group => group.Count() > 1);
+        if (repeated is not null)
         {
-            plan = new SipatPlanEntity { SipatEventId = sipatId, TenantId = sipat.TenantId };
-            db.SipatPlans.Add(plan);
+            var video = await catalog.FindVideoAsync(repeated.Key, token);
+            return Failure<IReadOnlyList<ProgramDay>>("learning.program.video_repeated_across_days",
+                $"O vídeo \"{video?.Title}\" está em dois dias. Cada vídeo entra uma vez no treinamento.");
         }
 
-        plan.DaysJson = JsonSerializer.Serialize(cleaned.Value, JsonOptions);
-        plan.UpdatedAt = now;
-        // the week open in the video editor follows the days
-        var week = await db.SipatWeekCourses.AsNoTracking().SingleOrDefaultAsync(item => item.SipatEventId == sipatId, token);
-        if (week is not null && await db.PlatformCourses.AnyAsync(course => course.Id == week.CourseId, token))
-            await WriteWeekAsync(week.CourseId, cleaned.Value, token);
+        var now = clock.GetUtcNow();
+        await WriteDaysAsync(sipat.CourseId, cleaned.Value, token);
 
         var dates = cleaned.Value.Where(day => day.Date is not null).Select(day => day.Date!.Value).ToArray();
         if (dates.Length > 0)
@@ -319,10 +232,10 @@ public sealed class SipatPlanService(
         await db.SaveChangesAsync(token);
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(sipat.TenantId), "sipat.plan.saved", "sipat_event",
             sipatId.ToString("D"), now), token);
-        return cleaned;
+        return Result<IReadOnlyList<ProgramDay>>.Success(await ReadDaysAsync(sipat.CourseId, token));
     }
 
-    /// <summary>Starts the SIPAT from the days of another one (same company): new days, same videos and games, dates left to the new start date.</summary>
+    /// <summary>Starts the training from the days of another one (same company): new days, same videos and games, dates left to the new start date.</summary>
     public async Task<Result<IReadOnlyList<ProgramDay>>> CopyAsync(Guid sipatId, Guid sourceId, CancellationToken token)
     {
         var source = await GetAsync(sourceId, token);
@@ -345,9 +258,7 @@ public sealed class SipatPlanService(
             return Failure<ProgramApplication>("sipat.cancelled", "Este treinamento foi cancelado e não pode ser publicado.");
 
         // what goes live is the days as the planner and the video editor last left them
-        var current = await GetAsync(sipatId, token);
-        if (!current.IsSuccess) return Result<ProgramApplication>.Failure(current.Error);
-        var saved = current.Value;
+        var saved = await ReadDaysAsync(sipat.CourseId, token);
         if (saved.Count == 0)
             return Failure<ProgramApplication>("sipat.plan_empty", "Monte os dias do treinamento antes de publicar.");
         // the plan may have changed since the days were saved: what goes live is what the plan allows today
@@ -382,13 +293,16 @@ public sealed class SipatPlanService(
         if (!cleaned.IsSuccess) return cleaned;
 
         var hidden = await plans.HiddenSubjectsAsync(token);
-        var courses = (await catalog.ListAsync(token))
+        var owned = await WeekCourseIdsAsync(token);
+        // a company's own training is never a ready module to pick from
+        var models = (await catalog.ListAsync(token)).Where(course => !owned.Contains(course.Id)).ToArray();
+        var courses = models
             .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0)
             .ToArray();
         var available = courses.Where(course => !hidden.Contains(course.Id)).ToArray();
         // a video is blocked when it lives only in assuntos the company cannot use (a video outside any assunto is not)
         var allowedVideos = available.SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
-        var blockedVideos = (await catalog.ListAsync(token)).Where(course => hidden.Contains(course.Id))
+        var blockedVideos = models.Where(course => hidden.Contains(course.Id))
             .SelectMany(course => course.Videos.Select(video => video.Id)).Where(id => !allowedVideos.Contains(id)).ToHashSet();
         blockedVideos.UnionWith(await plans.HiddenVideosAsync(token));
         var outside = cleaned.Value.FirstOrDefault(day => day.VideoIds.Any(blockedVideos.Contains));
@@ -428,11 +342,6 @@ public sealed class SipatPlanService(
             ? Failure<SipatEventEntity>("sipat.not_found", "O treinamento não foi encontrado.")
             : Result<SipatEventEntity>.Success(sipat);
     }
-
-    private static IReadOnlyList<ProgramDay> Read(SipatPlanEntity plan) =>
-        (JsonSerializer.Deserialize<IReadOnlyList<ProgramDay>>(plan.DaysJson, JsonOptions) ?? [])
-            .Select(day => day with { VideoIds = day.VideoIds ?? [], GameIds = day.GameIds ?? [] })
-            .ToArray();
 
     private static Result<T> Failure<T>(string code, string message) where T : notnull =>
         Result<T>.Failure(new DomainError(code, message));

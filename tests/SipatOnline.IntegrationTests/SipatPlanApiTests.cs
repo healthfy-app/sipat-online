@@ -19,13 +19,14 @@ public sealed class SipatPlanApiTests
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
         await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString(), developmentSampleEnabled: true);
-        Guid firstVideo, secondVideo;
+        Guid firstVideo, secondVideo, thirdVideo;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
             var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
             firstVideo = await AddVideoAsync(db, "A1V1 - Abertura");
             secondVideo = await AddVideoAsync(db, "A1V2 - Encerramento");
+            thirdVideo = await AddVideoAsync(db, "A1V3 - Pausa ativa");
         }
 
         using var admin = Client(factory);
@@ -33,7 +34,7 @@ public sealed class SipatPlanApiTests
 
         // the administrator sees what a day can be made of, read only
         var catalog = await Get(admin, "/api/admin/sipat-catalog");
-        Assert.Equal(2, catalog.GetProperty("videos").GetArrayLength()); // standalone videos of the library are offered too
+        Assert.Equal(3, catalog.GetProperty("videos").GetArrayLength()); // standalone videos of the library are offered too
 
         // a SIPAT starts as a draft, with the days of a week
         var start = new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero);
@@ -45,7 +46,7 @@ public sealed class SipatPlanApiTests
         var days = new[]
         {
             Day("Boa postura e movimento", "2026-11-09", firstVideo),
-            Day("Mente tranquila", "2026-11-10", secondVideo, firstVideo)
+            Day("Mente tranquila", "2026-11-10", secondVideo, thirdVideo)
         };
         var saved = await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days });
         Assert.Equal(2, saved.GetArrayLength());
@@ -61,6 +62,9 @@ public sealed class SipatPlanApiTests
             new { days = new[] { Day("Sem vídeos", "2026-11-09") } });
         await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.BadRequest);
         await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days });
+        // a training holds each video once: the same video on two days is refused
+        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan",
+            new { days = new[] { Day("Um", "2026-11-09", firstVideo), Day("Dois", "2026-11-10", firstVideo) } }, HttpStatusCode.BadRequest);
         // a video that does not exist is refused
         await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan",
             new { days = new[] { Day("Vídeo fantasma", "2026-11-09", Guid.NewGuid()) } }, HttpStatusCode.BadRequest);

@@ -378,9 +378,12 @@ public sealed class DevelopmentDemoPresentationInitializer(
             return;
         }
 
+        var content = new PlatformCourseEntity { Id = Guid.NewGuid(), Title = title, CreatedAt = now, TenantId = tenant.Id };
+        db.PlatformCourses.Add(content);
         db.SipatEvents.Add(new SipatEventEntity
         {
             Id = sipatId,
+            CourseId = content.Id,
             TenantId = tenant.Id,
             Title = title,
             Description = description,

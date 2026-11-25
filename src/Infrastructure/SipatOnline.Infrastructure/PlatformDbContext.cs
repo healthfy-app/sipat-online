@@ -59,8 +59,6 @@ public sealed class PlatformDbContext(
     public DbSet<GameModuleEntity> GameModules => Set<GameModuleEntity>();
     public DbSet<SipatProgramEntity> SipatPrograms => Set<SipatProgramEntity>();
 
-    public DbSet<SipatPlanEntity> SipatPlans => Set<SipatPlanEntity>();
-    public DbSet<SipatWeekCourseEntity> SipatWeekCourses => Set<SipatWeekCourseEntity>();
 
     public DbSet<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity> PlanSubjectExclusions => Set<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity>();
     public DbSet<SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity> CompanySubjects => Set<SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity>();

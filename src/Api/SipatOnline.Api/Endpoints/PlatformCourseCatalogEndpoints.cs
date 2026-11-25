@@ -91,8 +91,14 @@ public static class PlatformCourseCatalogEndpoints
             Guid courseId,
             HttpContext context,
             PlatformCourseCatalogService courseService,
+            SipatOnline.Infrastructure.PlatformDbContext db,
             CancellationToken cancellationToken) =>
         {
+            // a company's training is its content: it leaves only with the training, from the company's own list
+            if (await db.PlatformCourses.AnyAsync(course => course.Id == courseId && course.TenantId != null, cancellationToken))
+                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "learning.platform_course.company_training",
+                    detail: "Este treinamento é de uma empresa. Cancele-o na tela de treinamentos da empresa.",
+                    extensions: new Dictionary<string, object?> { ["code"] = "learning.platform_course.company_training" });
             var result = await courseService.DeleteCourseAsync(courseId, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
         })

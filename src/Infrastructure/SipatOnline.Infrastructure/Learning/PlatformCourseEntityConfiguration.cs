@@ -17,7 +17,9 @@ public sealed class PlatformCourseEntityConfiguration : IEntityTypeConfiguration
         builder.Property(course => course.GamificationEnabled).HasDefaultValue(false).IsRequired();
         builder.Property(course => course.GameType).HasDefaultValue(0).IsRequired();
         builder.Property(course => course.CoverContentType).HasMaxLength(50);
+        builder.Property(course => course.IsReadySipat).HasDefaultValue(false).IsRequired();
         builder.HasIndex(course => course.CreatedAt);
+        builder.HasIndex(course => course.TenantId);
     }
 }
 
@@ -95,6 +97,7 @@ public sealed class PlatformCourseLessonEntityConfiguration :
         builder.Property(lesson => lesson.Id).ValueGeneratedNever();
         builder.Property(lesson => lesson.Title).HasMaxLength(200).IsRequired();
         builder.Property(lesson => lesson.Description).HasMaxLength(2000);
+        builder.Property(lesson => lesson.Subject).HasMaxLength(120);
         builder.HasOne(lesson => lesson.Course)
             .WithMany(course => course.Lessons)
             .HasForeignKey(lesson => lesson.CourseId)

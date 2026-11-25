@@ -34,6 +34,10 @@ public sealed class SipatEventEntityConfiguration : IEntityTypeConfiguration<Sip
             .WithMany()
             .HasForeignKey(sipatEvent => sipatEvent.TenantId)
             .OnDelete(DeleteBehavior.Restrict);
+        builder.HasOne<SipatOnline.Infrastructure.Learning.PlatformCourseEntity>()
+            .WithOne()
+            .HasForeignKey<SipatEventEntity>(sipatEvent => sipatEvent.CourseId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.HasIndex(sipatEvent => new { sipatEvent.TenantId, sipatEvent.StartsAt, sipatEvent.Id });
     }
 }

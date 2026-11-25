@@ -22,6 +22,12 @@ public sealed class PlatformCourseEntity
 
     public Guid? CategoryId { get; set; }
 
+    /// <summary>The company the training belongs to; null for a model of the operation (Conteúdo).</summary>
+    public Guid? TenantId { get; set; }
+
+    /// <summary>A model offered whole as a ready SIPAT (what a Bronze company picks). Only on models.</summary>
+    public bool IsReadySipat { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 
     public ICollection<PlatformCourseModuleLinkEntity> ModuleLinks { get; set; } = [];
@@ -41,6 +47,12 @@ public sealed class PlatformCourseLessonEntity
     public string? Description { get; set; }
 
     public int Position { get; set; }
+
+    /// <summary>The day this Título is delivered on, in a company's training; null when it has no date (a "Módulo").</summary>
+    public DateOnly? Date { get; set; }
+
+    /// <summary>The assunto chosen for the day, when there is one.</summary>
+    public string? Subject { get; set; }
 
     public PlatformCourseEntity Course { get; set; } = null!;
 }
