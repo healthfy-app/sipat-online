@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as api from '@/api';
 import SipatsPage from './SipatsPage';
 
-vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api')>()), listSipatEvents: vi.fn(), listSipatPlans: vi.fn(), reactivateSipatEvent: vi.fn() }));
+vi.mock('@/api', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/api')>()), listSipatEvents: vi.fn(), listSipatPlans: vi.fn(), reactivateSipatEvent: vi.fn(), getCompanyRegistry: vi.fn().mockRejectedValue(new Error('sem cadastro')) }));
 afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const event = (id: string, title: string, startsAt: string, status: 'Draft' | 'Published' | 'Cancelled') =>
@@ -37,6 +37,26 @@ describe('SIPATs of a company', () => {
     expect(within(first).getByText('Dias ainda não montados')).toBeVisible();
     expect(screen.getByRole('link', { name: 'Abrir SIPAT 2026' })).toHaveAttribute('href', '/admin/sipats/b');
     expect(screen.getByRole('link', { name: 'Novo treinamento' })).toHaveAttribute('href', '/admin/sipats/nova');
+  });
+
+  it('says on the card who the training is for, when it is not the whole company', async () => {
+    vi.mocked(api.listSipatEvents).mockResolvedValue({
+      offset: 0, limit: 100, totalCount: 2,
+      items: [event('a', 'LGPD', '2026-11-09T00:00:00Z', 'Published'), event('b', 'SIPAT geral', '2026-11-09T00:00:00Z', 'Published')],
+    });
+    vi.mocked(api.listSipatPlans).mockResolvedValue([
+      { sipatEventId: 'a', days: 1, videos: 2, targets: [{ unitId: 'minas', sectorId: 'hr' }, { unitId: 'sp', sectorId: 'it' }] },
+      { sipatEventId: 'b', days: 1, videos: 2, targets: [] },
+    ]);
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({
+      units: [{ id: 'minas', name: 'Minas Gerais', isActive: true, peopleCount: 3 }, { id: 'sp', name: 'São Paulo', isActive: true, peopleCount: 2 }],
+      sectors: [{ id: 'hr', name: 'RH', isActive: true, peopleCount: 1 }, { id: 'it', name: 'TI', isActive: true, peopleCount: 1 }],
+      rules: { requireRegistration: false, requireEmail: false, requirePhone: false, requireUnit: false, requireSector: false },
+    });
+    render(<MemoryRouter><SipatsPage basePath="/admin/treinamentos" /></MemoryRouter>);
+
+    expect(await screen.findByText('Minas Gerais › RH · São Paulo › TI')).toBeVisible();
+    expect(screen.queryByText('Toda a empresa')).not.toBeInTheDocument();
   });
 
   it('shows a cancelled SIPAT disabled, with a way to bring it back as a draft', async () => {

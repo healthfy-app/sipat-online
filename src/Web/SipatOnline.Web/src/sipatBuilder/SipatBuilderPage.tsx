@@ -1,7 +1,7 @@
 import { saveFile } from '@/lib/saveFile';
 import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, listCompanyVideos, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
@@ -22,6 +22,7 @@ import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
+import AudienceRow from '@/trainings/AudienceRow';
 import { copyTrainingLink } from '@/trainings/trainingLink';
 import { checkVideoFile, enqueueUploads, isActive, onVideoUploaded, titleFromFileName, useUploadQueue } from '@/videoUploads/uploadQueue';
 
@@ -60,6 +61,7 @@ export function findIssues(name: string, days: DaySlots[]): { name: string | nul
 export default function SipatBuilderPage({ basePath, canEditThemes = false }: { basePath: string; canEditThemes?: boolean }) {
   const navigate = useNavigate();
   const params = useParams();
+  const [search] = useSearchParams();
   const isNew = params.sipatId === 'nova';
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [others, setOthers] = useState<SipatEvent[]>([]);
@@ -449,6 +451,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
           <li><Gamepad2 aria-hidden="true" /><strong>{totals.games}</strong> {totals.games === 1 ? 'jogo' : 'jogos'}</li>
           <li><Clock aria-hidden="true" />{totals.time > 0 ? formatSpan(totals.time) : 'sem vídeos'}</li>
         </ul>}
+        {/* who it is for: the whole company, or the units and sectors marked */}
+        {stage === 'grid' && sipat && !cancelled && <AudienceRow canEdit={!viewOnly} openAtStart={search.get('para-quem') === '1'} sipatId={sipat.id} />}
       </div>
       {stage === 'grid' && !cancelled && !viewOnly && <div className="ops-hero-actions max-[760px]:grid! max-[760px]:w-full max-[760px]:grid-cols-[auto_minmax(0,1fr)] max-[760px]:gap-2">
         <DropdownMenu modal={false}>

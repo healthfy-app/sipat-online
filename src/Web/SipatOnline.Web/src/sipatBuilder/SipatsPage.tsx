@@ -1,9 +1,9 @@
-import { CalendarDays, Copy, Film, ImagePlus, Link2, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, Copy, Film, ImagePlus, Link2, Pencil, Plus, RotateCcw, Search, Trash2, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  copySipatPlan, createSipatEvent, deleteSipat, setTrainingCover, getCompanyCapabilities, listSipatEvents, listSipatPlans, openSipatWeek, reactivateSipatEvent,
-  type SipatEvent, type SipatPlanSummary,
+  copySipatPlan, createSipatEvent, deleteSipat, setTrainingCover, getCompanyCapabilities, getCompanyRegistry, listSipatEvents, listSipatPlans, openSipatWeek, reactivateSipatEvent,
+  type CompanyRegistry, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import { cn } from '@/lib/utils';
 import { phaseLabel, sipatPhase, type SipatPhase } from './sipatPhase';
+import { audienceLabel } from '@/trainings/audienceLabel';
 import { copyTrainingLink } from '@/trainings/trainingLink';
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
@@ -47,6 +48,8 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
   const [viewOnly, setViewOnly] = useState(false);
   const [events, setEvents] = useState<SipatEvent[] | null>(null);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
+  // the units and sectors, to say who each training is for; the list works without them
+  const [registry, setRegistry] = useState<CompanyRegistry | null>(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   // the training an action is running on (reactivate, duplicate, delete, open in the editor)
@@ -57,6 +60,7 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
   useEffect(() => {
     let current = true;
     if (!operator) getCompanyCapabilities().then(capabilities => { if (current) setViewOnly(!capabilities.customizeGrid); }, () => undefined);
+    getCompanyRegistry().then(loaded => { if (current) setRegistry(loaded); }, () => undefined);
     Promise.all([listSipatEvents(0, 100), listSipatPlans()])
       .then(([page, summaries]) => { if (current) { setEvents(page.items); setPlans(summaries); } })
       .catch((failure: unknown) => { if (current) setError(getErrorMessage(failure)); });
@@ -107,7 +111,8 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
     const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
     const copy = await createSipatEvent({ title: `${event.title} (cópia)`.slice(0, 200), description: event.description, startsAt: `${today}T00:00:00.000Z`, endsAt: `${tomorrow}T00:00:00.000Z` });
     if ((summaryOf(event)?.days ?? 0) > 0) await copySipatPlan(copy.id, event.id);
-    navigate(`${basePath}/${copy.id}`);
+    // a company with units duplicates to give the copy to another unit: its "Para quem" opens right away
+    navigate(`${basePath}/${copy.id}${registry?.units.some(unit => unit.isActive) ? '?para-quem=1' : ''}`);
   });
 
   /** The link to hand to the people who will take the training: they sign in and land on it. */
@@ -195,6 +200,11 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
                   ? `${pluralize(plan.days, 'dia', 'dias')} · ${pluralize(plan.videos, 'vídeo', 'vídeos')}${plan.durationMilliseconds ? ` · ${runtime(plan.durationMilliseconds)}` : ''}`
                   : 'Dias ainda não montados'}
               </p>
+              {/* who it is for, when it is not the whole company */}
+              {registry && (plan?.targets?.length ?? 0) > 0 && <p className="m-0 flex items-start gap-1.5 text-[0.8125rem] font-medium text-primary">
+                <Users aria-hidden="true" className="mt-px size-4 shrink-0" />
+                <span className="line-clamp-2">{audienceLabel(plan?.targets ?? [], registry)}</span>
+              </p>}
             </div>
           </>;
           const card = 'group relative flex h-full min-w-0 flex-col overflow-hidden rounded-[1.25rem] border bg-card';

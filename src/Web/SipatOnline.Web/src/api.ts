@@ -244,7 +244,7 @@ export function getSipatCatalog(): Promise<SipatCatalog> {
   return requestJson<SipatCatalog>('/api/admin/sipat-catalog');
 }
 /** A training as its card shows it: how much it has, how long it runs and its cover (null when it has none). */
-export interface SipatPlanSummary { sipatEventId: string; days: number; videos: number; courseId?: string; durationMilliseconds?: number; coverVersion?: number | null }
+export interface SipatPlanSummary { sipatEventId: string; days: number; videos: number; courseId?: string; durationMilliseconds?: number; coverVersion?: number | null; targets?: AudienceTarget[] }
 /** Deletes a training that was never delivered; one that was published stays in the history. */
 export async function deleteSipat(sipatId: string): Promise<void> {
   await request(`/api/admin/sipats/${sipatId}`, { method: 'DELETE' });
@@ -1689,6 +1689,31 @@ export function updateRegistryItem(kind: RegistryKind, id: string, change: { nam
   return requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) });
 }
 
+/** Takes a unit or sector off the list: deleted when nobody uses it, only put away (`deleted: false`) when in use. */
+export function removeRegistryItem(kind: RegistryKind, id: string): Promise<{ deleted: boolean }> {
+  return requestJson<{ deleted: boolean }>(`/api/admin/registry/${kind}/${id}`, { method: 'DELETE' });
+}
+
+/**
+ * One group a training is for: a unit (`sectorId` null: all of it), a sector of a unit, or (`unitId` null) a sector in
+ * every unit. A training with no group is for the whole company.
+ */
+export interface AudienceTarget { unitId: string | null; sectorId: string | null }
+export interface TrainingAudience { targets: AudienceTarget[] }
+const tidyAudience = (audience: Partial<TrainingAudience> | null | undefined): TrainingAudience => ({
+  targets: (audience?.targets ?? []).map(target => ({ unitId: target.unitId ?? null, sectorId: target.sectorId ?? null })),
+});
+export async function getTrainingAudience(sipatId: string): Promise<TrainingAudience> {
+  return tidyAudience(await requestJson<TrainingAudience>(`/api/admin/sipats/${sipatId}/audience`));
+}
+export async function saveTrainingAudience(sipatId: string, audience: TrainingAudience): Promise<TrainingAudience> {
+  return tidyAudience(await requestJson<TrainingAudience>(`/api/admin/sipats/${sipatId}/audience`, { method: 'PUT', body: JSON.stringify(audience) }));
+}
+/** How many active participants an audience reaches, and how many it leaves out only for having no unit or sector. */
+export function countAudience(audience: TrainingAudience): Promise<{ receiving: number; leftOutUnplaced: number }> {
+  return requestJson<{ receiving: number; leftOutUnplaced: number }>('/api/admin/registry/audience-count', { method: 'POST', body: JSON.stringify(audience) });
+}
+
 export function saveProfileRules(rules: ProfileRules): Promise<ProfileRules> {
   return requestJson<ProfileRules>('/api/admin/registry/rules', { method: 'PUT', body: JSON.stringify(rules) });
 }
@@ -1707,8 +1732,10 @@ export function saveParticipantProfile(userId: string, data: ProfileChange): Pro
 }
 
 /** Moves many collaborators to one unit or sector at once; a null `valueId` takes them out of it. */
-export function changePlacement(userIds: string[], field: 'unit' | 'sector', valueId: string | null): Promise<{ changed: number }> {
-  return requestJson<{ changed: number }>('/api/admin/users/placement', { method: 'PUT', body: JSON.stringify({ userIds, field, valueId }) });
+/** What moving people did: how many moved, the days of trainings they received and lost, and the trainings received. */
+export interface PlacementResult { changed: number; added: number; removed: number; receivedTrainings: string[] }
+export function changePlacement(userIds: string[], field: 'unit' | 'sector', valueId: string | null): Promise<PlacementResult> {
+  return requestJson<PlacementResult>('/api/admin/users/placement', { method: 'PUT', body: JSON.stringify({ userIds, field, valueId }) });
 }
 
 export interface ImportRow {
