@@ -12,7 +12,7 @@ vi.mock('@/api', async (importOriginal) => {
     ...original,
     listPlatformLibraryVideos: vi.fn(), deletePlatformVideo: vi.fn(),
     listSubjects: vi.fn(), listVideoSubjects: vi.fn(), listPlatformCompanies: vi.fn(), listVideoCompanies: vi.fn(),
-    listCompanyVideos: vi.fn(), acceptCompanyVideoTerms: vi.fn(), renameCompanyVideo: vi.fn(), deleteCompanyVideo: vi.fn(),
+    listCompanyVideos: vi.fn(), acceptCompanyVideoTerms: vi.fn(), renameVideo: vi.fn(), setVideoThumbnail: vi.fn(), removeVideoThumbnail: vi.fn(), deleteCompanyVideo: vi.fn(),
   };
 });
 
@@ -52,7 +52,8 @@ beforeEach(() => {
     videos: [{ video: opening, trainings: ['SIPAT 2026'] }], usedBytes: 1024 * 1024 * 1024, quotaBytes: 20 * 1024 * 1024 * 1024, termsAccepted: true, canSend: true,
   });
   vi.mocked(api.acceptCompanyVideoTerms).mockReset().mockResolvedValue(undefined);
-  vi.mocked(api.renameCompanyVideo).mockReset().mockResolvedValue(undefined);
+  vi.mocked(api.renameVideo).mockReset().mockResolvedValue(undefined);
+  vi.mocked(api.setVideoThumbnail).mockReset().mockResolvedValue(undefined);
   vi.mocked(api.deleteCompanyVideo).mockReset().mockResolvedValue(undefined);
   vi.mocked(enqueueUploads).mockClear();
 });
@@ -69,8 +70,12 @@ describe('Video library page (the operation)', () => {
     await screen.findByRole('button', { name: 'Assistir Abertura' });
     expect(screen.getByText(/2 vídeos/)).toBeVisible();
     expect(screen.getByTitle('Soma do tamanho de todos os vídeos da biblioteca')).toHaveTextContent('0 MB no total');
-    await waitFor(() => expect(within(card('Abertura')).getByText(/Em 1 treinamento · Ergonomia/)).toBeVisible());
-    expect(within(card('Encerramento')).getByText('Ainda em nenhum treinamento')).toBeVisible();
+    expect(within(card('Abertura')).getByText('Usado em 1 treinamento')).toBeVisible();
+    expect(within(card('Abertura')).getByText('1:30 · 0 MB')).toBeVisible();
+    // the assuntos of the video, with the way to change them
+    await waitFor(() => expect(within(card('Abertura')).getByRole('button', { name: /Ergonomia.*Editar/ })).toBeVisible());
+    expect(within(card('Encerramento')).getByRole('button', { name: /Sem assunto.*Editar/ })).toBeVisible();
+    expect(within(card('Encerramento')).getByText('Ainda não usado em treinamentos')).toBeVisible();
     expect(await within(card('Encerramento')).findByText('Privado: Damare')).toBeVisible();
   });
 
@@ -117,11 +122,16 @@ describe('Video library page (the operation)', () => {
     const user = userEvent.setup();
     show();
     await screen.findByRole('button', { name: 'Assistir Abertura' });
-    await user.click(screen.getByRole('checkbox', { name: 'Selecionar Abertura' }));
+    // the bar is always there: nothing to do until something is picked
     const bar = screen.getByRole('toolbar');
+    expect(within(bar).getByText('Selecionar todos')).toBeVisible();
+    expect(within(bar).getByRole('button', { name: 'Excluir' })).toBeDisabled();
+    await user.click(screen.getByRole('checkbox', { name: 'Selecionar Abertura' }));
     expect(within(bar).getByText('1 selecionado')).toBeVisible();
-    expect(within(bar).getByRole('button', { name: 'Assuntos e empresas' })).toBeEnabled();
+    expect(within(bar).getByRole('button', { name: 'Associar a assunto ou empresa' })).toBeEnabled();
     expect(within(bar).getByRole('button', { name: 'Excluir' })).toBeEnabled();
+    await user.click(within(bar).getByRole('checkbox', { name: 'Selecionar todos os vídeos' }));
+    expect(within(bar).getByText('2 selecionados')).toBeVisible();
   });
 
   it('shows a video being prepared without a way to watch it, and why a conversion failed', async () => {
@@ -161,7 +171,7 @@ describe('Video library page (a company)', () => {
     show(true);
     expect(await screen.findByRole('heading', { name: 'Vídeos da empresa', level: 1 })).toBeVisible();
     await screen.findByRole('button', { name: 'Assistir Abertura' });
-    expect(within(card('Abertura')).getByText('Em SIPAT 2026')).toBeVisible();
+    expect(within(card('Abertura')).getByText('Usado em SIPAT 2026')).toBeVisible();
     expect(within(screen.getByRole('contentinfo', { name: 'Espaço usado' })).getByText('1 GB de 20 GB')).toBeVisible();
     // what is only the operation's to decide is not there
     expect(screen.queryByLabelText('Filtrar por assunto')).not.toBeInTheDocument();
@@ -170,7 +180,7 @@ describe('Video library page (a company)', () => {
     const name = screen.getByRole('textbox', { name: 'Nome do vídeo Abertura' });
     await user.clear(name);
     await user.type(name, 'Fala do diretor{Enter}');
-    await waitFor(() => expect(api.renameCompanyVideo).toHaveBeenCalledWith('v-1', 'Fala do diretor'));
+    await waitFor(() => expect(api.renameVideo).toHaveBeenCalledWith('v-1', 'Fala do diretor', true));
   });
 
   it('asks for the terms once, before the first video', async () => {
@@ -188,5 +198,28 @@ describe('Video library page (a company)', () => {
     show(true);
     expect(await screen.findByText('Disponível no plano Diamante')).toBeVisible();
     expect(screen.queryByLabelText('Enviar vídeos')).not.toBeInTheDocument();
+  });
+});
+
+describe('Video library page (a video\'s own name and picture)', () => {
+  it('plays a video in its own card, and changes its name and its picture from the card', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.renameVideo).mockResolvedValue(undefined);
+    vi.mocked(api.setVideoThumbnail).mockResolvedValue(undefined);
+    show();
+    await user.click(await screen.findByRole('button', { name: 'Assistir Abertura' }));
+    // no box opens: the player takes the place of the picture
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Assistir Abertura' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Assistir Encerramento' })).toBeVisible();
+
+    const name = screen.getByRole('textbox', { name: 'Nome do vídeo Encerramento' });
+    await user.clear(name);
+    await user.type(name, 'Fechamento{Enter}');
+    await waitFor(() => expect(api.renameVideo).toHaveBeenCalledWith('v-2', 'Fechamento', false));
+
+    const picture = new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'capa.png', { type: 'image/png' });
+    await user.upload(screen.getByLabelText('Miniatura de Encerramento'), picture);
+    await waitFor(() => expect(api.setVideoThumbnail).toHaveBeenCalledWith('v-2', picture, false));
   });
 });

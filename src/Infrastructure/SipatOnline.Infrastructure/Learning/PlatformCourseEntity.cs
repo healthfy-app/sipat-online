@@ -87,6 +87,11 @@ public sealed class PlatformCourseVideoEntity
     /// <summary>The video id at the external provider; null for uploaded files.</summary>
     public string? ExternalId { get; set; }
 
+    /// <summary>The picture shown for the video (its file is in <see cref="PlatformVideoThumbnailEntity"/>); null shows a frame of the video itself.</summary>
+    public string? ThumbnailContentType { get; set; }
+
+    public DateTimeOffset? ThumbnailUpdatedAt { get; set; }
+
     /// <summary>The company that sent the video (its own, private to it); null for the operation's library.</summary>
     public Guid? OwnerTenantId { get; set; }
 
@@ -170,4 +175,12 @@ public sealed class PlatformCourseVideoLinkEntity
     public PlatformCourseEntity Course { get; set; } = null!;
 
     public PlatformCourseVideoEntity Video { get; set; } = null!;
+}
+
+/// <summary>The picture chosen for a video, kept apart so listing videos never loads it.</summary>
+public sealed class PlatformVideoThumbnailEntity
+{
+    public Guid VideoId { get; set; }
+
+    public byte[] Data { get; set; } = [];
 }

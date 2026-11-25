@@ -645,5 +645,6 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
             HasSd480: entity.HasSd480,
             Provider: Enum.TryParse<VideoProvider>(entity.Provider, out var provider) ? provider : VideoProvider.Sipat,
             ExternalId: entity.ExternalId,
-            HasFhd1080: entity.HasFhd1080);
+            HasFhd1080: entity.HasFhd1080,
+            ThumbnailUpdatedAt: entity.ThumbnailContentType is null ? null : entity.ThumbnailUpdatedAt);
 }

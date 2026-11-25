@@ -56,6 +56,7 @@ public sealed class PlatformDbContext(
 
     public DbSet<PlatformCourseLessonEntity> PlatformCourseLessons => Set<PlatformCourseLessonEntity>();
     public DbSet<PlatformCourseCoverEntity> PlatformCourseCovers => Set<PlatformCourseCoverEntity>();
+    public DbSet<PlatformVideoThumbnailEntity> PlatformVideoThumbnails => Set<PlatformVideoThumbnailEntity>();
     public DbSet<GameModuleEntity> GameModules => Set<GameModuleEntity>();
     public DbSet<SipatProgramEntity> SipatPrograms => Set<SipatProgramEntity>();
 

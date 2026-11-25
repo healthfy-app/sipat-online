@@ -906,7 +906,8 @@ public static partial class PlatformCourseCatalogEndpoints
             video.HasSd480,
             video.Provider.ToString(),
             video.ExternalId,
-            video.HasFhd1080);
+            video.HasFhd1080,
+            video.ThumbnailUpdatedAt is { } thumbnail ? $"/api/platform/catalog/videos/{video.Id:D}/thumbnail?v={thumbnail.ToUnixTimeMilliseconds()}" : null);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -1137,7 +1138,8 @@ public sealed record PlatformCourseVideoResponse(
     bool HasSd480 = false,
     string Provider = "Sipat",
     string? ExternalId = null,
-    bool HasFhd1080 = false);
+    bool HasFhd1080 = false,
+    string? ThumbnailUrl = null);
 
 public sealed record CreateExternalVideoRequest(
     string? Provider,

@@ -56,6 +56,7 @@ public sealed class PlatformCourseVideoEntityConfiguration :
         builder.Property(video => video.HasFhd1080).IsRequired().HasDefaultValue(false);
         builder.Property(video => video.Provider).HasMaxLength(16).IsRequired().HasDefaultValue("Sipat");
         builder.Property(video => video.ExternalId).HasMaxLength(ExternalVideoLink.MaximumIdLength);
+        builder.Property(video => video.ThumbnailContentType).HasMaxLength(50);
         builder.HasIndex(video => video.CreatedAt);
         builder.HasIndex(video => video.OwnerTenantId);
         builder.HasIndex(video => new { video.Provider, video.ExternalId })
@@ -159,5 +160,19 @@ public sealed class PlatformVideoCheckpointEntityConfiguration :
             .OnDelete(DeleteBehavior.Cascade);
         builder.HasIndex(checkpoint => new { checkpoint.VideoId, checkpoint.TimeMilliseconds });
         builder.HasIndex(checkpoint => new { checkpoint.CourseId, checkpoint.VideoId });
+    }
+}
+
+public sealed class PlatformVideoThumbnailEntityConfiguration : IEntityTypeConfiguration<PlatformVideoThumbnailEntity>
+{
+    public void Configure(EntityTypeBuilder<PlatformVideoThumbnailEntity> builder)
+    {
+        builder.ToTable("PlatformVideoThumbnails", "learning");
+        builder.HasKey(thumbnail => thumbnail.VideoId);
+        builder.Property(thumbnail => thumbnail.Data).IsRequired();
+        builder.HasOne<PlatformCourseVideoEntity>()
+            .WithOne()
+            .HasForeignKey<PlatformVideoThumbnailEntity>(thumbnail => thumbnail.VideoId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

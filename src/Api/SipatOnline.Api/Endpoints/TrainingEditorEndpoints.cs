@@ -41,7 +41,7 @@ public static partial class PlatformCourseCatalogEndpoints
             var course = await courses.FindCourseAsync(courseId, token);
             return course is null
                 ? Results.NotFound()
-                : Results.Ok(new TrainingEditorResponse(ToResponse(course), access!, sipat!.Id, sipat.Title, sipat.Status.ToString()));
+                : Results.Ok(new TrainingEditorResponse(ToResponse(course), access!, sipat!.Id, sipat.Title, sipat.Status.ToString(), await UnavailableAsync(context, course, token)));
         })
         .WithName("GetTrainingEditorCourse");
 
@@ -58,7 +58,7 @@ public static partial class PlatformCourseCatalogEndpoints
             var course = await courses.FindCourseAsync(courseId.Value, token);
             return course is null
                 ? Results.NotFound()
-                : Results.Ok(new TrainingEditorResponse(ToResponse(course), access!, sipat!.Id, sipat.Title, sipat.Status.ToString()));
+                : Results.Ok(new TrainingEditorResponse(ToResponse(course), access!, sipat!.Id, sipat.Title, sipat.Status.ToString(), await UnavailableAsync(context, course, token)));
         })
         .WithName("GetTrainingEditorBySipat");
 
@@ -232,8 +232,16 @@ public static partial class PlatformCourseCatalogEndpoints
         return (access, sipat, null);
     }
 
+    /// <summary>The videos of the training that the company can no longer use.</summary>
+    private static async Task<IReadOnlyList<Guid>> UnavailableAsync(HttpContext context, PlatformCourse course, CancellationToken token)
+    {
+        var blocked = await context.RequestServices.GetRequiredService<SipatPlanService>().BlockedVideosAsync(token);
+        return course.Videos.Select(video => video.Id).Where(blocked.Contains).ToArray();
+    }
+
     private static IResult Denied(int status, string code, string message) =>
         Results.Problem(statusCode: status, title: code, detail: message, extensions: new Dictionary<string, object?> { ["code"] = code });
 }
 
-public sealed record TrainingEditorResponse(PlatformCourseResponse Course, TrainingAccess Access, Guid SipatId, string SipatTitle, string SipatStatus);
+/// <param name="UnavailableVideoIds">Videos of the training the company can no longer use (made private to another company, or out of its plan): the editor says so.</param>
+public sealed record TrainingEditorResponse(PlatformCourseResponse Course, TrainingAccess Access, Guid SipatId, string SipatTitle, string SipatStatus, IReadOnlyList<Guid> UnavailableVideoIds);

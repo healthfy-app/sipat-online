@@ -309,6 +309,8 @@ export interface PlatformCourseVideo {
   /** Missing in payloads from before external videos: read it with `videoProvider`. */
   provider?: VideoProvider;
   externalId?: string | null;
+  /** The picture chosen for the video; absent or null shows a frame of the video itself. */
+  thumbnailUrl?: string | null;
 }
 
 export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo';
@@ -762,13 +764,39 @@ export async function acceptCompanyVideoTerms(): Promise<void> {
 export async function renameCompanyVideo(videoId: string, title: string): Promise<void> {
   await request(`${companyVideos}/${videoId}`, { method: 'PUT', body: JSON.stringify({ title }) });
 }
+/** Changes the name of a video: any of the library for the operation, its own for a company. */
+export async function renameVideo(videoId: string, title: string, company: boolean): Promise<void> {
+  await request(company ? `${companyVideos}/${videoId}` : `${platformCatalog}/videos/${videoId}/title`, { method: 'PUT', body: JSON.stringify({ title }) });
+}
+/** The picture shown for a video instead of a frame of it: PNG, JPEG or WebP, up to 2 MB. */
+export async function setVideoThumbnail(videoId: string, image: File, company: boolean): Promise<void> {
+  const form = new FormData();
+  form.append('image', image);
+  await request(company ? `${companyVideos}/${videoId}/thumbnail` : `${platformCatalog}/videos/${videoId}/thumbnail`, { method: 'PUT', body: form });
+}
+export async function removeVideoThumbnail(videoId: string, company: boolean): Promise<void> {
+  await request(company ? `${companyVideos}/${videoId}/thumbnail` : `${platformCatalog}/videos/${videoId}/thumbnail`, { method: 'DELETE' });
+}
 export async function deleteCompanyVideo(videoId: string): Promise<void> {
   await request(`${companyVideos}/${videoId}`, { method: 'DELETE' });
 }
 
 /** What the company's plan lets it change in one of its trainings. */
 export interface TrainingAccess { editDetails: boolean; editGrid: boolean; editActivities: boolean; uploadVideo: boolean; plan: string }
-export interface TrainingEditorData { course: PlatformCourse; access: TrainingAccess; sipatId: string; sipatTitle: string; sipatStatus: string }
+export interface TrainingEditorData { course: PlatformCourse; access: TrainingAccess; sipatId: string; sipatTitle: string; sipatStatus: string; unavailableVideoIds?: string[] }
+/**
+ * The cover of a company's training (PNG, JPEG or WebP, up to 2 MB), from its card or its page. It goes by the
+ * company's own route, which the operation also uses while inside the company.
+ */
+export async function setTrainingCover(courseId: string, image: File): Promise<void> {
+  const form = new FormData();
+  form.append('cover', image);
+  await request(`${trainingEditor}/courses/${courseId}/cover`, { method: 'PUT', body: form });
+}
+export async function removeTrainingCover(courseId: string): Promise<void> {
+  await request(`${trainingEditor}/courses/${courseId}/cover`, { method: 'DELETE' });
+}
+
 /** A company's training as its editor needs it: the content, and what the plan allows. */
 export function getTrainingEditor(sipatId: string): Promise<TrainingEditorData> {
   return requestJson<TrainingEditorData>(`${trainingEditor}/sipats/${sipatId}`);

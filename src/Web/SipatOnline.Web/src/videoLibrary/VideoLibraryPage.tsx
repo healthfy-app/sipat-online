@@ -1,13 +1,12 @@
-import { CloudUpload, Lock, MoreHorizontal, Play, RotateCcw, Search, Tags, Trash2, X } from 'lucide-react';
+import { CloudUpload, ImageMinus, ImagePlus, Lock, MoreHorizontal, Pencil, Play, RotateCcw, Search, Tags, Trash2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   acceptCompanyVideoTerms, deleteCompanyVideo, deletePlatformVideo, isExternal, isExtra, listCompanyVideos, listPlatformCompanies, listPlatformLibraryVideos,
-  listSubjects, listVideoCompanies, listVideoSubjects, renameCompanyVideo, videoProvider,
+  listSubjects, listVideoCompanies, listVideoSubjects, removeVideoThumbnail, renameVideo, setVideoThumbnail, videoProvider,
   type PlatformCourseVideo,
 } from '@/api';
 import { Button } from '@/components/ui/button';
-import { Dialog } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
@@ -17,7 +16,7 @@ import InlineText from '@/courseEditor/InlineText';
 import { ExternalVideoFrame } from '@/ExternalVideoPreview';
 import LoadingState from '@/LoadingState';
 import { cn } from '@/lib/utils';
-import VideoPreview from '@/VideoPreview';
+import { SipatVideoPlayer } from '@sipat/video-player';
 import {
   cancelUpload, checkVideoFile, enqueueUploads, isActive, onVideoUploaded, retryUpload, titleFromFileName, useUploadQueue,
   type UploadItem,
@@ -48,7 +47,8 @@ export default function VideoLibraryPage({ company = false }: { company?: boolea
   const [selected, setSelected] = useState<Set<string>>(new Set());
   // the videos whose assuntos and companies are being set (one from its menu, or the selection)
   const [associating, setAssociating] = useState<string[] | null>(null);
-  const [playing, setPlaying] = useState<LibraryItem | null>(null);
+  // the video playing, in its own card (one at a time)
+  const [playing, setPlaying] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -156,7 +156,16 @@ export default function VideoLibraryPage({ company = false }: { company?: boolea
   async function rename(item: LibraryItem, title: string) {
     const next = title.trim();
     if (!next || next === item.video.title) return;
-    try { await renameCompanyVideo(item.video.id, next); await load(); } catch (failure) { setError(getErrorMessage(failure)); }
+    try { await renameVideo(item.video.id, next, company); await load(); } catch (failure) { setError(getErrorMessage(failure)); }
+  }
+
+  async function changeThumbnail(item: LibraryItem, image: File | null) {
+    setError('');
+    try {
+      if (image) await setVideoThumbnail(item.video.id, image, company); else await removeVideoThumbnail(item.video.id, company);
+      await load();
+      setNotice(image ? `Miniatura de "${item.video.title}" trocada.` : `"${item.video.title}" voltou a mostrar um quadro do vídeo.`);
+    } catch (failure) { setError(getErrorMessage(failure)); }
   }
 
   const removeOne = (videoId: string) => (company ? deleteCompanyVideo(videoId) : deletePlatformVideo(videoId));
@@ -222,43 +231,44 @@ export default function VideoLibraryPage({ company = false }: { company?: boolea
       </section>
       : <DropZone compact={sending.length > 0 || all.length > 0} onFiles={send} />)}
 
-    {all.length > 0 && (selected.size > 0
-      // something is checked: the row turns into what can be done with the selection
-      ? <div className="flex flex-wrap items-center gap-2.5 rounded-2xl border border-primary bg-accent px-3 py-2" role="toolbar">
-        <SelectCheck checked={shown.length > 0 && shown.every(item => selected.has(item.video.id))} label="Selecionar todos os vídeos" mixed
+    {all.length > 0 && <div className="flex flex-wrap items-center gap-2.5" role="search">
+      <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-md">
+        <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4" />
+        <Input aria-label="Buscar vídeo" className="pl-9" onChange={event => setParam('q', event.target.value)} placeholder="Buscar vídeo por nome" type="search" value={query} />
+      </label>
+      {!company && <NativeSelect aria-label="Filtrar por assunto" className="w-auto max-w-xs" onChange={event => setParam('assunto', event.target.value)} value={subjectFilter}>
+        <option value="">Todos os assuntos</option>
+        <option value="none">Sem assunto</option>
+        {subjects.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
+      </NativeSelect>}
+      {narrowed && <Button onClick={() => setParams(new URLSearchParams(), { replace: true })} size="sm" variant="ghost">Limpar</Button>}
+      <span aria-live="polite" className="ml-auto text-sm tabular-nums text-muted-foreground max-sm:ml-0">
+        {narrowed ? `${shown.length} de ${all.length}` : pluralize(all.length, 'vídeo', 'vídeos')}
+        {!company && totalBytes > 0 && <> · <span title="Soma do tamanho de todos os vídeos da biblioteca">{formatBytes(totalBytes)} no total</span></>}
+      </span>
+    </div>}
+
+    {shown.length > 0 && <div className={cn('sticky top-0 z-20 flex flex-wrap items-center gap-2.5 rounded-2xl border bg-card px-3.5 py-2 shadow-[0_1px_2px_rgb(18_51_44/0.05)] transition-colors', selected.size > 0 ? 'border-primary' : 'border-[#dfe6e3]')} role="toolbar">
+      <label className="m-0 flex cursor-pointer items-center gap-2.5 text-sm font-semibold">
+        <SelectCheck checked={shown.every(item => selected.has(item.video.id))} label="Selecionar todos os vídeos" mixed={selected.size > 0}
           onChange={checked => setSelected(checked ? new Set(shown.map(item => item.video.id)) : new Set())} />
-        <strong className="text-sm font-semibold text-primary">{pluralize(selected.size, 'selecionado', 'selecionados')}</strong>
-        <Button aria-label="Limpar seleção" onClick={() => setSelected(new Set())} size="icon-sm" title="Limpar seleção" variant="ghost"><X /></Button>
-        <span className="ml-auto flex flex-wrap gap-2 max-[640px]:ml-0">
-          {!company && <Button disabled={busy} onClick={() => setAssociating([...selected])} size="sm" variant="outline"><Tags /> Assuntos e empresas</Button>}
-          <Button disabled={busy} onClick={() => void removeSelected()} size="sm" variant="outline"><Trash2 /> Excluir</Button>
-        </span>
-      </div>
-      : <div className="flex flex-wrap items-center gap-2.5" role="search">
-        <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-md">
-          <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4" />
-          <Input aria-label="Buscar vídeo" className="pl-9" onChange={event => setParam('q', event.target.value)} placeholder="Buscar vídeo por nome" type="search" value={query} />
-        </label>
-        {!company && <NativeSelect aria-label="Filtrar por assunto" className="w-auto max-w-xs" onChange={event => setParam('assunto', event.target.value)} value={subjectFilter}>
-          <option value="">Todos os assuntos</option>
-          <option value="none">Sem assunto</option>
-          {subjects.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
-        </NativeSelect>}
-        {narrowed && <Button onClick={() => setParams(new URLSearchParams(), { replace: true })} size="sm" variant="ghost">Limpar</Button>}
-        <span aria-live="polite" className="ml-auto text-sm tabular-nums text-muted-foreground max-sm:ml-0">
-          {narrowed ? `${shown.length} de ${all.length}` : pluralize(all.length, 'vídeo', 'vídeos')}
-          {!company && totalBytes > 0 && <> · <span title="Soma do tamanho de todos os vídeos da biblioteca">{formatBytes(totalBytes)} no total</span></>}
-        </span>
-      </div>)}
+        {selected.size > 0 ? pluralize(selected.size, 'selecionado', 'selecionados') : 'Selecionar todos'}
+      </label>
+      {selected.size > 0 && <Button aria-label="Limpar seleção" onClick={() => setSelected(new Set())} size="icon-sm" title="Limpar seleção" variant="ghost"><X /></Button>}
+      <span className="ml-auto flex flex-wrap gap-2 max-[640px]:ml-0 max-[640px]:w-full">
+        <Button className="max-[640px]:flex-1" disabled={selected.size === 0 || busy} onClick={() => void removeSelected()} variant="outline"><Trash2 /> Excluir</Button>
+        {!company && <Button className="max-[640px]:flex-[2]" disabled={selected.size === 0 || busy} onClick={() => setAssociating([...selected])}><Tags /> Associar a assunto ou empresa</Button>}
+      </span>
+    </div>}
 
     {all.length > 0 && shown.length === 0 && <EmptyState description="Tente outro nome ou outro assunto." title="Nenhum vídeo encontrado." />}
 
-    {(sending.length > 0 || shown.length > 0) && <ul aria-label="Vídeos" className="m-0 grid list-none gap-x-5 gap-y-6 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+    {(sending.length > 0 || shown.length > 0) && <ul aria-label="Vídeos" className="m-0 grid list-none gap-x-6 gap-y-8 p-0 sm:grid-cols-2 lg:grid-cols-3">
       {sending.map(item => <li key={item.id}><SendingCard item={item} /></li>)}
       {shown.map(item => <li key={item.video.id}>
         <VideoCard checked={selected.has(item.video.id)} item={item} onCheck={checked => toggle(item.video.id, checked)}
-          onAssociate={company ? undefined : () => setAssociating([item.video.id])} onPlay={() => setPlaying(item)} onRemove={() => void remove(item)}
-          onRename={company ? title => void rename(item, title) : undefined}
+          onAssociate={company ? undefined : () => setAssociating([item.video.id])} onPlay={() => setPlaying(item.video.id)} onRemove={() => void remove(item)}
+          onRename={title => void rename(item, title)} onThumbnail={image => void changeThumbnail(item, image)} playing={playing === item.video.id}
           privateTo={(videoCompanies.get(item.video.id) ?? []).map(id => names.companies.get(id) ?? 'empresa removida')}
           subjects={(videoSubjects.get(item.video.id) ?? []).flatMap(id => names.subjects.get(id) ?? [])} />
       </li>)}
@@ -270,14 +280,6 @@ export default function VideoLibraryPage({ company = false }: { company?: boolea
       </div>
       <p className={cn('m-0 text-xs tabular-nums', used > 0.9 ? 'font-semibold text-destructive' : 'text-muted-foreground')}>{formatBytes(room.usedBytes)} de {formatBytes(room.quotaBytes)}</p>
     </footer>}
-
-    {playing && <Dialog description={playing.video.durationMilliseconds > 0 ? formatDuration(playing.video.durationMilliseconds) : undefined} onClose={() => setPlaying(null)} size="lg" title={playing.video.title}>
-      <div className="aspect-video overflow-hidden rounded-xl bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
-        {isExternal(playing.video)
-          ? <ExternalVideoFrame title={playing.video.title} video={playing.video} />
-          : <VideoPreview preload="metadata" src={playing.video.fileUrl} title={playing.video.title} />}
-      </div>
-    </Dialog>}
 
     {associating && <AssociateVideosDialog companies={companies} onClose={() => setAssociating(null)} subjects={subjects}
       onSubjectCreated={subject => setSubjects(current => current.some(item => item.id === subject.id)
@@ -326,13 +328,14 @@ function DropZone({ onFiles, compact = false }: { onFiles: (files: FileList | Fi
 }
 
 const tile = 'relative grid aspect-video w-full place-items-center overflow-hidden rounded-xl bg-[#12332c] text-white';
+const sendingTile = cn(tile, 'rounded-[1.25rem]');
 
 /** A video on its way: how far it is, or what went wrong with a way to try again. */
 function SendingCard({ item }: { item: UploadItem }) {
   const failed = item.status === 'failed';
   const percent = item.totalBytes > 0 ? Math.round((item.sentBytes / item.totalBytes) * 100) : 0;
   return <article className="grid gap-2.5">
-    <div className={cn(tile, failed && 'bg-destructive-soft text-destructive')}>
+    <div className={cn(sendingTile, failed && 'bg-destructive-soft text-destructive')}>
       {failed
         ? <p className="m-0 px-4 text-center text-sm font-medium">{item.error ?? 'O envio não terminou.'}</p>
         : <span className="text-2xl font-semibold tabular-nums">{percent}%</span>}
@@ -348,58 +351,107 @@ function SendingCard({ item }: { item: UploadItem }) {
   </article>;
 }
 
+/** The picture of a video: the one chosen for it, the provider's for YouTube, or a frame of the video itself. */
+function Thumbnail({ video }: { video: PlatformCourseVideo }) {
+  const [broken, setBroken] = useState(false);
+  const cover = 'absolute inset-0 size-full object-cover';
+  if (broken) return null;
+  if (video.thumbnailUrl) return <img alt="" className={cover} decoding="async" loading="lazy" onError={() => setBroken(true)} src={video.thumbnailUrl} />;
+  if (isExternal(video) && videoProvider(video) === 'YouTube' && video.externalId)
+    return <img alt="" className={cover} decoding="async" loading="lazy" onError={() => setBroken(true)} src={`https://i.ytimg.com/vi/${video.externalId}/hqdefault.jpg`} />;
+  // a frame a second in: the video's own image, without a picture made for it
+  if (!isExternal(video) && video.fileUrl)
+    return <video aria-hidden="true" className={cn(cover, 'pointer-events-none')} muted onError={() => setBroken(true)} playsInline preload="metadata" src={`${video.fileUrl}#t=1`} tabIndex={-1} />;
+  return null;
+}
+
+/** The video playing in its own card: ours starts by itself; YouTube and Vimeo in their player. */
+function InlinePlayer({ video }: { video: PlatformCourseVideo }) {
+  const ref = useRef<HTMLVideoElement | null>(null);
+  // a browser may refuse to start by itself (or have no player at all): the play button is still there
+  useEffect(() => { try { void Promise.resolve(ref.current?.play()).catch(() => undefined); } catch { /* stays paused */ } }, []);
+  return <div className="absolute inset-0 bg-black [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
+    {isExternal(video)
+      ? <ExternalVideoFrame title={video.title} video={video} />
+      : <div className="video-preview"><SipatVideoPlayer preload="metadata" sources={[{ src: video.fileUrl }]} title={video.title} videoRef={ref} /></div>}
+  </div>;
+}
+
 /**
- * A video: click to watch, a check on the corner to pick several, the rest behind "⋯". A company changes the name in
- * place; the operation sees the assuntos of the video and, when it is private, the companies that have it.
+ * A video, as the library always showed it: a card with the video on top (its picture, and a click plays it right
+ * there), its name, length and size, who it is private to, its assuntos with "Editar", and where it is used. A check
+ * on the corner picks several; a picture of its own and deleting are behind "⋯".
  */
-function VideoCard({ item, checked, onCheck, onPlay, onRename, onRemove, onAssociate, subjects, privateTo }: {
-  item: LibraryItem; checked: boolean; onCheck: (checked: boolean) => void; onPlay: () => void; onRemove: () => void;
-  onRename?: (title: string) => void; onAssociate?: () => void; subjects: string[]; privateTo: string[];
+function VideoCard({ item, checked, playing, onCheck, onPlay, onRename, onThumbnail, onRemove, onAssociate, subjects, privateTo }: {
+  item: LibraryItem; checked: boolean; playing: boolean; onCheck: (checked: boolean) => void; onPlay: () => void; onRemove: () => void;
+  onRename: (title: string) => void; onThumbnail: (image: File | null) => void; onAssociate?: () => void; subjects: string[]; privateTo: string[];
 }) {
   const { video, trainings, uses } = item;
   const ready = video.status === 'Ready';
+  const picker = useRef<HTMLInputElement>(null);
+  const nameField = useRef<HTMLDivElement>(null);
   const length = isExtra(video) && video.durationMilliseconds <= 0 ? videoProvider(video) : formatDuration(video.durationMilliseconds);
-  return <article className="group/card grid gap-2.5">
-    <div className="relative">
-      {ready
-        ? <button aria-label={`Assistir ${video.title}`} className={cn(tile, 'group m-0 min-h-0 cursor-pointer border-0 p-0 transition-transform duration-200 hover:-translate-y-0.5 motion-reduce:hover:translate-y-0', checked && 'ring-2 ring-primary ring-offset-2')} onClick={onPlay} type="button">
-          <span className="grid size-12 place-items-center rounded-full bg-white/15 transition-colors group-hover:bg-white group-hover:text-[#12332c]"><Play aria-hidden="true" className="size-5 translate-x-px fill-current" /></span>
-          {isExternal(video) && <span className="absolute bottom-2.5 left-2.5 rounded-md bg-black/45 px-1.5 py-0.5 text-xs font-semibold">{videoProvider(video)}</span>}
-          <span className="absolute right-2.5 bottom-2.5 rounded-md bg-black/45 px-1.5 py-0.5 text-xs tabular-nums">{length}</span>
-        </button>
-        : <div className={cn(tile, video.status === 'Failed' && 'bg-destructive-soft text-destructive')}>
-          <p className="m-0 px-4 text-center text-sm font-medium" role="status">{video.status === 'Failed' ? video.processingError ?? 'Não foi possível preparar este vídeo.' : 'Preparando o vídeo…'}</p>
-        </div>}
-      {/* the check shows on the card under the pointer, and stays once something is picked */}
-      <span className={cn('absolute top-2.5 left-2.5 transition-opacity group-focus-within/card:opacity-100 group-hover/card:opacity-100 max-[760px]:opacity-100', checked ? 'opacity-100' : 'opacity-0')}>
-        <SelectCheck checked={checked} label={`Selecionar ${video.title}`} onChange={onCheck} tone="dark" />
-      </span>
-    </div>
-    <div className="flex items-start gap-1 px-1">
-      <div className="min-w-0 flex-1">
-        {onRename
-          ? <InlineText className="text-[0.9375rem] font-semibold" label={`Nome do vídeo ${video.title}`} onCommit={onRename} value={video.title} />
-          : <strong className="line-clamp-2 px-1.5 text-[0.9375rem] leading-snug font-semibold" title={video.title}>{video.title}</strong>}
-        <p className="m-0 px-1.5 text-xs text-muted-foreground">
-          {trainings.length === 1 ? `Em ${trainings[0]}` : uses > 0 ? `Em ${pluralize(uses, 'treinamento', 'treinamentos')}` : 'Ainda em nenhum treinamento'}
-          {subjects.length > 0 && <> · {subjects.join(', ')}</>}
+  const facts = [isExternal(video) && video.durationMilliseconds > 0 ? videoProvider(video) : '', length, !isExternal(video) && video.sizeBytes > 0 ? formatBytes(video.sizeBytes) : ''].filter(Boolean);
+  return <article className={cn('group/card flex h-full min-w-0 flex-col overflow-hidden rounded-[1.25rem] border bg-card shadow-[0_1px_2px_rgb(18_51_44/0.05)] transition-[box-shadow,border-color] duration-200 hover:shadow-[0_14px_30px_-18px_rgb(18_51_44/0.45)]',
+    checked ? 'border-primary ring-1 ring-primary' : 'border-[#dfe6e3] hover:border-[#12332c]/40')}>
+    <div className={cn(tile, 'rounded-none')}>
+      {!ready
+        ? <p className={cn('m-0 px-4 text-center text-sm font-medium', video.status === 'Failed' && 'text-destructive')} role="status">
+          {video.status === 'Failed' ? video.processingError ?? 'Não foi possível preparar este vídeo.' : 'Preparando o vídeo…'}
         </p>
-        {privateTo.length > 0 && <p className="m-0 mt-0.5 flex items-center gap-1 px-1.5 text-xs font-semibold text-warning">
-          <Lock aria-hidden="true" className="size-3 shrink-0" /><span className="min-w-0 truncate">Privado: {privateTo.join(', ')}</span>
-        </p>}
-      </div>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild><Button aria-label={`Mais opções de ${video.title}`} size="icon-sm" variant="ghost"><MoreHorizontal /></Button></DropdownMenuTrigger>
-        <DropdownMenuContent>
-          {trainings.length > 0 && <>
-            <DropdownMenuLabel>Usado em</DropdownMenuLabel>
-            {trainings.map(title => <DropdownMenuItem disabled key={title}>{title}</DropdownMenuItem>)}
-            <DropdownMenuSeparator />
-          </>}
-          {onAssociate && <DropdownMenuItem onSelect={onAssociate}><Tags /> Assuntos e empresas</DropdownMenuItem>}
-          <DropdownMenuItem onSelect={onRemove} variant="destructive"><Trash2 /> Excluir</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+        : playing
+          ? <InlinePlayer video={video} />
+          : <button aria-label={`Assistir ${video.title}`} className="group absolute inset-0 m-0 grid min-h-0 cursor-pointer place-items-center rounded-none border-0 bg-transparent p-0 text-white" onClick={onPlay} type="button">
+            <Thumbnail video={video} />
+            {/* a soft shade at the foot keeps the length readable on any picture */}
+            <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-1/3 bg-gradient-to-t from-black/45 to-transparent" />
+            <span className="relative grid size-14 place-items-center rounded-full bg-[#0f7a3d] shadow-[0_6px_18px_rgb(0_0_0/0.3)] transition-transform duration-200 group-hover:scale-105 motion-reduce:group-hover:scale-100"><Play aria-hidden="true" className="size-6 translate-x-0.5 fill-current" /></span>
+            <span className="absolute right-2.5 bottom-2.5 rounded-md bg-black/55 px-1.5 py-0.5 text-xs tabular-nums">{length}</span>
+          </button>}
+      {!playing && <span className="absolute top-3 left-3 z-10">
+        <SelectCheck checked={checked} label={`Selecionar ${video.title}`} onChange={onCheck} tone="dark" />
+      </span>}
     </div>
+
+    <div className="grid flex-1 content-start gap-2 px-4 pt-3.5 pb-3">
+      <div className="flex items-start gap-1">
+        <div className="-ml-1.5 min-w-0 flex-1" ref={nameField}>
+          <InlineText className="text-[1.0625rem] font-extrabold tracking-[-0.01em] text-[#12332c]" label={`Nome do vídeo ${video.title}`} onCommit={onRename} value={video.title} />
+        </div>
+        <input accept="image/png,image/jpeg,image/webp" aria-label={`Miniatura de ${video.title}`} className="sr-only" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) onThumbnail(file); }} ref={picker} tabIndex={-1} type="file" />
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild><Button aria-label={`Mais opções de ${video.title}`} size="icon-sm" variant="ghost"><MoreHorizontal /></Button></DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem onSelect={() => window.setTimeout(() => nameField.current?.querySelector('input')?.select(), 0)}><Pencil /> Renomear</DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => picker.current?.click()}><ImagePlus /> {video.thumbnailUrl ? 'Trocar miniatura' : 'Escolher miniatura'}</DropdownMenuItem>
+            {video.thumbnailUrl && <DropdownMenuItem onSelect={() => onThumbnail(null)}><ImageMinus /> Usar um quadro do vídeo</DropdownMenuItem>}
+            {trainings.length > 0 && <>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Usado em</DropdownMenuLabel>
+              {trainings.map(title => <DropdownMenuItem disabled key={title}>{title}</DropdownMenuItem>)}
+            </>}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={onRemove} variant="destructive"><Trash2 /> Excluir</DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <p className="m-0 text-[0.8125rem] tabular-nums text-muted-foreground">{facts.join(' · ')}</p>
+      {privateTo.length > 0 && <p className="m-0 flex items-center gap-1.5 text-[0.8125rem] font-semibold text-warning">
+        <Lock aria-hidden="true" className="size-3.5 shrink-0" /><span className="min-w-0 truncate">Privado: {privateTo.join(', ')}</span>
+      </p>}
+      {/* the assuntos of the video, with the way to change them (and the companies it is private to) */}
+      {onAssociate && <button className="m-0 flex min-h-9 w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-transparent px-2.5 text-left text-[0.8125rem] transition-colors hover:border-primary/50 hover:bg-accent/50" onClick={onAssociate} type="button">
+        <Tags aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
+        <span className={cn('min-w-0 flex-1 truncate', subjects.length === 0 && 'text-muted-foreground')}>{subjects.length > 0 ? subjects.join(' · ') : 'Sem assunto'}</span>
+        <span className="shrink-0 text-xs font-semibold text-primary">Editar</span>
+      </button>}
+    </div>
+
+    <footer className="flex items-center justify-between gap-2 border-t border-[#dfe6e3] px-4 py-2.5">
+      <span className={cn('truncate rounded-full px-2.5 py-0.5 text-xs font-semibold', uses > 0 ? 'bg-accent text-primary' : 'bg-warning-soft text-warning')}>
+        {trainings.length === 1 ? `Usado em ${trainings[0]}` : uses > 0 ? `Usado em ${pluralize(uses, 'treinamento', 'treinamentos')}` : 'Ainda não usado em treinamentos'}
+      </span>
+      <Button aria-label={`Excluir vídeo ${video.title}`} onClick={onRemove} size="icon-sm" title="Excluir vídeo" variant="ghost"><Trash2 /></Button>
+    </footer>
   </article>;
 }

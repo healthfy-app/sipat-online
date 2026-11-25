@@ -1011,6 +1011,13 @@ namespace SipatOnline.Infrastructure.Migrations
                         .HasColumnType("character varying(16)")
                         .HasDefaultValue("Ready");
 
+                    b.Property<string>("ThumbnailContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset?>("ThumbnailUpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<string>("Title")
                         .IsRequired()
                         .HasMaxLength(200)
@@ -1115,6 +1122,20 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasIndex("VideoId", "TimeMilliseconds");
 
                     b.ToTable("PlatformVideoCheckpoints", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoThumbnailEntity", b =>
+                {
+                    b.Property<Guid>("VideoId")
+                        .HasColumnType("uuid");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.HasKey("VideoId");
+
+                    b.ToTable("PlatformVideoThumbnails", "learning");
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlaybackGrantEntity", b =>
@@ -1696,6 +1717,15 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Navigation("Course");
 
                     b.Navigation("Video");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoThumbnailEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.PlatformCourseVideoEntity", null)
+                        .WithOne()
+                        .HasForeignKey("SipatOnline.Infrastructure.Learning.PlatformVideoThumbnailEntity", "VideoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoCheckpointEntity", b =>
