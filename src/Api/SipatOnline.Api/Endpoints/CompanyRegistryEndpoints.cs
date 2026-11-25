@@ -47,6 +47,23 @@ public static class CompanyRegistryEndpoints
             .RequireAuthorization("ManageTenantUsers")
             .WithName("RemoveCompanySector");
 
+        // the sectors of one unit: made inside it, and taken out of it
+        group.MapPost("/units/{id:guid}/sectors", async (Guid id, AddRegistryItemsRequest request, CompanyRegistryService registry, CancellationToken token) =>
+        {
+            var result = await registry.AddUnitSectorsAsync(id, request.Names, token);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .RequireAuthorization("ManageTenantUsers")
+        .WithName("AddUnitSectors");
+
+        group.MapDelete("/units/{id:guid}/sectors/{sectorId:guid}", async (Guid id, Guid sectorId, CompanyRegistryService registry, CancellationToken token) =>
+        {
+            var result = await registry.RemoveUnitSectorAsync(id, sectorId, token);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .RequireAuthorization("ManageTenantUsers")
+        .WithName("RemoveUnitSector");
+
         group.MapPut("/rules", async (ProfileRules rules, CompanyRegistryService registry, CancellationToken token) =>
         {
             var result = await registry.SaveRulesAsync(rules, token);
@@ -82,7 +99,7 @@ public static class CompanyRegistryEndpoints
         {
             "identity.forbidden" => StatusCodes.Status403Forbidden,
             "registry.not_found" => StatusCodes.Status404NotFound,
-            "registry.name.duplicate" => StatusCodes.Status409Conflict,
+            "registry.name.duplicate" or "registry.unit_sector.in_use" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 

@@ -6,7 +6,7 @@ import PlacementDialog from './PlacementDialog';
 
 vi.mock('@/api', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/api')>()),
-  changePlacement: vi.fn(), addRegistryItems: vi.fn(), removeRegistryItem: vi.fn(), getCompanyRegistry: vi.fn(),
+  changePlacement: vi.fn(), addRegistryItems: vi.fn(), removeRegistryItem: vi.fn(), getCompanyRegistry: vi.fn(), addUnitSectors: vi.fn(), removeUnitSector: vi.fn(),
 }));
 
 const rules = { requireRegistration: false, requireEmail: false, requirePhone: false, requireUnit: false, requireSector: false };
@@ -103,5 +103,52 @@ describe('unit and sector of the selected people', () => {
     await waitFor(() => expect(screen.queryByRole('radio', { name: /Minas Gerais/ })).not.toBeInTheDocument());
     // "Sem unidade" is not something to take off the list
     expect(screen.queryByRole('button', { name: 'Tirar Sem unidade' })).not.toBeInTheDocument();
+  });
+});
+
+describe('the sectors offered are the ones of the unit', () => {
+  const withSectors: api.CompanyRegistry = {
+    ...registry,
+    sectors: [{ id: 'hr', name: 'RH', isActive: true, peopleCount: 1 }, { id: 'it', name: 'TI', isActive: true, peopleCount: 0 }, { id: 'prod', name: 'Produção', isActive: true, peopleCount: 0 }],
+    unitSectors: [{ unitId: 'sp', sectorId: 'hr', peopleCount: 1 }, { unitId: 'sp', sectorId: 'it', peopleCount: 0 }, { unitId: 'rio', sectorId: 'prod', peopleCount: 0 }],
+  };
+  const openWith = (profiles: api.ParticipantProfile[]) => render(<PlacementDialog onClose={vi.fn()} onSaved={vi.fn()} people={profiles.map(item => item.id)}
+    profiles={new Map(profiles.map(item => [item.id, item]))} registry={withSectors} />);
+
+  it('lists the sectors of the unit the people are in', async () => {
+    const user = userEvent.setup();
+    openWith([person('a', 'sp', 'hr'), person('b', 'sp')]);
+    await user.click(screen.getByRole('tab', { name: 'Setores' }));
+    expect(screen.getByText('Setores de São Paulo.')).toBeVisible();
+    expect(screen.getByRole('radio', { name: /RH/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /TI/ })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /Produção/ })).not.toBeInTheDocument();
+  });
+
+  it('follows the unit just picked in the other tab, and makes a new sector inside it', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.addUnitSectors).mockResolvedValue({
+      ...withSectors,
+      sectors: [...withSectors.sectors, { id: 'buy', name: 'Compras', isActive: true, peopleCount: 0 }],
+      unitSectors: [...withSectors.unitSectors!, { unitId: 'rio', sectorId: 'buy', peopleCount: 0 }],
+    });
+    openWith([person('a', 'sp', 'hr')]);
+    await user.click(screen.getByRole('radio', { name: /Rio de Janeiro/ }));
+    await user.click(screen.getByRole('tab', { name: 'Setores' }));
+    expect(screen.getByText('Setores de Rio de Janeiro.')).toBeVisible();
+    expect(screen.getByRole('radio', { name: /Produção/ })).toBeInTheDocument();
+    expect(screen.queryByRole('radio', { name: /TI/ })).not.toBeInTheDocument();
+    await user.type(screen.getByRole('searchbox', { name: 'Buscar ou criar setor' }), 'Compras');
+    await user.click(screen.getByRole('button', { name: 'Criar setor “Compras”' }));
+    expect(api.addUnitSectors).toHaveBeenCalledWith('rio', ['Compras']);
+    expect(await screen.findByRole('radio', { name: /Compras/ })).toBeChecked();
+  });
+
+  it('offers every sector while the people are of different units', async () => {
+    const user = userEvent.setup();
+    openWith([person('a', 'sp'), person('b', 'rio')]);
+    await user.click(screen.getByRole('tab', { name: 'Setores' }));
+    expect(screen.getByRole('radio', { name: /Produção/ })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: /TI/ })).toBeInTheDocument();
   });
 });

@@ -1372,6 +1372,24 @@ namespace SipatOnline.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.CompanyUnitSectorEntity", b =>
+                {
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SectorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("UnitId", "SectorId");
+
+                    b.HasIndex("SectorId");
+
+                    b.ToTable("CompanyUnitSectors", "identity");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventTargetEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1796,6 +1814,21 @@ namespace SipatOnline.Infrastructure.Migrations
                         .WithMany()
                         .HasForeignKey("TenantId")
                         .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Identity.CompanyUnitSectorEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Identity.CompanySectorEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SectorId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SipatOnline.Infrastructure.Identity.CompanyUnitEntity", null)
+                        .WithMany()
+                        .HasForeignKey("UnitId")
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });
 

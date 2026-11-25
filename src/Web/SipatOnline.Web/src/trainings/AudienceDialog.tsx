@@ -93,6 +93,9 @@ export default function AudienceDialog({ sipatId, audience, registry: givenRegis
   // a unit or sector put away shows only while the training still names it
   const shownUnits = registry.units.filter(unit => (unit.isActive || units.has(unit.id)) && lower(unit.name).includes(lower(needle)));
   const sectorsOf = (marked: ReadonlySet<string>) => registry.sectors.filter(sector => sector.isActive || marked.has(sector.id));
+  // under a unit: the sectors that unit has (and any the training already names there)
+  const sectorsIn = (unitId: string, marked: ReadonlySet<string>) => sectorsOf(marked).filter(sector =>
+    !registry.unitSectors || marked.has(sector.id) || registry.unitSectors.some(link => link.unitId === unitId && link.sectorId === sector.id));
   const canCreate = needle.length > 0 && !registry.units.some(unit => lower(unit.name) === lower(needle));
 
   async function createUnit() {
@@ -147,9 +150,9 @@ export default function AudienceDialog({ sipatId, audience, registry: givenRegis
                 <span className="min-w-0 flex-1 font-medium">{unit.name}{!unit.isActive && <span className="ml-1.5 text-xs font-normal text-muted-foreground">desativada</span>}</span>
                 <span aria-hidden="true" className="shrink-0 text-xs tabular-nums text-muted-foreground">{people(unit.peopleCount)}</span>
               </label>
-              {marked && sectorsOf(marked).length > 0 && <div aria-label={`Setores de ${unit.name}`} className="flex flex-wrap gap-1.5 px-2 pb-2.5 pl-8.5" role="group">
+              {marked && sectorsIn(unit.id, marked).length > 0 && <div aria-label={`Setores de ${unit.name}`} className="flex flex-wrap gap-1.5 px-2 pb-2.5 pl-8.5" role="group">
                 <SectorChip disabled={busy} name="Toda a unidade" onClick={() => setUnits(current => new Map(current).set(unit.id, new Set()))} pressed={marked.size === 0} />
-                {sectorsOf(marked).map(sector => <SectorChip count={inSector(unit.id, sector.id)} disabled={busy} key={sector.id} name={sector.name}
+                {sectorsIn(unit.id, marked).map(sector => <SectorChip count={inSector(unit.id, sector.id)} disabled={busy} key={sector.id} name={sector.name}
                   onClick={() => toggleSector(unit.id, sector.id)} pressed={marked.has(sector.id)} />)}
               </div>}
             </div>;

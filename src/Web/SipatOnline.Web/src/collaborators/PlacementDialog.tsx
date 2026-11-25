@@ -1,7 +1,7 @@
 import { Building2, Network } from 'lucide-react';
 import { useState } from 'react';
 import {
-  addRegistryItems, changePlacement, getCompanyRegistry, removeRegistryItem,
+  addRegistryItems, addUnitSectors, changePlacement, getCompanyRegistry, removeRegistryItem, removeUnitSector,
   type CompanyRegistry, type ParticipantProfile, type PlacementResult, type RegistryKind,
 } from '@/api';
 import { Button } from '@/components/ui/button';
@@ -47,7 +47,16 @@ export default function PlacementDialog({ people, profiles, registry: givenRegis
   const [error, setError] = useState('');
 
   const text = words[tab];
-  const items = registry[text.kind];
+  // the sectors offered are the ones of the unit: the one just picked in the other tab, else the one the people share
+  const units = new Set(people.map(id => profiles.get(id)?.unitId ?? null));
+  const sectorUnitId = picked.unit !== undefined ? (picked.unit === none ? null : picked.unit) : units.size === 1 ? [...units][0] : null;
+  const sectorUnit = registry.units.find(unit => unit.id === sectorUnitId) ?? null;
+  const links = sectorUnit && registry.unitSectors ? registry.unitSectors.filter(link => link.unitId === sectorUnit.id) : null;
+  const inUnit = tab === 'sector' && links !== null;
+  // a sector some of the people are in, or just picked, stays in view even if the unit does not have it yet
+  const held = new Set([...people.map(id => profiles.get(id)?.sectorId ?? none), picked.sector ?? none]);
+  const items = (inUnit ? registry.sectors.filter(sector => links.some(link => link.sectorId === sector.id) || held.has(sector.id)) : registry[text.kind])
+    .map(item => inUnit ? { ...item, peopleCount: links.find(link => link.sectorId === item.id)?.peopleCount ?? 0 } : item);
   const placeOf = (id: string) => (tab === 'unit' ? profiles.get(id)?.unitId : profiles.get(id)?.sectorId) ?? none;
   const choices: Choice[] = [
     { id: none, title: text.without },
@@ -64,7 +73,7 @@ export default function PlacementDialog({ people, profiles, registry: givenRegis
   async function create(name: string) {
     setError('');
     try {
-      const next = await addRegistryItems(text.kind, [name]);
+      const next = inUnit && sectorUnit ? await addUnitSectors(sectorUnit.id, [name]) : await addRegistryItems(text.kind, [name]);
       accept(next);
       const made = next[text.kind].find(item => same(item.name, name));
       if (made) setPicked(current => ({ ...current, [tab]: made.id }));
@@ -74,8 +83,9 @@ export default function PlacementDialog({ people, profiles, registry: givenRegis
   async function remove(id: string) {
     setError('');
     try {
-      await removeRegistryItem(text.kind, id);
-      accept(await getCompanyRegistry());
+      // inside a unit, a sector only leaves that unit; in the whole list, it is put away or deleted
+      if (inUnit && sectorUnit) accept(await removeUnitSector(sectorUnit.id, id));
+      else { await removeRegistryItem(text.kind, id); accept(await getCompanyRegistry()); }
       setPicked(current => current[tab] === id ? { ...current, [tab]: undefined } : current);
     } catch (failure) { setError(getErrorMessage(failure)); throw failure; }
   }
@@ -107,11 +117,12 @@ export default function PlacementDialog({ people, profiles, registry: givenRegis
         {tabButton('unit', Building2)}
         {tabButton('sector', Network)}
       </div>
-      <p className="m-0 text-[0.8125rem] text-muted-foreground">{text.hint}</p>
+      <p className="m-0 text-[0.8125rem] text-muted-foreground">{tab === 'sector' ? (inUnit && sectorUnit ? `Setores de ${sectorUnit.name}.` : 'O setor das pessoas. Com uma unidade escolhida, aparecem só os setores dela.') : text.hint}</p>
       <ChoiceList canRemove={choice => choice.id !== none} choices={choices} disabled={busy} key={tab} marks={marks} mode="single" noun={text.noun}
         onCreate={create} onRemove={remove} onToggle={id => setPicked(current => ({ ...current, [tab]: id }))}
         removeNote={choice => {
           const count = items.find(item => item.id === choice.id)?.peopleCount ?? 0;
+          if (inUnit && sectorUnit) return count === 0 ? `Sai de ${sectorUnit.name}; continua na lista da empresa.` : `${pluralize(count, 'pessoa', 'pessoas')} de ${sectorUnit.name} ${count === 1 ? 'está' : 'estão'} nele: mude o setor antes.`;
           return count === 0 ? text.empty : `${pluralize(count, 'pessoa', 'pessoas')} ${count === 1 ? text.stayOne : text.stay}`;
         }}
         removeVerb="Tirar" someLabel="(em parte das pessoas)" />

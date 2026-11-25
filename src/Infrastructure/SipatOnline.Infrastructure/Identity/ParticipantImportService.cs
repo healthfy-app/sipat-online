@@ -115,6 +115,8 @@ public sealed class ParticipantImportService(
         var moved = placedBefore.Where(before => nowPlaced.TryGetValue(before.ParticipantId, out var now) &&
             (now.UnitId != before.UnitId || now.SectorId != before.SectorId)).ToArray();
         db.ChangeTracker.Clear();
+        // a line with a unit and a sector makes that sector one of that unit
+        await CompanyRegistryService.LinkPlacedAsync(db, tenant.Value, token);
         // people who arrive while a training is live start with its days already there
         if (result.Created > 0) await distribution.EnsureAssignmentsAsync(tenant.Value, plan.Creates.Select(item => item.User.Id).ToArray(), token);
         if (moved.Length > 0) await distribution.PlacementChangedAsync(tenant.Value, moved, token);

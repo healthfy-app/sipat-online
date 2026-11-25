@@ -1670,7 +1670,9 @@ export interface RegistryItem { id: string; name: string; isActive: boolean; peo
 export interface ProfileRules {
   requireRegistration: boolean; requireEmail: boolean; requirePhone: boolean; requireUnit: boolean; requireSector: boolean;
 }
-export interface CompanyRegistry { units: RegistryItem[]; sectors: RegistryItem[]; rules: ProfileRules }
+/** A sector that exists inside a unit (the HR of Minas), and how many people of that unit are in it. */
+export interface UnitSector { unitId: string; sectorId: string; peopleCount: number }
+export interface CompanyRegistry { units: RegistryItem[]; sectors: RegistryItem[]; rules: ProfileRules; unitSectors?: UnitSector[] }
 export type RegistryKind = 'units' | 'sectors';
 
 /**
@@ -1693,6 +1695,15 @@ export async function addRegistryItems(kind: RegistryKind, names: string[]): Pro
 
 export async function updateRegistryItem(kind: RegistryKind, id: string, change: { name?: string; isActive?: boolean }): Promise<RegistryItem> {
   return registryChanged(await requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) }));
+}
+
+/** Makes sectors inside a unit; a name the company already has is that same sector, brought into the unit. */
+export async function addUnitSectors(unitId: string, names: string[]): Promise<CompanyRegistry> {
+  return registryChanged(await requestJson<CompanyRegistry>(`/api/admin/registry/units/${unitId}/sectors`, { method: 'POST', body: JSON.stringify({ names }) }));
+}
+/** Takes a sector out of a unit (refused while someone of the unit is in it); it stays in the company's list. */
+export async function removeUnitSector(unitId: string, sectorId: string): Promise<CompanyRegistry> {
+  return registryChanged(await requestJson<CompanyRegistry>(`/api/admin/registry/units/${unitId}/sectors/${sectorId}`, { method: 'DELETE' }));
 }
 
 /** Takes a unit or sector off the list: deleted when nobody uses it, only put away (`deleted: false`) when in use. */

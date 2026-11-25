@@ -82,6 +82,8 @@ public sealed class ParticipantProfileService(
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId, "identity.user.profile_changed", "user",
             user.Id.ToString("D"), clock.GetUtcNow()), token);
         await db.SaveChangesAsync(token);
+        // where a person is in a unit and a sector, that sector is one of that unit
+        await CompanyRegistryService.LinkPlacedAsync(db, tenant, token);
         // a new unit or sector brings the trainings that are for it, and takes back the untouched ones that are not
         if (before.UnitId != user.UnitId || before.SectorId != user.SectorId)
             await distribution.PlacementChangedAsync(tenant, [before], token);
@@ -138,6 +140,7 @@ public sealed class ParticipantProfileService(
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId, "identity.users.placement_changed", "user",
             $"{(isUnit ? "unit" : "sector")}:{changed}", clock.GetUtcNow()), token);
         await db.SaveChangesAsync(token);
+        await CompanyRegistryService.LinkPlacedAsync(db, tenant, token);
         var sync = await distribution.PlacementChangedAsync(tenant, moved, token);
         return Result<PlacementResult>.Success(new PlacementResult(changed, sync.Added, sync.Removed, sync.ReceivedTrainings));
     }

@@ -22,6 +22,8 @@ public sealed class PlatformDbContext(
 
     public DbSet<CompanySectorEntity> CompanySectors => Set<CompanySectorEntity>();
 
+    public DbSet<CompanyUnitSectorEntity> CompanyUnitSectors => Set<CompanyUnitSectorEntity>();
+
     public DbSet<CompanyProfileRulesEntity> CompanyProfileRules => Set<CompanyProfileRulesEntity>();
 
     public DbSet<TenantEntity> Tenants => Set<TenantEntity>();

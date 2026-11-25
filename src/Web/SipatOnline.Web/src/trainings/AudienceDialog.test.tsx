@@ -119,6 +119,19 @@ describe('who a training is for', () => {
     expect(await screen.findByRole('checkbox', { name: /Rio de Janeiro/ })).toBeChecked();
   });
 
+  it('offers under each unit only the sectors that unit has', async () => {
+    const user = userEvent.setup();
+    const linked = { ...registry, unitSectors: [{ unitId: 'minas', sectorId: 'hr', peopleCount: 2 }, { unitId: 'sp', sectorId: 'it', peopleCount: 1 }] };
+    render(<AudienceDialog audience={{ targets: [] }} onClose={vi.fn()} onSaved={vi.fn()} profiles={profiles} registry={linked} sipatId="t1" />);
+    await user.click(screen.getByRole('radio', { name: 'Escolher unidades e setores' }));
+    await user.click(screen.getByRole('checkbox', { name: /Minas Gerais/ }));
+    const minas = within(screen.getByRole('group', { name: 'Setores de Minas Gerais' }));
+    expect(minas.getByRole('button', { name: 'RH, 2 pessoas' })).toBeVisible();
+    expect(minas.queryByRole('button', { name: /^TI/ })).not.toBeInTheDocument();
+    // every sector of the company can still be marked for all the units
+    expect(within(screen.getByRole('group', { name: 'Em todas as unidades' })).getByRole('button', { name: /^TI/ })).toBeVisible();
+  });
+
   it('does not save a choice with nothing chosen', async () => {
     const user = userEvent.setup();
     open();
