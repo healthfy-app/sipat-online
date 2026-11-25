@@ -1,9 +1,9 @@
 import { saveFile } from '@/lib/saveFile';
-import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, MoreHorizontal, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
 import {
-  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, listCompanyVideos, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
+  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, listCompanyVideos, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -321,6 +321,19 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   }
   for (const item of preparing) onItsWay(item.dayKey, { id: item.videoId, title: item.title, status: 'preparando…' });
 
+  // the picture of the training's card, changed from here too
+  const coverPicker = useRef<HTMLInputElement>(null);
+  async function changeCover(image: File) {
+    const courseId = plans.find(item => item.sipatEventId === sipat?.id)?.courseId;
+    if (!courseId) { setError('Salve o treinamento antes de escolher a capa.'); return; }
+    setError('');
+    try {
+      await setTrainingCover(courseId, image);
+      setPlans(await listSipatPlans());
+      setNotice('Capa do treinamento trocada. Ela aparece no card da lista.');
+    } catch (failure) { setError(getErrorMessage(failure)); }
+  }
+
   /** The link to hand to the people who will take the training: they sign in and land on it. */
   async function share() {
     if (!sipat) return;
@@ -444,6 +457,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
             {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
             {canCustomizeGrid && <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>}
             <DropdownMenuItem disabled={days.length === 0} onSelect={exportCsv}><FileDown /> Exportar CSV</DropdownMenuItem>
+            {sipat && <DropdownMenuItem onSelect={() => coverPicker.current?.click()}><ImagePlus /> Capa do treinamento</DropdownMenuItem>}
             {sipat && <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setConfirmingEnd(true)} variant="destructive"><Ban /> Encerrar este treinamento</DropdownMenuItem>
@@ -462,6 +476,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       </div>}
     </header>
 
+    <input accept="image/png,image/jpeg,image/webp" aria-label="Capa do treinamento" className="sr-only" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void changeCover(file); }} ref={coverPicker} tabIndex={-1} type="file" />
     {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Este treinamento foi encerrado e não pode ser alterado. Para usá-lo de novo, reative-o na lista de treinamentos, ou use "Duplicar" em um novo treinamento.</p>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {showIssues && issueCount > 0 && stage === 'grid' && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">

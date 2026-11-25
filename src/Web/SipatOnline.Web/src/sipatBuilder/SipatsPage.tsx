@@ -1,8 +1,8 @@
-import { CalendarDays, Copy, Film, Link2, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
+import { CalendarDays, Copy, Film, ImagePlus, Link2, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  copySipatPlan, createSipatEvent, deleteSipat, getCompanyCapabilities, listSipatEvents, listSipatPlans, openSipatWeek, reactivateSipatEvent,
+  copySipatPlan, createSipatEvent, deleteSipat, setTrainingCover, getCompanyCapabilities, listSipatEvents, listSipatPlans, openSipatWeek, reactivateSipatEvent,
   type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -116,6 +116,15 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
     setNotice(copied ? `Link de "${event.title}" copiado. Quem abrir entra com o seu login e cai neste treinamento.` : `Link de "${event.title}": ${link}`);
   });
 
+  /** The picture of the training's card: sent right from the card, and the card shows it at once. */
+  const changeCover = (event: SipatEvent, image: File) => run(event, async () => {
+    const courseId = summaryOf(event)?.courseId;
+    if (!courseId) return;
+    await setTrainingCover(courseId, image);
+    setPlans(await listSipatPlans());
+    setNotice(`Capa de "${event.title}" trocada.`);
+  });
+
   const remove = (event: SipatEvent) => {
     if (!window.confirm(`Excluir "${event.title}"? Os dias montados e a capa são apagados. Isso não pode ser desfeito.`)) return;
     void run(event, async () => {
@@ -202,6 +211,13 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
               : <div className={cn(card, 'shadow-[0_1px_2px_rgb(18_51_44/0.05)] transition-[box-shadow,transform,border-color] duration-200 ease-out-soft hover:-translate-y-1 hover:border-[#12332c] hover:shadow-[0_18px_34px_-18px_rgb(18_51_44/0.5)] motion-reduce:hover:translate-y-0',
                 event.status === 'Published' && new Date(event.endsAt) > new Date() ? 'border-primary/40' : 'border-[#dfe6e3]')}>
                 <Link aria-label={`Abrir ${event.title}`} className="flex flex-1 flex-col text-foreground no-underline" to={`${basePath}/${event.id}`}>{details}</Link>
+                {/* the cover is changed right on the card: a quiet button over the picture, in view on the card under the pointer */}
+                {!viewOnly && plan?.courseId && <label className={cn('absolute top-3 right-3 z-10 m-0 inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full bg-black/55 px-3 text-xs font-semibold text-white backdrop-blur-sm transition-opacity hover:bg-black/75 focus-within:opacity-100 group-hover:opacity-100 max-[760px]:opacity-100',
+                  cover ? 'opacity-0' : 'opacity-100', busy && 'pointer-events-none opacity-50')}>
+                  <ImagePlus aria-hidden="true" className="size-3.5" /> {cover ? 'Trocar capa' : 'Adicionar capa'}
+                  <input accept="image/png,image/jpeg,image/webp" aria-label={`Capa de ${event.title}`} className="sr-only"
+                    onChange={input => { const file = input.target.files?.[0]; input.target.value = ''; if (file) void changeCover(event, file); }} type="file" />
+                </label>}
                 <footer className="mt-1 flex items-center gap-1 border-t border-[#dfe6e3] px-4 py-3">
                   <Link aria-hidden="true" className="mr-auto inline-block whitespace-nowrap rounded-full bg-[#12332c] px-3.5 py-1.5 text-[0.8125rem] font-bold text-white no-underline transition-colors hover:bg-[#0f7a3d]" tabIndex={-1} to={`${basePath}/${event.id}`}>Abrir →</Link>
                   <button aria-label={`${viewOnly ? 'Ver' : 'Editar'} ${event.title} no editor de vídeos`} className={cn(iconAction, 'max-[760px]:hidden')} disabled={busy} onClick={() => void edit(event)} title={viewOnly ? 'Ver no editor' : 'Editar treinamento'} type="button"><Pencil aria-hidden="true" /></button>
