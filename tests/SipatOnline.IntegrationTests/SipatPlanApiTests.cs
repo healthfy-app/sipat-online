@@ -107,6 +107,18 @@ public sealed class SipatPlanApiTests
         Assert.Equal(JsonValueKind.Null, copy[0].GetProperty("date").ValueKind);
         Assert.NotEqual(saved[0].GetProperty("id").GetGuid(), copy[0].GetProperty("id").GetGuid());
 
+        // the card of a training: what it has, how long it runs, and its content (for the cover)
+        var card = Assert.Single((await Get(admin, "/api/admin/sipat-plans")).EnumerateArray(), item => item.GetProperty("sipatEventId").GetGuid() == sipatId);
+        Assert.NotEqual(Guid.Empty, card.GetProperty("courseId").GetGuid());
+        Assert.True(card.GetProperty("durationMilliseconds").GetInt64() > 0);
+        Assert.Equal(JsonValueKind.Null, card.GetProperty("coverVersion").ValueKind);
+
+        // a training never delivered can be deleted; one that went to the participants stays in the history
+        await Send(admin, HttpMethod.Delete, $"/api/admin/sipats/{nextId}", new { }, HttpStatusCode.NoContent);
+        Assert.DoesNotContain((await Get(admin, "/api/admin/sipats")).GetProperty("items").EnumerateArray(), item => item.GetProperty("id").GetGuid() == nextId);
+        var delivered = await Send(admin, HttpMethod.Delete, $"/api/admin/sipats/{sipatId}", new { }, HttpStatusCode.Conflict);
+        Assert.Equal("sipat.delivered", delivered.GetProperty("code").GetString());
+
         // an empty SIPAT cannot go live
         var empty = await Send(admin, HttpMethod.Post, "/api/admin/sipats",
             new SipatEventDataRequestBody("SIPAT vazia", null, start.AddYears(2), start.AddYears(2).AddDays(1)), HttpStatusCode.Created);

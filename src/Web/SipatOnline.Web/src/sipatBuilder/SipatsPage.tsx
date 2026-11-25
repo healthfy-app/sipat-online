@@ -1,15 +1,18 @@
-import { CalendarDays, Film, Plus, RotateCcw } from 'lucide-react';
+import { CalendarDays, Copy, Film, Pencil, Plus, RotateCcw, Search, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { getCompanyCapabilities, listSipatEvents, listSipatPlans, reactivateSipatEvent, type SipatEvent, type SipatPlanSummary } from '@/api';
+import { Link, useNavigate } from 'react-router-dom';
+import {
+  copySipatPlan, createSipatEvent, deleteSipat, getCompanyCapabilities, listSipatEvents, listSipatPlans, openSipatWeek, reactivateSipatEvent,
+  type SipatEvent, type SipatPlanSummary,
+} from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
-import { getCourseCover } from '@/courseCover';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import { cn } from '@/lib/utils';
-import { phaseLabel, sipatPhase } from './sipatPhase';
+import { phaseLabel, sipatPhase, type SipatPhase } from './sipatPhase';
 
 const dateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'UTC' });
 const fullDateFormat = new Intl.DateTimeFormat('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'UTC' });
@@ -23,15 +26,32 @@ function periodLabel(startsAt: string, endsAt: string): string {
   return from === to ? from : `${from} a ${to}`;
 }
 
-/** The trainings of a company, newest year first. Several can be published at the same time. */
-/** `operator`: the operation, inside a company. On a plan that only views (Bronze) it is the one that builds the trainings. */
+/** "45 min", "1 h 20 min": how long the videos of the training run. */
+function runtime(milliseconds: number): string {
+  const minutes = Math.max(1, Math.round(milliseconds / 60_000));
+  const hours = Math.floor(minutes / 60);
+  return hours === 0 ? `${minutes} min` : minutes % 60 === 0 ? `${hours} h` : `${hours} h ${minutes % 60} min`;
+}
+
+const phases: SipatPhase[] = ['draft', 'created', 'published', 'running', 'finished', 'cancelled'];
+const iconAction = 'grid size-9 min-h-0 cursor-pointer place-items-center rounded-full border-0 bg-transparent p-0 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40 [&_svg]:size-4';
+
+/**
+ * The trainings of a company, the way Conteúdo lists its own: a search, a filter by phase, and a card for each with
+ * its cover and what can be done with it. Newest year first; several can be published at the same time.
+ * `operator`: the operation, inside a company. On a plan that only views (Bronze) it is the one that builds the trainings.
+ */
 export default function SipatsPage({ basePath, operator = false }: { basePath: string; operator?: boolean }) {
+  const navigate = useNavigate();
   const [viewOnly, setViewOnly] = useState(false);
   const [events, setEvents] = useState<SipatEvent[] | null>(null);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [reactivating, setReactivating] = useState<string | null>(null);
+  // the training an action is running on (reactivate, duplicate, delete, open in the editor)
+  const [working, setWorking] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [phase, setPhase] = useState<SipatPhase | 'all'>('all');
 
   useEffect(() => {
     let current = true;
@@ -42,46 +62,109 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
     return () => { current = false; };
   }, [operator]);
 
+  const summaryOf = (event: SipatEvent) => plans.find(item => item.sipatEventId === event.id);
+  const phaseOf = (event: SipatEvent) => sipatPhase(event, summaryOf(event)?.days ?? 0);
+
+  const shown = useMemo(() => {
+    const text = query.trim().toLocaleLowerCase('pt-BR');
+    return (events ?? []).filter(event => (phase === 'all' || phaseOf(event) === phase)
+      && (!text || event.title.toLocaleLowerCase('pt-BR').includes(text)));
+    // phaseOf reads the summaries
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, plans, query, phase]);
+
   const years = useMemo(() => {
     const byYear = new Map<number, SipatEvent[]>();
-    for (const event of events ?? []) {
+    for (const event of shown) {
       const year = new Date(event.startsAt).getUTCFullYear();
       byYear.set(year, [...(byYear.get(year) ?? []), event]);
     }
     return [...byYear.entries()].sort((a, b) => b[0] - a[0]);
-  }, [events]);
+  }, [shown]);
 
-  async function reactivate(event: SipatEvent) {
-    setReactivating(event.id); setError(''); setNotice('');
-    try {
-      const back = await reactivateSipatEvent(event.id);
-      setEvents(known => (known ?? []).map(item => (item.id === back.id ? back : item)));
-      setNotice(`"${back.title}" voltou como rascunho. Abra, confira os dias e publique de novo.`);
-    } catch (failure) {
-      setError(getErrorMessage(failure));
-    } finally { setReactivating(null); }
+  async function run(event: SipatEvent, action: () => Promise<void>) {
+    setWorking(event.id); setError(''); setNotice('');
+    try { await action(); } catch (failure) { setError(getErrorMessage(failure)); } finally { setWorking(null); }
   }
 
+  const reactivate = (event: SipatEvent) => run(event, async () => {
+    const back = await reactivateSipatEvent(event.id);
+    setEvents(known => (known ?? []).map(item => (item.id === back.id ? back : item)));
+    setNotice(`"${back.title}" voltou como rascunho. Abra, confira os dias e publique de novo.`);
+  });
+
+  /** The pencil: the training in the video editor. The company has its own page; the operation edits in Conteúdo. */
+  const edit = (event: SipatEvent) => run(event, async () => {
+    if (!operator) { navigate(`${basePath}/${event.id}/editar`); return; }
+    const { courseId } = await openSipatWeek(event.id);
+    navigate(`/platform/courses/${courseId}/edit`);
+  });
+
+  /** A new draft with the same days, videos, games and cover; the dates are set on the copy. */
+  const duplicate = (event: SipatEvent) => run(event, async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+    const copy = await createSipatEvent({ title: `${event.title} (cópia)`.slice(0, 200), description: event.description, startsAt: `${today}T00:00:00.000Z`, endsAt: `${tomorrow}T00:00:00.000Z` });
+    if ((summaryOf(event)?.days ?? 0) > 0) await copySipatPlan(copy.id, event.id);
+    navigate(`${basePath}/${copy.id}`);
+  });
+
+  const remove = (event: SipatEvent) => {
+    if (!window.confirm(`Excluir "${event.title}"? Os dias montados e a capa são apagados. Isso não pode ser desfeito.`)) return;
+    void run(event, async () => {
+      await deleteSipat(event.id);
+      setEvents(known => (known ?? []).filter(item => item.id !== event.id));
+      setNotice(`"${event.title}" foi excluído.`);
+    });
+  };
+
+  const total = events?.length ?? 0;
+  const filtered = query.trim() !== '' || phase !== 'all';
   const create = viewOnly ? undefined : <Link className={buttonVariants()} to={`${basePath}/nova`}><Plus /> Novo treinamento</Link>;
   return <Page>
     <PageHeader actions={create} description="Cada treinamento tem os seus dias ou módulos. Vários podem estar publicados ao mesmo tempo; os anteriores continuam no histórico." eyebrow="Programação" title="Treinamentos" />
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
     {!events && !error && <LoadingState>Carregando os treinamentos...</LoadingState>}
-    {events && events.length === 0 && (viewOnly
+    {events && total === 0 && (viewOnly
       ? <EmptyState description="No seu plano a operação monta o treinamento. Quando ele estiver pronto, aparece aqui." title="Nenhum treinamento ainda." />
       : <EmptyState action={<Link className={buttonVariants()} to={`${basePath}/nova`}>Criar o primeiro treinamento</Link>} description="Defina a data de início, quantos dias e o assunto de cada dia." title="Nenhum treinamento ainda." />)}
+
+    {total > 0 && <div className="flex flex-wrap items-center gap-2.5" role="search">
+      <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-md">
+        <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4" />
+        <Input aria-label="Buscar treinamento" className="pl-9" onChange={event => setQuery(event.target.value)} placeholder="Buscar por nome" type="search" value={query} />
+      </label>
+      <NativeSelect aria-label="Fase" className="w-auto max-sm:flex-1" onChange={event => setPhase(event.target.value as SipatPhase | 'all')} value={phase}>
+        <option value="all">Todas as fases</option>
+        {phases.map(item => <option key={item} value={item}>{phaseLabel[item].text}</option>)}
+      </NativeSelect>
+      {filtered && <Button onClick={() => { setQuery(''); setPhase('all'); }} size="sm" variant="ghost">Limpar</Button>}
+      <span aria-live="polite" className="ml-auto text-sm tabular-nums text-muted-foreground">
+        {filtered ? `${shown.length} de ${pluralize(total, 'treinamento', 'treinamentos')}` : pluralize(total, 'treinamento', 'treinamentos')}
+      </span>
+    </div>}
+    {total > 0 && shown.length === 0 && <EmptyState description="Tente outro nome ou outra fase." title="Nenhum treinamento encontrado." />}
+
     {years.map(([year, items]) => <section aria-label={`Treinamentos de ${year}`} className="grid gap-3" key={year}>
       <h2 className="m-0 text-sm font-semibold tracking-wide text-muted-foreground">{year}</h2>
       <ul className="m-0 grid list-none gap-5 p-0 md:grid-cols-2 xl:grid-cols-3">
         {items.map(event => {
-          const plan = plans.find(item => item.sipatEventId === event.id);
-          const label = phaseLabel[sipatPhase(event, plan?.days ?? 0)];
+          const plan = summaryOf(event);
+          const label = phaseLabel[phaseOf(event)];
           const cancelled = event.status === 'Cancelled';
+          const busy = working === event.id;
+          // an <img> cannot send the header that says which company the operation is in: it loads the photo from its own route
+          const cover = plan?.courseId && plan.coverVersion != null
+            ? `${operator ? '/api/platform/catalog' : '/api/admin/training-editor'}/courses/${plan.courseId}/cover?v=${plan.coverVersion}`
+            : null;
           // same card as Conteúdo: cover on top, phase over it, period and days below
           const details = <>
             <div className="relative aspect-video overflow-hidden bg-[#12332c] after:pointer-events-none after:absolute after:inset-x-0 after:bottom-0 after:h-1/3 after:bg-gradient-to-t after:from-[rgb(11_36_31/0.45)] after:to-transparent after:content-['']">
-              <img alt="" className="block size-full object-cover transition-transform duration-500 ease-out-soft group-hover:scale-[1.03] motion-reduce:group-hover:scale-100" decoding="async" loading="lazy" src={getCourseCover(event.title)} />
+              {cover
+                ? <img alt="" className="block size-full object-cover transition-transform duration-500 ease-out-soft group-hover:scale-[1.03] motion-reduce:group-hover:scale-100" decoding="async" loading="lazy" src={cover} />
+                // no photo yet: the name on the training's own color, instead of a stock picture that is the same on every card
+                : <span aria-hidden="true" className="grid size-full place-items-center px-6 text-center text-xl leading-tight font-extrabold tracking-[-0.01em] text-white/90"><span className="line-clamp-3">{event.title}</span></span>}
               <Badge className="absolute left-3 top-3 z-10" variant={label.variant}>{label.text}</Badge>
             </div>
             <div className="grid flex-1 content-start gap-1.5 px-5 pb-3 pt-4">
@@ -92,7 +175,9 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
               </p>
               <p className="m-0 flex items-center gap-1.5 text-[0.8125rem] tabular-nums text-muted-foreground">
                 <Film aria-hidden="true" className="size-4" />
-                {plan && plan.days > 0 ? `${pluralize(plan.days, 'dia', 'dias')} · ${pluralize(plan.videos, 'vídeo', 'vídeos')}` : 'Dias ainda não montados'}
+                {plan && plan.days > 0
+                  ? `${pluralize(plan.days, 'dia', 'dias')} · ${pluralize(plan.videos, 'vídeo', 'vídeos')}${plan.durationMilliseconds ? ` · ${runtime(plan.durationMilliseconds)}` : ''}`
+                  : 'Dias ainda não montados'}
               </p>
             </div>
           </>;
@@ -102,18 +187,22 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
               ? <div aria-disabled="true" aria-label={`${event.title} (encerrada)`} className={cn(card, 'border-dashed border-border bg-muted/40 text-muted-foreground')} role="group">
                 <div className="flex flex-1 flex-col opacity-60 grayscale">{details}</div>
                 {!viewOnly && <footer className="mt-1 border-t border-[#dfe6e3] px-4 py-3">
-                  <Button disabled={reactivating === event.id} onClick={() => void reactivate(event)} size="sm" variant="outline">
-                    <RotateCcw /> {reactivating === event.id ? 'Reativando...' : 'Reativar'}
+                  <Button disabled={busy} onClick={() => void reactivate(event)} size="sm" variant="outline">
+                    <RotateCcw /> {busy ? 'Reativando...' : 'Reativar'}
                   </Button>
                 </footer>}
               </div>
-              : <Link aria-label={`Abrir ${event.title}`} className={cn(card, 'text-foreground no-underline shadow-[0_1px_2px_rgb(18_51_44/0.05)] transition-[box-shadow,transform,border-color] duration-200 ease-out-soft hover:-translate-y-1 hover:border-[#12332c] hover:shadow-[0_18px_34px_-18px_rgb(18_51_44/0.5)] motion-reduce:hover:translate-y-0',
-                event.status === 'Published' && new Date(event.endsAt) > new Date() ? 'border-primary/40' : 'border-[#dfe6e3]')} to={`${basePath}/${event.id}`}>
-                {details}
-                <footer className="mt-1 border-t border-[#dfe6e3] px-4 py-3">
-                  <span aria-hidden="true" className="inline-block whitespace-nowrap rounded-full bg-[#12332c] px-3.5 py-1.5 text-[0.8125rem] font-bold text-white transition-colors group-hover:bg-[#0f7a3d]">Abrir →</span>
+              : <div className={cn(card, 'shadow-[0_1px_2px_rgb(18_51_44/0.05)] transition-[box-shadow,transform,border-color] duration-200 ease-out-soft hover:-translate-y-1 hover:border-[#12332c] hover:shadow-[0_18px_34px_-18px_rgb(18_51_44/0.5)] motion-reduce:hover:translate-y-0',
+                event.status === 'Published' && new Date(event.endsAt) > new Date() ? 'border-primary/40' : 'border-[#dfe6e3]')}>
+                <Link aria-label={`Abrir ${event.title}`} className="flex flex-1 flex-col text-foreground no-underline" to={`${basePath}/${event.id}`}>{details}</Link>
+                <footer className="mt-1 flex items-center gap-1 border-t border-[#dfe6e3] px-4 py-3">
+                  <Link aria-hidden="true" className="mr-auto inline-block whitespace-nowrap rounded-full bg-[#12332c] px-3.5 py-1.5 text-[0.8125rem] font-bold text-white no-underline transition-colors hover:bg-[#0f7a3d]" tabIndex={-1} to={`${basePath}/${event.id}`}>Abrir →</Link>
+                  <button aria-label={`${viewOnly ? 'Ver' : 'Editar'} ${event.title} no editor de vídeos`} className={cn(iconAction, 'max-[760px]:hidden')} disabled={busy} onClick={() => void edit(event)} title={viewOnly ? 'Ver no editor' : 'Editar treinamento'} type="button"><Pencil aria-hidden="true" /></button>
+                  {!viewOnly && <button aria-label={`Duplicar ${event.title}`} className={iconAction} disabled={busy} onClick={() => void duplicate(event)} title="Duplicar" type="button"><Copy aria-hidden="true" /></button>}
+                  {/* only what was never delivered can go; a published training is ended from its own page */}
+                  {!viewOnly && event.status === 'Draft' && <button aria-label={`Excluir ${event.title}`} className={cn(iconAction, 'hover:text-destructive')} disabled={busy} onClick={() => remove(event)} title="Excluir" type="button"><Trash2 aria-hidden="true" /></button>}
                 </footer>
-              </Link>}
+              </div>}
           </li>;
         })}
       </ul>

@@ -10,7 +10,8 @@ namespace SipatOnline.Infrastructure.Learning;
 /// <summary>A company's training as Conteúdo and the editor need it: which training, of which company, it is.</summary>
 public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName);
 
-public sealed record SipatPlanSummary(Guid SipatEventId, int Days, int Videos);
+/// <summary>A training as its card shows it: how much it has, how long it runs, and its cover (the version changes with the photo).</summary>
+public sealed record SipatPlanSummary(Guid SipatEventId, int Days, int Videos, Guid CourseId, long DurationMilliseconds, long? CoverVersion);
 
 /// <summary>
 /// A company's training: some days, each with its date, its videos and its activities. Its content is a training of
@@ -192,14 +193,46 @@ public sealed class SipatPlanService(
     {
         var tenant = Tenant();
         if (!tenant.IsSuccess) return Result<IReadOnlyList<SipatPlanSummary>>.Failure(tenant.Error);
-        var summaries = await db.SipatEvents.AsNoTracking().Where(sipat => sipat.TenantId == tenant.Value)
-            .Select(sipat => new SipatPlanSummary(
+        var rows = await db.SipatEvents.AsNoTracking().Where(sipat => sipat.TenantId == tenant.Value)
+            .Select(sipat => new
+            {
                 sipat.Id,
-                db.PlatformCourseLessons.Count(lesson => lesson.CourseId == sipat.CourseId),
-                db.PlatformCourseVideoLinks.Count(link => link.CourseId == sipat.CourseId)))
+                sipat.CourseId,
+                Days = db.PlatformCourseLessons.Count(lesson => lesson.CourseId == sipat.CourseId),
+                Videos = db.PlatformCourseVideoLinks.Count(link => link.CourseId == sipat.CourseId),
+                Duration = db.PlatformCourseVideoLinks.Where(link => link.CourseId == sipat.CourseId).Sum(link => (long?)link.Video.DurationMilliseconds) ?? 0,
+                Cover = db.PlatformCourses.Where(course => course.Id == sipat.CourseId && course.CoverContentType != null).Select(course => course.CoverUpdatedAt).FirstOrDefault(),
+                HasCover = db.PlatformCourses.Any(course => course.Id == sipat.CourseId && course.CoverContentType != null),
+            })
             .ToListAsync(token);
-        // as before, a training whose days were never built is not in the list
-        return Result<IReadOnlyList<SipatPlanSummary>>.Success(summaries.Where(summary => summary.Days > 0).ToArray());
+        return Result<IReadOnlyList<SipatPlanSummary>>.Success(rows
+            .Select(row => new SipatPlanSummary(row.Id, row.Days, row.Videos, row.CourseId, row.Duration,
+                row.HasCover ? row.Cover?.ToUnixTimeMilliseconds() ?? 0 : null))
+            .ToArray());
+    }
+
+    /// <summary>
+    /// Deletes a training that was never delivered (it has no days with the participants): the training and its content
+    /// go. One that was published stays in the history; it can be ended, not deleted.
+    /// </summary>
+    public async Task<Result<bool>> DeleteAsync(Guid sipatId, CancellationToken token)
+    {
+        var found = await FindEventAsync(sipatId, token);
+        if (!found.IsSuccess) return Result<bool>.Failure(found.Error);
+        var sipat = found.Value;
+        if (await db.LearningTracks.AnyAsync(track => track.SipatEventId == sipatId, token))
+            return Failure<bool>("sipat.delivered", "Este treinamento já foi entregue aos participantes e fica no histórico. Use \"Encerrar este treinamento\".");
+        var course = await db.PlatformCourses.SingleOrDefaultAsync(item => item.Id == sipat.CourseId, token);
+        db.SipatEvents.Remove(sipat);
+        await db.SaveChangesAsync(token);
+        if (course is not null)
+        {
+            db.PlatformCourses.Remove(course);
+            await db.SaveChangesAsync(token);
+        }
+        await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(sipat.TenantId), "sipat.deleted", "sipat_event",
+            sipatId.ToString("D"), clock.GetUtcNow()), token);
+        return Result<bool>.Success(true);
     }
 
     /// <summary>Saves the days. The training's dates follow the dates of its days, so a week is always what the table says.</summary>
@@ -249,7 +282,28 @@ public sealed class SipatPlanService(
         var copy = source.Value
             .Select(day => day with { Id = Guid.NewGuid(), Date = null })
             .ToArray();
-        return await SaveAsync(sipatId, copy, token);
+        var saved = await SaveAsync(sipatId, copy, token);
+        if (!saved.IsSuccess) return saved;
+
+        // the copy is the same training with new dates: its cover and the games in the middle of its videos come along
+        var from = (await db.SipatEvents.AsNoTracking().SingleAsync(item => item.Id == sourceId, token)).CourseId;
+        var to = (await db.SipatEvents.AsNoTracking().SingleAsync(item => item.Id == sipatId, token)).CourseId;
+        var kept = saved.Value.SelectMany(day => day.VideoIds).ToHashSet();
+        db.PlatformVideoCheckpoints.RemoveRange(await db.PlatformVideoCheckpoints.Where(stop => stop.CourseId == to).ToListAsync(token));
+        db.PlatformVideoCheckpoints.AddRange((await db.PlatformVideoCheckpoints.AsNoTracking().Where(stop => stop.CourseId == from).ToListAsync(token))
+            .Where(stop => kept.Contains(stop.VideoId))
+            .Select(stop => new PlatformVideoCheckpointEntity { Id = Guid.NewGuid(), CourseId = to, VideoId = stop.VideoId, ModuleId = stop.ModuleId, TimeMilliseconds = stop.TimeMilliseconds }));
+        var sourceCourse = await db.PlatformCourses.AsNoTracking().SingleAsync(course => course.Id == from, token);
+        var cover = await db.PlatformCourseCovers.AsNoTracking().SingleOrDefaultAsync(item => item.CourseId == from, token);
+        var target = await db.PlatformCourses.SingleAsync(course => course.Id == to, token);
+        if (cover is not null && sourceCourse.CoverContentType is not null && target.CoverContentType is null)
+        {
+            db.PlatformCourseCovers.Add(new PlatformCourseCoverEntity { CourseId = to, Data = cover.Data });
+            target.CoverContentType = sourceCourse.CoverContentType;
+            target.CoverUpdatedAt = clock.GetUtcNow();
+        }
+        await db.SaveChangesAsync(token);
+        return saved;
     }
 
     /// <summary>Publishes the training and delivers its days. Other published trainings of the company stay as they are.</summary>

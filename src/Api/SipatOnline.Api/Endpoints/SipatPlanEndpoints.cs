@@ -57,6 +57,15 @@ public static class SipatPlanEndpoints
         .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("SaveSipatPlan");
 
+        // a training never delivered can go; one that was published stays in the history
+        group.MapDelete("/sipats/{sipatId:guid}", async (Guid sipatId, SipatPlanService service, CancellationToken token) =>
+        {
+            var result = await service.DeleteAsync(sipatId, token);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
+        .WithName("DeleteSipat");
+
         // the week in the video editor: a copy training of this SIPAT whose Títulos are its days (made once, then kept in step)
         group.MapPost("/sipats/{sipatId:guid}/week", async (Guid sipatId, SipatPlanService service, CancellationToken token) =>
         {
@@ -96,7 +105,7 @@ public static class SipatPlanEndpoints
         statusCode: error.Code switch
         {
             "sipat.not_found" => StatusCodes.Status404NotFound,
-            "sipat.already_published" or "sipat.cancelled" => StatusCodes.Status409Conflict,
+            "sipat.already_published" or "sipat.cancelled" or "sipat.delivered" => StatusCodes.Status409Conflict,
             "sipat.week.forbidden" => StatusCodes.Status403Forbidden,
             _ => StatusCodes.Status400BadRequest
         },

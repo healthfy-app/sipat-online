@@ -243,7 +243,12 @@ export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibra
 export function getSipatCatalog(): Promise<SipatCatalog> {
   return requestJson<SipatCatalog>('/api/admin/sipat-catalog');
 }
-export interface SipatPlanSummary { sipatEventId: string; days: number; videos: number }
+/** A training as its card shows it: how much it has, how long it runs and its cover (null when it has none). */
+export interface SipatPlanSummary { sipatEventId: string; days: number; videos: number; courseId?: string; durationMilliseconds?: number; coverVersion?: number | null }
+/** Deletes a training that was never delivered; one that was published stays in the history. */
+export async function deleteSipat(sipatId: string): Promise<void> {
+  await request(`/api/admin/sipats/${sipatId}`, { method: 'DELETE' });
+}
 export function listSipatPlans(): Promise<SipatPlanSummary[]> {
   return requestJson<SipatPlanSummary[]>('/api/admin/sipat-plans');
 }
