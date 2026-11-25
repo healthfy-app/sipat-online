@@ -220,6 +220,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddSingleton<ICertificatePdfRenderer, CertificatePdfRenderer>();
         services.AddSingleton<SipatOnline.Learning.Application.Quality.IPlaybackQualityPdfRenderer, PlaybackQualityPdfRenderer>();
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
+        services.AddScoped<CatalogAccessGrant>();
         services.AddScoped<PlatformCourseCatalogService>();
         AddPlatformCourseVideoStorage(services, configuration);
         AddVideoConversion(services, configuration);

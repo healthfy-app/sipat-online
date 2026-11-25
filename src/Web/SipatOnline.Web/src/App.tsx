@@ -42,6 +42,7 @@ import PlatformUsersPage from './PlatformUsersPage';
 import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
+import TrainingEditorPage from './trainings/TrainingEditorPage';
 import CompanyNav from './companies/CompanyNav';
 import PlanMedal from './companies/PlanMedal';
 import PlaybackQualityPage from './quality/PlaybackQualityPage';
@@ -214,6 +215,10 @@ export default function App() {
             <Route
               path="/admin/treinamentos/:sipatId"
               element={state.session && hasAdminRole(state.session) ? <SipatBuilderPage basePath="/admin/treinamentos" canEditThemes={false} /> : <AccessDenied />}
+            />
+            <Route
+              path="/admin/treinamentos/:sipatId/editar"
+              element={state.session && hasAdminRole(state.session) ? <TrainingEditorPage basePath="/admin/treinamentos" /> : <AccessDenied />}
             />
             <Route
               path="/platform/companies/:companyId/treinamentos"

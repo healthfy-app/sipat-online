@@ -7,7 +7,7 @@ using SipatOnline.Learning.Application.Catalog;
 
 namespace SipatOnline.Api.Endpoints;
 
-public static class PlatformCourseCatalogEndpoints
+public static partial class PlatformCourseCatalogEndpoints
 {
     public static IEndpointRouteBuilder MapPlatformCourseCatalogEndpoints(
         this IEndpointRouteBuilder endpoints)

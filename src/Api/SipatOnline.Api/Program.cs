@@ -244,6 +244,7 @@ app.MapTenantAppearanceEndpoints();
 app.MapSipatEventEndpoints();
 app.MapSipatPlanEndpoints();
 app.MapSipatCatalogEndpoints();
+app.MapTrainingEditorEndpoints();
 app.MapPlanSubjectEndpoints();
 app.MapLearningEndpoints();
 app.MapLearningEngagementEndpoints();

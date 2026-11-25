@@ -1,3 +1,4 @@
+import { noLocks, type EditorLocks } from './CourseOutlinePanel';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
@@ -27,6 +28,7 @@ export default function CoursePropertiesPanel({
   gamificationEnabled,
   busy,
   actions,
+  locks = noLocks,
 }: {
   item: TrackItem | undefined;
   lesson: LessonGroup | undefined;
@@ -36,6 +38,7 @@ export default function CoursePropertiesPanel({
   gamificationEnabled: boolean;
   busy: boolean;
   actions: PropertiesActions;
+  locks?: EditorLocks;
 }) {
   const kind = lesson ? 'AULA' : item?.kind === 'activity' ? 'ATIVIDADE' : 'VÍDEO';
   return (
@@ -52,26 +55,26 @@ export default function CoursePropertiesPanel({
 
         {lesson && <>
           <CommitField
-            disabled={busy}
+            disabled={busy || locks.grid}
             id="prop-lesson-title"
             label="Nome da aula"
             onCommit={(value) => value.trim() && actions.onRenameLesson(lesson.id, value.trim())}
             value={lesson.title}
           />
           <CommitField
-            disabled={busy}
+            disabled={busy || locks.grid}
             id="prop-lesson-description"
             label="Descrição"
             multiline
             onCommit={(value) => actions.onDescribeLesson(lesson.id, value)}
             value={lesson.description ?? ''}
           />
-          <Button className="w-full" disabled={busy} onClick={() => actions.onAddVideo(lesson.id)} variant="outline">Adicionar vídeo à aula</Button>
+          <Button className="w-full" disabled={busy || locks.grid} onClick={() => actions.onAddVideo(lesson.id)} variant="outline">Adicionar vídeo à aula</Button>
         </>}
 
         {!lesson && item?.kind === 'video' && <>
           <CommitField
-            disabled={busy}
+            disabled={busy || locks.grid}
             hint={item.video.libraryTitle && item.video.libraryTitle !== item.title
               ? `Título original na biblioteca: ${item.video.libraryTitle}`
               : 'Muda só neste treinamento; o título da biblioteca continua o mesmo.'}
@@ -85,7 +88,7 @@ export default function CoursePropertiesPanel({
             value={item.title}
           />
           {item.video.libraryTitle && item.video.libraryTitle !== item.title && (
-            <Button disabled={busy} onClick={() => actions.onRenameVideo(item.video.id, null)} size="sm" variant="outline">Restaurar título original</Button>
+            <Button disabled={busy || locks.grid} onClick={() => actions.onRenameVideo(item.video.id, null)} size="sm" variant="outline">Restaurar título original</Button>
           )}
           <div className="grid grid-cols-2 gap-3">
             <PropField label="Duração">{durationLabel(item.video)}</PropField>
@@ -95,8 +98,8 @@ export default function CoursePropertiesPanel({
             ? <p className="m-0 text-xs leading-relaxed text-muted-foreground">{isExtra(item.video)
               ? 'Vídeo extra: sem duração, não conta no progresso nem no certificado.'
               : `Vídeo do ${item.video.provider}: conta no progresso e no certificado.`}</p>
-            : <Button disabled={busy} onClick={actions.onManageActivities} variant="outline">Editar perguntas do vídeo</Button>}
-          <Button disabled={busy} onClick={() => actions.onRemoveVideo(item.video.id)} variant="ghost">Remover do treinamento</Button>
+            : <Button disabled={busy || locks.activities} onClick={actions.onManageActivities} variant="outline">Editar perguntas do vídeo</Button>}
+          <Button disabled={busy || locks.grid} onClick={() => actions.onRemoveVideo(item.video.id)} variant="ghost">Remover do treinamento</Button>
         </>}
 
         {!lesson && item?.kind === 'activity' && <>
@@ -110,7 +113,7 @@ export default function CoursePropertiesPanel({
           {item.module.questions.length > 0 && (
             <PropField label="Conteúdo">{pluralize(item.module.questions.length, 'pergunta', 'perguntas')}</PropField>
           )}
-          <Button disabled={busy} onClick={actions.onManageActivities} variant="outline">Editar atividade</Button>
+          <Button disabled={busy || locks.activities} onClick={actions.onManageActivities} variant="outline">Editar atividade</Button>
         </>}
 
         <section aria-labelledby="ce-props-activities" className="grid gap-2 border-t border-border pt-4 max-[1180px]:col-span-full">
@@ -118,7 +121,7 @@ export default function CoursePropertiesPanel({
           <p className="m-0 text-[0.8125rem] leading-relaxed text-muted-foreground">
             Adicione atividades entre vídeos ou perguntas que aparecem durante a reprodução.
           </p>
-          <Button className="w-full" disabled={busy} onClick={actions.onManageActivities} variant="outline">Configurar atividades</Button>
+          <Button className="w-full" disabled={busy || locks.activities} onClick={actions.onManageActivities} variant="outline">Configurar atividades</Button>
           <span
             className={cn(
               "inline-flex items-center gap-1.5 text-xs text-muted-foreground before:size-1.5 before:rounded-full before:content-['']",

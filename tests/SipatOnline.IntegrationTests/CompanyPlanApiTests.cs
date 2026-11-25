@@ -205,6 +205,13 @@ public sealed class CompanyPlanApiTests
             .Single(item => item.GetProperty("id").GetGuid() == readySipat).GetProperty("isReadySipat").GetBoolean());
         await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("SIPAT pronta", second, first) } });
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("SIPAT pronta", second, first) } }, HttpStatusCode.Forbidden);
+        // the editor, opened to the company: on Bronze it shows the training and changes nothing
+        var editor = await Get(admin, $"/api/admin/training-editor/sipats/{sipatId}");
+        var courseId = editor.GetProperty("course").GetProperty("id").GetGuid();
+        Assert.False(editor.GetProperty("access").GetProperty("editGrid").GetBoolean());
+        var structure = $"/api/admin/training-editor/courses/{courseId}/structure";
+        object Lessons(params Guid[] videos) => new { lessons = new[] { new { id = (Guid?)null, title = "Dia 1", description = (string?)null, videos = videos.Select(id => new { videoId = id, title = (string?)null }).ToArray() } } };
+        Assert.Equal("sipat.plan_required", (await Send(admin, HttpMethod.Put, structure, Lessons(first), HttpStatusCode.Forbidden)).GetProperty("code").GetString());
         var mixed = await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Misturado", first, other) } }, HttpStatusCode.BadRequest);
         Assert.Equal("sipat.grid_not_customizable", mixed.GetProperty("code").GetString());
         await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Parte do módulo", first) } }, HttpStatusCode.BadRequest);
@@ -215,6 +222,10 @@ public sealed class CompanyPlanApiTests
         // Prata: the grid of videos is personalized
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Prata" });
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Misturado", first, other) } });
+        // and edits its own training in the editor: the grid, with the videos it can use; games and questions stay for Diamante
+        await Send(admin, HttpMethod.Put, structure, Lessons(first, other));
+        await Send(admin, HttpMethod.Put, structure, Lessons(internalVideo), HttpStatusCode.BadRequest);
+        await Send(admin, HttpMethod.Put, $"/api/admin/training-editor/courses/{courseId}/modules", new { items = Array.Empty<object>() }, HttpStatusCode.Forbidden);
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } }, HttpStatusCode.BadRequest);
 
         // Ouro: its logo and colors show
@@ -225,10 +236,15 @@ public sealed class CompanyPlanApiTests
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Diamante" });
         Assert.Equal(["Ergonomia", "Higiene mental", "Vídeos da Acme"], Titles(await Get(admin, "/api/admin/sipat-catalog")));
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } });
+        await Send(admin, HttpMethod.Put, $"/api/admin/training-editor/courses/{courseId}/modules", new { items = Array.Empty<object>() });
         using (var outra = Client(factory, "outra-regras.localhost"))
         {
             await Send(outra, HttpMethod.Post, "/api/identity/login", new LoginRequest("outra-admin", "AdminPassword123"), HttpStatusCode.NoContent);
             Assert.Equal(["Ergonomia", "Higiene mental"], Titles(await Get(outra, "/api/admin/sipat-catalog")));
+            // another company's training is not there for it, even on the plan that edits everything
+            using var foreign = await outra.GetAsync($"/api/admin/training-editor/courses/{courseId}");
+            Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+            await Send(outra, HttpMethod.Put, structure, Lessons(first), HttpStatusCode.NotFound);
         }
 
         // back to Bronze: what goes live is what the plan allows today

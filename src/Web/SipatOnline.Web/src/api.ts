@@ -711,7 +711,35 @@ async function request(
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  return (await request(path, init)).json() as Promise<T>;
+  const value = await (await request(path, init)).json() as T;
+  // in a company's editor the links the server gives (cover, video file) go to the company's own routes
+  return path.startsWith(`${trainingEditor}/`)
+    ? JSON.parse(JSON.stringify(value).replaceAll(`${platformCatalog}/`, `${trainingEditor}/`)) as T
+    : value;
+}
+
+const platformCatalog = '/api/platform/catalog';
+const trainingEditor = '/api/admin/training-editor';
+let editorBase = platformCatalog;
+/**
+ * Where the video editor's calls go: the operation's catalog (Conteúdo), or the company's own training, which its
+ * administrator edits inside what the plan allows. The page that opens the editor sets it and puts it back on leaving.
+ */
+export function setEditorScope(scope: 'platform' | 'company'): void {
+  editorBase = scope === 'company' ? trainingEditor : platformCatalog;
+}
+
+/** The links of the operation's catalog (cover, video file) as the company's own routes. */
+export function companyEditorLinks<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value).replaceAll(`${platformCatalog}/`, `${trainingEditor}/`)) as T;
+}
+
+/** What the company's plan lets it change in one of its trainings. */
+export interface TrainingAccess { editDetails: boolean; editGrid: boolean; editActivities: boolean; uploadVideo: boolean; plan: string }
+export interface TrainingEditorData { course: PlatformCourse; access: TrainingAccess; sipatId: string; sipatTitle: string; sipatStatus: string }
+/** A company's training as its editor needs it: the content, and what the plan allows. */
+export function getTrainingEditor(sipatId: string): Promise<TrainingEditorData> {
+  return requestJson<TrainingEditorData>(`${trainingEditor}/sipats/${sipatId}`);
 }
 
 export function getTenantBranding(): Promise<TenantBranding> {
@@ -861,7 +889,7 @@ export function updatePlatformCourse(
   courseId: string,
   data: PlatformCourseUpdate,
 ): Promise<PlatformCourse> {
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -887,7 +915,7 @@ export function setPlatformCourseStructure(
   courseId: string,
   lessons: CourseLessonDraft[],
 ): Promise<PlatformCourse> {
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/structure`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}/structure`, {
     method: "PUT",
     body: JSON.stringify({ lessons }),
   });
@@ -1149,20 +1177,20 @@ export function createExternalPlatformVideo(data: {
 export function setPlatformCourseCover(courseId: string, file: File): Promise<PlatformCourse> {
   const formData = new FormData();
   formData.append('cover', file);
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/cover`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}/cover`, {
     method: 'PUT',
     body: formData,
   });
 }
 
 export function removePlatformCourseCover(courseId: string): Promise<PlatformCourse> {
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/cover`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}/cover`, {
     method: 'DELETE',
   });
 }
 
 export function listGameModules(): Promise<GameModule[]> {
-  return requestJson<GameModule[]>('/api/platform/catalog/modules');
+  return requestJson<GameModule[]>(`${editorBase}/modules`);
 }
 
 export function createGameModule(data: GameModuleData): Promise<GameModule> {
@@ -1187,7 +1215,7 @@ export function setPlatformCourseModules(
   courseId: string,
   items: CourseModulePlacement[],
 ): Promise<PlatformCourse> {
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/modules`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}/modules`, {
     method: 'PUT',
     body: JSON.stringify({ items }),
   });
@@ -1199,7 +1227,7 @@ export function setVideoCheckpoints(
   videoId: string,
   items: VideoCheckpoint[],
 ): Promise<PlatformCourseVideo> {
-  return requestJson<PlatformCourseVideo>(`/api/platform/catalog/courses/${courseId}/videos/${videoId}/checkpoints`, {
+  return requestJson<PlatformCourseVideo>(`${editorBase}/courses/${courseId}/videos/${videoId}/checkpoints`, {
     method: 'PUT',
     body: JSON.stringify({ items }),
   });

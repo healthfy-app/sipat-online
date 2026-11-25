@@ -347,6 +347,24 @@ public sealed class SipatPlanService(
         return Result<IReadOnlyList<ProgramDay>>.Success(result);
     }
 
+    /// <summary>
+    /// The videos the company of the request cannot use: those that live only in assuntos its plan leaves out, and those
+    /// made private to other companies. The same rule the days follow, for whoever adds videos another way (the editor).
+    /// </summary>
+    public async Task<IReadOnlySet<Guid>> BlockedVideosAsync(CancellationToken token)
+    {
+        var hidden = await plans.HiddenSubjectsAsync(token);
+        var owned = await WeekCourseIdsAsync(token);
+        var models = (await catalog.ListAsync(token)).Where(course => !owned.Contains(course.Id)).ToArray();
+        var allowed = models
+            .Where(course => course.Status == PlatformCourseStatus.Published && course.Videos.Count > 0 && !hidden.Contains(course.Id))
+            .SelectMany(course => course.Videos.Select(video => video.Id)).ToHashSet();
+        var blocked = models.Where(course => hidden.Contains(course.Id))
+            .SelectMany(course => course.Videos.Select(video => video.Id)).Where(id => !allowed.Contains(id)).ToHashSet();
+        blocked.UnionWith(await plans.HiddenVideosAsync(token));
+        return blocked;
+    }
+
     private Result<Guid> Tenant() =>
         tenantContext.CurrentTenantId is { IsEmpty: false } tenant
             ? Result<Guid>.Success(tenant.Value)

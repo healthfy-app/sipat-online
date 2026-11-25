@@ -10,7 +10,8 @@ public sealed class GameModuleService(
     IPlatformCourseCatalogStore catalogStore,
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    CatalogAccessGrant accessGrant)
 {
     private const int MaximumQuestions = 50;
     private const int MaximumOptions = 6;
@@ -305,8 +306,8 @@ public sealed class GameModuleService(
             cancellationToken);
 
     private Result<bool> EnsurePlatformOperator() =>
-        currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
-        tenantContext.CurrentTenantId is null
+        accessGrant.Granted || (currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
+        tenantContext.CurrentTenantId is null)
             ? Result<bool>.Success(true)
             : Result<bool>.Failure(new DomainError(
                 "learning.platform_course.forbidden",

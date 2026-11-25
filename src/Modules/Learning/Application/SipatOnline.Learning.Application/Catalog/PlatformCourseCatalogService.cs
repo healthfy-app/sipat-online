@@ -11,6 +11,7 @@ public sealed class PlatformCourseCatalogService(
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
     TimeProvider timeProvider,
+    CatalogAccessGrant accessGrant,
     IVideoConversionQueue conversionQueue,
     IDirectVideoUploadStore directUploads)
 {
@@ -1147,8 +1148,8 @@ public sealed class PlatformCourseCatalogService(
         Failure<T>("learning.platform_course.not_found", "O curso não foi encontrado.");
 
     private Result<bool> EnsurePlatformOperator() =>
-        currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
-        tenantContext.CurrentTenantId is null
+        accessGrant.Granted || (currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
+        tenantContext.CurrentTenantId is null)
             ? Result<bool>.Success(true)
             : Result<bool>.Failure(new DomainError(
                 "learning.platform_course.forbidden",
