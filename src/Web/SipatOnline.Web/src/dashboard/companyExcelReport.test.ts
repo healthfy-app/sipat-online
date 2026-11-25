@@ -28,6 +28,20 @@ const participation: LearningParticipantProgress[] = [
 ];
 
 describe('company Excel report', () => {
+  it('adds the unit and the sector of each person at the end of the collaborators sheet, when the company has them', async () => {
+    const rows = toParticipantRows(summarizeParticipants(participants, participation));
+    const base = { companyName: 'Acme', overview: summarizeCompanyProgress(participants, participation), rows, participation };
+    const withPlaces = await buildCompanyExcelReport({ ...base, placement: new Map([['p1', { unit: 'Minas Gerais', sector: 'RH' }]]) });
+    const people = withPlaces.getWorksheet('Colaboradores')!;
+    expect([people.getRow(1).getCell(12).value, people.getRow(1).getCell(13).value]).toEqual(['Unidade', 'Setor']);
+    expect([people.getRow(2).getCell(12).value, people.getRow(2).getCell(13).value]).toEqual(['Minas Gerais', 'RH']);
+    // someone with no place says so, instead of an empty cell
+    expect(people.getRow(3).getCell(12).value).toBe('—');
+
+    const without = await buildCompanyExcelReport(base);
+    expect(without.getWorksheet('Colaboradores')!.getRow(1).getCell(12).value).toBeNull();
+  });
+
   it('builds summary, participants, heatmap and detail sheets with real numbers', async () => {
     const rows = toParticipantRows(summarizeParticipants(participants, participation));
     const workbook = await buildCompanyExcelReport({

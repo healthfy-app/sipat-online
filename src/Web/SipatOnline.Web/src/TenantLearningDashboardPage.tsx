@@ -1,7 +1,7 @@
 import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { listAllParticipants, listLearningParticipation, listParticipantProfiles, type LearningParticipantProgress, type ParticipantProfile } from './api';
+import { getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles, type CompanyRegistry, type LearningParticipantProgress, type ParticipantProfile } from './api';
 import {
   participantProgressStatuses,
   summarizeCompanyProgress,
@@ -26,6 +26,7 @@ import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { cn } from '@/lib/utils';
 import { activeParticipantsByDay, totalWatchedMilliseconds } from './dashboard/activity';
+import { byUnit } from './dashboard/byUnit';
 import { ColumnChart, Donut, type ColumnPoint } from './dashboard/charts';
 import LoadingState from './LoadingState';
 import { TrainingSelect } from './trainings/TrainingSelect';
@@ -65,6 +66,14 @@ export default function TenantLearningDashboardPage({
   const unitScope = useUnitScope();
   const [profiles, setProfiles] = useState<ReadonlyMap<string, ParticipantProfile> | null>(null);
   useEffect(() => { listParticipantProfiles().then(list => setProfiles(Array.isArray(list) ? new Map(list.map(item => [item.id, item])) : null), () => setProfiles(null)); }, []);
+  const [registry, setRegistry] = useState<CompanyRegistry | null>(null);
+  useEffect(() => { getCompanyRegistry().then(loaded => setRegistry(Array.isArray(loaded?.units) ? loaded : null), () => setRegistry(null)); }, []);
+  // unit and sector of each person by name, for the spreadsheet
+  const placement = useMemo(() => {
+    if (!profiles || !registry || registry.units.length + registry.sectors.length === 0) return undefined;
+    const name = (items: { id: string; name: string }[], id: string | null) => items.find(item => item.id === id)?.name ?? '—';
+    return new Map([...profiles].map(([id, profile]) => [id, { unit: name(registry.units, profile.unitId), sector: name(registry.sectors, profile.sectorId) }]));
+  }, [profiles, registry]);
   // every number of the page is about the training chosen, so one person's finished SIPAT does not hide a fire drill not started
   const data = useMemo<DashboardData | null>(() => {
     if (!loaded) return null;
@@ -77,6 +86,11 @@ export default function TenantLearningDashboardPage({
       participation,
     };
   }, [loaded, training.selectedId, profiles, unitScope.unitId]);
+  // how each unit is doing, while the whole company is on screen
+  const unitRows = useMemo(
+    () => data && profiles && unitScope.active && unitScope.unitId === null ? byUnit(data.rows, profiles, unitScope.units) : [],
+    [data, profiles, unitScope.active, unitScope.unitId, unitScope.units],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [exportState, setExportState] = useState<{ busy: boolean; message: string }>({ busy: false, message: '' });
@@ -101,7 +115,7 @@ export default function TenantLearningDashboardPage({
     setExportState({ busy: true, message: '' });
     try {
       const { downloadCompanyExcelReport } = await import('./dashboard/companyExcelReport');
-      const fileName = await downloadCompanyExcelReport({ companyName, brandColor, ...data, trainingTitle: [training.selected?.title, unitScope.unit?.name].filter(Boolean).join(' · ') || undefined });
+      const fileName = await downloadCompanyExcelReport({ companyName, brandColor, ...data, placement, trainingTitle: [training.selected?.title, unitScope.unit?.name].filter(Boolean).join(' · ') || undefined });
       setExportState({ busy: false, message: `Relatório ${fileName} baixado.` });
     } catch (exportError) {
       setExportState({
@@ -198,6 +212,44 @@ export default function TenantLearningDashboardPage({
                 </Link>
               </section>
             )}
+
+            {unitRows.length > 0 && <Panel count={pluralize(unitRows.filter(row => row.unitId !== null).length, 'unidade', 'unidades')} id="by-unit-title" title="Por unidade">
+              <div className="overflow-x-auto">
+                <table aria-labelledby="by-unit-title" className="m-0 w-full min-w-[34rem] border-collapse text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold text-muted-foreground [&>th]:px-2 [&>th]:pb-2">
+                      <th scope="col">Unidade</th>
+                      <th className="text-right" scope="col">Pessoas</th>
+                      <th className="text-right" scope="col">Concluíram</th>
+                      <th className="text-right" scope="col">Em andamento</th>
+                      <th className="text-right" scope="col">Não iniciaram</th>
+                      <th className="w-40" scope="col">Concluído</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unitRows.map(row => <tr className="border-t border-border [&>td]:px-2 [&>td]:py-2.5" key={row.unitId ?? 'none'}>
+                      <td>
+                        {row.unitId
+                          // the row is the way into the unit: it chooses it on the switch at the top
+                          ? <button className="m-0 cursor-pointer border-0 bg-transparent p-0 text-left text-sm font-semibold text-primary underline-offset-2 hover:underline"
+                            onClick={() => unitScope.setUnitId(row.unitId)} title={`Ver só ${row.name}`} type="button">{row.name}</button>
+                          : <span className="text-muted-foreground">{row.name}</span>}
+                      </td>
+                      <td className="text-right tabular-nums">{row.people}</td>
+                      <td className="text-right tabular-nums">{row.completed}</td>
+                      <td className="text-right tabular-nums">{row.inProgress}</td>
+                      <td className="text-right tabular-nums">{row.notStarted}</td>
+                      <td>
+                        <div aria-label={`${row.completedPercent}% concluído`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={row.completedPercent} className="flex items-center gap-2" role="progressbar">
+                          <span aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${row.completedPercent}%` }} /></span>
+                          <strong className="w-10 text-right text-xs tabular-nums">{row.completedPercent}%</strong>
+                        </div>
+                      </td>
+                    </tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>}
 
             <section aria-label="Progresso de todos os participantes" className="grid gap-4 lg:grid-cols-2">
               <Panel count={pluralize(overview.participantCount, 'participante', 'participantes')} id="participant-distribution-title" title="Situação dos participantes">
