@@ -164,17 +164,14 @@ function TrayCard({ subject }: { subject: Subject }) {
 
 function VideoCard({ video, place, dragId = `video:${video.id}`, onPlay }: { video: CatalogVideo; place?: string; dragId?: string; onPlay?: (video: CatalogVideo) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: dragId, data: { video } });
-  // one height for every card (two lines of title, one of time), so rows and blocks line up whatever the title
-  return <div className={cn('flex h-[4.25rem] w-60 items-center gap-2 rounded-[0.875rem] border border-border bg-card p-2 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary hover:shadow-card motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef}>
-    <button aria-label={`Arrastar o vídeo ${video.title}`} className="grid size-7 min-h-0 shrink-0 cursor-grab touch-none place-items-center rounded-md border-0 bg-transparent p-0 text-muted-foreground hover:bg-muted active:cursor-grabbing" type="button" {...attributes} {...listeners}><GripVertical className="size-4" /></button>
-    {/* the dark square plays the video; the grip beside it is what drags */}
+  // the whole card is what drags; the round play button on it only plays
+  return <div aria-label={`Arrastar o vídeo ${video.title}`} className={cn('flex h-[4.25rem] w-60 cursor-grab touch-none items-center gap-2.5 rounded-[0.875rem] border border-border bg-card py-2 pr-2.5 pl-3 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary hover:shadow-card active:cursor-grabbing motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef} {...attributes} {...listeners}>
     {onPlay && video.source
-      ? <button aria-label={`Assistir ${video.title}`} className="group/play relative m-0 grid size-10 min-h-0 shrink-0 cursor-pointer place-items-center rounded-md border-0 bg-[#0b1f19] p-0 text-white/85 transition-colors hover:bg-primary"
-        onClick={() => onPlay(video)} title="Assistir" type="button">
-        <Film aria-hidden="true" className="size-4 transition-opacity group-hover/play:opacity-0" />
-        <Play aria-hidden="true" className="absolute size-4 fill-current opacity-0 transition-opacity group-hover/play:opacity-100" />
+      ? <button aria-label={`Assistir ${video.title}`} className="m-0 grid size-8 min-h-0 shrink-0 cursor-pointer place-items-center rounded-full border border-border bg-transparent p-0 text-muted-foreground transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
+        onClick={() => onPlay(video)} onKeyDown={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} title="Assistir" type="button">
+        <Play aria-hidden="true" className="size-3.5 translate-x-px fill-current" />
       </button>
-      : <span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-md bg-[#0b1f19] text-white/85"><Film className="size-4" /></span>}
+      : <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full border border-border text-muted-foreground"><Play className="size-3.5 translate-x-px" /></span>}
     <div className="grid min-w-0 flex-1 gap-0.5">
       <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={video.title}>{video.title}</strong>
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs whitespace-nowrap tabular-nums text-muted-foreground">
@@ -202,7 +199,7 @@ export function DragPreview({ data }: { data: { title?: TrainingTitle; video?: C
     </div>
   </div>;
   if (data.video) return <div className={cn(lifted, 'border-primary bg-card')}>
-    <span className="grid size-10 shrink-0 place-items-center rounded-md bg-[#0b1f19] text-white/85"><Film aria-hidden="true" className="size-4" /></span>
+    <span className="grid size-8 shrink-0 place-items-center rounded-full border border-border text-muted-foreground"><Play aria-hidden="true" className="size-3.5 translate-x-px" /></span>
     <div className="grid min-w-0 flex-1 gap-0.5">
       <strong className="line-clamp-2 text-[0.8125rem] leading-tight">{data.video.title}</strong>
       <span className="text-xs tabular-nums text-muted-foreground">{videoTime(data.video)}</span>
