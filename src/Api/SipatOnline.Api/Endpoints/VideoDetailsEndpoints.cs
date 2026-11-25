@@ -82,12 +82,14 @@ public static partial class PlatformCourseCatalogEndpoints
         using var buffer = new MemoryStream();
         await file.CopyToAsync(buffer, token);
         var data = buffer.ToArray();
-        if (!PlatformCourseCatalogService.HasCoverSignature(data, file.ContentType))
+        // the type is read from the image itself, not from what the sender says it is
+        var contentType = new[] { "image/png", "image/jpeg", "image/webp" }.FirstOrDefault(type => PlatformCourseCatalogService.HasCoverSignature(data, type));
+        if (contentType is null)
             return Denied(StatusCodes.Status400BadRequest, "video.thumbnail_content_invalid", "Envie uma imagem PNG, JPEG ou WebP.");
         var stored = await db.PlatformVideoThumbnails.SingleOrDefaultAsync(item => item.VideoId == videoId, token);
         if (stored is null) db.PlatformVideoThumbnails.Add(new PlatformVideoThumbnailEntity { VideoId = videoId, Data = data });
         else stored.Data = data;
-        video.ThumbnailContentType = file.ContentType;
+        video.ThumbnailContentType = contentType;
         video.ThumbnailUpdatedAt = clock.GetUtcNow();
         await db.SaveChangesAsync(token);
         return Results.Ok(new { thumbnailUrl = $"/api/platform/catalog/videos/{videoId:D}/thumbnail?v={video.ThumbnailUpdatedAt.Value.ToUnixTimeMilliseconds()}" });
