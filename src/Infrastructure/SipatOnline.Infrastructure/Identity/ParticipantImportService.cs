@@ -58,6 +58,9 @@ public sealed class ParticipantImportService(
             return Failure("import.too_many_rows", $"A carga aceita no máximo {MaximumRows} linhas.");
 
         var company = await LoadAsync(tenant.Value, request.DryRun, token);
+        // where each person was before the sheet: someone it moves gets the trainings of where they go
+        var placedBefore = company.People.Values.Select(person => new SipatOnline.Infrastructure.Learning.PlacementBefore(
+            person.User.Id, person.User.UnitId, person.User.SectorId)).ToArray();
         var plan = await PlanAsync(rows, company, request.CreateOnly, token);
         // only what an accepted line uses: a refused line adds nothing to the lists
         var people = plan.Creates.Select(item => item.User).Concat(company.People.Values.Select(person => person.User)).ToArray();
@@ -108,9 +111,13 @@ public sealed class ParticipantImportService(
             }
         }
 
+        var nowPlaced = company.People.Values.ToDictionary(person => person.User.Id, person => (person.User.UnitId, person.User.SectorId));
+        var moved = placedBefore.Where(before => nowPlaced.TryGetValue(before.ParticipantId, out var now) &&
+            (now.UnitId != before.UnitId || now.SectorId != before.SectorId)).ToArray();
         db.ChangeTracker.Clear();
         // people who arrive while a training is live start with its days already there
         if (result.Created > 0) await distribution.EnsureAssignmentsAsync(tenant.Value, plan.Creates.Select(item => item.User.Id).ToArray(), token);
+        if (moved.Length > 0) await distribution.PlacementChangedAsync(tenant.Value, moved, token);
         return Result<ImportResult>.Success(result);
     }
 

@@ -277,6 +277,57 @@ public sealed class CompanyRegistryApiTests
         Assert.Equal(1, await db.AuditEntries.CountAsync(entry => entry.Action == "identity.registry.rules_changed"));
     }
 
+    [DockerFact]
+    public async Task Removing_an_unused_unit_deletes_it()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var minas = await company.UnitAsync("Minas Gerais");
+
+        var removal = await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{minas}", new { });
+
+        Assert.True(removal.GetProperty("deleted").GetBoolean());
+        Assert.DoesNotContain((await company.Get("/api/admin/registry")).GetProperty("units").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == minas);
+    }
+
+    [DockerFact]
+    public async Task Removing_a_sector_with_people_only_puts_it_away()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var production = await company.SectorAsync("Produção");
+        await company.PersonAsync("ana", sectorId: production);
+
+        var removal = await company.Send(HttpMethod.Delete, $"/api/admin/registry/sectors/{production}", new { });
+
+        Assert.False(removal.GetProperty("deleted").GetBoolean());
+        var sector = (await company.Get("/api/admin/registry")).GetProperty("sectors").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == production);
+        Assert.False(sector.GetProperty("isActive").GetBoolean());
+        Assert.Equal(1, sector.GetProperty("peopleCount").GetInt32());
+    }
+
+    [DockerFact]
+    public async Task Removing_a_unit_marked_on_a_training_only_puts_it_away()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var saoPaulo = await company.UnitAsync("São Paulo");
+        var training = await company.TrainingAsync("SIPAT SP");
+        await company.AudienceAsync(training, [saoPaulo]);
+
+        var removal = await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{saoPaulo}", new { });
+
+        Assert.False(removal.GetProperty("deleted").GetBoolean());
+        Assert.Equal([saoPaulo], TrainingAudienceScenario.Ids(await company.Get($"/api/admin/sipats/{training}/audience"), "unitIds"));
+    }
+
+    [DockerFact]
+    public async Task Removing_one_that_is_not_of_the_company_is_not_found()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+
+        await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{Guid.NewGuid()}", new { }, HttpStatusCode.NotFound);
+    }
+
     private static HttpClient CreateClient(SipatOnlineApiFactory factory) =>
         factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {

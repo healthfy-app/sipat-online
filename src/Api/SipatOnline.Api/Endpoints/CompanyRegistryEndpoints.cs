@@ -37,6 +37,16 @@ public static class CompanyRegistryEndpoints
             .RequireAuthorization("ManageTenantUsers")
             .WithName("UpdateCompanySector");
 
+        group.MapDelete("/units/{id:guid}", (Guid id, CompanyRegistryService registry, CancellationToken token) =>
+            RemoveAsync(RegistryKind.Unit, id, registry, token))
+            .RequireAuthorization("ManageTenantUsers")
+            .WithName("RemoveCompanyUnit");
+
+        group.MapDelete("/sectors/{id:guid}", (Guid id, CompanyRegistryService registry, CancellationToken token) =>
+            RemoveAsync(RegistryKind.Sector, id, registry, token))
+            .RequireAuthorization("ManageTenantUsers")
+            .WithName("RemoveCompanySector");
+
         group.MapPut("/rules", async (ProfileRules rules, CompanyRegistryService registry, CancellationToken token) =>
         {
             var result = await registry.SaveRulesAsync(rules, token);
@@ -57,6 +67,12 @@ public static class CompanyRegistryEndpoints
     private static async Task<IResult> UpdateAsync(RegistryKind kind, Guid id, UpdateRegistryItemRequest request, CompanyRegistryService registry, CancellationToken token)
     {
         var result = await registry.UpdateAsync(kind, id, request.Name, request.IsActive, token);
+        return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+    }
+
+    private static async Task<IResult> RemoveAsync(RegistryKind kind, Guid id, CompanyRegistryService registry, CancellationToken token)
+    {
+        var result = await registry.RemoveAsync(kind, id, token);
         return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
     }
 

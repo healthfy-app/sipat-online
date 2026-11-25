@@ -14,6 +14,9 @@ public sealed record CompanyRegistry(IReadOnlyList<RegistryItem> Units, IReadOnl
 
 public enum RegistryKind { Unit, Sector }
 
+/// <summary><c>Deleted</c> false: the item was in use, so it was only put away.</summary>
+public sealed record RegistryRemoval(bool Deleted);
+
 /// <summary>
 /// The units and sectors of a company and which optional profile fields it requires of a new participant.
 /// Items are only ever added, renamed or deactivated: there is no delete, and the people keep what they have.
@@ -115,6 +118,39 @@ public sealed class CompanyRegistryService(
         if (sectorFailed is not null) return sectorFailed;
         return Result<RegistryItem>.Success(new RegistryItem(sector.Id, sector.Name, sector.IsActive,
             await Participants(tenant).CountAsync(user => user.SectorId == id, token)));
+    }
+
+    /// <summary>
+    /// Takes a unit or sector off the company's list. One nobody has and no training is for is deleted; one in use is only
+    /// put away: it stops being offered, and the people and trainings that have it keep it.
+    /// </summary>
+    public async Task<Result<RegistryRemoval>> RemoveAsync(RegistryKind kind, Guid id, CancellationToken token)
+    {
+        var guard = Guard<RegistryRemoval>(out var tenant);
+        if (guard is not null) return guard;
+
+        var isUnit = kind == RegistryKind.Unit;
+        object? item = isUnit
+            ? await db.CompanyUnits.SingleOrDefaultAsync(unit => unit.Id == id && unit.TenantId == tenant, token)
+            : await db.CompanySectors.SingleOrDefaultAsync(sector => sector.Id == id && sector.TenantId == tenant, token);
+        if (item is null) return Failure<RegistryRemoval>("registry.not_found", "O item não foi encontrado.");
+
+        var inUse = isUnit
+            ? await db.Users.AnyAsync(user => user.TenantId == tenant && user.UnitId == id, token) ||
+              await db.SipatEventUnits.AnyAsync(link => link.UnitId == id, token)
+            : await db.Users.AnyAsync(user => user.TenantId == tenant && user.SectorId == id, token) ||
+              await db.SipatEventSectors.AnyAsync(link => link.SectorId == id, token);
+        if (inUse)
+        {
+            if (item is CompanyUnitEntity unit) unit.IsActive = false;
+            else ((CompanySectorEntity)item).IsActive = false;
+        }
+        else db.Remove(item);
+
+        // the audit goes in the same save as the change
+        await WriteAuditAsync(isUnit ? "identity.registry.unit_removed" : "identity.registry.sector_removed", kind, id.ToString("D"), token);
+        await db.SaveChangesAsync(token);
+        return Result<RegistryRemoval>.Success(new RegistryRemoval(!inUse));
     }
 
     public async Task<Result<ProfileRules>> SaveRulesAsync(ProfileRules rules, CancellationToken token)

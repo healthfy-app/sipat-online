@@ -212,6 +212,7 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<LearningEngagementService>();
         services.AddScoped<LearningDistributionService>();
         services.AddScoped<SipatPlanService>();
+        services.AddScoped<TrainingAudienceService>();
         services.AddScoped<SipatOnline.Infrastructure.Identity.EmployeeCredentialService>();
         services.AddScoped<SipatOnline.Infrastructure.Identity.ParticipantProfileService>();
         services.AddScoped<SipatOnline.Infrastructure.Identity.CompanyRegistryService>();

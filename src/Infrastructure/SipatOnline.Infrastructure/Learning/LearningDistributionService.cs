@@ -16,6 +16,15 @@ public sealed record DistributionCourse(Guid TrackId, Guid? SourceCourseId, stri
 public sealed record ProgramApplication(int Days, int Created, int Updated, int Kept);
 public sealed record CompanyLearningCatalog(IReadOnlyList<DistributionEvent> Events, IReadOnlyList<DistributionCourse> Courses);
 
+/// <summary>Where a person was before a change of unit or sector.</summary>
+public sealed record PlacementBefore(Guid ParticipantId, Guid? UnitId, Guid? SectorId);
+
+/// <summary>What a change of place or of audience did: days given, days taken back, and the trainings someone received.</summary>
+public sealed record AssignmentSync(int Added, int Removed, IReadOnlyList<string> ReceivedTrainings)
+{
+    public static AssignmentSync Nothing { get; } = new(0, 0, []);
+}
+
 public sealed class LearningDistributionService(PlatformDbContext db, ICurrentActor actor, ITenantContext context,
     IPlatformCourseCatalogStore catalog, IGameModuleStore modules, ILearningStore learning,
     ISipatProgramStore programs, IAuditTrail audit, TimeProvider clock)
@@ -117,12 +126,12 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             CoverData = cover?.Data,
             CoverContentType = cover?.ContentType
         });
-        var participantIds = await db.Users.AsNoTracking().Where(item => item.TenantId == tenantId && item.IsActive)
-            .Select(item => item.Id).ToArrayAsync(token);
-        foreach (var participantId in participantIds)
+        // only the people the training is for: the units and sectors marked on it, or the whole company
+        var audience = (await TrainingAudienceService.OfAsync(db, tenantId, [sipatId], token))[sipatId];
+        foreach (var person in await ActiveParticipantsAsync(tenantId, null, token))
         {
-            if (await learning.IsActiveParticipantAsync(tenant, participantId, token))
-                await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, track.Value.Id, participantId, now).Value, token);
+            if (audience.Includes(person.UnitId, person.SectorId))
+                await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, track.Value.Id, person.Id, now).Value, token);
         }
         await audit.WriteAsync(new AuditRecord(actor.UserId!, tenant, "learning.course.distributed",
             "learning_track", track.Value.Id.ToString("D"), now), token);
@@ -237,86 +246,157 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
     }
 
     /// <summary>
-    /// Gives the active participants of a company (or one of them) the days of the SIPATs that are live, where they do not have
-    /// them yet. Days are delivered when a SIPAT is published, so people who arrive later — a new hire, an import after the
-    /// publication — are caught up here. A day taken away from someone on purpose (revoked) is not given back.
+    /// Gives the active participants of a company (or one of them) the days of the trainings that are live and are for
+    /// them, where they do not have them yet. Days are delivered when a training is published, so people who arrive later
+    /// — a new hire, an import after the publication — are caught up here. A day taken away on purpose (revoked) is not
+    /// given back.
     /// </summary>
-    public async Task<int> EnsureAssignmentsAsync(Guid tenantId, Guid? onlyParticipantId, CancellationToken token)
+    public async Task<int> EnsureAssignmentsAsync(Guid tenantId, Guid? onlyParticipantId, CancellationToken token) =>
+        (await DeliverAsync(tenantId, onlyParticipantId is Guid one ? [one] : null, null, token)).Count;
+
+    /// <summary>The same, for the people just created (an import): only they are looked at.</summary>
+    public async Task<int> EnsureAssignmentsAsync(Guid tenantId, IReadOnlyCollection<Guid> participantIds, CancellationToken token) =>
+        participantIds.Count == 0 ? 0 : (await DeliverAsync(tenantId, participantIds, null, token)).Count;
+
+    /// <summary>
+    /// People changed unit or sector: they get the live trainings of where they are now, and lose the ones they only had
+    /// for being where they were, unless they already started them (then they keep every day). A training handed to
+    /// someone who was never in its audience is not touched.
+    /// </summary>
+    public async Task<AssignmentSync> PlacementChangedAsync(Guid tenantId, IReadOnlyCollection<PlacementBefore> people, CancellationToken token)
     {
-        var now = clock.GetUtcNow();
-        var trackIds = await LiveTrackIdsAsync(tenantId, now, token);
-        if (trackIds.Length == 0) return 0;
+        if (people.Count == 0) return AssignmentSync.Nothing;
+        var tracks = await LiveTracksAsync(tenantId, null, token);
+        if (tracks.Count == 0) return AssignmentSync.Nothing;
 
-        var people = db.Users.AsNoTracking().Where(item => item.TenantId == tenantId && item.IsActive);
-        if (onlyParticipantId is Guid one) people = people.Where(item => item.Id == one);
-        var participantIds = await people.Select(item => item.Id).ToArrayAsync(token);
+        var ids = people.Select(person => person.ParticipantId).Distinct().ToArray();
+        var added = await DeliverAsync(tenantId, ids, null, token);
+        var audiences = await TrainingAudienceService.OfAsync(db, tenantId, tracks.Select(track => track.SipatId).Distinct().ToArray(), token);
+        var current = await db.Users.AsNoTracking().Where(user => user.TenantId == tenantId && ids.Contains(user.Id))
+            .Select(user => new PlacedParticipant(user.Id, user.UnitId, user.SectorId))
+            .ToDictionaryAsync(user => user.Id, token);
+        var leaving = (
+            from person in people
+            where current.ContainsKey(person.ParticipantId)
+            from audience in audiences
+            where audience.Value.Includes(person.UnitId, person.SectorId) &&
+                !audience.Value.Includes(current[person.ParticipantId].UnitId, current[person.ParticipantId].SectorId)
+            select (person.ParticipantId, audience.Key)).ToArray();
+        var removed = await RemoveUntouchedAsync(tenantId, leaving, tracks, token);
+        return new AssignmentSync(added.Count, removed, added.Select(item => item.SipatTitle).Distinct().ToArray());
+    }
 
+    /// <summary>
+    /// A training changed who it is for. If it is live, the people it now includes get its days, and the ones it no
+    /// longer includes lose them, unless they already started it.
+    /// </summary>
+    public async Task<AssignmentSync> AudienceChangedAsync(Guid tenantId, Guid sipatId, TrainingAudience before, CancellationToken token)
+    {
+        var tracks = await LiveTracksAsync(tenantId, sipatId, token);
+        if (tracks.Count == 0) return AssignmentSync.Nothing;
+
+        var added = await DeliverAsync(tenantId, null, sipatId, token);
+        var audience = (await TrainingAudienceService.OfAsync(db, tenantId, [sipatId], token))[sipatId];
+        var people = await db.Users.AsNoTracking().Where(user => user.TenantId == tenantId)
+            .Select(user => new PlacedParticipant(user.Id, user.UnitId, user.SectorId)).ToListAsync(token);
+        var leaving = people
+            .Where(person => before.Includes(person.UnitId, person.SectorId) && !audience.Includes(person.UnitId, person.SectorId))
+            .Select(person => (person.Id, sipatId)).ToArray();
+        var removed = await RemoveUntouchedAsync(tenantId, leaving, tracks, token);
+        return new AssignmentSync(added.Count, removed, added.Select(item => item.SipatTitle).Distinct().ToArray());
+    }
+
+    /// <summary>Adds, for the people given (or everyone), each live day that is for them and that they do not have.</summary>
+    private async Task<List<LiveTrack>> DeliverAsync(Guid tenantId, IReadOnlyCollection<Guid>? participantIds, Guid? onlySipatId, CancellationToken token)
+    {
+        var added = new List<LiveTrack>();
+        var tracks = await LiveTracksAsync(tenantId, onlySipatId, token);
+        if (tracks.Count == 0) return added;
+        var people = await ActiveParticipantsAsync(tenantId, participantIds, token);
+        if (people.Count == 0) return added;
+
+        var trackIds = tracks.Select(track => track.TrackId).ToArray();
+        var personIds = people.Select(person => person.Id).ToArray();
+        var audiences = await TrainingAudienceService.OfAsync(db, tenantId, tracks.Select(track => track.SipatId).Distinct().ToArray(), token);
+        // a revoked day counts as known: it was taken away on purpose
         var known = (await db.LearningAssignments.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && trackIds.Contains(item.TrackId))
+            .Where(item => item.TenantId == tenantId && trackIds.Contains(item.TrackId) && personIds.Contains(item.ParticipantId))
             .Select(item => new { item.TrackId, item.ParticipantId }).ToArrayAsync(token))
             .Select(item => (item.TrackId, item.ParticipantId)).ToHashSet();
 
         var tenant = new TenantId(tenantId);
-        var added = 0;
-        foreach (var participantId in participantIds)
+        var now = clock.GetUtcNow();
+        foreach (var person in people)
         {
-            if (!await learning.IsActiveParticipantAsync(tenant, participantId, token)) continue;
-            foreach (var trackId in trackIds.Where(id => !known.Contains((id, participantId))))
+            foreach (var track in tracks)
             {
-                await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, trackId, participantId, now).Value, token);
-                added++;
+                if (known.Contains((track.TrackId, person.Id)) || !audiences[track.SipatId].Includes(person.UnitId, person.SectorId)) continue;
+                await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, track.TrackId, person.Id, now).Value, token);
+                added.Add(track);
             }
         }
 
-        if (added > 0) await db.SaveChangesAsync(token);
+        if (added.Count > 0) await db.SaveChangesAsync(token);
         return added;
     }
 
     /// <summary>
-    /// The same, for the people just created (an import): only they are looked at, and whether each is an active
-    /// participant comes from one query for all of them instead of one per person.
+    /// Takes a training away from the people who left its audience and never opened it. With progress on any of its days,
+    /// the person keeps all of them. The days are deleted, not revoked, so someone who comes back gets them again.
     /// </summary>
-    public async Task<int> EnsureAssignmentsAsync(Guid tenantId, IReadOnlyCollection<Guid> participantIds, CancellationToken token)
+    private async Task<int> RemoveUntouchedAsync(Guid tenantId, IReadOnlyCollection<(Guid ParticipantId, Guid SipatId)> leaving,
+        IReadOnlyList<LiveTrack> tracks, CancellationToken token)
     {
-        if (participantIds.Count == 0) return 0;
-        var now = clock.GetUtcNow();
-        var trackIds = await LiveTrackIdsAsync(tenantId, now, token);
-        if (trackIds.Length == 0) return 0;
-
-        var ids = participantIds.Distinct().ToArray();
-        var participantRole = PlatformRoles.Participant.ToUpperInvariant();
-        var active = await db.Users.AsNoTracking()
-            .Where(user => user.TenantId == tenantId && user.IsActive && ids.Contains(user.Id) && db.UserRoles.Any(link =>
-                link.UserId == user.Id && db.Roles.Any(role => role.Id == link.RoleId && role.NormalizedName == participantRole)))
-            .Select(user => user.Id).ToArrayAsync(token);
-        if (active.Length == 0) return 0;
-
-        var known = (await db.LearningAssignments.AsNoTracking()
-            .Where(item => item.TenantId == tenantId && trackIds.Contains(item.TrackId) && active.Contains(item.ParticipantId))
-            .Select(item => new { item.TrackId, item.ParticipantId }).ToArrayAsync(token))
-            .Select(item => (item.TrackId, item.ParticipantId)).ToHashSet();
-
-        var tenant = new TenantId(tenantId);
-        var added = 0;
-        foreach (var participantId in active)
+        var removed = 0;
+        foreach (var group in leaving.GroupBy(item => item.SipatId))
         {
-            foreach (var trackId in trackIds.Where(id => !known.Contains((id, participantId))))
-            {
-                await learning.AddAssignmentAsync(LearningAssignment.Create(tenant, trackId, participantId, now).Value, token);
-                added++;
-            }
+            var trackIds = tracks.Where(track => track.SipatId == group.Key).Select(track => track.TrackId).ToArray();
+            if (trackIds.Length == 0) continue;
+            var personIds = group.Select(item => item.ParticipantId).Distinct().ToArray();
+            var started = await db.LearningProgress.AsNoTracking()
+                .Where(item => item.TenantId == tenantId && trackIds.Contains(item.TrackId) && personIds.Contains(item.ParticipantId))
+                .Select(item => item.ParticipantId).Distinct().ToListAsync(token);
+            var untouched = personIds.Except(started).ToArray();
+            if (untouched.Length == 0) continue;
+            removed += await db.LearningAssignments
+                .Where(item => item.TenantId == tenantId && trackIds.Contains(item.TrackId) && untouched.Contains(item.ParticipantId) && item.RevokedAt == null)
+                .ExecuteDeleteAsync(token);
         }
 
-        if (added > 0) await db.SaveChangesAsync(token);
-        return added;
+        return removed;
     }
 
-    /// <summary>The tracks of the company's SIPATs that are published and not over yet.</summary>
-    private Task<Guid[]> LiveTrackIdsAsync(Guid tenantId, DateTimeOffset now, CancellationToken token) => (
-        from track in db.LearningTracks.AsNoTracking()
-        join sipat in db.SipatEvents.AsNoTracking() on track.SipatEventId equals sipat.Id
-        where track.TenantId == tenantId && sipat.TenantId == tenantId && sipat.Status == SipatEventStatus.Published && sipat.EndsAt > now
-        select track.Id).ToArrayAsync(token);
+    /// <summary>The active people of the company who take trainings (all of them, or the ones given), with where each one is.</summary>
+    private async Task<List<PlacedParticipant>> ActiveParticipantsAsync(Guid tenantId, IReadOnlyCollection<Guid>? participantIds, CancellationToken token)
+    {
+        var role = PlatformRoles.Participant.ToUpperInvariant();
+        var people = db.Users.AsNoTracking()
+            .Where(user => user.TenantId == tenantId && user.IsActive && db.UserRoles.Any(link =>
+                link.UserId == user.Id && db.Roles.Any(item => item.Id == link.RoleId && item.NormalizedName == role)));
+        if (participantIds is not null)
+        {
+            var ids = participantIds.Distinct().ToArray();
+            people = people.Where(user => ids.Contains(user.Id));
+        }
+
+        return await people.Select(user => new PlacedParticipant(user.Id, user.UnitId, user.SectorId)).ToListAsync(token);
+    }
+
+    /// <summary>The days of the company's trainings that are published and not over yet (of all of them, or of one).</summary>
+    private async Task<List<LiveTrack>> LiveTracksAsync(Guid tenantId, Guid? onlySipatId, CancellationToken token)
+    {
+        var now = clock.GetUtcNow();
+        return await (
+            from track in db.LearningTracks.AsNoTracking()
+            join sipat in db.SipatEvents.AsNoTracking() on track.SipatEventId equals sipat.Id
+            where track.TenantId == tenantId && sipat.TenantId == tenantId && sipat.Status == SipatEventStatus.Published && sipat.EndsAt > now
+                && (onlySipatId == null || sipat.Id == onlySipatId)
+            select new LiveTrack(track.Id, sipat.Id, sipat.Title)).ToListAsync(token);
+    }
+
+    private sealed record LiveTrack(Guid TrackId, Guid SipatId, string SipatTitle);
+
+    private sealed record PlacedParticipant(Guid Id, Guid? UnitId, Guid? SectorId);
 
     /// <summary>
     /// Replaces the lessons and activities of a day's track. Once some participant has progress in it, only extras

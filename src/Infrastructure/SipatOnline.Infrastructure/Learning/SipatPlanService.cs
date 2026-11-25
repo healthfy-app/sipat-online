@@ -11,7 +11,8 @@ namespace SipatOnline.Infrastructure.Learning;
 public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName, string SipatStatus);
 
 /// <summary>A training as its card shows it: how much it has, how long it runs, and its cover (the version changes with the photo).</summary>
-public sealed record SipatPlanSummary(Guid SipatEventId, int Days, int Videos, Guid CourseId, long DurationMilliseconds, long? CoverVersion);
+public sealed record SipatPlanSummary(Guid SipatEventId, int Days, int Videos, Guid CourseId, long DurationMilliseconds, long? CoverVersion,
+    IReadOnlyList<Guid> UnitIds, IReadOnlyList<Guid> SectorIds);
 
 /// <summary>
 /// A company's training: some days, each with its date, its videos and its activities. Its content is a training of
@@ -207,9 +208,14 @@ public sealed class SipatPlanService(
                 HasCover = db.PlatformCourses.Any(course => course.Id == sipat.CourseId && course.CoverContentType != null),
             })
             .ToListAsync(token);
+        // who each training is for: the units and sectors marked on it (none is the whole company)
+        var units = (await db.SipatEventUnits.AsNoTracking().Where(link => link.TenantId == tenant.Value).ToListAsync(token))
+            .ToLookup(link => link.SipatEventId, link => link.UnitId);
+        var sectors = (await db.SipatEventSectors.AsNoTracking().Where(link => link.TenantId == tenant.Value).ToListAsync(token))
+            .ToLookup(link => link.SipatEventId, link => link.SectorId);
         return Result<IReadOnlyList<SipatPlanSummary>>.Success(rows
             .Select(row => new SipatPlanSummary(row.Id, row.Days, row.Videos, row.CourseId, row.Duration,
-                row.HasCover ? row.Cover?.ToUnixTimeMilliseconds() ?? 0 : null))
+                row.HasCover ? row.Cover?.ToUnixTimeMilliseconds() ?? 0 : null, units[row.Id].ToArray(), sectors[row.Id].ToArray()))
             .ToArray());
     }
 

@@ -1372,6 +1372,42 @@ namespace SipatOnline.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventSectorEntity", b =>
+                {
+                    b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("SectorId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SipatEventId", "SectorId");
+
+                    b.HasIndex("SectorId");
+
+                    b.ToTable("SipatEventSectors", "sipats");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventUnitEntity", b =>
+                {
+                    b.Property<Guid>("SipatEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("UnitId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SipatEventId", "UnitId");
+
+                    b.HasIndex("UnitId");
+
+                    b.ToTable("SipatEventUnits", "sipats");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity", b =>
                 {
                     b.Property<Guid>("CourseId")
@@ -1764,6 +1800,36 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.HasOne("SipatOnline.Infrastructure.Tenancy.TenantEntity", null)
                         .WithMany()
                         .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventSectorEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Identity.CompanySectorEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SectorId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("SipatOnline.Infrastructure.Sipats.SipatEventEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SipatEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Sipats.SipatEventUnitEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Sipats.SipatEventEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SipatEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SipatOnline.Infrastructure.Identity.CompanyUnitEntity", null)
+                        .WithMany()
+                        .HasForeignKey("UnitId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
