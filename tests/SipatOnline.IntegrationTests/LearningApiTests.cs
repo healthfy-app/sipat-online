@@ -386,7 +386,7 @@ public sealed class LearningApiTests
         await using var scenario = await BonusLessonScenario.StartEmptyAsync();
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
-        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         await scenario.PlaceCheckpointAsync(b);
         await scenario.ApplyDayAsync(a, b);
         var before = await scenario.LessonIdsAsync();
@@ -426,7 +426,7 @@ public sealed class LearningApiTests
     {
         await using var scenario = await BonusLessonScenario.StartEmptyAsync();
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
-        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
         await scenario.PlaceCheckpointAsync(b);
         await scenario.ApplyDayAsync(a, x, b);
@@ -456,7 +456,7 @@ public sealed class LearningApiTests
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
         var c = await scenario.SeedHouseVideoAsync("Vídeo C");
-        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         await scenario.ApplyDayAsync(a, b);
         var before = await scenario.LessonIdsAsync();
         await scenario.CompleteAsync(before[0]);
@@ -484,7 +484,7 @@ public sealed class LearningApiTests
         await using var scenario = await BonusLessonScenario.StartEmptyAsync();
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
-        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         await scenario.PlaceCheckpointAsync(b);
         var courseId = await scenario.CreateCourseAsync();
         await SetStructureAsync([a], [b]);

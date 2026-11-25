@@ -38,7 +38,8 @@ describe('extras in the day planner catalog', () => {
   });
 
   it('sums only house videos in a subject and in a day', () => {
-    const library = [libraryVideo('h', 'Ready'), external('x', 600000)];
+    // an external video without a length is an extra; with its length it counts like a house video
+    const library = [libraryVideo('h', 'Ready'), external('x', 0)];
     const course = { id: 'c-1', title: 'Ergonomia', videos: [library[0].video, library[1].video], modules: [] } as unknown as PlatformCourse;
     const catalog = buildCatalog([course], library, []);
 

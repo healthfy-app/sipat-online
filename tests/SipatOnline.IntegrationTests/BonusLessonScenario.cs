@@ -51,7 +51,7 @@ internal sealed class BonusLessonScenario : IAsyncDisposable
     {
         var scenario = await CreateAsync();
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
-        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
         var courseId = await scenario.CreateCourseAsync();
         await scenario.Call(scenario.Platform, $"/api/platform/catalog/courses/{courseId}/structure", HttpMethod.Put, new
