@@ -37,9 +37,12 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
   return <>
     <NavLink className="sidebar-link" end to="/platform"><ArrowLeft aria-hidden="true" className="mr-1.5 inline size-3.5" />Todas as empresas</NavLink>
     <p className="sidebar-label sidebar-label-spaced">EMPRESA</p>
-    {/* two even lines instead of a long one and a leftover word; the whole name is in the tooltip */}
-    <strong className="px-3 pb-1 text-sm font-semibold leading-snug text-balance [overflow-wrap:anywhere]" title={name || undefined}>{name ? breakAtSeparator(name) : 'Carregando...'}</strong>
-    {plan && <div className="px-3 pb-2"><CompanyPlanButton companyId={companyId} onChanged={setPlan} plan={plan} /></div>}
+    {/* the plan sits beside the name; a name too long for both goes on, and the plan drops under it */}
+    <div className="mb-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3">
+      {/* two even lines instead of a long one and a leftover word; the whole name is in the tooltip */}
+      <strong className="min-w-0 text-sm font-semibold leading-snug text-balance [overflow-wrap:anywhere]" title={name || undefined}>{name ? breakAtSeparator(name) : 'Carregando...'}</strong>
+      {plan && <CompanyPlanButton companyId={companyId} onChanged={setPlan} plan={plan} />}
+    </div>
     <NavLink className={link(inSipat)} to={`${base}/treinamentos`}>Treinamentos</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/participantes`}>Participantes</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/administradores`}>Administradores</NavLink>
