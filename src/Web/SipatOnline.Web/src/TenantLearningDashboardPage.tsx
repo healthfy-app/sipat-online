@@ -1,4 +1,4 @@
-import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles, type CompanyRegistry, type LearningParticipantProgress, type ParticipantProfile } from './api';
@@ -137,10 +137,6 @@ export default function TenantLearningDashboardPage({
   };
 
   const overview = data?.overview;
-  const noTracksCount = overview?.participantDistribution.find(({ status }) => status === 'no-tracks')?.count ?? 0;
-  const notStartedCount = overview?.participantDistribution.find(({ status }) => status === 'not-started')?.count ?? 0;
-  const nextStepStatus = noTracksCount > 0 ? 'no-tracks' : 'not-started';
-  const nextStepCount = noTracksCount > 0 ? noTracksCount : notStartedCount;
   const completedCount = overview?.participantDistribution.find(({ status }) => status === 'completed')?.count ?? 0;
 
   return (
@@ -197,34 +193,8 @@ export default function TenantLearningDashboardPage({
               <SummaryCard icon={Clock3} label="Tempo assistido" note="Somando todos os participantes" value={formatDuration(totalWatchedMilliseconds(data.participation))} />
             </section>
 
-            {nextStepCount > 0 && (
-              <section
-                aria-labelledby="tenant-dashboard-next-step"
-                className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-warning-soft px-5 py-4"
-              >
-                <div className="grid gap-1">
-                  <p className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-warning">PRÓXIMO PASSO</p>
-                  <h2 className="m-0 text-base font-semibold" id="tenant-dashboard-next-step">
-                    {noTracksCount > 0
-                      ? `Entregue o treinamento a ${pluralize(noTracksCount, 'colaborador', 'colaboradores')}`
-                      : `Acompanhe ${pluralize(notStartedCount, 'participante', 'participantes')} sem início`}
-                  </h2>
-                  <p className="m-0 text-sm text-muted-foreground">
-                    {noTracksCount > 0
-                      ? 'Esses colaboradores ainda não receberam nenhum dia de treinamento.'
-                      : 'Veja quem já recebeu os dias do treinamento e ainda não iniciou.'}
-                  </p>
-                </div>
-                <Link className={buttonVariants()} to={`/admin/learning?status=${nextStepStatus}`}>
-                  {noTracksCount > 0
-                    ? readOnly ? 'Ver colaboradores sem dias de treinamento' : 'Escolher participantes'
-                    : readOnly ? 'Ver acompanhamento' : 'Acompanhar progresso'}
-                  <ArrowRight />
-                </Link>
-              </section>
-            )}
-
-            {unitRows.length > 0 && <Panel count={pluralize(unitRows.filter(row => row.unitId !== null).length, 'unidade', 'unidades')} id="by-unit-title" title="Por unidade">
+            {/* only when someone is in a unit: a company with no unit in use has nothing to compare */}
+            {unitRows.some(row => row.unitId !== null) && <Panel count={pluralize(unitRows.filter(row => row.unitId !== null).length, 'unidade', 'unidades')} id="by-unit-title" title="Por unidade">
               <div className="overflow-x-auto">
                 <table aria-labelledby="by-unit-title" className="m-0 w-full min-w-[34rem] border-collapse text-sm">
                   <thead>

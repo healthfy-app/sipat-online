@@ -1,8 +1,9 @@
-import { Check, ChevronDown, MapPin, Plus, Settings2 } from 'lucide-react';
-import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Check, ChevronsUpDown, MapPin, Plus, Settings2 } from 'lucide-react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { getCompanyRegistry, type AudienceTarget, type RegistryItem } from '@/api';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 
 /**
@@ -85,99 +86,63 @@ export function inUnit(profiles: ReadonlyMap<string, { unitId: string | null }>,
   return personId => unitId === null || profiles.get(personId)?.unitId === unitId;
 }
 
-/**
- * The switcher, suspended at the top of the company's pages like an island: a dark glass capsule that floats over the
- * page and stays in sight while it scrolls. It is always there for a company, so the way the company is organized is
- * in sight from the first day: with no unit yet, it leads to making the first.
- */
-export function UnitBar({ manageHref }: { /** Where units and sectors are made, for who can make them. */ manageHref?: string }) {
-  const { active, units } = useUnitScope();
-  if (!active) return null;
-  const manageLabel = units.length === 0 ? 'Criar unidades' : 'Unidades e setores';
-  // the wrapper lets clicks through: only the island itself is in the way of the page
-  return <div className="pointer-events-none sticky top-[calc(var(--shell-top,0rem)+0.75rem)] z-30 mb-5 flex justify-center max-[760px]:mb-4" data-slot="unit-bar">
-    <div className={cn(
-      'pointer-events-auto inline-flex max-w-full min-w-0 items-center gap-1 rounded-full bg-[rgb(12_24_21/0.9)] p-1.5 pl-3.5 text-white',
-      'shadow-[0_14px_34px_-10px_rgb(8_26_21/0.5),0_3px_8px_rgb(8_26_21/0.22),inset_0_0_0_1px_rgb(255_255_255/0.09)] backdrop-blur-xl backdrop-saturate-150',
-      'transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-[1.015] motion-reduce:transition-none motion-reduce:hover:scale-100',
-    )}>
-      <MapPin aria-hidden="true" className="size-4 shrink-0 text-white/55" />
-      <span className="sr-only">Unidade</span>
-      <UnitSwitcher tone="island" />
-      {manageHref && <Link aria-label={manageLabel} title={manageLabel} to={manageHref}
-        className="grid size-8 shrink-0 place-items-center rounded-full text-white/70 no-underline transition-colors hover:bg-white/12 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white max-[640px]:size-9">
-        {units.length === 0 ? <Plus aria-hidden="true" className="size-4" /> : <Settings2 aria-hidden="true" className="size-4" />}
-      </Link>}
-    </div>
-  </div>;
-}
 
-/** Up to this many units sit side by side; more become one button that opens the list. */
-const segmentLimit = 4;
+/** From this many units on, the list opens with a field to search it. */
+const searchFrom = 8;
+const lower = (text: string) => text.toLocaleLowerCase('pt-BR');
 
 /**
- * The switch itself: "Todas" and the units side by side, with the lit pill sliding to the one tapped. With many units
- * it is one button that opens the list. `tone` is where it sits: on the page (light), or on the dark island.
+ * The unit the company is being looked at through, in the side bar right under the company's name: what is chosen here
+ * is what the menu below it shows. It opens a list; a long name is cut in the button (and whole in its tooltip) and
+ * wraps to two lines in the list, which is wider than the bar; many units bring a field to search them.
  */
-export function UnitSwitcher({ className, tone = 'light' }: { className?: string; tone?: 'light' | 'island' }) {
+export function UnitMenu({ manageHref, className }: {
+  /** Where units and sectors are made, for who can make them. */
+  manageHref?: string; className?: string;
+}) {
   const { unitId, unit, units, active, setUnitId } = useUnitScope();
-  const group = useRef<HTMLDivElement>(null);
-  const [pill, setPill] = useState<{ left: number; width: number } | null>(null);
-  const segmented = units.length <= segmentLimit;
-  const island = tone === 'island';
-
-  // the pill sits under the chosen one, and follows when the names change width (a rename, the phone turned)
-  useLayoutEffect(() => {
-    const element = group.current;
-    if (!active || !segmented || !element) return;
-    const place = () => {
-      const chosen = element.querySelector<HTMLElement>('[aria-checked="true"]');
-      if (chosen) setPill({ left: chosen.offsetLeft, width: chosen.offsetWidth });
-    };
-    place();
-    if (typeof ResizeObserver === 'undefined') return;
-    const observer = new ResizeObserver(place);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [active, segmented, unitId, units]);
-
+  const [query, setQuery] = useState('');
   if (!active) return null;
-  const options = [{ id: null as string | null, name: 'Todas' }, ...units];
 
-  if (!segmented) return <DropdownMenu modal={false}>
+  const current = unit?.name ?? 'Todas as unidades';
+  const shown = units.filter(item => lower(item.name).includes(lower(query.trim())));
+  const option = (id: string | null, name: string) => <DropdownMenuItem className="items-start" key={id ?? 'all'} onSelect={() => setUnitId(id)}>
+    <span className="min-w-0 flex-1 [overflow-wrap:anywhere] line-clamp-2 leading-snug" title={name}>{name}</span>
+    {id === unitId && <Check aria-hidden="true" className="mt-0.5" />}
+  </DropdownMenuItem>;
+
+  return <DropdownMenu modal={false} onOpenChange={open => { if (!open) setQuery(''); }}>
     <DropdownMenuTrigger asChild>
-      <button aria-label={`Unidade: ${unit?.name ?? 'Todas as unidades'}`} type="button"
-        className={cn('m-0 inline-flex max-w-full cursor-pointer items-center gap-2 rounded-full border-0 text-sm font-semibold transition-colors',
-          island
-            ? 'h-8 bg-transparent px-2.5 text-white hover:bg-white/12 max-[640px]:h-9'
-            : 'h-10 bg-[#eef3f1] px-4 text-[#12332c] shadow-[inset_0_0_0_1px_rgb(18_51_44/0.06)] hover:bg-[#e4ece9]',
-          className)}>
-        {!island && <MapPin aria-hidden="true" className="size-4 shrink-0 text-primary" />}
-        <span className="truncate">{unit?.name ?? 'Todas as unidades'}</span>
-        <ChevronDown aria-hidden="true" className="size-4 shrink-0 opacity-60" />
+      <button aria-label={`Unidade: ${current}`} title={current} type="button"
+        className={cn('m-0 mb-2 flex min-h-11 w-full min-w-0 cursor-pointer items-center gap-2.5 rounded-[0.625rem] border border-[#dfe6e3] bg-white px-2.5 py-1.5 text-left transition-colors hover:border-[#cdd7d3] hover:bg-[#f6f8f7] data-[state=open]:border-primary data-[state=open]:bg-accent', className)}>
+        <MapPin aria-hidden="true" className={cn('size-4 shrink-0', unit ? 'text-primary' : 'text-muted-foreground')} />
+        <span className="grid min-w-0 flex-1">
+          <span className="text-[0.625rem] font-semibold uppercase leading-tight tracking-[0.08em] text-muted-foreground">Unidade</span>
+          <span className="truncate text-[0.8125rem] font-semibold leading-snug text-[#12332c]">{current}</span>
+        </span>
+        <ChevronsUpDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
       </button>
     </DropdownMenuTrigger>
-    <DropdownMenuContent align="center" className="max-h-[60vh] min-w-56 overflow-y-auto">
-      {options.map(option => <DropdownMenuItem key={option.id ?? 'all'} onSelect={() => setUnitId(option.id)}>
-        <span className="min-w-0 flex-1 truncate">{option.id === null ? 'Todas as unidades' : option.name}</span>
-        {option.id === unitId && <Check aria-hidden="true" />}
-      </DropdownMenuItem>)}
+    <DropdownMenuContent align="start" className="flex max-h-[min(26rem,70vh)] w-[min(20rem,calc(100vw-1.5rem))] flex-col p-0">
+      {units.length >= searchFrom && <div className="border-b border-border p-1.5">
+        {/* typing here is searching, not the menu's own jump-to-letter */}
+        <Input aria-label="Buscar unidade" autoFocus onChange={event => setQuery(event.target.value)} onKeyDown={event => { if (event.key !== 'Escape' && event.key !== 'ArrowDown') event.stopPropagation(); }}
+          placeholder="Buscar unidade" type="search" value={query} />
+      </div>}
+      <div className="min-h-0 flex-1 overflow-y-auto p-1">
+        {query.trim() === '' && option(null, 'Todas as unidades')}
+        {shown.map(item => option(item.id, item.name))}
+        {units.length === 0 && <p className="m-0 px-2.5 py-2 text-[0.8125rem] leading-snug text-muted-foreground">A empresa ainda não tem unidades.</p>}
+        {units.length > 0 && shown.length === 0 && <p className="m-0 px-2.5 py-2 text-[0.8125rem] text-muted-foreground">Nenhuma unidade com esse nome.</p>}
+      </div>
+      {manageHref && <div className="border-t border-border p-1">
+        <DropdownMenuItem asChild>
+          <Link className="font-semibold text-primary no-underline" to={manageHref}>
+            {units.length === 0 ? <Plus aria-hidden="true" /> : <Settings2 aria-hidden="true" />}
+            {units.length === 0 ? 'Criar unidades' : 'Unidades e setores'}
+          </Link>
+        </DropdownMenuItem>
+      </div>}
     </DropdownMenuContent>
   </DropdownMenu>;
-
-  return <div aria-label="Unidade" ref={group} role="radiogroup"
-    className={cn('relative inline-flex max-w-full min-w-0 items-center overflow-x-auto rounded-full [scrollbar-width:none]',
-      island ? 'p-0' : 'bg-[#eef3f1] p-1 shadow-[inset_0_0_0_1px_rgb(18_51_44/0.06)]', className)}>
-    {pill && <span aria-hidden="true" style={{ transform: `translateX(${pill.left}px)`, width: pill.width }}
-      className={cn('pointer-events-none absolute left-0 rounded-full bg-white transition-[transform,width] duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none',
-        island ? 'top-0 h-full shadow-[0_1px_4px_rgb(0_0_0/0.35)]' : 'top-1 h-[calc(100%-0.5rem)] shadow-[0_1px_3px_rgb(18_51_44/0.14),0_1px_1px_rgb(18_51_44/0.06)]')} />}
-    {options.map(option => {
-      const chosen = option.id === unitId;
-      return <button aria-checked={chosen} key={option.id ?? 'all'} onClick={() => setUnitId(option.id)} role="radio" type="button"
-        className={cn('relative z-10 m-0 inline-flex h-8 shrink-0 cursor-pointer items-center whitespace-nowrap rounded-full border-0 bg-transparent px-4 text-[0.8125rem] transition-colors duration-200 max-[640px]:h-9',
-          chosen ? 'font-semibold text-[#12332c]' : island ? 'font-medium text-white/65 hover:text-white' : 'font-medium text-[#12332c]/60 hover:text-[#12332c]')}>
-        {option.name}
-      </button>;
-    })}
-  </div>;
 }

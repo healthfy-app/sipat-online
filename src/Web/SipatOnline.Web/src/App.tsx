@@ -31,7 +31,7 @@ import { Sheet } from './components/ui/sheet';
 import SipatsPage from './sipatBuilder/SipatsPage';
 import { LegacySipatRedirect } from './trainings/LegacySipatRedirect';
 import CompanyContext from './companies/CompanyContext';
-import { UnitBar, UnitScopeProvider } from './trainings/unitScope';
+import { UnitMenu, UnitScopeProvider } from './trainings/unitScope';
 import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
 import CollaboratorsPage from './collaborators/CollaboratorsPage';
@@ -609,6 +609,8 @@ function ProtectedPortal({
   // the same links serve the desktop sidebar and the phone menu
   const sidebarNav = (
     <>
+      {/* the unit the company is looked at through: it sits above the menu it filters, in the side bar and in the phone's menu */}
+      {companyPages && <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
       {session.roles.includes('Participant') && !isPlatformCompanyContext && (
         <>
           <p className="sidebar-label">APRENDIZAGEM</p>
@@ -646,6 +648,8 @@ function ProtectedPortal({
   );
 
   return (
+    <UnitScopeProvider companyId={isPlatformOperator && !isPlatformCompanyContext ? companyWorkspaceId ?? undefined : undefined} enabled={companyPages}
+      scopeKey={unitScopeCompany ? `company:${unitScopeCompany}` : tenant.tenantKey}>
     <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${isPlatformCompanyContext ? ' portal-layout-company-context' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
       {!isLearnerOnly && isPlatformCompanyContext && (
         <aside aria-label="Modo de administração da empresa" className="company-context-banner" role="status">
@@ -796,17 +800,14 @@ function ProtectedPortal({
           tabIndex={-1}
         >
           {error && <p className="form-error" role="alert">{error}</p>}
-          <UnitScopeProvider companyId={isPlatformOperator && !isPlatformCompanyContext ? companyWorkspaceId ?? undefined : undefined} enabled={companyPages}
-            scopeKey={unitScopeCompany ? `company:${unitScopeCompany}` : tenant.tenantKey}>
-          {companyPages && <UnitBar manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
           {/* an administrator who also takes trainings keeps the admin menu, and the participant pages keep their look */}
           {!isLearnerOnly && location.pathname.startsWith('/learning')
             ? <div className="portal-layout-learner contents"><Outlet /></div>
             : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
-          </UnitScopeProvider>
         </section>
       </div>
     </div>
+    </UnitScopeProvider>
   );
 }
 
