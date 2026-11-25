@@ -22,10 +22,12 @@ import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
 import { planToCsv, sampleCsv } from './csv';
 import ImportDialog from './ImportDialog';
+import { VideoUploadForm } from '@/courseEditor/CourseMediaForms';
+import { onVideoUploaded } from '@/videoUploads/uploadQueue';
 import { phaseLabel, sipatPhase } from './sipatPhase';
 import {
   addDays, buildCatalog, dayDuration, dayFromTitle, maxDays, dayVideoCounts, formatSpan, fromProgramDay, isValidDate, newDay, toProgramDay, withDayWord,
-  type Catalog, type DaySlots, type TrayTraining,
+  type Catalog, type DaySlots,
 } from './model';
 
 /** On the phone (up to 760px) the hero buttons are 44px tall: "Mais" and "Salvar" share a row, the main action takes the next one. */
@@ -80,8 +82,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const [leavingTo, setLeavingTo] = useState<string | null>(null);
   // the last day removed, kept for a few seconds so it can be put back
   const [removed, setRemoved] = useState<{ day: DaySlots; index: number } | null>(null);
-  // the days as they were before a Título or a whole training replaced their videos, kept a few seconds for undo
-  const [replaced, setReplaced] = useState<{ days: DaySlots[]; message: string } | null>(null);
+  // sending videos, for who may send them: they join the list above the days when ready
+  const [sending, setSending] = useState(false);
   // problems are only shown after a save or publish attempt, then they update live as they get fixed
   const [showIssues, setShowIssues] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
@@ -166,20 +168,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     return () => window.clearTimeout(timer);
   }, [removed]);
 
-  useEffect(() => {
-    if (!replaced) return;
-    const timer = window.setTimeout(() => setReplaced(null), 8000);
-    return () => window.clearTimeout(timer);
-  }, [replaced]);
-
-  // the trainings of Conteúdo with their Títulos, only the videos ready in the library
-  const trayTrainings = useMemo<TrayTraining[]>(() => !catalog ? [] : trainings
-    .map(item => ({
-      id: item.id, title: item.title, coverUrl: item.coverUrl ?? null,
-      titles: titlesOf(item).map(title => ({ id: title.id, title: title.title, videoIds: title.videoIds.filter(id => catalog.videos.has(id)) })),
-    }))
-    .filter(item => item.titles.some(title => title.videoIds.length > 0))
-    .sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [trainings, catalog]);
+  // a video that finished sending joins the list quietly, the days being built stay as they are
+  useEffect(() => onVideoUploaded(() => { getSipatCatalog().then(applyContent, () => undefined); }), [applyContent]);
 
   const totals = useMemo(() => !catalog ? { videos: 0, extras: 0, games: 0, time: 0 } : {
     videos: days.reduce((sum, day) => sum + dayVideoCounts(day.videos.filter((id): id is string => !!id), catalog).house, 0),
@@ -221,17 +211,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   function removeDay(index: number) {
     setRemoved({ day: days[index], index });
     edit(days.filter((_, position) => position !== index));
-  }
-
-  function replaceDays(next: DaySlots[], message: string) {
-    setReplaced({ days, message });
-    edit(next);
-  }
-
-  function undoReplace() {
-    if (!replaced) return;
-    edit(replaced.days);
-    setReplaced(null);
   }
 
   function undoRemove() {
@@ -438,7 +417,11 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
       : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
         onChange={cancelled || viewOnly ? () => undefined : edit} onRemoveDay={cancelled ? undefined : removeDay}
-        onReplace={cancelled ? () => undefined : replaceDays} trainings={canCustomizeGrid ? trayTrainings : []} />}
+        onUpload={canEditThemes && !cancelled ? () => setSending(true) : undefined} />}
+
+    {sending && <Dialog description="Os vídeos entram na lista assim que terminam de ser preparados. Você pode continuar montando os dias enquanto isso." onClose={() => setSending(false)} size="lg" title="Enviar vídeo">
+      <VideoUploadForm onQueued={() => { setSending(false); setNotice('Envio iniciado. O vídeo aparece na lista quando estiver pronto.'); }} />
+    </Dialog>}
 
     {importing && <ImportDialog catalog={catalog} hasPlan={stage === 'grid' && days.some(day => day.videos.some(Boolean))} onClose={() => setImporting(false)}
       onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${pluralize(imported.length, 'dia importado', 'dias importados')}. Revise e salve.`); }}
@@ -460,7 +443,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
       <DialogActions><Button onClick={() => setCopying(false)} variant="outline">Cancelar</Button></DialogActions>
     </Dialog>}
 
-    {(notice || removed || replaced) && <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 grid -translate-x-1/2 justify-items-center gap-2 max-[760px]:right-4 max-[760px]:bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] max-[760px]:left-4 max-[760px]:translate-x-0 max-[760px]:*:w-full max-[760px]:*:justify-between">
+    {(notice || removed) && <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 grid -translate-x-1/2 justify-items-center gap-2 max-[760px]:right-4 max-[760px]:bottom-[calc(1rem+env(safe-area-inset-bottom,0px))] max-[760px]:left-4 max-[760px]:translate-x-0 max-[760px]:*:w-full max-[760px]:*:justify-between">
       {notice && <div className="builder-undo pointer-events-auto flex items-center gap-3 rounded-xl bg-foreground py-2 pr-2 pl-4 text-sm text-background shadow-overlay" role="status">
         <span>{notice}</span>
         <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setNotice('')} size="icon-sm" variant="ghost"><X /></Button>
@@ -469,11 +452,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         <span>{removed.day.title.trim() ? `"${removed.day.title.trim()}" removido.` : `${partWord(days.map(day => day.date))} ${removed.index + 1} removido.`}</span>
         <Button className="bg-background/15 text-background hover:bg-background/25 hover:text-background" onClick={undoRemove} size="sm" variant="ghost"><Undo2 /> Desfazer</Button>
         <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setRemoved(null)} size="icon-sm" variant="ghost"><X /></Button>
-      </div>}
-      {replaced && <div className="builder-undo pointer-events-auto flex items-center gap-3 rounded-xl bg-foreground py-2 pr-2 pl-4 text-sm text-background shadow-overlay" role="status">
-        <span>{replaced.message}</span>
-        <Button className="bg-background/15 text-background hover:bg-background/25 hover:text-background" onClick={undoReplace} size="sm" variant="ghost"><Undo2 /> Desfazer</Button>
-        <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setReplaced(null)} size="icon-sm" variant="ghost"><X /></Button>
       </div>}
     </div>}
 
