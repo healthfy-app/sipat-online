@@ -355,7 +355,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
     }
 
     /// <summary>
-    /// Brings to a track people already follow only the extras added to or taken out of its course. Every house lesson
+    /// Brings to a track people already follow only the extras added to or taken out of its course, and the YouTube or
+    /// Vimeo extras that now have their length and start to count. Every house lesson
     /// keeps its row (id, progress, completion, certificate), extras are matched by their link, and the answers given
     /// to the games in the middle of a house video follow that video to its new place. Anything else (a house video
     /// added, removed or moved, other games, nothing changed at all) leaves the track exactly as it is and returns false.
@@ -368,11 +369,18 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var next = course.Videos;
         var oldReferences = old.Select(item => item.ProviderAssetReference).ToArray();
         var nextReferences = next.Select(LessonReference.For).ToArray();
-        if (old.Count == 0 || oldReferences.SequenceEqual(nextReferences)) return false;
+        if (old.Count == 0) return false;
         if (oldReferences.Distinct().Count() != old.Count || nextReferences.Distinct().Count() != next.Count) return false;
         if (old.Any(item => item.IsBonus && !LessonReference.IsBonus(item.ProviderAssetReference))) return false;
+        // a YouTube or Vimeo extra that now has its length starts to count: it keeps its row and becomes a house lesson
+        var promoted = next.Where(video => !IsBonus(video))
+            .Select(LessonReference.For)
+            .Where(reference => old.Any(item => item.IsBonus && item.ProviderAssetReference == reference))
+            .ToHashSet();
+        if (oldReferences.SequenceEqual(nextReferences) && promoted.Count == 0) return false;
         var oldHouse = Enumerable.Range(0, old.Count).Where(index => !old[index].IsBonus).ToArray();
-        var nextHouse = Enumerable.Range(0, next.Count).Where(index => !IsBonus(next[index])).ToArray();
+        var nextHouse = Enumerable.Range(0, next.Count)
+            .Where(index => !IsBonus(next[index]) && !promoted.Contains(nextReferences[index])).ToArray();
         if (!oldHouse.Select(index => oldReferences[index]).SequenceEqual(nextHouse.Select(index => nextReferences[index]))) return false;
 
         var nextIndex = Enumerable.Range(0, next.Count).ToDictionary(index => nextReferences[index]);
@@ -390,7 +398,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             || previous.Videos.Any(item => item?.Checkpoints is null)) return false;
         if (previous.GamificationEnabled != snapshot.Value.GamificationEnabled
             || !previous.Placements.Select(item => item.ModuleId).SequenceEqual(snapshot.Value.Placements.Select(item => item.ModuleId))
-            || next.Where(IsBonus).Any(video => video.Checkpoints.Count > 0)
+            || next.Where(video => IsBonus(video) || promoted.Contains(LessonReference.For(video))).Any(video => video.Checkpoints.Count > 0)
             || oldHouse.Where((index, house) => !previous.Videos[index].Checkpoints.SequenceEqual(snapshot.Value.Videos[nextHouse[house]].Checkpoints)).Any())
             return false;
 
@@ -421,6 +429,7 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             {
                 lesson.Position = index + 1;
                 if (!lesson.IsBonus) continue;
+                lesson.IsBonus = fresh[index].IsBonus;
                 lesson.Title = fresh[index].Title;
                 lesson.DurationMilliseconds = fresh[index].DurationMilliseconds;
                 lesson.SectionTitle = section;
