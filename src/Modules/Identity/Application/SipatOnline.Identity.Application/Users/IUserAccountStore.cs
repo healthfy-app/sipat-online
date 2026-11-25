@@ -26,6 +26,7 @@ public interface IUserAccountStore
         TenantId tenantId,
         int offset,
         int limit,
+        Guid? unitId,
         CancellationToken cancellationToken);
 
     Task<Result<User>> UpdateAsync(User user, CancellationToken cancellationToken);

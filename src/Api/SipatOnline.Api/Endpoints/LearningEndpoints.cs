@@ -30,10 +30,11 @@ public static class LearningEndpoints
         .WithName("ListTenantLearningTracks");
 
         reports.MapGet("/learning/participation", async (
+            Guid? unitId,
             LearningService learningService,
             CancellationToken cancellationToken) =>
         {
-            var result = await learningService.ListParticipantProgressAsync(cancellationToken);
+            var result = await learningService.ListParticipantProgressAsync(unitId, cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
         })
         .WithName("ListLearningParticipation");

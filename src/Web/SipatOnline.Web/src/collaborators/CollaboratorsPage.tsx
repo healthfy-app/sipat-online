@@ -1,5 +1,5 @@
 import { Pencil, Search, UserPlus } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { TrainingSelect } from '@/trainings/TrainingSelect';
@@ -83,23 +83,30 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   const [sectorFilter, setSectorFilter] = useState<PlacementFilter>('all');
   const [placing, setPlacing] = useState(false);
 
+  const lastLoad = useRef(0);
   const load = useCallback(async () => {
     setError('');
     // unit, sector and the rules are extra: if they fail the list stays usable, just without those columns
-    const extras = Promise.allSettled([listParticipantProfiles(), getCompanyRegistry()]);
+    // with a unit chosen at the top, the server sends its people only
+    const unit = unitScope.unitId;
+    // switching unit quickly: only the last answer asked for is shown
+    const asked = ++lastLoad.current;
+    const extras = Promise.allSettled([unit ? listParticipantProfiles(unit) : listParticipantProfiles(), getCompanyRegistry()]);
     try {
-      const [accounts, participation] = await Promise.all([listAllParticipants(), listLearningParticipation()]);
+      const [accounts, participation] = await Promise.all([unit ? listAllParticipants(unit) : listAllParticipants(), unit ? listLearningParticipation(unit) : listLearningParticipation()]);
+      if (asked !== lastLoad.current) return;
       setPeople(accounts); setRows(participation);
     } catch (failure) {
       setError(getErrorMessage(failure));
       setPeople(current => current ?? []);
     }
     const [profileResult, registryResult] = await extras;
+    if (asked !== lastLoad.current) return;
     setProfiles(profileResult.status === 'fulfilled' ? new Map(profileResult.value.map(profile => [profile.id, profile])) : null);
     setRegistry(registryResult.status === 'fulfilled' ? registryResult.value : null);
     const failure = profileResult.status === 'rejected' ? profileResult.reason : registryResult.status === 'rejected' ? registryResult.reason : null;
     if (failure) setError(current => current || getErrorMessage(failure));
-  }, []);
+  }, [unitScope.unitId]);
   useEffect(() => { void load(); }, [load]);
 
   const training = useTrainingFilter(rows);

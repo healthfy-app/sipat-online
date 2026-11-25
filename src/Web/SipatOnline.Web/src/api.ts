@@ -1352,19 +1352,22 @@ export function createPlatformUser(data: PlatformUserProvisionData): Promise<Pla
   });
 }
 
-export function listParticipants(offset = 0, limit = 100): Promise<ParticipantAccountPage> {
+/** With `unitId`, the server sends the people of that unit only (the pages of a company with a unit chosen at the top). */
+const unitQuery = (unitId: string | null | undefined, first: boolean) => unitId ? `${first ? '?' : '&'}unitId=${encodeURIComponent(unitId)}` : '';
+
+export function listParticipants(offset = 0, limit = 100, unitId?: string | null): Promise<ParticipantAccountPage> {
   return requestJson<ParticipantAccountPage>(
-    `/api/admin/users/participants?offset=${offset}&limit=${limit}`,
+    `/api/admin/users/participants?offset=${offset}&limit=${limit}${unitQuery(unitId, false)}`,
   );
 }
 
-export async function listAllParticipants(): Promise<ParticipantAccount[]> {
+export async function listAllParticipants(unitId?: string | null): Promise<ParticipantAccount[]> {
   const participants: ParticipantAccount[] = [];
   let offset = 0;
   let totalCount = 1;
 
   while (offset < totalCount) {
-    const page = await listParticipants(offset, 100);
+    const page = await (unitId ? listParticipants(offset, 100, unitId) : listParticipants(offset, 100));
     participants.push(...page.items);
     totalCount = page.totalCount;
     if (page.items.length === 0) break;
@@ -1421,8 +1424,8 @@ export function changeUserStatus(userId: string, isActive: boolean): Promise<Par
   });
 }
 
-export function listLearningParticipation(): Promise<LearningParticipantProgress[]> {
-  return requestJson<LearningParticipantProgress[]>('/api/admin/learning/participation');
+export function listLearningParticipation(unitId?: string | null): Promise<LearningParticipantProgress[]> {
+  return requestJson<LearningParticipantProgress[]>(`/api/admin/learning/participation${unitQuery(unitId, true)}`);
 }
 
 export function getLearningTrackDraft(trackId: string): Promise<LearningTrackDraft> {
@@ -1726,8 +1729,8 @@ export interface ParticipantProfile {
 }
 export type ProfileChange = Omit<ParticipantProfile, 'id'>;
 
-export function listParticipantProfiles(): Promise<ParticipantProfile[]> {
-  return requestJson<ParticipantProfile[]>('/api/admin/users/participants/profiles');
+export function listParticipantProfiles(unitId?: string | null): Promise<ParticipantProfile[]> {
+  return requestJson<ParticipantProfile[]>(`/api/admin/users/participants/profiles${unitQuery(unitId, true)}`);
 }
 
 export function saveParticipantProfile(userId: string, data: ProfileChange): Promise<ParticipantProfile> {

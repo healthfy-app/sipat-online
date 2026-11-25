@@ -189,6 +189,10 @@ describe('collaborators', () => {
     await waitFor(() => expect(within(table).queryByText('José Maria Santos')).not.toBeInTheDocument());
     expect(within(table).getByText('Maria José Oliveira')).toBeVisible();
     expect(screen.queryByLabelText('Filtrar por unidade')).not.toBeInTheDocument();
+    // and the server is asked for that unit only
+    await waitFor(() => expect(api.listAllParticipants).toHaveBeenLastCalledWith('u-1'));
+    expect(api.listLearningParticipation).toHaveBeenLastCalledWith('u-1');
+    expect(api.listParticipantProfiles).toHaveBeenLastCalledWith('u-1');
     expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
     localStorage.clear();
   });

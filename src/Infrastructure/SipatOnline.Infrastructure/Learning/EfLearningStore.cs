@@ -225,17 +225,24 @@ public sealed class EfLearningStore(
     public Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
         TenantId tenantId,
         CancellationToken cancellationToken) =>
-        ListParticipantProgressAsync(tenantId, null, cancellationToken);
+        ListParticipantProgressAsync(tenantId, null, null, cancellationToken);
+
+    public Task<IReadOnlyList<LearningParticipantProgress>> ListUnitProgressAsync(
+        TenantId tenantId,
+        Guid unitId,
+        CancellationToken cancellationToken) =>
+        ListParticipantProgressAsync(tenantId, null, unitId, cancellationToken);
 
     public Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
         TenantId tenantId,
         Guid participantId,
         CancellationToken cancellationToken) =>
-        ListParticipantProgressAsync(tenantId, (Guid?)participantId, cancellationToken);
+        ListParticipantProgressAsync(tenantId, participantId, null, cancellationToken);
 
     private async Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
         TenantId tenantId,
         Guid? onlyParticipantId,
+        Guid? onlyUnitId,
         CancellationToken cancellationToken)
     {
         var assignmentQuery = dbContext.LearningAssignments.AsNoTracking()
@@ -245,6 +252,13 @@ public sealed class EfLearningStore(
         if (onlyParticipantId is Guid only)
         {
             assignmentQuery = assignmentQuery.Where(assignment => assignment.ParticipantId == only);
+        }
+
+        if (onlyUnitId is Guid unit)
+        {
+            // the people of one unit: the filter runs in the database, so the others never leave it
+            assignmentQuery = assignmentQuery.Where(assignment => dbContext.Users.Any(user =>
+                user.Id == assignment.ParticipantId && user.TenantId == tenantId.Value && user.UnitId == unit));
         }
 
         var assignments = await assignmentQuery.ToListAsync(cancellationToken);

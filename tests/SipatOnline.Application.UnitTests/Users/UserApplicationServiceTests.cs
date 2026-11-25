@@ -283,6 +283,7 @@ public sealed class UserApplicationServiceTests
             TenantId tenantId,
             int offset,
             int limit,
+            Guid? unitId,
             CancellationToken cancellationToken) =>
             ListAsync(tenantId, offset, limit, cancellationToken);
 

@@ -108,6 +108,7 @@ public sealed class EfUserAccountStore(
         TenantId tenantId,
         int offset,
         int limit,
+        Guid? unitId,
         CancellationToken cancellationToken)
     {
         var participantRoleId = await dbContext.Roles.AsNoTracking()
@@ -125,6 +126,7 @@ public sealed class EfUserAccountStore(
                            dbContext.UserRoles.Any(role =>
                                role.UserId == user.Id && role.RoleId == participantRoleId.Value))
             .WithoutAdmins(dbContext);
+        if (unitId is Guid unit) participants = participants.Where(user => user.UnitId == unit);
         var totalCount = await participants.CountAsync(cancellationToken);
         var users = await participants
             .OrderBy(user => user.DisplayName)

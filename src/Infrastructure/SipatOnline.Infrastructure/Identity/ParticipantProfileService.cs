@@ -30,12 +30,14 @@ public sealed class ParticipantProfileService(
     public const int MaximumPlacementIds = 2000;
     private const int MaximumEmailLength = 256;
 
-    public async Task<Result<IReadOnlyList<ParticipantProfile>>> ListAsync(CancellationToken token)
+    /// <summary>The profiles of the participants of the company, or (with a unit) of that unit only.</summary>
+    public async Task<Result<IReadOnlyList<ParticipantProfile>>> ListAsync(Guid? unitId, CancellationToken token)
     {
         if (tenantContext.CurrentTenantId is not { IsEmpty: false } tenant)
             return Failure<IReadOnlyList<ParticipantProfile>>("tenant.context.required", "Não foi possível identificar a empresa.");
 
         var list = await ParticipantsOf(tenant.Value).AsNoTracking()
+            .Where(user => unitId == null || user.UnitId == unitId)
             .Select(user => new ParticipantProfile(user.Id, user.RegistrationNumber, user.Email, user.Phone, user.UnitId, user.SectorId))
             .ToListAsync(token);
         return Result<IReadOnlyList<ParticipantProfile>>.Success(list);

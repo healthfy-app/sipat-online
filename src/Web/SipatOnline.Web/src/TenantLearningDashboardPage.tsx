@@ -1,5 +1,5 @@
 import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles, type CompanyRegistry, type LearningParticipantProgress, type ParticipantProfile } from './api';
 import {
@@ -65,7 +65,13 @@ export default function TenantLearningDashboardPage({
   // with a unit chosen at the top, every number is about its people (where each one is comes apart: without it, the whole company)
   const unitScope = useUnitScope();
   const [profiles, setProfiles] = useState<ReadonlyMap<string, ParticipantProfile> | null>(null);
-  useEffect(() => { listParticipantProfiles().then(list => setProfiles(Array.isArray(list) ? new Map(list.map(item => [item.id, item])) : null), () => setProfiles(null)); }, []);
+  useEffect(() => {
+    let current = true;
+    (unitScope.unitId ? listParticipantProfiles(unitScope.unitId) : listParticipantProfiles()).then(
+      list => { if (current) setProfiles(Array.isArray(list) ? new Map(list.map(item => [item.id, item])) : null); },
+      () => { if (current) setProfiles(null); });
+    return () => { current = false; };
+  }, [unitScope.unitId]);
   const [registry, setRegistry] = useState<CompanyRegistry | null>(null);
   useEffect(() => { getCompanyRegistry().then(loaded => setRegistry(Array.isArray(loaded?.units) ? loaded : null), () => setRegistry(null)); }, []);
   // unit and sector of each person by name, for the spreadsheet
@@ -95,18 +101,23 @@ export default function TenantLearningDashboardPage({
   const [error, setError] = useState('');
   const [exportState, setExportState] = useState<{ busy: boolean; message: string }>({ busy: false, message: '' });
 
+  const lastLoad = useRef(0);
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
     setError('');
     try {
-      const [participants, participation] = await Promise.all([listAllParticipants(), listLearningParticipation()]);
+      // with a unit chosen at the top, the server sends its people only
+      const unit = unitScope.unitId;
+      const asked = ++lastLoad.current;
+      const [participants, participation] = await Promise.all([unit ? listAllParticipants(unit) : listAllParticipants(), unit ? listLearningParticipation(unit) : listLearningParticipation()]);
+      if (asked !== lastLoad.current) return;
       setLoaded({ participants, participation });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar o painel.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [unitScope.unitId]);
 
   useEffect(() => { void loadOverview(); }, [loadOverview]);
 
