@@ -82,7 +82,7 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
     }
 
     [DockerFact]
-    public async Task Import_UnknownSector_RejectsLineOnly()
+    public async Task Import_UnknownSector_JoinsTheCompanyList()
     {
         await using var postgres = await StartPostgresAsync();
         await using var factory = await CreateFactoryAsync(postgres);
@@ -93,10 +93,10 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
             Row(2, "Carlos Pereira") with { Sector = "producao" },
             Row(3, "Beatriz Lima") with { Sector = "Marketing" });
 
-        Assert.Equal(1, result.Created);
-        var rejection = Assert.Single(result.Rejected);
-        Assert.Equal(3, rejection.Row);
-        Assert.Equal("Setor \"Marketing\" não está na lista da empresa.", rejection.Message);
+        // a sector the company already has is matched; a new one is added with the import
+        Assert.Equal(2, result.Created);
+        Assert.Empty(result.Rejected);
+        Assert.Equal(["Marketing"], result.NewSectors);
     }
 
     [DockerFact]

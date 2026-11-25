@@ -56,9 +56,12 @@ public sealed class SipatPlanApiTests
         Assert.Equal(2, summary.GetProperty("days").GetInt32());
         Assert.Equal(3, summary.GetProperty("videos").GetInt32());
 
-        // a day without videos, or with a video that does not exist, is refused
+        // the draft may keep a day without videos (the video editor fills it), but it cannot go live like that
         await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan",
-            new { days = new[] { Day("Sem vídeos", "2026-11-09") } }, HttpStatusCode.BadRequest);
+            new { days = new[] { Day("Sem vídeos", "2026-11-09") } });
+        await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.BadRequest);
+        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days });
+        // a video that does not exist is refused
         await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan",
             new { days = new[] { Day("Vídeo fantasma", "2026-11-09", Guid.NewGuid()) } }, HttpStatusCode.BadRequest);
 
