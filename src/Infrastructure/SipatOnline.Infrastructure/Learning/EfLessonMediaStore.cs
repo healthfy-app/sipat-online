@@ -30,4 +30,13 @@ public sealed class EfLessonMediaStore(PlatformDbContext db) : ILessonMediaStore
             ? null
             : new LessonMedia(videoId, video.ContentType, video.HasSd480, video.HasFhd1080);
     }
+
+    public async Task<LessonThumbnail?> FindThumbnailAsync(Guid videoId, CancellationToken cancellationToken)
+    {
+        var found = await (from video in db.PlatformCourseVideos.AsNoTracking()
+                           join thumbnail in db.PlatformVideoThumbnails.AsNoTracking() on video.Id equals thumbnail.VideoId
+                           where video.Id == videoId && video.ThumbnailContentType != null
+                           select new { thumbnail.Data, video.ThumbnailContentType }).SingleOrDefaultAsync(cancellationToken);
+        return found is null ? null : new LessonThumbnail(found.Data, found.ThumbnailContentType!);
+    }
 }
