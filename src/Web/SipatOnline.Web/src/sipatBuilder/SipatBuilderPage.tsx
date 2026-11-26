@@ -510,6 +510,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
       : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
         onChange={cancelled || viewOnly ? () => undefined : edit} onRemoveDay={cancelled ? undefined : removeDay}
+        onEdit={cancelled || viewOnly ? undefined : () => { if (!busy) void editWeek(); }}
         // every day has its own "Enviar vídeo", for a company that has its own videos (Diamante)
         arriving={arriving} onSendToDay={capabilities?.internalVideos && !cancelled ? (dayKey, files) => void sendToDay(dayKey, files) : undefined} />}
 

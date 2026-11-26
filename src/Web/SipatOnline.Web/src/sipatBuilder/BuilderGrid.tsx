@@ -1,6 +1,6 @@
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type Modifier } from '@dnd-kit/core';
 import { getEventCoordinates } from '@dnd-kit/utilities';
-import { Plus, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,7 +49,9 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, onUpload, onSendToDay, arriving, canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false }: {
+export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, onUpload, onSendToDay, onEdit, arriving, canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false }: {
+  /** Opens this training in the video editor, the same as "Editar treinamento" in the top bar; a pencil on each day. */
+  onEdit?: () => void;
   /** The days came whole from a ready SIPAT (Bronze): their videos stay as they are, and no day is added or taken out. */
   locked?: boolean;
   /** Nothing can be changed: the company only views what the operation built. */
@@ -157,6 +159,8 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
                   <span className="rounded-full px-2.5 py-0.5 text-xs max-[760px]:px-3 max-[760px]:py-1 max-[760px]:tracking-[0.04em] font-extrabold tracking-wide text-white" style={{ backgroundColor: color }}>{word.toUpperCase()} {index + 1}</span>
                   {/* the date field shows day/month; only the weekday is added here. The time of the day lives in the column footer. */}
                   <span className="mr-auto text-xs font-semibold text-muted-foreground capitalize max-[760px]:text-[0.9375rem] max-[760px]:text-foreground">{shortDate(day.date).split(' ')[0]}</span>
+                  {/* the same "Editar treinamento" of the top bar, at hand on each day */}
+                  {onEdit && <Button aria-label={`Editar treinamento a partir do ${lower} ${index + 1}`} className="max-[760px]:hidden" onClick={onEdit} size="icon-sm" title="Editar treinamento" variant="ghost"><Pencil /></Button>}
                   <Button aria-label={`Remover o ${lower} ${index + 1}`} className="max-[760px]:-my-1.5 max-[760px]:-mr-2.5 max-[760px]:size-11 max-[760px]:min-h-11" disabled={days.length === 1} hidden={locked} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </div>
                 <Input aria-label={`Data do ${lower} ${index + 1}`} disabled={readOnly} className={cn('h-9 min-w-0 px-2 text-sm', phoneField)} onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />

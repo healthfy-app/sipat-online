@@ -214,8 +214,13 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     {subject && available.length > 1 && <option value="all">Todos os vídeos de {subject.title} ({available.length})</option>}
     {available.map(video => <option key={video.id} value={video.id}>{video.title}</option>)}
   </select>;
-  // its own button and what is on its way, at the foot of the day
+  // its own button and what is on its way, at the top of the day (on the phone, still at its foot)
   const sendRow = <>
+    {onSend && !full && <label className="m-0 flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-input px-2 text-[0.8125rem] font-semibold text-primary transition-colors hover:border-primary hover:bg-accent focus-within:border-primary max-[760px]:order-3 max-[760px]:min-h-12">
+      <CloudUpload aria-hidden="true" className="size-4" /> Enviar vídeo
+      <input accept="video/mp4,video/webm,.mp4,.webm" aria-label={`Enviar vídeo para o dia ${dayIndex + 1}`} className="sr-only" multiple
+        onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ''; if (files.length > 0) onSend(files); }} type="file" />
+    </label>}
     {arriving.length > 0 && <ul aria-label={`Vídeos a caminho do dia ${dayIndex + 1}`} className="m-0 grid list-none gap-1 p-0 max-[760px]:order-3">
       {arriving.map(item => <li className="flex items-center gap-2 rounded-lg border border-dashed border-primary/40 bg-accent/40 px-2 py-1.5" key={item.id}>
         <span aria-hidden="true" className="size-2 shrink-0 animate-pulse rounded-full bg-primary motion-reduce:animate-none" />
@@ -223,11 +228,6 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
         <span className="shrink-0 text-[0.6875rem] text-muted-foreground">{item.status}</span>
       </li>)}
     </ul>}
-    {onSend && !full && <label className="m-0 flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-input px-2 text-[0.8125rem] font-semibold text-primary transition-colors hover:border-primary hover:bg-accent focus-within:border-primary max-[760px]:order-3 max-[760px]:min-h-12">
-      <CloudUpload aria-hidden="true" className="size-4" /> Enviar vídeo
-      <input accept="video/mp4,video/webm,.mp4,.webm" aria-label={`Enviar vídeo para o dia ${dayIndex + 1}`} className="sr-only" multiple
-        onChange={event => { const files = Array.from(event.target.files ?? []); event.target.value = ''; if (files.length > 0) onSend(files); }} type="file" />
-    </label>}
   </>;
   const move = (from: number, to: number) => {
     const next = [...videoIds];
@@ -239,15 +239,16 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
   if (empty) {
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
       {dropBadge}
+      {sendRow}
       {editable ? <Film aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" /> : <Layers aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" />}
       <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{locked ? 'Este dia ainda não tem vídeos' : editable ? 'Arraste vídeos da lista para este dia' : 'Arraste um assunto para este dia'}</p>
       {chooser}
       {videoPicker}
-      {sendRow}
     </div>;
   }
   return <div className={frame} ref={setNodeRef}>
     {dropBadge}
+    {sendRow}
     {chooser}
     {locked ? null : subject
       ? <div className="flex items-center gap-2.5">
@@ -289,6 +290,5 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       </ul>}
     </div>
     {videoPicker}
-    {sendRow}
   </div>;
 }
