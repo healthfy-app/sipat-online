@@ -42,26 +42,38 @@ import { imageEdgeColor } from './imageEdgeColor';
 import LoadingState from './LoadingState';
 import VideoUploadTray from './videoUploads/VideoUploadTray';
 
+/**
+ * A page that loads on demand is a file of the version the browser opened. After a new version goes up that file is
+ * gone: the page is loaded again, once, to pick the new version up, instead of failing where it stands.
+ */
+function reloadForNewVersion(error: unknown): never | Promise<never> {
+  const key = 'sipat:reloaded-for-version';
+  let already = true;
+  try { already = sessionStorage.getItem(key) === '1'; if (!already) sessionStorage.setItem(key, '1'); } catch { /* no storage: do not risk a loop */ }
+  if (already) throw error;
+  window.location.reload();
+  return new Promise<never>(() => undefined);
+}
 // The pages of the company's administration and of the operation load when they are opened: a participant, who only
 // ever sees the learning pages, does not download them.
-const SipatsPage = lazy(() => import('./sipatBuilder/SipatsPage'));
-const CompanyHome = lazy(() => import('./companies/CompanyHome'));
-const CollaboratorsPage = lazy(() => import('./collaborators/CollaboratorsPage'));
-const RegistryPage = lazy(() => import('./registry/RegistryPage'));
-const TenantLearningDashboardPage = lazy(() => import('./TenantLearningDashboardPage'));
-const PlatformCompaniesPage = lazy(() => import('./PlatformCompaniesPage'));
-const PlatformCompanyEmployeesPage = lazy(() => import('./PlatformCompanyEmployeesPage'));
-const PlatformUsersPage = lazy(() => import('./PlatformUsersPage'));
-const PlatformHomePage = lazy(() => import('./PlatformHomePage'));
-const PlatformCoursesPage = lazy(() => import('./PlatformCoursesPage'));
-const SipatBuilderPage = lazy(() => import('./sipatBuilder/SipatBuilderPage'));
-const TrainingEditorPage = lazy(() => import('./trainings/TrainingEditorPage'));
-const PlaybackQualityPage = lazy(() => import('./quality/PlaybackQualityPage'));
-const PlaybackQualityComparisonPage = lazy(() => import('./quality/PlaybackQualityComparisonPage'));
-const PlatformSettingsPage = lazy(() => import('./PlatformSettingsPage'));
-const CertificatesPage = lazy(() => import('./CertificatesPage'));
-const TenantAppearancePage = lazy(() => import('./TenantAppearancePage'));
-const VideoLibraryPage = lazy(() => import('./videoLibrary/VideoLibraryPage'));
+const SipatsPage = lazy(() => import('./sipatBuilder/SipatsPage').catch(reloadForNewVersion));
+const CompanyHome = lazy(() => import('./companies/CompanyHome').catch(reloadForNewVersion));
+const CollaboratorsPage = lazy(() => import('./collaborators/CollaboratorsPage').catch(reloadForNewVersion));
+const RegistryPage = lazy(() => import('./registry/RegistryPage').catch(reloadForNewVersion));
+const TenantLearningDashboardPage = lazy(() => import('./TenantLearningDashboardPage').catch(reloadForNewVersion));
+const PlatformCompaniesPage = lazy(() => import('./PlatformCompaniesPage').catch(reloadForNewVersion));
+const PlatformCompanyEmployeesPage = lazy(() => import('./PlatformCompanyEmployeesPage').catch(reloadForNewVersion));
+const PlatformUsersPage = lazy(() => import('./PlatformUsersPage').catch(reloadForNewVersion));
+const PlatformHomePage = lazy(() => import('./PlatformHomePage').catch(reloadForNewVersion));
+const PlatformCoursesPage = lazy(() => import('./PlatformCoursesPage').catch(reloadForNewVersion));
+const SipatBuilderPage = lazy(() => import('./sipatBuilder/SipatBuilderPage').catch(reloadForNewVersion));
+const TrainingEditorPage = lazy(() => import('./trainings/TrainingEditorPage').catch(reloadForNewVersion));
+const PlaybackQualityPage = lazy(() => import('./quality/PlaybackQualityPage').catch(reloadForNewVersion));
+const PlaybackQualityComparisonPage = lazy(() => import('./quality/PlaybackQualityComparisonPage').catch(reloadForNewVersion));
+const PlatformSettingsPage = lazy(() => import('./PlatformSettingsPage').catch(reloadForNewVersion));
+const CertificatesPage = lazy(() => import('./CertificatesPage').catch(reloadForNewVersion));
+const TenantAppearancePage = lazy(() => import('./TenantAppearancePage').catch(reloadForNewVersion));
+const VideoLibraryPage = lazy(() => import('./videoLibrary/VideoLibraryPage').catch(reloadForNewVersion));
 
 type AppState =
   | { status: 'loading' }
