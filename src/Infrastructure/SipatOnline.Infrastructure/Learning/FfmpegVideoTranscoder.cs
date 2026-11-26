@@ -96,6 +96,35 @@ public sealed class FfmpegVideoTranscoder(VideoConversionOptions options)
         }
     }
 
+    /// <summary>
+    /// Writes the frame a second into the video as a small JPEG, the picture its card shows. False when there is
+    /// none to take (a video shorter than a second, a failure of ffmpeg): the card then shows the video itself.
+    /// </summary>
+    public async Task<bool> ExtractPosterAsync(string inputPath, string outputPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var run = await RunAsync(
+                options.FfmpegPath,
+                [
+                    "-hide_banner", "-nostdin", "-y",
+                    "-ss", "1", "-i", inputPath,
+                    "-frames:v", "1", "-update", "1",
+                    "-vf", "scale=640:-2",
+                    "-q:v", "4",
+                    outputPath
+                ],
+                TimeSpan.FromMinutes(1),
+                lowPriority: true,
+                cancellationToken);
+            return run.ExitCode == 0 && File.Exists(outputPath) && new FileInfo(outputPath).Length > 0;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            return false;
+        }
+    }
+
     public async Task<long?> ProbeDurationMillisecondsAsync(string path, CancellationToken cancellationToken)
     {
         try

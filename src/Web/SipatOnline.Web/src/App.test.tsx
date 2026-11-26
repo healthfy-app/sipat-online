@@ -120,11 +120,12 @@ describe('tenant portal', () => {
     expect(within(companyNavigation).queryByRole('link', { name: 'Empresas' })).not.toBeInTheDocument();
     expect(sessionStorage.getItem('sipat-company-administration')).toBe('company-1');
     expect(requests).toContainEqual({ url: '/api/platform/identity/session', company: null });
-    expect(requests.filter(request => request.url.startsWith('/api/admin/')))
+    // the dashboard asks for its numbers after the heading is on screen
+    await waitFor(() => expect(requests.filter(request => request.url.startsWith('/api/admin/')))
       .toEqual(expect.arrayContaining([
         { url: '/api/admin/learning/participation', company: 'company-1' },
         { url: '/api/admin/users/participants?offset=0&limit=100', company: 'company-1' },
-      ]));
+      ])));
   });
 
   it.each([

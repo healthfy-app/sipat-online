@@ -360,9 +360,24 @@ function Thumbnail({ video }: { video: PlatformCourseVideo }) {
   if (isExternal(video) && videoProvider(video) === 'YouTube' && video.externalId)
     return <img alt="" className={cover} decoding="async" loading="lazy" onError={() => setBroken(true)} src={`https://i.ytimg.com/vi/${video.externalId}/hqdefault.jpg`} />;
   // a frame a second in: the video's own image, without a picture made for it
-  if (!isExternal(video) && video.fileUrl)
-    return <video aria-hidden="true" className={cn(cover, 'pointer-events-none')} muted onError={() => setBroken(true)} playsInline preload="metadata" src={`${video.fileUrl}#t=1`} tabIndex={-1} />;
+  if (!isExternal(video) && video.fileUrl) return <VideoFrame className={cover} onError={() => setBroken(true)} src={video.fileUrl} />;
   return null;
+}
+
+/** A frame of the video, asked for only when its card scrolls into view: a long library does not open every video at once. */
+function VideoFrame({ src, className, onError }: { src: string; className: string; onError: () => void }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const node = ref.current;
+    if (!node || typeof IntersectionObserver === 'undefined') { setVisible(true); return; }
+    const observer = new IntersectionObserver(entries => { if (entries.some(entry => entry.isIntersecting)) { setVisible(true); observer.disconnect(); } }, { rootMargin: '200px' });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+  return <div className={className} ref={ref}>
+    {visible && <video aria-hidden="true" className="pointer-events-none size-full object-cover" muted onError={onError} playsInline preload="metadata" src={`${src}#t=1`} tabIndex={-1} />}
+  </div>;
 }
 
 /** The video playing in its own card: ours starts by itself; YouTube and Vimeo in their player. */
