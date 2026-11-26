@@ -39,8 +39,13 @@ public sealed class UnifyTrainingsMigrationTests
                 INSERT INTO tenancy."Tenants" ("Id", "Key", "Name", "PrimaryColor", "SecondaryColor", "CreatedAt", "IsActive", "Plan")
                 VALUES ({tenant}, 'damare', 'Damare', '#123456', '#654321', now(), true, 3)
                 """);
-            // these tables did not change: the current model writes them
-            db.PlatformCourseVideos.AddRange(Video(v1, "Um"), Video(v2, "Dois"), Video(v3, "Três"));
+            // the videos go in by hand too: their table gained the picture's columns after this point
+            foreach (var (id, title) in new[] { (v1, "Um"), (v2, "Dois"), (v3, "Três") })
+                await db.Database.ExecuteSqlInterpolatedAsync($"""
+                    INSERT INTO learning."PlatformCourseVideos" ("Id", "Title", "ContentType", "SizeBytes", "DurationMilliseconds", "CreatedAt")
+                    VALUES ({id}, {title}, 'video/mp4', 1000, 60000, now())
+                    """);
+            // this table did not change: the current model writes it
             db.GameModules.Add(new GameModuleEntity { Id = game, Title = "Quiz", CreatedAt = DateTimeOffset.UtcNow });
             await db.SaveChangesAsync();
 
@@ -139,14 +144,4 @@ public sealed class UnifyTrainingsMigrationTests
     private static async Task<(Guid, Guid?)[]> LinksAsync(PlatformDbContext db, Guid course) =>
         (await db.PlatformCourseVideoLinks.AsNoTracking().Where(link => link.CourseId == course).OrderBy(link => link.Position).ToListAsync())
             .Select(link => (link.VideoId, link.LessonId)).ToArray();
-
-    private static PlatformCourseVideoEntity Video(Guid id, string title) => new()
-    {
-        Id = id,
-        Title = title,
-        ContentType = "video/mp4",
-        SizeBytes = 1_000,
-        DurationMilliseconds = 60_000,
-        CreatedAt = DateTimeOffset.UtcNow
-    };
 }
