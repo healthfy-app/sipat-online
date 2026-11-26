@@ -404,7 +404,87 @@
   }
 }
 
-/* Banner da empresa: vira o fundo do painel de marca, desfocado e com véu escuro para o texto continuar legível */
+/* Banner da empresa: peça pronta 1:1. O painel é um quadrado da altura da tela e mostra a peça inteira,
+   sem desfoque, sem véu e sem texto por cima; o que sobrar ao redor fica na cor do painel. */
+.login-layout.has-art {
+  grid-template-columns: min(100vh, 58vw) minmax(0, 1fr);
+  grid-template-columns: min(100svh, 58vw) minmax(0, 1fr);
+}
+
+.login-art-panel {
+  display: grid;
+  padding: 0;
+  place-items: center;
+  background: var(--login-forest);
+}
+
+.login-art-panel::before,
+.login-art-panel::after {
+  display: none;
+}
+
+/* presa ao painel, não ao tamanho natural do arquivo: assim cabe inteira em qualquer tela */
+.login-art {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.login-layout.has-art .login-form-panel {
+  align-content: center;
+  gap: 1.5rem;
+}
+
+.login-form-brand {
+  width: min(100%, 28rem);
+  margin: 0;
+  font: inherit;
+}
+
+.login-form-brand .tenant-identity {
+  gap: 0.75rem;
+}
+
+.login-form-brand .tenant-name {
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.login-form-brand .sipat-default-logo,
+.login-form-brand .tenant-logo {
+  width: auto;
+  max-width: 9rem;
+  height: 2.5rem;
+  object-fit: contain;
+}
+
+@media (max-width: 760px) {
+  .login-layout.has-art {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* no celular a peça fica no topo, inteira, e nunca passa de 40% da tela: o formulário aparece sem rolar muito */
+  .login-art-panel {
+    min-height: 0;
+    padding: 0;
+  }
+
+  .login-art-panel {
+    height: min(100vw, 40vh);
+    height: min(100vw, 40svh);
+  }
+
+  .login-form-brand {
+    width: min(100%, 34rem);
+  }
+}
+
+/* Entrada da plataforma: a foto vira o fundo do painel de marca, desfocada e com véu escuro para o texto continuar legível */
 .login-brand-panel.has-banner {
   isolation: isolate;
   background: var(--login-forest);

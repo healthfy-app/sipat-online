@@ -55,6 +55,7 @@ import PlatformSettingsPage from './PlatformSettingsPage';
 import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
 import { BrandThemeContext, tenantTheme } from './branding';
+import { imageEdgeColor } from './imageEdgeColor';
 import LoadingState from './LoadingState';
 import VideoUploadTray from './videoUploads/VideoUploadTray';
 import VideoLibraryPage from './videoLibrary/VideoLibraryPage';
@@ -436,16 +437,31 @@ function LoginPage({
     }
   }
 
+  // the company's cover is a finished 1:1 piece: it shows whole, with nothing over it, and the identity moves to the form
+  const art = tenant.tenantKey === 'platform' ? null : tenant.bannerReference || null;
+  // a piece that is not square leaves room around it: that room takes the colour of the piece's own edge
+  const [artEdge, setArtEdge] = useState<string | null>(null);
+
   return (
     <section
       aria-label={tenant.tenantKey === 'platform' ? 'Acesso à plataforma' : 'Acesso ao portal da empresa'}
-      className="login-layout"
+      className={`login-layout${art ? ' has-art' : ''}`}
     >
+      {art ? (
+        <div className="login-brand-panel login-art-panel" style={artEdge ? { background: artEdge } : undefined}>
+          <img
+            alt={`Capa de ${tenant.tenantName}`}
+            className="login-art"
+            onLoad={(event) => setArtEdge(imageEdgeColor(event.currentTarget))}
+            src={art}
+          />
+        </div>
+      ) : (
       <div
-        className={`login-brand-panel${tenant.bannerReference || tenant.tenantKey === 'platform' ? ' has-banner' : ''}`}
+        className={`login-brand-panel${tenant.tenantKey === 'platform' ? ' has-banner' : ''}`}
         style={
-          tenant.bannerReference || tenant.tenantKey === 'platform'
-            ? ({ '--login-banner': `url("${tenant.bannerReference || '/platform-login-banner.jpg'}")` } as React.CSSProperties)
+          tenant.tenantKey === 'platform'
+            ? ({ '--login-banner': 'url("/platform-login-banner.jpg")' } as React.CSSProperties)
             : undefined
         }
       >
@@ -472,7 +488,13 @@ function LoginPage({
           {tenant.tenantKey === 'platform' ? 'Acesso exclusivo para operadores' : 'Ambiente de aprendizagem da empresa'}
         </span>
       </div>
+      )}
       <div className="login-form-panel" id="app-content" tabIndex={-1}>
+        {art && (
+          <h1 className="login-form-brand">
+            <TenantIdentity tenant={tenant} compact={false} />
+          </h1>
+        )}
         <form aria-labelledby="login-form-title" className="login-card" onSubmit={handleSubmit}>
           <div className="login-form-heading">
             <span aria-hidden="true" className="login-form-symbol">

@@ -12,34 +12,32 @@ const tenant: TenantBranding = {
 };
 afterEach(() => { cleanup(); vi.resetAllMocks(); });
 
-/** jsdom draws nothing: a fake image and canvas stand in to measure how bright the banner is */
-function stubBannerBrightness(level: number) {
-  const channel = Math.round(level * 255);
-  vi.stubGlobal('Image', class { onload: (() => void) | null = null; set src(_value: string) { queueMicrotask(() => this.onload?.()); } });
-  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue({
-    drawImage: vi.fn(),
-    getImageData: () => ({ data: new Uint8ClampedArray(24 * 24 * 4).fill(channel) }),
-  } as unknown as CanvasRenderingContext2D);
+/** jsdom loads no image: a fake one stands in, with the size the test gives it */
+function stubImageSize(width: number, height: number) {
+  vi.stubGlobal('Image', class {
+    naturalWidth = width; naturalHeight = height;
+    onload: (() => void) | null = null;
+    set src(_value: string) { queueMicrotask(() => this.onload?.()); }
+  });
 }
 
 describe('company identity settings', () => {
-  it('previews the login with the banner blurred, and warns when the image is very bright', async () => {
-    stubBannerBrightness(0.95);
+  it('previews the login with the cover whole and sharp, and warns when the image is not square', async () => {
+    stubImageSize(1600, 700);
     render(<TenantAppearancePage tenant={{ ...tenant, bannerReference: '/api/tenant/banner/acme?v=1' }} onSaved={vi.fn()} />);
-    const layer = screen.getByTestId('login-preview-banner');
-    expect(layer.getAttribute('style')).toContain('blur(');
-    expect(await screen.findByText(/Esta imagem é muito clara/)).toBeVisible();
+    const cover = screen.getByTestId('login-preview-banner');
+    expect(cover).toHaveAttribute('src', '/api/tenant/banner/acme?v=1');
+    expect(cover.getAttribute('style') ?? '').not.toContain('blur(');
+    expect(await screen.findByText(/Esta imagem não é quadrada/)).toBeVisible();
     vi.unstubAllGlobals();
-    vi.restoreAllMocks();
   });
 
-  it('does not warn about a dark banner', async () => {
-    stubBannerBrightness(0.2);
+  it('does not warn about a square cover', async () => {
+    stubImageSize(1080, 1080);
     render(<TenantAppearancePage tenant={{ ...tenant, bannerReference: '/api/tenant/banner/acme?v=1' }} onSaved={vi.fn()} />);
     await screen.findByTestId('login-preview-banner');
-    await waitFor(() => expect(screen.queryByText(/Esta imagem é muito clara/)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText(/Esta imagem não é quadrada/)).not.toBeInTheDocument());
     vi.unstubAllGlobals();
-    vi.restoreAllMocks();
   });
 
   it('previews picker and HEX changes locally and discards without publishing', async () => {
@@ -80,12 +78,12 @@ describe('company identity settings', () => {
     vi.mocked(saveTenantAppearance).mockResolvedValue(saved);
     render(<TenantAppearancePage tenant={tenant} onSaved={onSaved} />);
     const user = userEvent.setup({ applyAccept: false });
-    expect(screen.getByText(/Nenhum banner/)).toBeVisible();
-    await user.upload(screen.getByLabelText('Selecionar banner da entrada'), new File(['x'], 'animado.gif', { type: 'image/gif' }));
-    expect(await screen.findByRole('alert')).toHaveTextContent('Selecione um banner PNG, JPEG ou WebP de até 1,5 MB.');
-    await user.upload(screen.getByLabelText('Selecionar banner da entrada'), banner);
+    expect(screen.getByText(/Nenhuma capa/)).toBeVisible();
+    await user.upload(screen.getByLabelText('Selecionar capa da entrada'), new File(['x'], 'animado.gif', { type: 'image/gif' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Selecione uma capa PNG, JPEG ou WebP de até 1,5 MB.');
+    await user.upload(screen.getByLabelText('Selecionar capa da entrada'), banner);
     await screen.findByText('banner.png · pronto para salvar');
-    expect(screen.getByRole('img', { name: 'Prévia do banner da entrada' })).toBeVisible();
+    expect(screen.getByRole('img', { name: 'Prévia da capa da entrada' })).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Salvar identidade visual' }));
     await waitFor(() => expect(onSaved).toHaveBeenCalledWith(saved));
     expect(saveTenantAppearance).toHaveBeenCalledWith({
