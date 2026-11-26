@@ -3,7 +3,7 @@ import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2,
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
+  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, getTrainingLimit, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +100,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   const [startDate, setStartDate] = useState('');
   const [days, setDays] = useState<DaySlots[]>([]);
   const [dirty, setDirty] = useState(false);
+  // the last day the training can be taken, when it runs past its last day ('': it ends with its last day)
+  const [limit, setLimit] = useState('');
   const [busy, setBusy] = useState(false);
   const [importing, setImporting] = useState(false);
   const [copying, setCopying] = useState(false);
@@ -145,6 +147,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         if (!found) { setError('Não encontrei este treinamento.'); return; }
         setName(found.title);
         setDays((await getTemplateDays(templateId)).map(fromProgramDay));
+        setLimit(await getTrainingLimit(templateId).catch(() => null) ?? '');
         return;
       }
       const [content, events, summaries] = await Promise.all([getSipatCatalog(), listSipatEvents(0, 100), listSipatPlans()]);
@@ -156,6 +159,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         const found = events.items.find(item => item.id === params.sipatId);
         if (!found) { setError('Não encontrei este treinamento.'); return; }
         setSipat(found); setName(found.title);
+        // the training ends the day before `endsAt`: its last day, or its limit date when that is further ahead
+        setLimit(addDays(found.endsAt.slice(0, 10), -1));
         setDays((await getSipatPlan(found.id)).map(fromProgramDay));
       } else {
         const year = new Date().getFullYear();
@@ -256,6 +261,18 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
     setStage('grid'); setDirty(true);
   }
 
+  const dated = days.map(day => day.date).filter(isValidDate).sort();
+  const firstDate = dated[0] ?? '';
+  const lastDate = dated[dated.length - 1] ?? '';
+  // the limit shown: the one chosen, never behind the last day
+  const shownLimit = lastDate && (!isValidDate(limit) || limit < lastDate) ? lastDate : limit;
+  /** A new start carries every day with it, keeping the gaps between them (and the limit as far ahead as it was). */
+  function moveStart(next: string) {
+    if (!isValidDate(next)) return;
+    const shift = firstDate ? Math.round((Date.parse(`${next}T00:00:00Z`) - Date.parse(`${firstDate}T00:00:00Z`)) / 86_400_000) : 0;
+    edit(days.map((day, index) => ({ ...day, date: firstDate ? (isValidDate(day.date) ? addDays(day.date, shift) : day.date) : addDays(next, index) })));
+    if (firstDate && isValidDate(limit)) setLimit(addDays(limit, shift));
+  }
   const issues = useMemo(() => findIssues(name, days), [name, days]);
   const issueCount = Object.keys(issues.days).length + (issues.name ? 1 : 0);
 
@@ -286,9 +303,11 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   async function save(skipChecks = false): Promise<string | null> {
     if (!skipChecks && !checkIssues()) return null;
     setBusy(true); setError(''); setNotice('');
+    // a limit behind the last day would end the training before its days: it follows the last day then
+    const endsOn = lastDate ? (isValidDate(limit) && limit > lastDate ? limit : lastDate) : null;
     try {
       if (template) {
-        const saved = await saveTemplateDays(templateId, withDayWord(days, 'Dia').map(toProgramDay));
+        const saved = await saveTemplateDays(templateId, withDayWord(days, partWord(days.map(day => day.date))).map(toProgramDay), endsOn);
         setDays(saved.map(fromProgramDay)); setDirty(false);
         setNotice('Template salvo.');
         return templateId;
@@ -305,7 +324,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         current = await updateSipatEvent(current.id, { title: name.trim(), description: current.description, startsAt: current.startsAt, endsAt: current.endsAt });
       }
       // untyped names go out as the board shows them ("Módulo 2" without dates, "Dia 2" with)
-      const saved = await saveSipatPlan(current.id, withDayWord(days, partWord(days.map(day => day.date))).map(toProgramDay));
+      const saved = await saveSipatPlan(current.id, withDayWord(days, partWord(days.map(day => day.date))).map(toProgramDay), endsOn);
+      // the training's period follows what was just saved
+      if (firstDate && lastDate) current = { ...current, startsAt: `${firstDate}T00:00:00.000Z`, endsAt: `${addDays(endsOn ?? lastDate, 1)}T00:00:00.000Z` };
       setDays(saved.map(fromProgramDay)); setDirty(false); setSipat(current);
       setNotice('Rascunho salvo.');
       if (isNew) navigate(`${basePath}/${current.id}`, { replace: true });
@@ -483,7 +504,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         </div>
         <p className="ops-hero-lead is-keep max-[760px]:text-[0.875rem]! max-[760px]:leading-[1.45]">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : <>
           <span className="max-[760px]:hidden">{canCustomizeGrid
-            ? template ? 'Cada coluna é um dia, sem data: as datas entram quando uma empresa usa este template. Arraste vídeos da lista para cada dia.' : 'Cada coluna é um dia. Arraste um título ou vídeos da lista para cada dia e confira o tempo.'
+            ? 'Cada coluna é um dia. Arraste um título ou vídeos da lista para cada dia e confira o tempo.'
             : 'Cada coluna é um dia, com os vídeos da SIPAT pronta.'}</span>
           <span className="hidden max-[760px]:inline">{canCustomizeGrid ? 'Escolha um assunto para cada dia e confira os vídeos e os jogos.' : 'Os dias e os vídeos da SIPAT pronta.'}</span>
         </>}</p>
@@ -493,6 +514,17 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
           <li><Gamepad2 aria-hidden="true" /><strong>{totals.games}</strong> {totals.games === 1 ? 'jogo' : 'jogos'}</li>
           <li><Clock aria-hidden="true" />{totals.time > 0 ? formatSpan(totals.time) : 'sem vídeos'}</li>
         </ul>}
+        {/* when it runs: from its first day to its limit date, which can go past the last day */}
+        {stage === 'grid' && <div className="flex flex-wrap items-end gap-3">
+          <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Início
+            <Input aria-label="Início do treinamento" className="h-9 w-auto text-sm" disabled={viewOnly || busy} onChange={event => moveStart(event.target.value)} type="date" value={firstDate} />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Data limite
+            <Input aria-label="Data limite do treinamento" className="h-9 w-auto text-sm" disabled={viewOnly || busy || !lastDate} min={lastDate || undefined}
+              onChange={event => { setLimit(event.target.value); setDirty(true); }} type="date" value={shownLimit} />
+          </label>
+          <p className="m-0 max-w-sm pb-1.5 text-xs text-muted-foreground">O treinamento pode ser feito até a data limite, mesmo depois do último dia.</p>
+        </div>}
         {/* who it is for: the whole company, or the units and sectors marked */}
         {stage === 'grid' && sipat && !cancelled && <AudienceRow canEdit={!viewOnly} openAtStart={search.get('para-quem') === '1'} sipatId={sipat.id} />}
       </div>
@@ -542,7 +574,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         onCopy={sources.length > 0 ? () => setCopying(true) : undefined}
         onTraining={setTraining} readyOnly={readyOnly} training={training}
         trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
-      : <BuilderGrid undated={template} canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
+      : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
         onChange={viewOnly ? () => undefined : edit} onRemoveDay={removeDay}
         onEdit={viewOnly ? undefined : () => { if (!busy) void editWeek(); }}
         // every day has its own "Enviar vídeo", for a company that has its own videos (Diamante)

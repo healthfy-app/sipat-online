@@ -113,6 +113,19 @@ export default function App() {
     };
   }, []);
 
+  // the operation's portal painted as a company (the operator was inside one) and nobody signed in any more (the
+  // session ended): the login is the operation's own, so the company is left and the operation's look comes back
+  const strandedInCompany = state.status === 'ready' && state.platformPortal && !state.session && state.tenant.tenantKey !== 'platform';
+  useEffect(() => {
+    if (!strandedInCompany) return;
+    let active = true;
+    clearCompanyAdministration();
+    getTenantBranding().then(tenant => {
+      if (active) setState(current => (current.status === 'ready' ? { ...current, tenant } : current));
+    }, () => undefined);
+    return () => { active = false; };
+  }, [strandedInCompany]);
+
   if (state.status === 'loading') {
     return <main className="app-loading"><LoadingState>Carregando o portal...</LoadingState></main>;
   }

@@ -161,7 +161,7 @@ describe('SIPAT builder', () => {
 
       await userEvent.type(screen.getByRole('textbox', { name: 'Título do dia 1' }), '!');
       await userEvent.click(screen.getByRole('button', { name: /Salvar rascunho/ }));
-      await waitFor(() => expect(api.saveSipatPlan).toHaveBeenCalledWith('s1', [expect.objectContaining({ videoIds: ids })]));
+      await waitFor(() => expect(api.saveSipatPlan).toHaveBeenCalledWith('s1', [expect.objectContaining({ videoIds: ids })], expect.anything()));
     });
   });
 });

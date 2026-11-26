@@ -259,15 +259,21 @@ export function listSipatPlans(): Promise<SipatPlanSummary[]> {
 export async function getSipatPlan(sipatId: string): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`));
 }
-export async function saveSipatPlan(sipatId: string, days: ProgramDay[]): Promise<ProgramDay[]> {
-  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify({ days }) }));
+/** `endsOn`: the limit date (the last day the training can be taken); left out, the limit stays as it is; null, it ends with its last day. */
+export async function saveSipatPlan(sipatId: string, days: ProgramDay[], endsOn?: string | null): Promise<ProgramDay[]> {
+  const body = endsOn === undefined ? { days } : { days, endsOn, setLimit: true };
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify(body) }));
 }
-/** The days of a template (a training of the operation, of no company): the same board, without dates. */
+/** The days of a template (a training of the operation, of no company): the same board of days. */
 export async function getTemplateDays(courseId: string): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`));
 }
-export async function saveTemplateDays(courseId: string, days: ProgramDay[]): Promise<ProgramDay[]> {
-  return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`, { method: 'PUT', body: JSON.stringify({ days }) }));
+export async function saveTemplateDays(courseId: string, days: ProgramDay[], endsOn: string | null): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`, { method: 'PUT', body: JSON.stringify({ days, endsOn }) }));
+}
+/** The limit date of a training, when it has one of its own ("2026-12-10"). */
+export async function getTrainingLimit(courseId: string): Promise<string | null> {
+  return (await requestJson<{ endsOn: string | null }>(`/api/platform/catalog/courses/${courseId}/days/limit`)).endsOn ?? null;
 }
 export async function copySipatPlan(sipatId: string, sourceId: string): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan/copy-from/${sourceId}`, { method: 'POST', body: '{}' }));
@@ -828,7 +834,9 @@ export function getTrainingEditor(sipatId: string): Promise<TrainingEditorData> 
 }
 
 export function getTenantBranding(): Promise<TenantBranding> {
-  return requestJson<TenantBranding>('/api/tenant/branding');
+  // the same address answers as the operation or as the company the operator is inside (by a header): a copy kept by
+  // the browser of one must never be served as the other
+  return requestJson<TenantBranding>('/api/tenant/branding', { cache: 'no-store' });
 }
 
 export interface TenantAppearanceData {

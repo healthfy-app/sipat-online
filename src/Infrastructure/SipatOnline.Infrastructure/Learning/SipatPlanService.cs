@@ -211,12 +211,13 @@ public sealed class SipatPlanService(
     }
 
     /// <summary>
-    /// Saves the days of a template, built on the same board a company uses. A template belongs to no company, so no
-    /// plan limits it and its days carry no date: the dates come when a company makes its training from it.
+    /// Saves the days of a template, built on the same board a company uses, with its dates and its limit date.
+    /// A template belongs to no company, so no plan limits it.
     /// </summary>
-    public async Task<Result<IReadOnlyList<ProgramDay>>> SaveTemplateAsync(Guid courseId, IReadOnlyList<ProgramDay>? days, CancellationToken token)
+    public async Task<Result<IReadOnlyList<ProgramDay>>> SaveTemplateAsync(Guid courseId, IReadOnlyList<ProgramDay>? days, DateOnly? endsOn, CancellationToken token)
     {
-        if (!await db.PlatformCourses.AnyAsync(course => course.Id == courseId && course.TenantId == null, token))
+        var template = await db.PlatformCourses.SingleOrDefaultAsync(course => course.Id == courseId && course.TenantId == null, token);
+        if (template is null)
             return Failure<IReadOnlyList<ProgramDay>>("sipat.not_found", "O treinamento não foi encontrado.");
         var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token, allowEmptyDays: true);
         if (!cleaned.IsSuccess) return cleaned;
@@ -228,11 +229,27 @@ public sealed class SipatPlanService(
                 $"O vídeo \"{video?.Title}\" está em dois dias. Cada vídeo entra uma vez no treinamento.");
         }
 
-        await WriteDaysAsync(courseId, cleaned.Value.Select(day => day with { Date = null }).ToArray(), token);
+        var limit = Limit(cleaned.Value, endsOn);
+        if (!limit.IsSuccess) return Result<IReadOnlyList<ProgramDay>>.Failure(limit.Error);
+        await WriteDaysAsync(courseId, cleaned.Value, token);
+        template.EndsOn = endsOn;
         await db.SaveChangesAsync(token);
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId ?? default, "learning.template.days_saved", "platform_course",
             courseId.ToString("D"), clock.GetUtcNow()), token);
         return Result<IReadOnlyList<ProgramDay>>.Success(await ReadDaysAsync(courseId, token));
+    }
+
+    /// <summary>The limit date of a training (the last day it can be taken), when it has one of its own.</summary>
+    public async Task<DateOnly?> LimitAsync(Guid courseId, CancellationToken token) =>
+        await db.PlatformCourses.AsNoTracking().Where(course => course.Id == courseId).Select(course => course.EndsOn).SingleOrDefaultAsync(token);
+
+    /// <summary>The limit date has to reach the last day: a training runs past its days, never ends before them.</summary>
+    private static Result<bool> Limit(IReadOnlyList<ProgramDay> days, DateOnly? endsOn)
+    {
+        var last = days.Where(day => day.Date is not null).Select(day => day.Date!.Value).DefaultIfEmpty().Max();
+        return endsOn is { } limit && last != default && limit < last
+            ? Result<bool>.Failure(new DomainError("sipat.limit_before_last_day", "A data limite não pode ser antes do último dia do treinamento."))
+            : Result<bool>.Success(true);
     }
 
     public async Task<Result<IReadOnlyList<SipatPlanSummary>>> SummariesAsync(CancellationToken token)
@@ -303,8 +320,11 @@ public sealed class SipatPlanService(
         return Result<bool>.Success(true);
     }
 
-    /// <summary>Saves the days. The training's dates follow the dates of its days, so a week is always what the table says.</summary>
-    public async Task<Result<IReadOnlyList<ProgramDay>>> SaveAsync(Guid sipatId, IReadOnlyList<ProgramDay>? days, CancellationToken token)
+    /// <summary>
+    /// Saves the days. The training starts on its first day and ends on its last one, or on its limit date when it has
+    /// one further ahead (the training runs past its days).
+    /// </summary>
+    public async Task<Result<IReadOnlyList<ProgramDay>>> SaveAsync(Guid sipatId, IReadOnlyList<ProgramDay>? days, CancellationToken token, DateOnly? endsOn = null, bool keepLimit = true)
     {
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<IReadOnlyList<ProgramDay>>.Failure(found.Error);
@@ -329,13 +349,19 @@ public sealed class SipatPlanService(
         }
 
         var now = clock.GetUtcNow();
+        var content = await db.PlatformCourses.SingleAsync(course => course.Id == sipat.CourseId, token);
+        // a caller that does not know the limit (an older screen) leaves it as it is
+        if (!keepLimit) content.EndsOn = endsOn;
+        var limit = Limit(cleaned.Value, content.EndsOn);
+        if (!limit.IsSuccess) return Result<IReadOnlyList<ProgramDay>>.Failure(limit.Error);
         await WriteDaysAsync(sipat.CourseId, cleaned.Value, token);
 
         var dates = cleaned.Value.Where(day => day.Date is not null).Select(day => day.Date!.Value).ToArray();
         if (dates.Length > 0)
         {
+            var last = content.EndsOn is { } ahead && ahead > dates.Max() ? ahead : dates.Max();
             sipat.StartsAt = new DateTimeOffset(dates.Min().ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-            sipat.EndsAt = new DateTimeOffset(dates.Max().AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            sipat.EndsAt = new DateTimeOffset(last.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         }
 
         await db.SaveChangesAsync(token);

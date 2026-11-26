@@ -28,6 +28,9 @@ public sealed class PlatformCourseEntity
     /// <summary>A model offered whole as a ready SIPAT (what a Bronze company picks). Only on models.</summary>
     public bool IsReadySipat { get; set; }
 
+    /// <summary>The last day the training can be taken, when it runs past its last day; null ends with the last day.</summary>
+    public DateOnly? EndsOn { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 
     public ICollection<PlatformCourseModuleLinkEntity> ModuleLinks { get; set; } = [];
