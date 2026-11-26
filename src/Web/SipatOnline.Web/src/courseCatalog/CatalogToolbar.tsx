@@ -1,5 +1,5 @@
 import { Search, Settings2, X } from 'lucide-react';
-import type { CourseCategory } from '@/api';
+import type { CourseCategory, VideoSubject } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
 import type { CatalogFilters, StatusFilter } from './catalogFilters';
@@ -23,6 +23,9 @@ export default function CatalogToolbar({
   filters,
   categories,
   companies = [],
+  subjects = [],
+  subject = '',
+  onSubject = () => undefined,
   hasUncategorized,
   countText,
   isFiltered,
@@ -35,6 +38,10 @@ export default function CatalogToolbar({
   categories: CourseCategory[];
   /** The companies that have trainings, to show only one's (or only the operation's models). */
   companies?: { id: string; name: string }[];
+  /** The assuntos, to show only one's games (the games tab). */
+  subjects?: VideoSubject[];
+  subject?: string;
+  onSubject?: (subject: string) => void;
   hasUncategorized: boolean;
   countText: string;
   isFiltered: boolean;
@@ -76,6 +83,14 @@ export default function CatalogToolbar({
           </NativeSelect>}
           <Button className="text-muted-foreground max-sm:order-3" onClick={onManageCategories} size="sm" variant="ghost"><Settings2 /> Gerenciar categorias</Button>
         </>
+      )}
+
+      {tab === 'modules' && subjects.length > 0 && (
+        <NativeSelect aria-label="Filtrar por assunto" className="w-auto max-w-xs max-sm:flex-1" onChange={(event) => onSubject(event.target.value)} value={subject}>
+          <option value="">Todos os assuntos</option>
+          <option value="none">Sem assunto</option>
+          {subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </NativeSelect>
       )}
 
       {isFiltered && <Button onClick={onClear} size="sm" variant="ghost"><X /> Limpar filtros</Button>}
