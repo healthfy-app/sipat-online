@@ -40,6 +40,7 @@ import PlanMedal from './companies/PlanMedal';
 import { BrandThemeContext, tenantTheme } from './branding';
 import { imageEdgeColor } from './imageEdgeColor';
 import LoadingState from './LoadingState';
+import { useNewVersionReload } from './versionWatch';
 import VideoUploadTray from './videoUploads/VideoUploadTray';
 
 /**
@@ -631,6 +632,8 @@ function ProtectedPortal({
   // the phone menu (sheet) closes whenever the page changes, including after tapping one of its links
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
+  // a tab left open picks a new version up on the next change of page, instead of showing screens that were replaced
+  useNewVersionReload(location.pathname);
 
   if (!session) {
     return <Navigate to="/login" replace />;
