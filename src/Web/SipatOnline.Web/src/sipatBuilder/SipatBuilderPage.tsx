@@ -437,6 +437,17 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
     } finally { setBusy(false); }
   }
 
+  /** Starts from a template of the operation: each of its Títulos becomes a day, with its videos; the dates follow the start chosen, or stay open. */
+  function copyFromTemplate(source: PlatformCourse) {
+    if (!catalog) return;
+    setCopying(false);
+    const base = isValidDate(startDate) ? startDate : firstDate;
+    const known = (ids: string[]) => ids.filter(id => catalog.videos.has(id));
+    setDays(titlesOf(source).slice(0, maxDays).map((title, index) => dayFromTitle(index, base ? addDays(base, index) : '', title.title, known(title.videoIds))));
+    setStage('grid'); setDirty(true);
+    setNotice(`Dias copiados de "${source.title}". Confira as datas e os vídeos antes de salvar.`);
+  }
+
   async function copyFrom(sourceId: string) {
     setCopying(false);
     setBusy(true); setError('');
@@ -476,6 +487,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   const viewOnly = readyOnly && !canEditThemes;
   const readySipats = trainings.filter(item => item.isReadySipat);
   const sources = others.filter(item => item.id !== sipat?.id && (plans.find(plan => plan.sipatEventId === item.id)?.days ?? 0) > 0);
+  // the operation's templates to start from, beside the company's own trainings (Bronze: only the ready SIPATs)
+  const templateSources = (readyOnly ? readySipats : trainings).filter(item => titlesOf(item).length > 0);
+  const canCopy = sources.length > 0 || templateSources.length > 0;
   const label = sipat ? phaseLabel[sipatPhase(sipat, days.filter(day => day.videos.some(Boolean)).length)] : null;
   // the name is edited in the title itself, while the SIPAT is a draft; after publishing it stays as it is
   const canRename = !template && stage === 'grid' && !cancelled && (sipat === null || sipat.status === 'Draft');
@@ -532,7 +546,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild><Button className={phoneAction} disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
           <DropdownMenuContent>
-            {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
+            {canCopy && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
             {canCustomizeGrid && <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>}
             <DropdownMenuItem disabled={days.length === 0} onSelect={exportCsv}><FileDown /> Exportar CSV</DropdownMenuItem>
             {sipat && <DropdownMenuItem onSelect={() => coverPicker.current?.click()}><ImagePlus /> Capa do treinamento</DropdownMenuItem>}
@@ -571,7 +585,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
     {stage === 'setup'
       ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={canCustomizeGrid ? () => setImporting(true) : undefined} onName={setName} onStart={start}
         onStartDate={setStartDate} onTemplate={csvTemplate} startDate={startDate}
-        onCopy={sources.length > 0 ? () => setCopying(true) : undefined}
+        onCopy={canCopy ? () => setCopying(true) : undefined}
         onTraining={setTraining} readyOnly={readyOnly} training={training}
         trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
       : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
@@ -585,7 +599,10 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
       onTemplate={csvTemplate} />}
 
     {copying && <Dialog description="Escolha o treinamento de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outro treinamento">
-      <ul className="m-0 grid max-h-72 list-none gap-2 overflow-auto p-0">
+      <div className="grid max-h-[60vh] gap-4 overflow-auto">
+      {sources.length > 0 && <section className="grid gap-2">
+      <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{template ? 'Treinamentos' : 'Da empresa'}</h3>
+      <ul className="m-0 grid list-none gap-2 p-0">
         {sources.map(item => {
           const plan = plans.find(entry => entry.sipatEventId === item.id);
           return <li key={item.id}>
@@ -597,6 +614,20 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
           </li>;
         })}
       </ul>
+      </section>}
+      {templateSources.length > 0 && <section className="grid gap-2">
+        <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Templates da operação</h3>
+        <ul className="m-0 grid list-none gap-2 p-0">
+          {templateSources.map(item => <li key={item.id}>
+            <button className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-primary" onClick={() => copyFromTemplate(item)} type="button">
+              <span className="grid"><strong className="text-sm">{item.title}</strong>
+                <span className="text-xs text-muted-foreground">{pluralize(titlesOf(item).length, 'dia', 'dias')} · {pluralize(item.videos.length, 'vídeo', 'vídeos')}</span></span>
+              <Badge variant="outline">Template</Badge>
+            </button>
+          </li>)}
+        </ul>
+      </section>}
+      </div>
       <DialogActions><Button onClick={() => setCopying(false)} variant="outline">Cancelar</Button></DialogActions>
     </Dialog>}
 
