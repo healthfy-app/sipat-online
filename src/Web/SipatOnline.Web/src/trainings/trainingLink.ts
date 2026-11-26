@@ -1,4 +1,4 @@
-import { getPlatformDashboard } from '@/api';
+import { getCompanyAdministrationId, getPlatformDashboard } from '@/api';
 import { companyAddress } from '@/companies/CompanyAddress';
 
 /**
@@ -44,8 +44,13 @@ export function clearLinkedTraining(): void {
  */
 export async function trainingLink(sipatId: string, basePath: string, operator: boolean): Promise<string> {
   let origin = window.location.origin;
-  if (operator) {
-    const companyId = basePath.split('/')[3];
+  // on the operation's address the link is always the company's: inside a company (/platform/companies/{id}/…) or
+  // after "Entrar como administrador" (/admin/…, the company set for the calls). The operation's address has no
+  // participant sign-in, so a link on it sends people to the operators' login.
+  const onOperationAddress = /^ops\./.test(window.location.hostname);
+  if (operator || onOperationAddress) {
+    const companyId = (basePath.startsWith('/platform/companies/') ? basePath.split('/')[3] : null) ?? getCompanyAdministrationId();
+    if (!companyId) throw new Error('Não encontrei a empresa deste treinamento.');
     const company = (await getPlatformDashboard()).find(item => item.id === companyId);
     if (!company) throw new Error('Não encontrei o endereço desta empresa.');
     origin = companyAddress(company.key);
