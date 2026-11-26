@@ -720,9 +720,7 @@ async function request(
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   const value = await (await request(path, init)).json() as T;
   // in a company's editor the links the server gives (cover, video file) go to the company's own routes
-  return path.startsWith(`${trainingEditor}/`)
-    ? JSON.parse(JSON.stringify(value).replaceAll(`${platformCatalog}/`, `${trainingEditor}/`)) as T
-    : value;
+  return path.startsWith(`${trainingEditor}/`) ? companyEditorLinks(value) : value;
 }
 
 const platformCatalog = '/api/platform/catalog';
@@ -736,8 +734,12 @@ export function setEditorScope(scope: 'platform' | 'company'): void {
   editorBase = scope === 'company' ? trainingEditor : platformCatalog;
 }
 
-/** The links of the operation's catalog (cover, video file) as the company's own routes. */
+/**
+ * The links of the operation's catalog (cover, video file) as the company's own routes. The operation inside a
+ * company keeps the catalog's links: an <img> or a <video> cannot send the company header the admin routes ask for.
+ */
 export function companyEditorLinks<T>(value: T): T {
+  if (companyAdministrationId) return value;
   return JSON.parse(JSON.stringify(value).replaceAll(`${platformCatalog}/`, `${trainingEditor}/`)) as T;
 }
 
