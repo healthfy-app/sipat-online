@@ -8,7 +8,8 @@ using SipatOnline.Sipats.Domain.Sipats;
 namespace SipatOnline.Infrastructure.Learning;
 
 /// <summary>A company's training as Conteúdo and the editor need it: which training, of which company, it is.</summary>
-public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName, string SipatStatus);
+public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName, string SipatStatus,
+    DateTimeOffset StartsAt, DateTimeOffset EndsAt, int Days);
 
 /// <summary>A training as its card shows it: how much it has, how long it runs, and its cover (the version changes with the photo).</summary>
 public sealed record SipatPlanSummary(Guid SipatEventId, int Days, int Videos, Guid CourseId, long DurationMilliseconds, long? CoverVersion,
@@ -55,9 +56,20 @@ public sealed class SipatPlanService(
     public async Task<IReadOnlyList<SipatWeekInfo>> WeeksAsync(CancellationToken token) =>
         (await (from sipat in db.SipatEvents.AsNoTracking()
                 join tenant in db.Tenants.AsNoTracking() on sipat.TenantId equals tenant.Id
-                select new { sipat.CourseId, sipat.Id, sipat.TenantId, sipat.Title, tenant.Name, sipat.Status })
+                select new
+                {
+                    sipat.CourseId,
+                    sipat.Id,
+                    sipat.TenantId,
+                    sipat.Title,
+                    tenant.Name,
+                    sipat.Status,
+                    sipat.StartsAt,
+                    sipat.EndsAt,
+                    Days = db.PlatformCourseLessons.Count(lesson => lesson.CourseId == sipat.CourseId),
+                })
             .ToListAsync(token))
-        .Select(row => new SipatWeekInfo(row.CourseId, row.Id, row.TenantId, row.Title, row.Name, row.Status.ToString()))
+        .Select(row => new SipatWeekInfo(row.CourseId, row.Id, row.TenantId, row.Title, row.Name, row.Status.ToString(), row.StartsAt, row.EndsAt, row.Days))
         .ToArray();
 
     /// <summary>The trainings that belong to a company, kept out of every list of models to pick from.</summary>
@@ -218,16 +230,34 @@ public sealed class SipatPlanService(
     }
 
     /// <summary>
-    /// Deletes a training that was never delivered (it has no days with the participants): the training and its content
-    /// go. One that was published stays in the history; it can be ended, not deleted.
+    /// Deletes a training nobody took: the training, its content and the days it had delivered go. One that is over, or
+    /// that a participant has started, stays in the history for everyone (the operation too); it can be ended, not deleted.
     /// </summary>
     public async Task<Result<bool>> DeleteAsync(Guid sipatId, CancellationToken token)
     {
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<bool>.Failure(found.Error);
         var sipat = found.Value;
-        if (await db.LearningTracks.AnyAsync(track => track.SipatEventId == sipatId, token))
-            return Failure<bool>("sipat.delivered", "Este treinamento já foi entregue aos participantes e fica no histórico. Use \"Encerrar este treinamento\".");
+        var trackIds = await db.LearningTracks.Where(track => track.SipatEventId == sipatId).Select(track => track.Id).ToListAsync(token);
+        if (trackIds.Count > 0 && sipat.Status == SipatEventStatus.Published && sipat.EndsAt <= clock.GetUtcNow())
+            return Failure<bool>("sipat.delivered", "Este treinamento já foi concluído e fica no histórico. Ele não pode ser excluído.");
+        var revisionIds = await db.LearningTrackRevisions.Where(revision => trackIds.Contains(revision.TrackId)).Select(revision => revision.Id).ToListAsync(token);
+        if (await db.LearningProgress.AnyAsync(progress => trackIds.Contains(progress.TrackId), token)
+            || await db.LearningActivityOutcomes.AnyAsync(outcome => revisionIds.Contains(outcome.RevisionId), token)
+            || await db.ParticipationCertificates.AnyAsync(certificate => certificate.SipatEventId == sipatId, token))
+            return Failure<bool>("sipat.delivered", "Algum participante já começou este treinamento, então ele fica no histórico. Use \"Encerrar\" para tirá-lo dos participantes.");
+
+        await using var transaction = await db.Database.BeginTransactionAsync(token);
+        if (trackIds.Count > 0)
+        {
+            // the days it delivered, which nobody opened, leave with it
+            await db.LearningAssignments.Where(item => trackIds.Contains(item.TrackId)).ExecuteDeleteAsync(token);
+            await db.LearningContentSnapshots.Where(item => revisionIds.Contains(item.RevisionId)).ExecuteDeleteAsync(token);
+            await db.LearningLessons.Where(item => trackIds.Contains(item.TrackId)).ExecuteDeleteAsync(token);
+            await db.LearningTrackRevisions.Where(item => trackIds.Contains(item.TrackId)).ExecuteDeleteAsync(token);
+            await db.LearningTracks.Where(item => trackIds.Contains(item.Id)).ExecuteDeleteAsync(token);
+        }
+
         var course = await db.PlatformCourses.SingleOrDefaultAsync(item => item.Id == sipat.CourseId, token);
         db.SipatEvents.Remove(sipat);
         await db.SaveChangesAsync(token);
@@ -238,6 +268,7 @@ public sealed class SipatPlanService(
         }
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(sipat.TenantId), "sipat.deleted", "sipat_event",
             sipatId.ToString("D"), clock.GetUtcNow()), token);
+        await transaction.CommitAsync(token);
         return Result<bool>.Success(true);
     }
 
