@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAssignedLearningTrack, type LearningLessonProgress, type LearningTrackCard } from '@/api';
 import { getCourseCover } from '@/courseCover';
+import LessonPicture from './LessonPicture';
 import { formatDuration, getTrackDisplayTitle, getTrackPath, type DayGroup } from './learningHelpers';
 import { partWord } from '@/trainings/partWord';
 import ProgressBar from './ProgressBar';
@@ -104,7 +105,7 @@ export default function WeekVideos({ days, allTracks }: {
                   return <li key={lesson.id}>
                     <Link className={`week-video is-${state}${lesson.isBonus ? ' is-extra' : ''}`} to={`${path}?video=${encodeURIComponent(lesson.id)}`}>
                       <span className="week-video-cover">
-                        <img alt="" decoding="async" loading="lazy" src={cover} />
+                        <LessonPicture cover={cover} lesson={lesson} />
                         <span aria-hidden="true" className="week-video-play">{lesson.isCompleted ? <Check /> : <Play />}</span>
                         {!lesson.isBonus && <span className="week-video-time">{formatDuration(lesson.durationMilliseconds)}</span>}
                         {state === 'progress' && <span aria-hidden="true" className="week-video-bar"><span style={{ width: `${lesson.watchedPercentage}%` }} /></span>}

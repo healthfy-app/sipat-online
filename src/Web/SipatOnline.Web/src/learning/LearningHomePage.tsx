@@ -2,6 +2,7 @@ import { useEffect, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { chosenTrainingKey, clearLinkedTraining, linkedTraining } from '@/trainings/trainingLink';
 import { getCourseCover } from '@/courseCover';
+import LessonPicture from './LessonPicture';
 import {
   getAssignedLearningTrack,
   listAssignedLearningTracks,
@@ -434,7 +435,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
             </div>
             {!isFormationComplete && continueTrack && (
               <Link aria-hidden="true" className="learning-resume-cover learning-hero-cover" tabIndex={-1} to={continuePath}>
-                <img alt="" decoding="async" src={continueTrack.coverUrl ?? getCourseCover(continueTrack.title)} />
+                <LessonPicture cover={continueTrack.coverUrl ?? getCourseCover(continueTrack.title)} eager
+                  lesson={resumeTrack ? resumeLesson : null} />
                 <span className="learning-resume-play">
                   <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" fill="currentColor" /></svg>
                 </span>

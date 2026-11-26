@@ -468,7 +468,7 @@
   background: var(--learner-deep);
 }
 
-.portal-layout-learner .learning-resume-cover > img {
+.portal-layout-learner .learning-resume-cover > :is(img, video) {
   display: block;
   width: 100%;
   height: 100%;

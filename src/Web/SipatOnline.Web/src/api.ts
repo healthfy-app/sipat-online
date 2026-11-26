@@ -554,6 +554,8 @@ export interface LearningLessonProgress {
   isBonus?: boolean;
   provider?: 'YouTube' | 'Vimeo' | null;
   externalId?: string | null;
+  /** The picture of the video, as the library shows it; missing when the video has none. */
+  thumbnailUrl?: string | null;
 }
 
 export interface LearningExperience {

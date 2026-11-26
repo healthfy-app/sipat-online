@@ -1,4 +1,6 @@
+using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Domain;
+using SipatOnline.Infrastructure;
 using SipatOnline.Learning.Application;
 using SipatOnline.Learning.Application.Catalog;
 
@@ -12,10 +14,42 @@ public static class LessonMediaEndpoints
 
     public static IEndpointRouteBuilder MapLessonMediaEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGroup("/api/learning")
+        var learning = endpoints.MapGroup("/api/learning")
             .RequireAuthorization("ParticipateInLearning")
-            .WithTags("Learning activities")
-            .MapGet("/lessons/{lessonId:guid}/media", async (
+            .WithTags("Learning activities");
+
+        // the picture of the lesson's video, as the library shows it: only for the participant the lesson is assigned to
+        learning.MapGet("/lessons/{lessonId:guid}/thumbnail", async (
+                Guid lessonId,
+                LessonMediaAccessService access,
+                PlatformDbContext db,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await access.AuthorizeAsync(lessonId, cancellationToken);
+                if (!result.IsSuccess)
+                {
+                    return ToProblem(result.Error);
+                }
+
+                var videoId = result.Value.VideoId;
+                var found = await (from video in db.PlatformCourseVideos.AsNoTracking()
+                                   join thumbnail in db.PlatformVideoThumbnails.AsNoTracking() on video.Id equals thumbnail.VideoId
+                                   where video.Id == videoId && video.ThumbnailContentType != null
+                                   select new { thumbnail.Data, video.ThumbnailContentType }).SingleOrDefaultAsync(cancellationToken);
+                if (found is null)
+                {
+                    return Results.NotFound();
+                }
+
+                // the address changes with the picture (?v=), so it can be kept
+                context.Response.Headers.CacheControl = "private, max-age=31536000, immutable";
+                context.Response.Headers.XContentTypeOptions = "nosniff";
+                return Results.File(found.Data, found.ThumbnailContentType!);
+            })
+            .WithName("GetLessonThumbnail");
+
+        learning.MapGet("/lessons/{lessonId:guid}/media", async (
                 Guid lessonId,
                 string? quality,
                 LessonMediaAccessService access,
