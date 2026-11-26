@@ -617,6 +617,19 @@ export function configureCompanyAdministration(companyId: string | null): void {
   companyAdministrationId = companyId;
 }
 
+/**
+ * The first calls of the portal are started by `public/boot.js` while the app is still downloading. Each answer is
+ * taken once; a missing or failed one gives null, and the caller asks the usual way.
+ */
+async function takeBoot<T>(name: 'branding' | 'session' | 'home', read: (response: Response) => Promise<T | undefined>): Promise<T | undefined> {
+  const boot = (globalThis as { __sipatBoot?: Record<string, Promise<Response> | undefined> }).__sipatBoot;
+  const pending = boot?.[name];
+  if (!boot || !pending) return undefined;
+  boot[name] = undefined;
+  try { return await read(await pending); } catch { return undefined; }
+}
+const okJson = async <T,>(response: Response): Promise<T | undefined> => (response.ok ? await response.json() as T : undefined);
+
 export function getCompanyAdministrationId(): string | null {
   return companyAdministrationId;
 }
@@ -833,7 +846,10 @@ export function getTrainingEditor(sipatId: string): Promise<TrainingEditorData> 
   return requestJson<TrainingEditorData>(`${trainingEditor}/sipats/${sipatId}`);
 }
 
-export function getTenantBranding(): Promise<TenantBranding> {
+export async function getTenantBranding(): Promise<TenantBranding> {
+  // the answer started with the page, unless the operator is inside a company (that one is asked with its header)
+  const early = companyAdministrationId ? undefined : await takeBoot('branding', okJson<TenantBranding>);
+  if (early) return early;
   // the same address answers as the operation or as the company the operator is inside (by a header): a copy kept by
   // the browser of one must never be served as the other
   return requestJson<TenantBranding>('/api/tenant/branding', { cache: 'no-store' });
@@ -855,6 +871,11 @@ export function saveTenantAppearance(data: TenantAppearanceData): Promise<Tenant
   });
 }
 export async function getSession(platform = false): Promise<IdentitySession | null> {
+  if (!platform) {
+    // null: nobody signed in; undefined: no early answer, ask now
+    const early = await takeBoot<IdentitySession | null>('session', async response => (response.status === 401 ? null : okJson<IdentitySession>(response)));
+    if (early !== undefined) return early;
+  }
   try {
     return await requestJson<IdentitySession>(
       platform ? '/api/platform/identity/session' : '/api/identity/session',
@@ -1570,6 +1591,15 @@ export async function cancelSipatEvent(id: string): Promise<SipatEvent> {
 
 export function listAssignedLearningTracks(): Promise<LearningTrackCard[]> {
   return requestJson<LearningTrackCard[]>('/api/learning/tracks');
+}
+
+/** The participant's home in one answer: every day assigned, and each with its videos and the progress in them. */
+export interface LearningHome { tracks: LearningTrackCard[]; experiences: LearningExperience[] }
+export async function getLearningHome(): Promise<LearningHome> {
+  const home = (await takeBoot('home', okJson<LearningHome>)) ?? await requestJson<LearningHome>('/api/learning/home');
+  // anything that is not the home (an older server, a proxy's page) is refused, and the caller asks the older way
+  if (!Array.isArray(home?.tracks) || !Array.isArray(home?.experiences)) throw new Error('A resposta do treinamento veio incompleta.');
+  return home;
 }
 
 export function getAssignedLearningTrack(trackId: string): Promise<LearningExperience> {

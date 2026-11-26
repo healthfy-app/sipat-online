@@ -286,6 +286,7 @@ export default function App() {
               element={
                 state.session?.roles.includes('Participant') ? (
                   <LearningPage
+                    participantId={state.session.id}
                     participantName={state.session.displayName}
                     tenantName={state.tenant.tenantName}
                   />
@@ -300,6 +301,7 @@ export default function App() {
               element={
                 state.session?.roles.includes('Participant') ? (
                   <LearningPage
+                    participantId={state.session.id}
                     participantName={state.session.displayName}
                     tenantName={state.tenant.tenantName}
                   />

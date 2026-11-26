@@ -389,7 +389,8 @@ describe('tenant portal', () => {
           roles: ['Participant'],
         }),
       )
-      .mockResolvedValueOnce(Response.json([]));
+      // the participant's home, in one answer
+      .mockResolvedValueOnce(Response.json({ tracks: [], experiences: [] }));
     vi.stubGlobal('fetch', fetchMock);
     const user = userEvent.setup();
 

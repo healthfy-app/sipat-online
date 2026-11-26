@@ -22,6 +22,8 @@ vi.mock('./api', () => ({
   },
   getAssignedLearningTrack: getAssignedTrack,
   listAssignedLearningTracks: listAssignedTracks,
+  // these tests walk the page through the list and each day's own call, which is what it falls back to
+  getLearningHome: () => Promise.reject(new Error('sem a resposta única')),
   startLearningPlayback: startPlayback,
   saveLearningPosition: savePosition,
   recordLearningPlaybackRange: recordRange,
