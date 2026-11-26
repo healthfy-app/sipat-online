@@ -244,8 +244,16 @@ public sealed class VideoConversionProcessor(
 
         long? duration = null;
         long size = 0;
+        byte[]? poster = null;
         if (!addsSd480Only)
         {
+            // The card's picture: without it the library opens every video just to show a frame of each.
+            var posterPath = Path.Combine(jobFolder, "poster.jpg");
+            if (await transcoder.ExtractPosterAsync(hd, posterPath, cancellationToken))
+            {
+                poster = await File.ReadAllBytesAsync(posterPath, cancellationToken);
+            }
+
             duration = await transcoder.ProbeDurationMillisecondsAsync(hd, cancellationToken);
             size = new FileInfo(hd).Length;
             if (lease.IsLost)
@@ -313,6 +321,18 @@ public sealed class VideoConversionProcessor(
                 await transaction.RollbackAsync(cancellationToken);
                 await storage.DeleteAsync(videoId, cancellationToken);
                 return ConversionOutcome.Failure("O vídeo foi excluído durante a conversão.");
+            }
+
+            // A picture someone chose for the video stays; only a video without one gains its frame.
+            if (poster is not null && await db.PlatformCourseVideos
+                    .Where(video => video.Id == videoId && video.ThumbnailContentType == null)
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(video => video.ThumbnailContentType, "image/jpeg")
+                        .SetProperty(video => video.ThumbnailUpdatedAt, clock.GetUtcNow()), cancellationToken) > 0)
+            {
+                await db.PlatformVideoThumbnails.Where(item => item.VideoId == videoId).ExecuteDeleteAsync(cancellationToken);
+                db.PlatformVideoThumbnails.Add(new PlatformVideoThumbnailEntity { VideoId = videoId, Data = poster });
+                await db.SaveChangesAsync(cancellationToken);
             }
 
             await transaction.CommitAsync(cancellationToken);
