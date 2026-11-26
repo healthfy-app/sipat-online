@@ -85,7 +85,8 @@ export default function CourseOutlinePanel({
           : <CourseThumb coverUrl={course.coverUrl} title={title} />}
         <div className="grid min-w-0 flex-1 gap-1">
           <h1 className="m-0 text-sm font-semibold leading-snug focus:outline-none" ref={headingRef} tabIndex={-1}>
-            <InlineText className="font-semibold" disabled={busy || locks.details} label="Renomear treinamento" onCommit={actions.onTitle} value={title || course.title} />
+            {/* the week shows the training's own name, which is renamed in "Editar treinamento" */}
+            {week ? title : <InlineText className="font-semibold" disabled={busy || locks.details} label="Renomear treinamento" onCommit={actions.onTitle} value={title || course.title} />}
           </h1>
           <div className="flex flex-wrap items-center gap-2 px-1.5 text-xs text-muted-foreground">
             {week
