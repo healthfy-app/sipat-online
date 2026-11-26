@@ -33,3 +33,12 @@ public static class CompanyPlans
     public static bool IsReadyTheme(string? description) =>
         description is not null && System.Text.RegularExpressions.Regex.IsMatch(description, "^Opção [1-3](?: ·[^\\r\\n]*)?(?:\\r?\\n|$)");
 }
+
+/// <summary>The room a company has for the videos it sends itself (the plan with internal videos).</summary>
+public static class CompanyVideoQuota
+{
+    /// <summary>20 GB, unless the operation set another for the company.</summary>
+    public const long StandardBytes = 20L * 1024 * 1024 * 1024;
+
+    public static long For(long? configured) => configured is > 0 ? configured.Value : StandardBytes;
+}

@@ -1,5 +1,6 @@
-import { Copy, Trash2 } from 'lucide-react';
+import { Building2, Copy, Trash2 } from 'lucide-react';
 import type { PlatformCourse } from '@/api';
+import type { CourseOwner } from './catalogFilters';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getCourseCover } from '@/courseCover';
@@ -9,6 +10,7 @@ export default function CourseCard({
   course,
   busy,
   categoryName,
+  owner,
   onOpen,
   onDuplicate,
   onDelete,
@@ -16,13 +18,16 @@ export default function CourseCard({
   course: PlatformCourse;
   busy: boolean;
   categoryName?: string | null;
+  /** The training belongs to a company: the card says whose, shows the training's own status, and leaves duplicating and deleting to the company's page. */
+  owner?: CourseOwner;
   onOpen: () => void;
   onDuplicate: () => void;
   onDelete: () => void;
 }) {
   const house = houseVideos(course.videos);
   const totalMilliseconds = house.reduce((sum, video) => sum + video.durationMilliseconds, 0);
-  const published = course.status === 'Published';
+  const status = owner?.status ?? course.status;
+  const published = status === 'Published';
 
   return (
     <article className="group relative flex min-w-0 flex-col overflow-hidden rounded-[1.25rem] border border-[#dfe6e3] bg-card shadow-[0_1px_2px_rgb(18_51_44/0.05)] transition-[box-shadow,transform,border-color] duration-200 ease-out-soft has-[button[data-open]:focus-visible]:outline-2 has-[button[data-open]:focus-visible]:outline-offset-2 has-[button[data-open]:focus-visible]:outline-ring hover:-translate-y-1 hover:border-[#12332c] hover:shadow-[0_18px_34px_-18px_rgb(18_51_44/0.5)] motion-reduce:hover:translate-y-0">
@@ -39,12 +44,13 @@ export default function CourseCard({
             ? 'absolute left-3 top-3 z-10 rounded-full bg-[rgb(15_122_61/0.95)] px-2.5 py-0.5 text-[0.6875rem] font-bold text-white backdrop-blur-sm'
             : 'absolute left-3 top-3 z-10 rounded-full bg-[#ffd166] px-2.5 py-0.5 text-[0.6875rem] font-bold text-[#12332c] backdrop-blur-sm'}
         >
-          {statusLabels[course.status]}
+          {status === 'Cancelled' ? 'Encerrado' : statusLabels[status]}
         </span>
       </div>
 
       <div className="grid flex-1 content-start gap-1.5 px-5 pb-3 pt-4">
         <div className="flex min-h-5 flex-wrap gap-1.5">
+          {owner && <span className="inline-flex items-center gap-1 rounded-[0.3125rem] bg-accent px-1.5 text-[0.6875rem] font-bold text-primary"><Building2 aria-hidden="true" className="size-3" />{owner.companyName}</span>}
           {categoryName && <span className="text-[0.75rem] font-bold uppercase tracking-[0.06em] text-[#3d514b]">{categoryName}</span>}
           {course.gamificationEnabled && <Badge className="rounded-[0.3125rem] px-1.5 text-[0.6875rem]">Gamificação</Badge>}
         </div>
@@ -70,7 +76,7 @@ export default function CourseCard({
         <span aria-hidden="true" className="whitespace-nowrap rounded-full bg-[#12332c] px-3.5 py-1.5 text-[0.8125rem] font-bold text-white transition-colors group-hover:bg-[#0f7a3d]">
           Abrir editor →
         </span>
-        <div className="flex items-center">
+        {!owner && <div className="flex items-center">
         <Button
           aria-label={`Duplicar treinamento ${course.title}`}
           className="relative z-10"
@@ -93,7 +99,7 @@ export default function CourseCard({
         >
           <Trash2 />
         </Button>
-        </div>
+        </div>}
       </footer>
     </article>
   );

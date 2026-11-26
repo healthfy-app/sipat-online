@@ -108,3 +108,28 @@ public sealed class CompanyProfileRulesEntityConfiguration : IEntityTypeConfigur
             .IsRequired();
     }
 }
+
+/// <summary>
+/// A sector that exists inside a unit (the HR of Minas). The sector's name is one for the whole company, so the HR of
+/// Minas and the HR of São Paulo are the same sector in two units.
+/// </summary>
+public sealed class CompanyUnitSectorEntity
+{
+    public Guid UnitId { get; set; }
+
+    public Guid SectorId { get; set; }
+
+    public Guid TenantId { get; set; }
+}
+
+public sealed class CompanyUnitSectorEntityConfiguration : IEntityTypeConfiguration<CompanyUnitSectorEntity>
+{
+    public void Configure(EntityTypeBuilder<CompanyUnitSectorEntity> builder)
+    {
+        builder.ToTable("CompanyUnitSectors", "identity");
+        builder.HasKey(link => new { link.UnitId, link.SectorId });
+        builder.Property(link => link.TenantId).IsRequired();
+        builder.HasOne<CompanyUnitEntity>().WithMany().HasForeignKey(link => link.UnitId).OnDelete(DeleteBehavior.Cascade);
+        builder.HasOne<CompanySectorEntity>().WithMany().HasForeignKey(link => link.SectorId).OnDelete(DeleteBehavior.Cascade);
+    }
+}

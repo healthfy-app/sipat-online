@@ -56,8 +56,13 @@ function loadVimeo(): Promise<any> {
 
 const POLL_MS = 400;
 
-function connectYouTube(iframe: HTMLIFrameElement, on: ProviderCallbacks): Promise<ProviderControl> {
-  return loadYouTube().then(YT => new Promise<ProviderControl>(resolve => {
+const cancelled = () => new Error('The page stopped following this video');
+
+function connectYouTube(iframe: HTMLIFrameElement, on: ProviderCallbacks, signal?: AbortSignal): Promise<ProviderControl> {
+  return loadYouTube().then(YT => new Promise<ProviderControl>((resolve, reject) => {
+    // only one YT.Player may follow a frame: a second one never hears onReady nor gets getCurrentTime, and the frame
+    // keeps talking to the first. A follow given up before the API loaded (React mounts twice in development) makes none
+    if (signal?.aborted) { reject(cancelled()); return; }
     let poll: ReturnType<typeof setInterval> | undefined;
     let player: any;
     const now = (): number => { try { return Number(player?.getCurrentTime?.()) || 0; } catch { return 0; } };
@@ -92,29 +97,39 @@ function connectYouTube(iframe: HTMLIFrameElement, on: ProviderCallbacks): Promi
   }));
 }
 
-function connectVimeo(iframe: HTMLIFrameElement, on: ProviderCallbacks): Promise<ProviderControl> {
+function connectVimeo(iframe: HTMLIFrameElement, on: ProviderCallbacks, signal?: AbortSignal): Promise<ProviderControl> {
   return loadVimeo().then(async Vimeo => {
+    if (signal?.aborted) throw cancelled();
     const player = new Vimeo.Player(iframe);
     let current = 0;
     await player.ready();
     on.ready(Number(await player.getDuration().catch(() => 0)) || 0);
-    player.on('timeupdate', (data: { seconds: number }) => { current = data.seconds; on.time(current); });
-    player.on('play', (data?: { seconds: number }) => { if (data) current = data.seconds; on.play(current); });
-    player.on('pause', (data?: { seconds: number }) => { if (data) current = data.seconds; on.pause(current); });
-    player.on('ended', (data?: { seconds: number }) => { if (data) current = data.seconds; on.ended(current); });
-    player.on('playbackratechange', (data: { playbackRate: number }) => on.rate(Number(data.playbackRate) || 1));
+    // Vimeo gives the same player to everyone who follows this frame: each one takes off only its own handlers
+    const handlers: Record<string, (data?: any) => void> = {
+      timeupdate: (data: { seconds: number }) => { current = data.seconds; on.time(current); },
+      play: (data?: { seconds: number }) => { if (data) current = data.seconds; on.play(current); },
+      pause: (data?: { seconds: number }) => { if (data) current = data.seconds; on.pause(current); },
+      ended: (data?: { seconds: number }) => { if (data) current = data.seconds; on.ended(current); },
+      playbackratechange: (data: { playbackRate: number }) => on.rate(Number(data.playbackRate) || 1),
+    };
+    for (const [name, handler] of Object.entries(handlers)) player.on(name, handler);
     const ignore = () => undefined;
     return {
       seek: seconds => { player.setCurrentTime(seconds).catch(ignore); },
       pause: () => { player.pause().catch(ignore); },
       play: () => { player.play().catch(ignore); },
       setRate: rate => { player.setPlaybackRate(rate).catch(ignore); },
-      destroy: () => { player.off('timeupdate'); player.off('play'); player.off('pause'); player.off('ended'); player.off('playbackratechange'); },
+      destroy: () => { for (const [name, handler] of Object.entries(handlers)) player.off(name, handler); },
     };
   });
 }
 
-/** Follows the provider iframe through its official player API (the iframe must use `externalEmbedUrl(..., { api: true })`). */
-export function connectProvider(provider: ExternalProvider, iframe: HTMLIFrameElement, on: ProviderCallbacks): Promise<ProviderControl> {
-  return provider === 'YouTube' ? connectYouTube(iframe, on) : connectVimeo(iframe, on);
+/**
+ * Follows the provider iframe through its official player API (the iframe must use `externalEmbedUrl(..., { api: true })`).
+ * Once `signal` aborts before the API is loaded, no player is made for the frame and the promise rejects.
+ */
+export function connectProvider(
+  provider: ExternalProvider, iframe: HTMLIFrameElement, on: ProviderCallbacks, signal?: AbortSignal,
+): Promise<ProviderControl> {
+  return provider === 'YouTube' ? connectYouTube(iframe, on, signal) : connectVimeo(iframe, on, signal);
 }

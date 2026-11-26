@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { CourseOwner } from './courseCatalog/catalogFilters';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   duplicatePlatformCourse,
@@ -108,7 +109,9 @@ export default function PlatformCoursesPage() {
 
   const selectedCourse = courseId ? courses.find((course) => course.id === courseId) ?? null : null;
   const week = selectedCourse ? weeks.find((item) => item.courseId === selectedCourse.id) : undefined;
-  const catalogCourses = courses.filter((course) => !weeks.some((item) => item.courseId === course.id));
+  // Conteúdo lists the companies' trainings beside the models: whose each is, and where it stands
+  const owners = useMemo(() => new Map<string, CourseOwner>(weeks.map((item) => [item.courseId,
+    { tenantId: item.tenantId, companyName: item.companyName, status: item.sipatStatus ?? 'Draft' }])), [weeks]);
   // back from a week: to that company's planner, which reads the days from the week's títulos
   const backToWeek = week ? () => navigate(`/platform/companies/${week.tenantId}/treinamentos/${week.sipatEventId}`) : undefined;
 
@@ -141,7 +144,8 @@ export default function PlatformCoursesPage() {
       ) : (
         <CourseCatalog
           busy={isDuplicating}
-          courses={catalogCourses}
+          courses={courses}
+          owners={owners}
           error={error}
           isLoading={isLoading}
           modules={modules}

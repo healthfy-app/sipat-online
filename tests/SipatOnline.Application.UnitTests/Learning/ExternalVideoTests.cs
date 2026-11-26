@@ -68,8 +68,8 @@ public sealed class ExternalVideoTests
         Assert.Equal("76979871", id);
 
         Assert.False(LessonReference.TryParseExternal($"catalog:{Guid.NewGuid():D}", out _, out _));
-        Assert.True(LessonReference.TryParseExternal("smartplayer:player.smartplayer.ai/v/1", out provider, out id));
-        Assert.Equal("player.smartplayer.ai/v/1", id);
+        // Smartplayer is no longer offered: its references are not external videos any more
+        Assert.False(LessonReference.TryParseExternal("smartplayer:player.smartplayer.ai/v/1", out _, out _));
 
         Assert.False(LessonReference.TryParseExternal("youtube:", out _, out _));
     }

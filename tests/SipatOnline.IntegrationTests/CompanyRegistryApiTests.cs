@@ -277,6 +277,109 @@ public sealed class CompanyRegistryApiTests
         Assert.Equal(1, await db.AuditEntries.CountAsync(entry => entry.Action == "identity.registry.rules_changed"));
     }
 
+    [DockerFact]
+    public async Task Sectors_are_made_inside_a_unit_and_the_same_name_in_another_unit_is_the_same_sector()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var minas = await company.UnitAsync("Minas Gerais");
+        var saoPaulo = await company.UnitAsync("São Paulo");
+
+        await company.Send(HttpMethod.Post, $"/api/admin/registry/units/{minas}/sectors", new { names = new[] { "RH", "TI", "" } });
+        var registry = await company.Send(HttpMethod.Post, $"/api/admin/registry/units/{saoPaulo}/sectors", new { names = new[] { "rh" } });
+
+        var sectors = registry.GetProperty("sectors").EnumerateArray().ToDictionary(item => item.GetProperty("name").GetString()!, item => item.GetProperty("id").GetGuid());
+        Assert.Equal(["RH", "TI"], sectors.Keys.Order());
+        Assert.Equal(new[] { (minas, sectors["RH"]), (minas, sectors["TI"]), (saoPaulo, sectors["RH"]) }.Order(), Links(registry).Order());
+    }
+
+    [DockerFact]
+    public async Task A_person_put_in_a_unit_and_a_sector_makes_the_sector_one_of_that_unit()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var minas = await company.UnitAsync("Minas Gerais");
+        var production = await company.SectorAsync("Produção");
+
+        await company.PersonAsync("lucia", minas, production);
+        await company.PersonAsync("nina", minas, production);
+
+        var link = (await company.Get("/api/admin/registry")).GetProperty("unitSectors").EnumerateArray().Single();
+        Assert.Equal(minas, link.GetProperty("unitId").GetGuid());
+        Assert.Equal(production, link.GetProperty("sectorId").GetGuid());
+        Assert.Equal(2, link.GetProperty("peopleCount").GetInt32());
+    }
+
+    [DockerFact]
+    public async Task A_sector_leaves_a_unit_only_when_nobody_of_the_unit_is_in_it()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var minas = await company.UnitAsync("Minas Gerais");
+        var registry = await company.Send(HttpMethod.Post, $"/api/admin/registry/units/{minas}/sectors", new { names = new[] { "RH", "TI" } });
+        var sectors = registry.GetProperty("sectors").EnumerateArray().ToDictionary(item => item.GetProperty("name").GetString()!, item => item.GetProperty("id").GetGuid());
+        await company.PersonAsync("lucia", minas, sectors["RH"]);
+
+        var refused = await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{minas}/sectors/{sectors["RH"]}", new { }, HttpStatusCode.Conflict);
+        var after = await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{minas}/sectors/{sectors["TI"]}", new { });
+
+        Assert.Equal("registry.unit_sector.in_use", refused.GetProperty("code").GetString());
+        Assert.Equal([(minas, sectors["RH"])], Links(after));
+        // the sector itself stays in the company's list: it only left this unit
+        Assert.Contains(after.GetProperty("sectors").EnumerateArray(), item => item.GetProperty("id").GetGuid() == sectors["TI"]);
+    }
+
+    private static (Guid Unit, Guid Sector)[] Links(System.Text.Json.JsonElement registry) =>
+        registry.GetProperty("unitSectors").EnumerateArray().Select(item => (item.GetProperty("unitId").GetGuid(), item.GetProperty("sectorId").GetGuid())).ToArray();
+
+    [DockerFact]
+    public async Task Removing_an_unused_unit_deletes_it()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var minas = await company.UnitAsync("Minas Gerais");
+
+        var removal = await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{minas}", new { });
+
+        Assert.True(removal.GetProperty("deleted").GetBoolean());
+        Assert.DoesNotContain((await company.Get("/api/admin/registry")).GetProperty("units").EnumerateArray(),
+            item => item.GetProperty("id").GetGuid() == minas);
+    }
+
+    [DockerFact]
+    public async Task Removing_a_sector_with_people_only_puts_it_away()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var production = await company.SectorAsync("Produção");
+        await company.PersonAsync("ana", sectorId: production);
+
+        var removal = await company.Send(HttpMethod.Delete, $"/api/admin/registry/sectors/{production}", new { });
+
+        Assert.False(removal.GetProperty("deleted").GetBoolean());
+        var sector = (await company.Get("/api/admin/registry")).GetProperty("sectors").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == production);
+        Assert.False(sector.GetProperty("isActive").GetBoolean());
+        Assert.Equal(1, sector.GetProperty("peopleCount").GetInt32());
+    }
+
+    [DockerFact]
+    public async Task Removing_a_unit_marked_on_a_training_only_puts_it_away()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+        var saoPaulo = await company.UnitAsync("São Paulo");
+        var training = await company.TrainingAsync("SIPAT SP");
+        await company.AudienceAsync(training, [(saoPaulo, null)]);
+
+        var removal = await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{saoPaulo}", new { });
+
+        Assert.False(removal.GetProperty("deleted").GetBoolean());
+        Assert.Equal([(saoPaulo, null)], TrainingAudienceScenario.Targets(await company.Get($"/api/admin/sipats/{training}/audience")));
+    }
+
+    [DockerFact]
+    public async Task Removing_one_that_is_not_of_the_company_is_not_found()
+    {
+        await using var company = await TrainingAudienceScenario.StartAsync();
+
+        await company.Send(HttpMethod.Delete, $"/api/admin/registry/units/{Guid.NewGuid()}", new { }, HttpStatusCode.NotFound);
+    }
+
     private static HttpClient CreateClient(SipatOnlineApiFactory factory) =>
         factory.CreateClient(new Microsoft.AspNetCore.Mvc.Testing.WebApplicationFactoryClientOptions
         {

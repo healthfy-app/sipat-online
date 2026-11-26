@@ -107,7 +107,8 @@ public sealed class DevelopmentDemoPresentationTests
             new[] { "development:mdn-flower-demo" },
             await db.LearningLessons.Select(lesson => lesson.ProviderAssetReference).Distinct().ToArrayAsync());
         Assert.Equal(20, await db.SipatEvents.CountAsync()); // the SIPAT and the fire training of each company
-        Assert.Equal(18, await db.PlatformCourses.CountAsync());
+        Assert.Equal(18, await db.PlatformCourses.CountAsync(course => course.TenantId == null)); // the models of Conteúdo
+        Assert.Equal(20, await db.PlatformCourses.CountAsync(course => course.TenantId != null)); // each training's own content
         var video = Assert.Single(await db.PlatformCourseVideos.AsNoTracking().ToListAsync());
         Assert.Equal(Guid.Parse(DevelopmentDemoPresentationInitializer.SharedVideoId), video.Id);
         Assert.Equal(12345, video.SizeBytes);

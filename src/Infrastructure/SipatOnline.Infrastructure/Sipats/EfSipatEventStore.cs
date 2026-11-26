@@ -9,7 +9,18 @@ public sealed class EfSipatEventStore(PlatformDbContext dbContext) : ISipatEvent
 {
     public Task AddAsync(SipatEvent sipatEvent, CancellationToken cancellationToken)
     {
-        dbContext.SipatEvents.Add(ToEntity(sipatEvent));
+        // a training is born with its content: a training of its own, the company's, where its days (Títulos), videos and cover live
+        var course = new SipatOnline.Infrastructure.Learning.PlatformCourseEntity
+        {
+            Id = Guid.NewGuid(),
+            Title = sipatEvent.Title.Value,
+            CreatedAt = sipatEvent.CreatedAt,
+            TenantId = sipatEvent.TenantId.Value,
+        };
+        dbContext.PlatformCourses.Add(course);
+        var entity = ToEntity(sipatEvent);
+        entity.CourseId = course.Id;
+        dbContext.SipatEvents.Add(entity);
         return Task.CompletedTask;
     }
 
@@ -63,6 +74,9 @@ public sealed class EfSipatEventStore(PlatformDbContext dbContext) : ISipatEvent
         entity.StartsAt = sipatEvent.StartsAt;
         entity.EndsAt = sipatEvent.EndsAt;
         entity.Status = sipatEvent.Status;
+        // one name: the training's content carries it too
+        var course = await dbContext.PlatformCourses.SingleOrDefaultAsync(item => item.Id == entity.CourseId, cancellationToken);
+        if (course is not null) course.Title = entity.Title;
     }
 
     private static SipatEventEntity ToEntity(SipatEvent sipatEvent) =>

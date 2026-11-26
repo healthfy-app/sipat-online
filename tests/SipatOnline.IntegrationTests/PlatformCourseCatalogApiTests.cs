@@ -125,14 +125,14 @@ public sealed class PlatformCourseCatalogApiTests
         using var checkpointResponse = await SendAsync(
             client,
             HttpMethod.Put,
-            $"/api/platform/catalog/videos/{firstVideo}/checkpoints",
+            $"/api/platform/catalog/courses/{courseId}/videos/{firstVideo}/checkpoints",
             new SetVideoCheckpointsRequest([new VideoCheckpointDto(30_000, moduleId)]));
         Assert.Equal(HttpStatusCode.OK, checkpointResponse.StatusCode);
 
         using var lateCheckpoint = await SendAsync(
             client,
             HttpMethod.Put,
-            $"/api/platform/catalog/videos/{firstVideo}/checkpoints",
+            $"/api/platform/catalog/courses/{courseId}/videos/{firstVideo}/checkpoints",
             new SetVideoCheckpointsRequest([new VideoCheckpointDto(120_000, moduleId)]));
         Assert.Equal(HttpStatusCode.BadRequest, lateCheckpoint.StatusCode);
 
@@ -367,11 +367,17 @@ public sealed class PlatformCourseCatalogApiTests
     {
         await using var env = await ExternalEnvironment.StartAsync();
         var id = await env.CreateExternalAsync();
+        using var created = await SendAsync(env.Operator, HttpMethod.Post, "/api/platform/catalog/courses",
+            new CreatePlatformCourseRequest("Com extra", null, false));
+        var courseId = (await ReadAsync(created)).GetProperty("id").GetGuid();
+        using var placed = await SendAsync(env.Operator, HttpMethod.Put, $"/api/platform/catalog/courses/{courseId}/videos",
+            new SetPlatformCourseVideosRequest([id]));
+        Assert.Equal(HttpStatusCode.OK, placed.StatusCode);
 
         using var response = await SendAsync(
             env.Operator,
             HttpMethod.Put,
-            $"/api/platform/catalog/videos/{id}/checkpoints",
+            $"/api/platform/catalog/courses/{courseId}/videos/{id}/checkpoints",
             new SetVideoCheckpointsRequest([]));
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);

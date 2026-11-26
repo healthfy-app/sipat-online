@@ -16,6 +16,7 @@ import {
   ApiError,
   configureCompanyAdministration,
   getCompanyCapabilities,
+  setUploadScope,
   type CompanyCapabilities,
   getCompanyAdministrationId,
   getSession,
@@ -30,6 +31,7 @@ import { Sheet } from './components/ui/sheet';
 import SipatsPage from './sipatBuilder/SipatsPage';
 import { LegacySipatRedirect } from './trainings/LegacySipatRedirect';
 import CompanyContext from './companies/CompanyContext';
+import { UnitMenu, UnitScopeProvider } from './trainings/unitScope';
 import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
 import CollaboratorsPage from './collaborators/CollaboratorsPage';
@@ -42,6 +44,9 @@ import PlatformUsersPage from './PlatformUsersPage';
 import PlatformHomePage from './PlatformHomePage';
 import PlatformCoursesPage from './PlatformCoursesPage';
 import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
+import TrainingEditorPage from './trainings/TrainingEditorPage';
+import { linkedTraining } from './trainings/trainingLink';
+
 import CompanyNav from './companies/CompanyNav';
 import PlanMedal from './companies/PlanMedal';
 import PlaybackQualityPage from './quality/PlaybackQualityPage';
@@ -216,9 +221,17 @@ export default function App() {
               element={state.session && hasAdminRole(state.session) ? <SipatBuilderPage basePath="/admin/treinamentos" canEditThemes={false} /> : <AccessDenied />}
             />
             <Route
+              path="/admin/videos"
+              element={state.session && hasAdminRole(state.session) ? <VideoLibraryPage company /> : <AccessDenied />}
+            />
+            <Route
+              path="/admin/treinamentos/:sipatId/editar"
+              element={state.session && hasAdminRole(state.session) ? <TrainingEditorPage basePath="/admin/treinamentos" /> : <AccessDenied />}
+            />
+            <Route
               path="/platform/companies/:companyId/treinamentos"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/treinamentos`} />}</CompanyContext>
+                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/treinamentos`} operator />}</CompanyContext>
                 : <AccessDenied />}
             />
             <Route
@@ -550,6 +563,9 @@ function ProtectedPortal({
     getCompanyCapabilities().then(result => { if (current) setCapabilities(result); }).catch(() => undefined);
     return () => { current = false; };
   }, [session]);
+  // videos go to the operation's library or to the company's own, by who is signed in; the upload queue follows it
+  // (the operation, while inside a company, sends for that company)
+  setUploadScope(session && (!session.roles.includes('PlatformOperator') || getCompanyAdministrationId() !== null) ? 'company' : 'platform');
   // the phone menu (sheet) closes whenever the page changes, including after tapping one of its links
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
@@ -566,6 +582,11 @@ function ProtectedPortal({
   const companyWorkspaceId = /^\/platform\/companies\/([^/]+)/.exec(location.pathname)?.[1] ?? null;
   // inside the company workspace the operator keeps the workspace menu, even though the company is set for the calls to its admin routes
   const isPlatformCompanyContext = isCompanyPanelMode(isPlatformOperator, location.pathname, getCompanyAdministrationId());
+  // the pages of one company (its administrator's, or the operation's while it looks at a company): they follow the unit chosen at the top
+  const companyPages = isPlatformOperator
+    ? isPlatformCompanyContext ? location.pathname.startsWith('/admin') : companyWorkspaceId !== null
+    : canViewCompany(session) && location.pathname.startsWith('/admin');
+  const unitScopeCompany = isPlatformOperator ? (isPlatformCompanyContext ? getCompanyAdministrationId() : companyWorkspaceId) : null;
 
   async function handleSignOut() {
     setError('');
@@ -588,6 +609,8 @@ function ProtectedPortal({
   // the same links serve the desktop sidebar and the phone menu
   const sidebarNav = (
     <>
+      {/* the unit the company is looked at through: it sits above the menu it filters, in the side bar and in the phone's menu */}
+      {companyPages && <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
       {session.roles.includes('Participant') && !isPlatformCompanyContext && (
         <>
           <p className="sidebar-label">APRENDIZAGEM</p>
@@ -602,6 +625,7 @@ function ProtectedPortal({
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
           {hasAdminRole(session) && <>
             <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
+            {capabilities?.internalVideos && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/videos">Vídeos da empresa</NavLink>}
             {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
           </>}
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
@@ -624,6 +648,8 @@ function ProtectedPortal({
   );
 
   return (
+    <UnitScopeProvider companyId={isPlatformOperator && !isPlatformCompanyContext ? companyWorkspaceId ?? undefined : undefined} enabled={companyPages}
+      scopeKey={unitScopeCompany ? `company:${unitScopeCompany}` : tenant.tenantKey}>
     <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${isPlatformCompanyContext ? ' portal-layout-company-context' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
       {!isLearnerOnly && isPlatformCompanyContext && (
         <aside aria-label="Modo de administração da empresa" className="company-context-banner" role="status">
@@ -774,10 +800,14 @@ function ProtectedPortal({
           tabIndex={-1}
         >
           {error && <p className="form-error" role="alert">{error}</p>}
-          <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />
+          {/* an administrator who also takes trainings keeps the admin menu, and the participant pages keep their look */}
+          {!isLearnerOnly && location.pathname.startsWith('/learning')
+            ? <div className="portal-layout-learner contents"><Outlet /></div>
+            : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
         </section>
       </div>
     </div>
+    </UnitScopeProvider>
   );
 }
 
@@ -839,6 +869,11 @@ function clearCompanyAdministration(): void {
 }
 
 function getLandingPage(session: IdentitySession): string {
+  // arrived by the link of a training: after signing in, straight to it
+  if (session.roles.includes('Participant') && linkedTraining()) {
+    return '/learning';
+  }
+
   if (session.roles.includes('PlatformOperator')) {
     return '/platform';
   }

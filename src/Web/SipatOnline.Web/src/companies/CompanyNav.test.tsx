@@ -19,6 +19,26 @@ describe('company sidebar', () => {
     expect(screen.getByRole('link', { name: 'Administradores' })).toHaveAttribute('href', '/platform/companies/c-1/administradores');
   });
 
+  it('breaks a long company name at its dash, in lines of even length, and keeps it whole in the tooltip', async () => {
+    vi.mocked(api.getPlatformDashboard).mockResolvedValue([{ id: 'c-1', name: 'Damare - Laticínios Resende', key: 'damare', isActive: true, employeeCount: 1, administratorCount: 1, totalUserCount: 2 }] as never);
+    render(<MemoryRouter initialEntries={['/platform/companies/c-1/treinamentos']}><CompanyNav companyId="c-1" /></MemoryRouter>);
+
+    const name = await screen.findByTitle('Damare - Laticínios Resende');
+    // the dash stays with the word before it, so the line can only break after it: "Damare -" / "Laticínios Resende"
+    expect(name.textContent).toBe('Damare - Laticínios Resende');
+    expect(name).toHaveClass('text-balance');
+  });
+
+  it('shows the plan beside the company name, on the same row, not on a line of its own', async () => {
+    vi.mocked(api.getPlatformDashboard).mockResolvedValue([{ id: 'c-1', name: 'Microsoft', key: 'ms', isActive: true, plan: 'Bronze', employeeCount: 1, administratorCount: 1, totalUserCount: 2 }] as never);
+    render(<MemoryRouter initialEntries={['/platform/companies/c-1/treinamentos']}><CompanyNav companyId="c-1" /></MemoryRouter>);
+
+    const name = await screen.findByTitle('Microsoft');
+    const plan = await screen.findByRole('button', { name: /Plano da empresa: Bronze/ });
+    expect(name.parentElement).toBe(plan.parentElement);
+    expect(name.parentElement).toHaveClass('flex');
+  });
+
   it('links to the video quality of the company', async () => {
     vi.mocked(api.getPlatformDashboard).mockResolvedValue([] as never);
     render(<MemoryRouter initialEntries={['/platform/companies/c1/treinamentos']}><CompanyNav companyId="c1" /></MemoryRouter>);

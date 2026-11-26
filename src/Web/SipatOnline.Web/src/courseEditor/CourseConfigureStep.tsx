@@ -16,6 +16,8 @@ export interface CourseSettingsValues {
   gamificationEnabled: boolean;
   gameType: GamificationGameType;
   categoryId: string | null;
+  /** Offered whole to the companies as a ready SIPAT (the Bronze plan picks one). */
+  readySipat: boolean;
 }
 
 export default function CourseConfigureStep({
@@ -76,6 +78,9 @@ export default function CourseConfigureStep({
                 <Textarea className="min-h-28" disabled={busy} id="edit-course-description" maxLength={2000} rows={4} value={values.description}
                   onChange={(event) => onChange({ description: event.target.value })} />
               </Field>
+              {!course.tenantId && <Switch checked={values.readySipat} description="As empresas escolhem este treinamento inteiro, com todos os dias e vídeos. É o que o plano Bronze usa."
+                disabled={busy} id="edit-course-ready-sipat" label="Disponível como SIPAT pronta"
+                onChange={(event) => onChange({ readySipat: event.target.checked })} />}
               <Switch checked={values.gamificationEnabled} description="Ative ou desative a experiência de jogo deste treinamento."
                 disabled={busy} id="edit-course-gamification" label="Gamificação após os vídeos"
                 onChange={(event) => onChange({ gamificationEnabled: event.target.checked })} />

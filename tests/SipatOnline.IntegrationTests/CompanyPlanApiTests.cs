@@ -21,14 +21,14 @@ public sealed class CompanyPlanApiTests
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
         await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
-        Guid readyVideo, freeVideo;
+        Guid readyVideo, freeVideo, readySipat;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
             var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
             readyVideo = await AddVideoAsync(db, "A1V1 - Ergonomia");
             freeVideo = await AddVideoAsync(db, "A9V1 - Fora das grades");
-            await AddThemeAsync(db, "Ergonomia", "Opção 1 · 1 aulas\nGrade pronta.", readyVideo);
+            readySipat = await AddThemeAsync(db, "Ergonomia", "Opção 1 · 1 aulas\nGrade pronta.", readyVideo);
             await AddThemeAsync(db, "Tema avulso", "Sem grade.", freeVideo);
         }
 
@@ -60,9 +60,16 @@ public sealed class CompanyPlanApiTests
         Assert.Equal(2, catalog.GetProperty("videos").GetArrayLength());
 
         var start = new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero);
-        var sipat = await Send(admin, HttpMethod.Post, "/api/admin/sipats", new { title = "SIPAT 2026", description = (string?)null, startsAt = start, endsAt = start.AddDays(1) }, HttpStatusCode.Created);
+        // Bronze only views: the operation, inside the company, builds its training from a ready SIPAT
+        var training = new { title = "SIPAT 2026", description = (string?)null, startsAt = start, endsAt = start.AddDays(1) };
+        Assert.Equal("sipat.view_only", (await Send(admin, HttpMethod.Post, "/api/admin/sipats", training, HttpStatusCode.Forbidden)).GetProperty("code").GetString());
+        using var inCompany = await OperatorInAsync(factory, companyId);
+        await Send(operatorClient, HttpMethod.Put, $"/api/platform/catalog/courses/{readySipat}/ready-sipat", new { ready = true }, HttpStatusCode.NoContent);
+        var sipat = await Send(inCompany, HttpMethod.Post, "/api/admin/sipats", training, HttpStatusCode.Created);
         var sipatId = sipat.GetProperty("id").GetGuid();
-        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Grade pronta", readyVideo) } });
+        await Send(inCompany, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Grade pronta", readyVideo) } });
+        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Grade pronta", readyVideo) } }, HttpStatusCode.Forbidden);
+        Assert.Single((await Get(admin, $"/api/admin/sipats/{sipatId}/plan")).EnumerateArray());
 
         // the operator takes the loose assunto out of Bronze: the company stops seeing it and cannot save a day with it
         var matrix = await Get(operatorClient, "/api/platform/catalog/plan-subjects");
@@ -72,7 +79,7 @@ public sealed class CompanyPlanApiTests
         using (var removed = await Raw(operatorClient, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = new[] { looseId } }))
             Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
         Assert.Equal(["Ergonomia"], (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()));
-        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Assunto fora do plano", freeVideo) } }, HttpStatusCode.BadRequest);
+        await Send(inCompany, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Assunto fora do plano", freeVideo) } }, HttpStatusCode.BadRequest);
         // other plans keep it
         Assert.Single((await Get(operatorClient, "/api/platform/catalog/plan-subjects")).GetProperty("excluded").GetProperty("Bronze").EnumerateArray());
         using (var back = await Raw(operatorClient, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = Array.Empty<Guid>() }))
@@ -145,7 +152,7 @@ public sealed class CompanyPlanApiTests
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
         await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
-        Guid first, second, other, internalVideo, internalSubject;
+        Guid first, second, other, internalVideo, internalSubject, readySipat;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
@@ -154,7 +161,7 @@ public sealed class CompanyPlanApiTests
             second = await AddVideoAsync(db, "A1V2 - Pausas");
             other = await AddVideoAsync(db, "A2V1 - Mente");
             internalVideo = await AddVideoAsync(db, "Boas-vindas da Acme");
-            await AddThemeAsync(db, "Ergonomia", null, first, second);
+            readySipat = await AddThemeAsync(db, "Ergonomia", null, first, second);
             await AddThemeAsync(db, "Higiene mental", null, other);
             internalSubject = await AddThemeAsync(db, "Vídeos da Acme", null, internalVideo);
         }
@@ -183,48 +190,128 @@ public sealed class CompanyPlanApiTests
         using var admin = Client(factory, "acme-regras.localhost");
         await Send(admin, HttpMethod.Post, "/api/identity/login", new LoginRequest("regras-admin", "AdminPassword123"), HttpStatusCode.NoContent);
         var start = new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero);
-        var sipatId = (await Send(admin, HttpMethod.Post, "/api/admin/sipats", new { title = "SIPAT 2026", description = (string?)null, startsAt = start, endsAt = start.AddDays(1) },
+        using var inCompany = await OperatorInAsync(factory, companyId);
+        var sipatId = (await Send(inCompany, HttpMethod.Post, "/api/admin/sipats", new { title = "SIPAT 2026", description = (string?)null, startsAt = start, endsAt = start.AddDays(1) },
             HttpStatusCode.Created)).GetProperty("id").GetGuid();
         var plan = $"/api/admin/sipats/{sipatId}/plan";
+        // Conteúdo lists the companies' trainings beside the models: whose each is, and where it stands
+        var listed = Assert.Single((await Get(operatorClient, "/api/platform/catalog/sipat-weeks")).EnumerateArray(), item => item.GetProperty("sipatEventId").GetGuid() == sipatId);
+        Assert.Equal("Acme Regras", listed.GetProperty("companyName").GetString());
+        Assert.Equal("Draft", listed.GetProperty("sipatStatus").GetString());
+        Assert.Contains((await Get(operatorClient, "/api/platform/catalog/courses")).EnumerateArray(), item =>
+            item.GetProperty("id").GetGuid() == listed.GetProperty("courseId").GetGuid() && item.GetProperty("tenantId").GetGuid() == companyId);
         string[] Titles(JsonElement catalog) => catalog.GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()!).Order().ToArray();
 
-        // Bronze: ready modules as they are, no own identity, no internal videos
+        // Bronze: one ready SIPAT whole (a model the operation marked as one), no own identity, no internal videos
         Assert.Equal(["Ergonomia", "Higiene mental"], Titles(await Get(admin, "/api/admin/sipat-catalog")));
-        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Módulo pronto", second, first) } });
-        var mixed = await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Misturado", first, other) } }, HttpStatusCode.BadRequest);
+        var notReady = await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Módulo pronto", second, first) } }, HttpStatusCode.BadRequest);
+        Assert.Equal("sipat.grid_not_customizable", notReady.GetProperty("code").GetString());
+        await Send(operatorClient, HttpMethod.Put, $"/api/platform/catalog/courses/{readySipat}/ready-sipat", new { ready = true }, HttpStatusCode.NoContent);
+        Assert.True((await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").EnumerateArray()
+            .Single(item => item.GetProperty("id").GetGuid() == readySipat).GetProperty("isReadySipat").GetBoolean());
+        await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("SIPAT pronta", second, first) } });
+        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("SIPAT pronta", second, first) } }, HttpStatusCode.Forbidden);
+        // the editor, opened to the company: on Bronze it shows the training and changes nothing
+        var editor = await Get(admin, $"/api/admin/training-editor/sipats/{sipatId}");
+        var courseId = editor.GetProperty("course").GetProperty("id").GetGuid();
+        Assert.False(editor.GetProperty("access").GetProperty("editGrid").GetBoolean());
+        var structure = $"/api/admin/training-editor/courses/{courseId}/structure";
+        object Lessons(params Guid[] videos) => new { lessons = new[] { new { id = (Guid?)null, title = "Dia 1", description = (string?)null, videos = videos.Select(id => new { videoId = id, title = (string?)null }).ToArray() } } };
+        Assert.Equal("sipat.plan_required", (await Send(admin, HttpMethod.Put, structure, Lessons(first), HttpStatusCode.Forbidden)).GetProperty("code").GetString());
+        var mixed = await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Misturado", first, other) } }, HttpStatusCode.BadRequest);
         Assert.Equal("sipat.grid_not_customizable", mixed.GetProperty("code").GetString());
-        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Parte do módulo", first) } }, HttpStatusCode.BadRequest);
-        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } }, HttpStatusCode.BadRequest);
+        await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Parte do módulo", first) } }, HttpStatusCode.BadRequest);
+        await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } }, HttpStatusCode.BadRequest);
         Assert.NotEqual("#123456", (await Get(admin, "/api/tenant/branding")).GetProperty("primaryColor").GetString());
+        // the personalized certificate (the company's logo on it) is Ouro's too: below it the operation cannot set one
+        var certificateLogo = $"/api/platform/companies/{companyId}/learning/certificate-logo";
+        using (var refused = await Raw(operatorClient, HttpMethod.Put, certificateLogo, new { }))
+            Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
         await Send(admin, HttpMethod.Put, "/api/tenant/branding", new { logoReference = (string?)null, primaryColor = "#123456", secondaryColor = "#FFFFFF" }, HttpStatusCode.Forbidden);
 
         // Prata: the grid of videos is personalized
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Prata" });
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Misturado", first, other) } });
+        // and edits its own training in the editor: the grid, with the videos it can use; games and questions stay for Diamante
+        await Send(admin, HttpMethod.Put, structure, Lessons(first, other));
+        await Send(admin, HttpMethod.Put, structure, Lessons(internalVideo), HttpStatusCode.BadRequest);
+        await Send(admin, HttpMethod.Put, $"/api/admin/training-editor/courses/{courseId}/modules", new { items = Array.Empty<object>() }, HttpStatusCode.Forbidden);
+        // sending its own videos is Diamante's
+        var upload = new { contentType = "video/mp4", sizeBytes = 1_000L };
+        Assert.Equal("sipat.plan_required", (await Send(admin, HttpMethod.Post, "/api/admin/company-videos/uploads", upload, HttpStatusCode.Forbidden)).GetProperty("code").GetString());
+        Assert.False((await Get(admin, "/api/admin/company-videos/")).GetProperty("canSend").GetBoolean());
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } }, HttpStatusCode.BadRequest);
 
         // Ouro: its logo and colors show
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Ouro" });
         Assert.Equal("#123456", (await Get(admin, "/api/tenant/branding")).GetProperty("primaryColor").GetString());
+        // and the certificate logo is accepted for it (this body is not an image, so it is refused for that, not for the plan)
+        using (var accepted = await Raw(operatorClient, HttpMethod.Put, certificateLogo, new { }))
+            Assert.NotEqual(HttpStatusCode.Forbidden, accepted.StatusCode);
 
         // Diamante: its internal videos, for it only
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Diamante" });
         Assert.Equal(["Ergonomia", "Higiene mental", "Vídeos da Acme"], Titles(await Get(admin, "/api/admin/sipat-catalog")));
         await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Interno", internalVideo) } });
+        await Send(admin, HttpMethod.Put, $"/api/admin/training-editor/courses/{courseId}/modules", new { items = Array.Empty<object>() });
+
+        // its own videos: the terms once, then inside the room it has (the operation sets it)
+        Assert.Equal("company_videos.terms_required", (await Send(admin, HttpMethod.Post, "/api/admin/company-videos/uploads", upload, HttpStatusCode.Conflict)).GetProperty("code").GetString());
+        await Send(admin, HttpMethod.Post, "/api/admin/company-videos/terms", new { }, HttpStatusCode.NoContent);
+        await Send(admin, HttpMethod.Post, "/api/admin/company-videos/uploads", upload);
+        Assert.Equal(20L * 1024 * 1024 * 1024, (await Get(admin, "/api/admin/company-videos/")).GetProperty("quotaBytes").GetInt64());
+        await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/video-quota", new { gigabytes = 1 });
+        var tooBig = await Send(admin, HttpMethod.Post, "/api/admin/company-videos/uploads", new { contentType = "video/mp4", sizeBytes = 1_500_000_000L }, HttpStatusCode.Conflict);
+        Assert.Equal("company_videos.quota_exceeded", tooBig.GetProperty("code").GetString());
+        await Send(admin, HttpMethod.Put, $"/api/platform/companies/{companyId}/video-quota", new { gigabytes = 50 }, HttpStatusCode.NotFound);
+
+        // a video a company sent is its own: on its list and in its days, and nobody else's
+        Guid ownVideo, foreignVideo;
+        var otherCompany = dashboard.EnumerateArray().Single(item => item.GetProperty("key").GetString() == "outra-regras").GetProperty("id").GetGuid();
+        await using (var scope = factory.Services.CreateAsyncScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
+            ownVideo = await AddVideoAsync(db, "Fala do diretor da Acme");
+            foreignVideo = await AddVideoAsync(db, "Vídeo da Outra");
+            await db.PlatformCourseVideos.Where(video => video.Id == ownVideo).ExecuteUpdateAsync(update => update.SetProperty(video => video.OwnerTenantId, (Guid?)companyId));
+            await db.PlatformCourseVideos.Where(video => video.Id == foreignVideo).ExecuteUpdateAsync(update => update.SetProperty(video => video.OwnerTenantId, (Guid?)otherCompany));
+        }
+        Assert.Equal(ownVideo, Assert.Single((await Get(admin, "/api/admin/company-videos/")).GetProperty("videos").EnumerateArray()).GetProperty("video").GetProperty("id").GetGuid());
+        var offered = (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("videos").EnumerateArray().Select(item => item.GetProperty("video").GetProperty("id").GetGuid()).ToArray();
+        Assert.Contains(ownVideo, offered);
+        Assert.DoesNotContain(foreignVideo, offered);
+        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Da outra", foreignVideo) } }, HttpStatusCode.BadRequest);
+        await Send(admin, HttpMethod.Put, $"/api/admin/company-videos/{ownVideo}", new { title = "Fala do diretor" }, HttpStatusCode.NoContent);
+        await Send(admin, HttpMethod.Put, $"/api/admin/company-videos/{foreignVideo}", new { title = "Minha agora" }, HttpStatusCode.NotFound);
+        await Send(admin, HttpMethod.Delete, $"/api/admin/company-videos/{foreignVideo}", new { }, HttpStatusCode.NotFound);
         using (var outra = Client(factory, "outra-regras.localhost"))
         {
             await Send(outra, HttpMethod.Post, "/api/identity/login", new LoginRequest("outra-admin", "AdminPassword123"), HttpStatusCode.NoContent);
             Assert.Equal(["Ergonomia", "Higiene mental"], Titles(await Get(outra, "/api/admin/sipat-catalog")));
+            // another company's training is not there for it, even on the plan that edits everything
+            using var foreign = await outra.GetAsync($"/api/admin/training-editor/courses/{courseId}");
+            Assert.Equal(HttpStatusCode.NotFound, foreign.StatusCode);
+            await Send(outra, HttpMethod.Put, structure, Lessons(first), HttpStatusCode.NotFound);
         }
 
         // back to Bronze: what goes live is what the plan allows today
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Bronze" });
-        await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.BadRequest);
+        await Send(inCompany, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.BadRequest);
+        await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.Forbidden);
 
         // only the operator decides whose an assunto is
         using (var denied = await Raw(admin, HttpMethod.Put, $"/api/platform/catalog/plan-subjects/courses/{internalSubject}/company", new { companyId = (Guid?)null }))
             Assert.NotEqual(HttpStatusCode.NoContent, denied.StatusCode);
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/catalog/plan-subjects/courses/{internalSubject}/company", new { companyId = (Guid?)null }, HttpStatusCode.NoContent);
+    }
+
+    /// <summary>The operation working inside a company, as it does from the company's pages.</summary>
+    private static async Task<HttpClient> OperatorInAsync(SipatOnlineApiFactory factory, Guid companyId)
+    {
+        var client = Client(factory, "ops.localhost");
+        await Send(client, HttpMethod.Post, "/api/platform/identity/login", new LoginRequest("platform-operator", "PlatformPassword123"), HttpStatusCode.NoContent);
+        client.DefaultRequestHeaders.Add(SipatOnline.Api.PlatformCompanyContextMiddleware.HeaderName, companyId.ToString());
+        return client;
     }
 
     private static object Day(string title, params Guid[] videos) =>
@@ -280,7 +367,12 @@ public sealed class CompanyPlanApiTests
 
     private static async Task<HttpResponseMessage> Raw(HttpClient client, HttpMethod method, string path, object body)
     {
+        // the token is asked without the company the operation is working in: that header goes on the call itself
+        const string company = SipatOnline.Api.PlatformCompanyContextMiddleware.HeaderName;
+        var inCompany = client.DefaultRequestHeaders.TryGetValues(company, out var values) ? values.ToArray() : null;
+        if (inCompany is not null) client.DefaultRequestHeaders.Remove(company);
         var token = (await client.GetFromJsonAsync<AntiforgeryTokenResponse>("/api/identity/antiforgery"))!.RequestToken;
+        if (inCompany is not null) client.DefaultRequestHeaders.Add(company, inCompany);
         var request = new HttpRequestMessage(method, path) { Content = JsonContent.Create(body) };
         request.Headers.Add("X-CSRF-TOKEN", token);
         return await client.SendAsync(request);

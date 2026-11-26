@@ -30,7 +30,11 @@ public sealed record PlatformCourse(
     string? CoverContentType = null,
     DateTimeOffset? CoverUpdatedAt = null,
     IReadOnlyList<PlatformCourseLesson>? Lessons = null,
-    Guid? CategoryId = null);
+    Guid? CategoryId = null,
+    // the company the training belongs to; null for a model of the operation
+    Guid? TenantId = null,
+    // a model offered whole as a ready SIPAT (what a Bronze company picks)
+    bool IsReadySipat = false);
 
 /// <summary>Aula de um curso, com os vídeos na ordem de exibição.</summary>
 public sealed record PlatformCourseLesson(Guid Id, string Title, string? Description, IReadOnlyList<Guid> VideoIds);
@@ -57,7 +61,9 @@ public sealed record PlatformCourseVideo(
     bool HasSd480 = false,
     VideoProvider Provider = VideoProvider.Sipat,
     string? ExternalId = null,
-    bool HasFhd1080 = false);
+    bool HasFhd1080 = false,
+    // when a picture was chosen for the video; null shows a frame of the video itself
+    DateTimeOffset? ThumbnailUpdatedAt = null);
 
 /// <summary>A video is "Processing" while it is converted; only "Ready" videos can enter a Day.</summary>
 public enum PlatformVideoStatus

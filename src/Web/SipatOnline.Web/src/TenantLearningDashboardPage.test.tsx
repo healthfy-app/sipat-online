@@ -65,7 +65,7 @@ describe('tenant learning dashboard', () => {
     expect(screen.getByText('1/2 concluíram · 70%')).toBeVisible();
   });
 
-  it('replaces a single-slice donut with a useful summary and a filtered next step', async () => {
+  it('replaces a single-slice donut with a useful summary, with no banner telling what to do next', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       if (url === '/api/admin/users/participants?offset=0&limit=100') {
         return Response.json({
@@ -87,34 +87,8 @@ describe('tenant learning dashboard', () => {
     expect(await screen.findByText('Participantes ativos')).toBeVisible();
     expect(within(screen.getByRole('list', { name: 'Legenda do progresso' }))
       .getByText('Sem dias')).toBeVisible();
-    expect(screen.getByRole('link', { name: 'Escolher participantes' }))
-      .toHaveAttribute('href', '/admin/learning?status=no-tracks');
-  });
-
-  it('offers the participant filter for people who have not started their assigned track', async () => {
-    vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/admin/users/participants?offset=0&limit=100') {
-        return Response.json({
-          offset: 0,
-          limit: 100,
-          totalCount: 1,
-          items: [{ id: 'p1', displayName: 'Ana Costa', loginIdentifier: 'MAT-001', isActive: true }],
-        });
-      }
-      if (url === '/api/admin/learning/participation') {
-        return Response.json([{
-          participantId: 'p1', displayName: 'Ana Costa', loginIdentifier: 'MAT-001',
-          trackId: 't1', trackTitle: 'Ergonomia', assignedAt: '2026-01-01T00:00:00Z',
-          lessonCount: 2, completedLessonCount: 0, progressPercentage: 0, isCompleted: false,
-        }]);
-      }
-      throw new Error(`Unexpected request: ${url}`);
-    }));
-
-    render(<MemoryRouter><TenantLearningDashboardPage /></MemoryRouter>);
-
-    expect(await screen.findByRole('link', { name: 'Acompanhar progresso' }))
-      .toHaveAttribute('href', '/admin/learning?status=not-started');
+    expect(screen.queryByText('PRÓXIMO PASSO')).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Escolher participantes' })).not.toBeInTheDocument();
   });
 
   it('shows an explicit empty state without a zero-valued chart for a company with no participants', async () => {

@@ -302,9 +302,12 @@ public sealed class PlaybackQualityDashboardApiTests
     private static Guid AddSipat(PlatformDbContext db, Guid tenant, string title, DateTimeOffset startsAt)
     {
         var id = Guid.NewGuid();
+        var content = new SipatOnline.Infrastructure.Learning.PlatformCourseEntity { Id = Guid.NewGuid(), Title = title, CreatedAt = DateTimeOffset.UtcNow, TenantId = tenant };
+        db.PlatformCourses.Add(content);
         db.SipatEvents.Add(new SipatEventEntity
         {
             Id = id,
+            CourseId = content.Id,
             TenantId = tenant,
             Title = title,
             StartsAt = startsAt,

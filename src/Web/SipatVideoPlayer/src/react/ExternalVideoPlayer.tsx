@@ -74,11 +74,13 @@ export default function ExternalVideoPlayer({
     tracked.callbacks.ready = durationS => { ready(durationS); if (durationS > 0) latest.current.onDuration?.(durationS); };
     tracker.current = tracked;
     let gone = false;
-    connectProvider(provider, iframe, tracked.callbacks)
+    const stop = new AbortController();
+    connectProvider(provider, iframe, tracked.callbacks, stop.signal)
       .then(control => { if (gone) control.destroy(); else tracked.connect(control); })
       .catch(() => undefined);
     return () => {
       gone = true;
+      stop.abort();
       tracked.detach();
       if (tracker.current === tracked) tracker.current = null;
     };

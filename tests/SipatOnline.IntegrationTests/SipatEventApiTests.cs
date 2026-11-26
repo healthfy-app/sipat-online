@@ -200,9 +200,12 @@ public sealed class SipatEventApiTests
             CreatedAt = DateTimeOffset.UtcNow,
             IsActive = true
         });
+        var content = new SipatOnline.Infrastructure.Learning.PlatformCourseEntity { Id = Guid.NewGuid(), Title = "SIPAT de outra empresa", CreatedAt = DateTimeOffset.UtcNow, TenantId = tenantId };
+        dbContext.PlatformCourses.Add(content);
         dbContext.SipatEvents.Add(new SipatEventEntity
         {
             Id = Guid.NewGuid(),
+            CourseId = content.Id,
             TenantId = tenantId,
             Title = "SIPAT de outra empresa",
             StartsAt = DateTimeOffset.UtcNow.AddDays(1),

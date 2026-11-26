@@ -23,7 +23,7 @@ export default function CompanyPlanButton({ companyId, plan, onChanged }: { comp
   }
 
   return <>
-    <button aria-label={`Plano da empresa: ${plan}. Alterar`} className="m-0 justify-self-start border-0 bg-transparent p-0" onClick={() => { setChosen(plan); setError(''); setOpen(true); }} type="button">
+    <button aria-label={`Plano da empresa: ${plan}. Alterar`} className="m-0 shrink-0 justify-self-start border-0 bg-transparent p-0" onClick={() => { setChosen(plan); setError(''); setOpen(true); }} type="button">
       <PlanBadge className="cursor-pointer hover:brightness-95" plan={plan} />
     </button>
     {open && <Dialog busy={busy} description="O plano define o que a empresa pode personalizar." onClose={() => setOpen(false)} title="Plano da empresa">

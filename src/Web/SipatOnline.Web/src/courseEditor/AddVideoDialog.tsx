@@ -29,6 +29,7 @@ export default function AddVideoDialog({
   onError,
   onLink,
   onQueued,
+  libraryOnly = false,
 }: {
   courseId: string;
   availableVideos: PlatformLibraryVideo[];
@@ -39,6 +40,8 @@ export default function AddVideoDialog({
   onError: (message: string) => void;
   onLink: (videoId: string) => void;
   onQueued: (count: number) => void;
+  /** A company's training: the videos come from what the company can use; sending new ones has its own place. */
+  libraryOnly?: boolean;
 }) {
   const [videoToLink, setVideoToLink] = useState('');
   const [source, setSource] = useState<Source>('house');
@@ -46,7 +49,7 @@ export default function AddVideoDialog({
   return (
     <Dialog busy={busy} onClose={onClose} size="lg" title="Adicionar vídeo">
       <div className="grid gap-5">
-        <SegmentedControl disabled={busy} label="Origem do vídeo" onChange={setSource} options={sources} value={source} />
+        {!libraryOnly && <SegmentedControl disabled={busy} label="Origem do vídeo" onChange={setSource} options={sources} value={source} />}
         {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
         {source === 'house' ? <>
           {availableVideos.length > 0 && (
@@ -59,10 +62,11 @@ export default function AddVideoDialog({
               </Button>
             </div>
           )}
-          <div className="grid gap-3">
+          {libraryOnly && availableVideos.length === 0 && <p className="m-0 text-sm text-muted-foreground">Todos os vídeos disponíveis para a sua empresa já estão neste treinamento.</p>}
+          {!libraryOnly && <div className="grid gap-3">
             <h3 className="m-0 text-sm font-semibold">Enviar novos vídeos</h3>
             <VideoUploadForm courseId={courseId} onQueued={onQueued} />
-          </div>
+          </div>}
         </> : (
           <ExternalVideoForm busy={busy} key={source} onBusyChange={onBusyChange} onError={onError} onLink={onLink} provider={source} />
         )}

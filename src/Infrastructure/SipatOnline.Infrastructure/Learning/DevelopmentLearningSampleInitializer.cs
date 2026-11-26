@@ -199,9 +199,12 @@ public sealed class DevelopmentLearningSampleInitializer(
             SipatEventStatus.Published);
         EnsureSuccess(sipat, "sipat");
 
+        var content = new PlatformCourseEntity { Id = Guid.NewGuid(), Title = sipat.Value.Title.Value, CreatedAt = sipat.Value.CreatedAt, TenantId = tenantId };
+        dbContext.PlatformCourses.Add(content);
         dbContext.SipatEvents.Add(new SipatEventEntity
         {
             Id = sipat.Value.Id,
+            CourseId = content.Id,
             TenantId = tenantId,
             Title = sipat.Value.Title.Value,
             Description = sipat.Value.Description,

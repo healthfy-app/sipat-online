@@ -22,6 +22,7 @@ export default function CatalogToolbar({
   tab,
   filters,
   categories,
+  companies = [],
   hasUncategorized,
   countText,
   isFiltered,
@@ -32,6 +33,8 @@ export default function CatalogToolbar({
   tab: CatalogTab;
   filters: CatalogFilters;
   categories: CourseCategory[];
+  /** The companies that have trainings, to show only one's (or only the operation's models). */
+  companies?: { id: string; name: string }[];
   hasUncategorized: boolean;
   countText: string;
   isFiltered: boolean;
@@ -66,6 +69,11 @@ export default function CatalogToolbar({
             {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
             {hasUncategorized && categories.length > 0 && <option value="none">Sem categoria</option>}
           </NativeSelect>
+          {companies.length > 0 && <NativeSelect aria-label="Filtrar por empresa" className="w-auto max-w-56 max-sm:flex-1" onChange={(event) => onChange({ owner: event.target.value })} value={filters.owner}>
+            <option value="all">Modelos e empresas</option>
+            <option value="models">Só modelos</option>
+            {companies.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </NativeSelect>}
           <Button className="text-muted-foreground max-sm:order-3" onClick={onManageCategories} size="sm" variant="ghost"><Settings2 /> Gerenciar categorias</Button>
         </>
       )}

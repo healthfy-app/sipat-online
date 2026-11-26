@@ -113,12 +113,13 @@ public sealed class EfGameModuleStore(PlatformDbContext dbContext) : IGameModule
     }
 
     public async Task SetVideoCheckpointsAsync(
+        Guid courseId,
         Guid videoId,
         IReadOnlyList<VideoCheckpoint> checkpoints,
         CancellationToken cancellationToken)
     {
         var existing = await dbContext.PlatformVideoCheckpoints
-            .Where(checkpoint => checkpoint.VideoId == videoId)
+            .Where(checkpoint => checkpoint.CourseId == courseId && checkpoint.VideoId == videoId)
             .ToListAsync(cancellationToken);
         dbContext.PlatformVideoCheckpoints.RemoveRange(existing);
         foreach (var checkpoint in checkpoints)
@@ -126,6 +127,7 @@ public sealed class EfGameModuleStore(PlatformDbContext dbContext) : IGameModule
             dbContext.PlatformVideoCheckpoints.Add(new PlatformVideoCheckpointEntity
             {
                 Id = Guid.NewGuid(),
+                CourseId = courseId,
                 VideoId = videoId,
                 ModuleId = checkpoint.ModuleId,
                 TimeMilliseconds = checkpoint.TimeMilliseconds

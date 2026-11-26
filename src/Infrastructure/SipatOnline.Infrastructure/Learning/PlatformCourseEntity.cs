@@ -22,6 +22,12 @@ public sealed class PlatformCourseEntity
 
     public Guid? CategoryId { get; set; }
 
+    /// <summary>The company the training belongs to; null for a model of the operation (Conteúdo).</summary>
+    public Guid? TenantId { get; set; }
+
+    /// <summary>A model offered whole as a ready SIPAT (what a Bronze company picks). Only on models.</summary>
+    public bool IsReadySipat { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 
     public ICollection<PlatformCourseModuleLinkEntity> ModuleLinks { get; set; } = [];
@@ -41,6 +47,12 @@ public sealed class PlatformCourseLessonEntity
     public string? Description { get; set; }
 
     public int Position { get; set; }
+
+    /// <summary>The day this Título is delivered on, in a company's training; null when it has no date (a "Módulo").</summary>
+    public DateOnly? Date { get; set; }
+
+    /// <summary>The assunto chosen for the day, when there is one.</summary>
+    public string? Subject { get; set; }
 
     public PlatformCourseEntity Course { get; set; } = null!;
 }
@@ -75,7 +87,12 @@ public sealed class PlatformCourseVideoEntity
     /// <summary>The video id at the external provider; null for uploaded files.</summary>
     public string? ExternalId { get; set; }
 
-    /// <summary>Reserved for videos owned by a company; always null for now.</summary>
+    /// <summary>The picture shown for the video (its file is in <see cref="PlatformVideoThumbnailEntity"/>); null shows a frame of the video itself.</summary>
+    public string? ThumbnailContentType { get; set; }
+
+    public DateTimeOffset? ThumbnailUpdatedAt { get; set; }
+
+    /// <summary>The company that sent the video (its own, private to it); null for the operation's library.</summary>
     public Guid? OwnerTenantId { get; set; }
 
     public ICollection<PlatformCourseVideoLinkEntity> CourseLinks { get; set; } = [];
@@ -122,9 +139,13 @@ public sealed class PlatformCourseModuleLinkEntity
     public GameModuleEntity Module { get; set; } = null!;
 }
 
+/// <summary>A game in the middle of a video, inside one training: the same video in another training has its own.</summary>
 public sealed class PlatformVideoCheckpointEntity
 {
     public Guid Id { get; set; }
+
+    /// <summary>The training the stop belongs to.</summary>
+    public Guid CourseId { get; set; }
 
     public Guid VideoId { get; set; }
 
@@ -154,4 +175,12 @@ public sealed class PlatformCourseVideoLinkEntity
     public PlatformCourseEntity Course { get; set; } = null!;
 
     public PlatformCourseVideoEntity Video { get; set; } = null!;
+}
+
+/// <summary>The picture chosen for a video, kept apart so listing videos never loads it.</summary>
+public sealed class PlatformVideoThumbnailEntity
+{
+    public Guid VideoId { get; set; }
+
+    public byte[] Data { get; set; } = [];
 }

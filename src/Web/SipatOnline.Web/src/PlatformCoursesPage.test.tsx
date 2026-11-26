@@ -669,7 +669,7 @@ describe('Platform course catalog', () => {
       expect(within(dialog).getByLabelText('Título')).toBeVisible();
       expect(within(dialog).getByLabelText('Duração (min)')).toBeVisible();
       expect(within(dialog).queryByLabelText('Vincular da biblioteca')).not.toBeInTheDocument();
-      expect(within(dialog).getByText('Vídeo extra: não conta no progresso nem no certificado.')).toBeVisible();
+      expect(within(dialog).getByText('Conta no progresso e no certificado: o participante assiste em sequência, sem pular.')).toBeVisible();
     });
 
     it('keeps Adicionar disabled while the link does not parse and previews it once it does', async () => {
@@ -683,6 +683,7 @@ describe('Platform course catalog', () => {
 
       await user.clear(within(dialog).getByLabelText('Link do vídeo'));
       await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://youtu.be/dQw4w9WgXcQ');
+      await user.type(within(dialog).getByLabelText('Duração (min)'), '10');
       expect(within(dialog).getByRole('button', { name: 'Adicionar' })).toBeEnabled();
       expect(dialog.querySelector('iframe')).toHaveAttribute('src', expect.stringContaining('/embed/dQw4w9WgXcQ'));
       expect(within(dialog).getByText(/Não abriu\?/)).toBeVisible();
@@ -696,10 +697,11 @@ describe('Platform course catalog', () => {
       await user.click(within(dialog).getByRole('button', { name: 'YouTube' }));
       await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://youtu.be/dQw4w9WgXcQ');
       await user.type(within(dialog).getByLabelText('Título'), 'Dicas de postura');
+      await user.type(within(dialog).getByLabelText('Duração (min)'), '10');
       await user.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
 
       await waitFor(() => expect(api.createExternalPlatformVideo).toHaveBeenCalledWith({
-        provider: 'YouTube', url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Dicas de postura', durationMilliseconds: null,
+        provider: 'YouTube', url: 'https://youtu.be/dQw4w9WgXcQ', title: 'Dicas de postura', durationMilliseconds: 600000,
       }));
       await waitFor(() => expect(api.setPlatformCourseStructure).toHaveBeenCalledWith('c-1', [
         expect.objectContaining({ videos: [{ videoId: 'v-1', title: null }, { videoId: 'v-2', title: null }, { videoId: 'v-9', title: null }] }),
@@ -713,6 +715,7 @@ describe('Platform course catalog', () => {
       await user.click(within(dialog).getByRole('button', { name: 'YouTube' }));
       await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://youtu.be/dQw4w9WgXcQ');
       await user.type(within(dialog).getByLabelText('Título'), 'Dicas');
+      await user.type(within(dialog).getByLabelText('Duração (min)'), '10');
       const form = within(dialog).getByLabelText('Título').closest('form') as HTMLFormElement;
       fireEvent.submit(form);
       fireEvent.submit(form);
@@ -762,6 +765,7 @@ describe('Platform course catalog', () => {
       await user.click(within(dialog).getByRole('button', { name: 'YouTube' }));
       await user.type(within(dialog).getByLabelText('Link do vídeo'), 'https://youtu.be/dQw4w9WgXcQ');
       await user.type(within(dialog).getByLabelText('Título'), 'Dicas');
+      await user.type(within(dialog).getByLabelText('Duração (min)'), '10');
       await user.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
 
       expect(await within(dialog).findByText('Esse vídeo não permite incorporação.')).toBeVisible();
@@ -781,7 +785,7 @@ describe('Platform course catalog', () => {
       expect(document.querySelector('iframe')).toHaveAttribute('src', expect.stringContaining('/embed/dQw4w9WgXcQ'));
       const properties = screen.getByRole('complementary', { name: 'Propriedades do conteúdo' });
       expect(within(properties).queryByRole('button', { name: 'Editar perguntas do vídeo' })).not.toBeInTheDocument();
-      expect(within(properties).getByText('Vídeo extra: não conta no progresso nem no certificado.')).toBeVisible();
+      expect(within(properties).getByText('Vídeo extra: sem duração, não conta no progresso nem no certificado.')).toBeVisible();
     });
 
     it('offers question moments only for house videos', async () => {
@@ -904,7 +908,8 @@ describe('Platform course catalog', () => {
     await waitFor(() => expect(api.updatePlatformCourse).toHaveBeenCalledWith('c-1', {
       title: 'Revisado', description: 'Postura', status: 'Published', gamificationEnabled: false, gameType: 'Quiz',
     }));
-    expect(await screen.findByText('Publicado')).toBeVisible();
+    // the status and the publish button both say Publicado once nothing is pending
+    expect((await screen.findAllByText('Publicado'))[0]).toBeVisible();
     view.unmount();
     render(<PlatformCoursesPage />, '/platform/courses/c-1/edit');
     await user.click(await screen.findByRole('button', { name: 'Configurar' }));

@@ -11,6 +11,7 @@ public sealed class PlatformCourseCatalogService(
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
     TimeProvider timeProvider,
+    CatalogAccessGrant accessGrant,
     IVideoConversionQueue conversionQueue,
     IDirectVideoUploadStore directUploads)
 {
@@ -1131,7 +1132,8 @@ public sealed class PlatformCourseCatalogService(
             : Result<PlatformCourseCover>.Success(cover);
     }
 
-    private static bool HasCoverSignature(byte[] data, string contentType) =>
+    /// <summary>The first bytes of a PNG, JPEG or WebP image, as its type says it is.</summary>
+    public static bool HasCoverSignature(byte[] data, string contentType) =>
         contentType switch
         {
             "image/png" => data.AsSpan().StartsWith(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
@@ -1147,8 +1149,8 @@ public sealed class PlatformCourseCatalogService(
         Failure<T>("learning.platform_course.not_found", "O curso não foi encontrado.");
 
     private Result<bool> EnsurePlatformOperator() =>
-        currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
-        tenantContext.CurrentTenantId is null
+        accessGrant.Granted || (currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
+        tenantContext.CurrentTenantId is null)
             ? Result<bool>.Success(true)
             : Result<bool>.Failure(new DomainError(
                 "learning.platform_course.forbidden",

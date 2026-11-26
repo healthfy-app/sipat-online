@@ -1,57 +1,29 @@
 import { KeyRound } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import {
-  addRegistryItems, changeEmployeeLogin, changeUserStatus, renameUser, resetEmployeePassword, saveParticipantProfile,
-  type CompanyRegistry, type ParticipantAccount, type ParticipantProfile, type RegistryItem, type RegistryKind,
+  changeEmployeeLogin, changeUserStatus, renameUser, resetEmployeePassword, saveParticipantProfile,
+  type CompanyRegistry, type ParticipantAccount, type ParticipantProfile,
 } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { Input, NativeSelect } from '@/components/ui/input';
 import { getErrorMessage } from '@/courseEditor/courseFormat';
 import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { generateInitialPassword } from '@/participantCsv';
+import { sectorsOfUnit } from './unitSectors';
 
 const requiredMark = ' (obrigatório nesta empresa)';
 const mark = (required?: boolean) => (required ? requiredMark : '');
 
-const key = (value: string) => value.trim().toLocaleLowerCase('pt-BR');
-const nameOf = (items: RegistryItem[] | undefined, id: string | null | undefined) => items?.find(item => item.id === id)?.name ?? '';
-
-/** Typed with suggestions of the company's units or sectors; a new name is created when saving. */
-function PlacementInput({ id, label, items, value, onChange }: {
-  id: string; label: string; items: RegistryItem[]; value: string; onChange: (value: string) => void;
-}) {
-  return <Field htmlFor={id} label={label}>
-    <Input autoComplete="off" id={id} list={`${id}-options`} maxLength={100} onChange={event => onChange(event.target.value)} placeholder="Digite ou escolha" value={value} />
-    <datalist id={`${id}-options`}>{items.filter(item => item.isActive).map(item => <option key={item.id} value={item.name} />)}</datalist>
-  </Field>;
-}
-
-/** The id of the typed name: an existing item (any case) or a new one created now; empty takes the person out of it. */
-async function resolvePlacement(kind: RegistryKind, items: RegistryItem[], typed: string): Promise<string | null> {
-  if (!typed.trim()) return null;
-  const found = items.find(item => key(item.name) === key(typed));
-  if (found) return found.id;
-  const registry = await addRegistryItems(kind, [typed.trim()]);
-  return registry[kind].find(item => key(item.name) === key(typed))?.id ?? null;
-}
 
 /**
  * Everything the administrator can correct about a collaborator in one place: name, login, a new password, whether the
  * access is active and, when the profile is known, registration number, e-mail, phone, unit and sector. Only what changed
  * is sent. The fields the company made required are flagged but do not block saving: the rule applies on creation.
  */
-/** The sectors where people of the unit already are come first: unit and sector stay independent, the people relate them. */
-function sectorsFor(registry: CompanyRegistry | null | undefined, everyone: ParticipantProfile[], unit: string): RegistryItem[] {
-  const sectors = registry?.sectors ?? [];
-  const unitId = registry?.units.find(item => key(item.name) === key(unit))?.id;
-  if (!unitId) return sectors;
-  const used = new Set(everyone.filter(item => item.unitId === unitId).map(item => item.sectorId));
-  return [...sectors.filter(item => used.has(item.id)), ...sectors.filter(item => !used.has(item.id))];
-}
 
-export default function EditCollaboratorDialog({ person, profile, profiles = [], registry, onClose, onSaved }: {
+export default function EditCollaboratorDialog({ person, profile, registry, onClose, onSaved }: {
   person: ParticipantAccount; profile?: ParticipantProfile; profiles?: ParticipantProfile[]; registry?: CompanyRegistry | null;
   onClose: () => void; onSaved: (message: string) => Promise<void>;
 }) {
@@ -62,10 +34,21 @@ export default function EditCollaboratorDialog({ person, profile, profiles = [],
   const [registration, setRegistration] = useState(profile?.registrationNumber ?? '');
   const [email, setEmail] = useState(profile?.email ?? '');
   const [phone, setPhone] = useState(profile?.phone ?? '');
-  const initialUnit = nameOf(registry?.units, profile?.unitId);
-  const initialSector = nameOf(registry?.sectors, profile?.sectorId);
+  // unit and sector are chosen, never typed, and the sectors offered are the ones of the unit chosen: no room for a
+  // sector the unit does not have, or for the same sector written two ways
+  const initialUnit = profile?.unitId ?? '';
+  const initialSector = profile?.sectorId ?? '';
   const [unit, setUnit] = useState(initialUnit);
   const [sector, setSector] = useState(initialSector);
+  const unitOptions = (registry?.units ?? []).filter(item => item.isActive || item.id === initialUnit);
+  // the sector the person is in stays in view while the unit is still the one they were in
+  const sectorsIn = (unitId: string) => sectorsOfUnit(registry, unitId || null, unitId === initialUnit ? initialSector : null);
+  const sectorOptions = sectorsIn(unit);
+  const chooseUnit = (next: string) => {
+    setUnit(next);
+    // a sector the new unit does not have cannot follow the person there
+    if (!sectorsIn(next).some(item => item.id === sector)) setSector('');
+  };
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -75,7 +58,7 @@ export default function EditCollaboratorDialog({ person, profile, profiles = [],
   const statusChanged = active !== person.isActive;
   const profileChanged = !!profile && (
     registration.trim() !== (profile.registrationNumber ?? '') || email.trim() !== (profile.email ?? '') || phone.trim() !== (profile.phone ?? '')
-    || key(unit) !== key(initialUnit) || key(sector) !== key(initialSector));
+    || unit !== initialUnit || sector !== initialSector);
   const changed = nameChanged || loginChanged || statusChanged || password !== '' || profileChanged;
   const rules = registry?.rules;
 
@@ -92,8 +75,7 @@ export default function EditCollaboratorDialog({ person, profile, profiles = [],
       if (profileChanged) {
         await saveParticipantProfile(person.id, {
           registrationNumber: registration.trim() || null, email: email.trim() || null, phone: phone.trim() || null,
-          unitId: await resolvePlacement('units', registry?.units ?? [], unit),
-          sectorId: await resolvePlacement('sectors', registry?.sectors ?? [], sector),
+          unitId: unit || null, sectorId: sector || null,
         });
         done.push('cadastro');
       }
@@ -124,8 +106,19 @@ export default function EditCollaboratorDialog({ person, profile, profiles = [],
         <Field htmlFor="edit-phone" label={`Telefone${mark(rules?.requirePhone)}`}>
           <Input autoComplete="off" id="edit-phone" inputMode="tel" maxLength={32} onChange={event => setPhone(event.target.value)} type="tel" value={phone} />
         </Field>
-        <PlacementInput id="edit-unit" items={registry?.units ?? []} label={`Unidade${mark(rules?.requireUnit)}`} onChange={setUnit} value={unit} />
-        <PlacementInput id="edit-sector" items={sectorsFor(registry, profiles, unit)} label={`Setor${mark(rules?.requireSector)}`} onChange={setSector} value={sector} />
+        <Field htmlFor="edit-unit" label={`Unidade${mark(rules?.requireUnit)}`}>
+          <NativeSelect id="edit-unit" onChange={event => chooseUnit(event.target.value)} value={unit}>
+            <option value="">Sem unidade</option>
+            {unitOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </NativeSelect>
+        </Field>
+        <Field htmlFor="edit-sector" label={`Setor${mark(rules?.requireSector)}`}
+          hint={!unit ? 'Escolha a unidade para ver os setores dela.' : sectorOptions.length === 0 ? 'Esta unidade ainda não tem setores. Crie em Cadastro.' : undefined}>
+          <NativeSelect disabled={sectorOptions.length === 0} id="edit-sector" onChange={event => setSector(event.target.value)} value={sector}>
+            <option value="">Sem setor</option>
+            {sectorOptions.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </NativeSelect>
+        </Field>
       </>}
       <Field hint={`${passwordRulesHint} Entregue a nova senha por um canal seguro: ela não aparece de novo.`} htmlFor="edit-password" label="Nova senha (opcional)">
         <div className="flex gap-2">

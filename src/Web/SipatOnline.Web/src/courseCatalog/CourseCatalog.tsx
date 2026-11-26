@@ -15,7 +15,7 @@ import { TabCount, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import CatalogToolbar, { type CatalogTab } from './CatalogToolbar';
-import { filterCourses, filterModules, hasCourseFilters, type CatalogFilters, type StatusFilter } from './catalogFilters';
+import { filterCourses, filterModules, hasCourseFilters, type CatalogFilters, type CourseOwner, type StatusFilter } from './catalogFilters';
 import CourseStartOptions from './CourseStartOptions';
 import CoursesPanel from './CoursesPanel';
 import CreateCourseDialog from './CreateCourseDialog';
@@ -38,6 +38,7 @@ type CatalogDialog =
 
 export default function CourseCatalog({
   courses,
+  owners,
   modules,
   isLoading,
   error,
@@ -51,6 +52,8 @@ export default function CourseCatalog({
   onError,
 }: {
   courses: PlatformCourse[];
+  /** The trainings that belong to a company, by training: whose, and where each stands. */
+  owners: Map<string, CourseOwner>;
   modules: GameModule[];
   isLoading: boolean;
   error: string;
@@ -71,6 +74,7 @@ export default function CourseCatalog({
     query: params.get('q') ?? '',
     status: (params.get('status') as StatusFilter | null) ?? 'all',
     category: params.get('categoria') ?? 'all',
+    owner: params.get('empresa') ?? 'all',
   };
 
   function patchParams(updates: Record<string, string | null>) {
@@ -87,8 +91,9 @@ export default function CourseCatalog({
     ...('query' in patch ? { q: patch.query ?? '' } : {}),
     ...('status' in patch ? { status: patch.status ?? 'all' } : {}),
     ...('category' in patch ? { categoria: patch.category ?? 'all' } : {}),
+    ...('owner' in patch ? { empresa: patch.owner ?? 'all' } : {}),
   });
-  const clearFilters = () => patchParams({ q: null, status: null, categoria: null });
+  const clearFilters = () => patchParams({ q: null, status: null, categoria: null, empresa: null });
 
   // coming back to the library (from an editor, another screen) restores the view it had
   useEffect(() => {
@@ -106,7 +111,10 @@ export default function CourseCatalog({
   const [dialogBusy, setDialogBusy] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const shownCourses = useMemo(() => filterCourses(courses, categories, filters), [courses, categories, filters.query, filters.status, filters.category]); // eslint-disable-line react-hooks/exhaustive-deps
+  const shownCourses = useMemo(() => filterCourses(courses, categories, filters, owners), [courses, categories, owners, filters.query, filters.status, filters.category, filters.owner]); // eslint-disable-line react-hooks/exhaustive-deps
+  // the companies that have trainings, by name, for the filter
+  const companies = useMemo(() => [...new Map([...owners.values()].map((owner) => [owner.tenantId, owner.companyName])).entries()]
+    .map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')), [owners]);
   const shownModules = useMemo(() => filterModules(modules, filters.query), [modules, filters.query]);
   const knownCategories = new Set(categories.map((item) => item.id));
   const hasUncategorized = courses.some((course) => !course.categoryId || !knownCategories.has(course.categoryId));
@@ -205,6 +213,7 @@ export default function CourseCatalog({
         {showTabs && tab !== 'plans' && (
           <CatalogToolbar
             categories={categories}
+            companies={companies}
             countText={countText}
             filters={filters}
             hasUncategorized={hasUncategorized}
@@ -219,7 +228,7 @@ export default function CourseCatalog({
         <TabsContent value="courses">
           {body ?? (isEmptyCatalog
             ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => navigate('/platform/videos')} />
-            : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} categories={categories} courses={shownCourses} onClearFilters={clearFilters} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
+            : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} categories={categories} courses={shownCourses} owners={owners} onClearFilters={clearFilters} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
         </TabsContent>
         <TabsContent value="plans">
           {body ?? <PlanSubjectsPanel />}

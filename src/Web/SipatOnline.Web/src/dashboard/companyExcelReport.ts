@@ -21,6 +21,8 @@ export interface CompanyExcelReportInput {
   generatedAt?: Date;
   /** The training the report is about; absent when it covers every training. */
   trainingTitle?: string;
+  /** The unit and the sector of each person (by id), when the company has them: two more columns in "Colaboradores". */
+  placement?: ReadonlyMap<string, { unit: string; sector: string }>;
 }
 
 const INK = '1F2A24';
@@ -229,6 +231,8 @@ function addParticipantsSheet(workbook: Workbook, input: CompanyExcelReportInput
     { header: 'Tempo assistido', width: 12 },
     { header: 'Último acesso', width: 18 },
   ];
+  // unit and sector come last, so the columns a company already reads stay where they are
+  if (input.placement) columns.push({ header: 'Unidade', width: 24 }, { header: 'Setor', width: 24 });
   sheet.columns = columns.map(({ width }) => ({ width }));
   headerRow(sheet, 1, columns.map(({ header }) => header), brand, 1);
 
@@ -247,6 +251,7 @@ function addParticipantsSheet(workbook: Workbook, input: CompanyExcelReportInput
       participant.progressPercentage / 100,
       participant.watchedMilliseconds / MS_PER_DAY,
       participant.lastAccessedAt ? excelDate(new Date(participant.lastAccessedAt)) : null,
+      ...(input.placement ? [input.placement.get(participant.id)?.unit ?? '—', input.placement.get(participant.id)?.sector ?? '—'] : []),
     ], 1, index % 2 === 1);
     const excelRow = sheet.getRow(rowNumber);
     statusPill(excelRow.getCell(4), participant.status);
