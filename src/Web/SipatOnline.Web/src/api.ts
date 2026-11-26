@@ -819,6 +819,28 @@ export interface TenantAppearanceData {
   removeBanner?: boolean;
 }
 
+/** The pictures of the company's certificate, each an address or null; `logoReference` is the logo the operation set. */
+export interface CertificateTemplate {
+  coverReference: string | null;
+  emblemReference: string | null;
+  footerReference: string | null;
+  logoReference: string | null;
+}
+
+export interface CertificateTemplateData {
+  coverBase64?: string | null; removeCover?: boolean;
+  emblemBase64?: string | null; removeEmblem?: boolean;
+  footerBase64?: string | null; removeFooter?: boolean;
+}
+
+export function getCertificateTemplate(): Promise<CertificateTemplate> {
+  return requestJson<CertificateTemplate>('/api/tenant/certificate-template');
+}
+
+export function saveCertificateTemplate(data: CertificateTemplateData): Promise<CertificateTemplate> {
+  return requestJson<CertificateTemplate>('/api/tenant/certificate-template', { method: 'PUT', body: JSON.stringify(data) });
+}
+
 export function saveTenantAppearance(data: TenantAppearanceData): Promise<TenantBranding> {
   return requestJson<TenantBranding>('/api/tenant/branding/appearance', {
     method: 'PUT',

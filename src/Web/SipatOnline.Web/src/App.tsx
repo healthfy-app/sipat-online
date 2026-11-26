@@ -54,6 +54,7 @@ import PlaybackQualityComparisonPage from './quality/PlaybackQualityComparisonPa
 import PlatformSettingsPage from './PlatformSettingsPage';
 import CertificatesPage from './CertificatesPage';
 import TenantAppearancePage from './TenantAppearancePage';
+import CertificateTemplatePage from './CertificateTemplatePage';
 import { BrandThemeContext, tenantTheme } from './branding';
 import { imageEdgeColor } from './imageEdgeColor';
 import LoadingState from './LoadingState';
@@ -267,6 +268,10 @@ export default function App() {
                 <TenantAppearancePage tenant={state.tenant} onSaved={tenant => setState(current =>
                   current.status === 'ready' ? { ...current, tenant } : current)} />
               ) : <AccessDenied />}
+            />
+            <Route
+              path="/admin/certificate"
+              element={state.session && hasAdminRole(state.session) ? <CertificateTemplatePage tenant={state.tenant} /> : <AccessDenied />}
             />
             <Route
               path="/learning"
@@ -650,6 +655,7 @@ function ProtectedPortal({
             <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
             {capabilities?.internalVideos && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/videos">Vídeos da empresa</NavLink>}
             {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
+            {capabilities?.customCertificate !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/certificate">Certificado</NavLink>}
           </>}
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
             {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}

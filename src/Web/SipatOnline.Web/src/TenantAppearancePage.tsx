@@ -14,7 +14,7 @@ const maxLogoBytes = 256 * 1024;
 const maxBannerBytes = 1_500_000;
 const bannerTypes = ['image/png', 'image/jpeg', 'image/webp'];
 
-function readAsBase64(file: File, failure: string): Promise<string> {
+export function readAsBase64(file: File, failure: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error(failure));
@@ -304,7 +304,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
                 </div>
               </PreviewFrame>
             </div>
-            <p className="m-0 text-xs text-muted-foreground">Nome, dados e certificados não mudam. A logo dos certificados é configurada separadamente pela plataforma.</p>
+            <p className="m-0 text-xs text-muted-foreground">Nome, dados e certificados não mudam. As imagens do certificado ficam em Certificado, no menu.</p>
           </aside>
         </form>
       </Page>
@@ -321,7 +321,7 @@ function PreviewFrame({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-function Dropzone({ id, ariaLabel, accept, title, hint, fileName, disabled, resetKey, onFile }: {
+export function Dropzone({ id, ariaLabel, accept, title, hint, fileName, disabled, resetKey, onFile }: {
   id: string; ariaLabel: string; accept: string; title: string; hint: string;
   fileName: string; disabled: boolean; resetKey: number; onFile: (file?: File) => void;
 }) {
