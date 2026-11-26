@@ -242,6 +242,7 @@ app.MapCompanyRegistryEndpoints();
 app.MapTrainingAudienceEndpoints();
 app.MapTenantEndpoints();
 app.MapTenantAppearanceEndpoints();
+app.MapCertificateTemplateEndpoints();
 app.MapSipatEventEndpoints();
 app.MapSipatPlanEndpoints();
 app.MapSipatCatalogEndpoints();

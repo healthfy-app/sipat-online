@@ -77,6 +77,7 @@ public sealed class PlatformDbContext(
     public DbSet<LearningContentSnapshotEntity> LearningContentSnapshots => Set<LearningContentSnapshotEntity>();
     public DbSet<LearningActivityOutcomeEntity> LearningActivityOutcomes => Set<LearningActivityOutcomeEntity>();
     public DbSet<ParticipationCertificateEntity> ParticipationCertificates => Set<ParticipationCertificateEntity>();
+    public DbSet<CertificateTemplateEntity> CertificateTemplates => Set<CertificateTemplateEntity>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

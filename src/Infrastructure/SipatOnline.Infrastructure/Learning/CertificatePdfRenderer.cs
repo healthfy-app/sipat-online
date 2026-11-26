@@ -34,26 +34,56 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         var muted = new XSolidBrush(XColor.FromArgb(96, 112, 104));
         var green = new XSolidBrush(greenColor);
 
+        // a picture inside a box: whole (the box keeps free room) or filling it (what does not fit is cut)
+        void Picture(CertificateLogo picture, XRect box, bool fill = false, bool round = false, bool right = false)
+        {
+            using var stream = new MemoryStream(picture.Data);
+            using var image = XImage.FromStream(stream);
+            var horizontal = box.Width / image.PixelWidth;
+            var vertical = box.Height / image.PixelHeight;
+            var scale = fill ? Math.Max(horizontal, vertical) : Math.Min(horizontal, vertical);
+            var width = image.PixelWidth * scale;
+            var height = image.PixelHeight * scale;
+            var state = graphics.Save();
+            if (round)
+            {
+                var circle = new XGraphicsPath();
+                circle.AddEllipse(box);
+                graphics.IntersectClip(circle);
+            }
+            else graphics.IntersectClip(box);
+            graphics.DrawImage(image, box.X + (right ? box.Width - width : (box.Width - width) / 2), box.Y + (box.Height - height) / 2, width, height);
+            graphics.Restore(state);
+        }
+
+        var template = certificate.Template;
+        var cover = template?.Cover;
+        var emblem = template?.Emblem;
         // paper, a double frame and a band of the product's colors on the left
         graphics.DrawRectangle(XBrushes.White, 0, 0, page.Width.Point, page.Height.Point);
         graphics.DrawRectangle(green, 0, 0, 14, page.Height.Point);
         graphics.DrawRectangle(new XSolidBrush(goldColor), 14, 0, 4, page.Height.Point);
+        // the company's cover takes the top of the page, in the place of the row of logos
+        if (cover is not null) Picture(cover, new XRect(40, 28, 774, 106), fill: true);
         graphics.DrawRectangle(new XPen(greenColor, 1.6), 34, 22, 786, 551);
         graphics.DrawRectangle(new XPen(XColor.FromArgb(200, 214, 206), 0.6), 40, 28, 774, 539);
 
-        graphics.DrawRectangle(new XSolidBrush(inkColor), 64, 50, 58, 58);
-        using var logoStream = Asset("sipat-online-logo.png");
-        using var logo = XImage.FromStream(logoStream);
-        graphics.DrawImage(logo, 69, 55, 48, 48);
-        graphics.DrawString("SIPAT Online", new XFont("SipatCertificate", 11), ink, new XRect(132, 66, 200, 16), XStringFormats.TopLeft);
-        if (certificate.CompanyLogo is { } companyLogo)
+        if (cover is null)
         {
-            using var companyStream = new MemoryStream(companyLogo.Data);
-            using var companyImage = XImage.FromStream(companyStream);
-            var scale = Math.Min(200d / companyImage.PixelWidth, 58d / companyImage.PixelHeight);
-            var width = companyImage.PixelWidth * scale;
-            var height = companyImage.PixelHeight * scale;
-            graphics.DrawImage(companyImage, 790 - width, 50 + (58 - height) / 2, width, height);
+            graphics.DrawRectangle(new XSolidBrush(inkColor), 64, 50, 58, 58);
+            using var logoStream = Asset("sipat-online-logo.png");
+            using var logo = XImage.FromStream(logoStream);
+            graphics.DrawImage(logo, 69, 55, 48, 48);
+            graphics.DrawString("SIPAT Online", new XFont("SipatCertificate", 11), ink, new XRect(132, 66, 200, 16), XStringFormats.TopLeft);
+            if (certificate.CompanyLogo is { } companyLogo) Picture(companyLogo, new XRect(590, 50, 200, 58), right: true);
+            if (emblem is not null) Picture(emblem, new XRect(392, 50, 58, 58));
+        }
+        else if (emblem is not null)
+        {
+            // the emblem sits on the lower edge of the cover, on a white disc with a gold ring
+            graphics.DrawEllipse(XBrushes.White, 383, 96, 76, 76);
+            graphics.DrawEllipse(new XPen(goldColor, 1.5), 383, 96, 76, 76);
+            Picture(emblem, new XRect(387, 100, 68, 68), round: true);
         }
         var small = new XFont("SipatCertificate", 9);
         void Block(string text, double top, double height, double preferredSize, XBrush? brush = null)
@@ -88,16 +118,34 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
             throw new InvalidOperationException("Certificate text exceeds its bounded layout.");
         }
 
-        Block(certificate.IsDemonstration ? "CERTIFICADO DEMONSTRATIVO" : "CERTIFICADO", 128, 22, 13, green);
-        Block("de participação", 150, 44, 32);
-        graphics.DrawLine(new XPen(goldColor, 2), 391, 200, 451, 200);
-        Block("Certificamos que", 216, 22, 13, muted);
-        Block(certificate.ParticipantName, 240, 60, 28);
-        graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.8), 231, 304, 611, 304);
-        Block($"da empresa {certificate.CompanyName}, participou do treinamento", 316, 40, 14);
-        Block(certificate.EventTitle, 358, 50, 18, green);
         var period = Period(certificate.StartsAt, certificate.EndsAt);
-        Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", 412, 24, 13, muted);
+        var heading = certificate.IsDemonstration ? "CERTIFICADO DEMONSTRATIVO" : "CERTIFICADO";
+        if (cover is null)
+        {
+            Block(heading, 128, 22, 13, green);
+            Block("de participação", 150, 44, 32);
+            graphics.DrawLine(new XPen(goldColor, 2), 391, 200, 451, 200);
+            Block("Certificamos que", 216, 22, 13, muted);
+            Block(certificate.ParticipantName, 240, 60, 28);
+            graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.8), 231, 304, 611, 304);
+            Block($"da empresa {certificate.CompanyName}, participou do treinamento", 316, 40, 14);
+            Block(certificate.EventTitle, 358, 50, 18, green);
+            Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", 412, 24, 13, muted);
+        }
+        else
+        {
+            // under a cover the same text is set closer together, below the emblem when there is one
+            var top = emblem is null ? 146d : 176d;
+            Block(heading, top, 22, 13, green);
+            Block("de participação", top + 20, 40, 28);
+            graphics.DrawLine(new XPen(goldColor, 2), 391, top + 66, 451, top + 66);
+            Block("Certificamos que", top + 76, 20, 13, muted);
+            Block(certificate.ParticipantName, top + 98, 52, 26);
+            graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.8), 231, top + 154, 611, top + 154);
+            Block($"da empresa {certificate.CompanyName}, participou do treinamento", top + 162, 36, 13);
+            Block(certificate.EventTitle, top + 200, 44, 17, green);
+            Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", top + 248, 22, 12, muted);
+        }
 
         // footer: issue date on the left, the code on the right, the notice in the middle
         graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.6), 64, 478, 790, 478);
@@ -107,6 +155,9 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         graphics.DrawString(certificate.IssuedAt.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture), value, ink, new XRect(64, 503, 220, 18), XStringFormats.TopLeft);
         graphics.DrawString("IDENTIFICADOR", label, muted, new XRect(540, 490, 250, 12), XStringFormats.TopRight);
         graphics.DrawString(certificate.Id.ToString("D"), small, ink, new XRect(540, 506, 250, 14), XStringFormats.TopRight);
+        // the middle of the footer: the demonstration notice, or the company's picture (its logo when a cover took the logo's place)
+        var footer = template?.Footer ?? (cover is null ? null : certificate.CompanyLogo);
+        if (!certificate.IsDemonstration && footer is not null) Picture(footer, new XRect(321, 484, 200, 42));
         if (certificate.IsDemonstration)
         {
             graphics.DrawString("Demonstração de software.", small, muted, new XRect(270, 494, 302, 14), XStringFormats.TopCenter);
