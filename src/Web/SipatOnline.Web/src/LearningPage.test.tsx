@@ -1036,7 +1036,7 @@ describe('learning experience', () => {
       fireEvent.pointerDown(screen.getByRole('slider', { name: 'Posição do vídeo' }), { clientX: 90, button: 0 });
     } finally { Reflect.deleteProperty(window, 'PointerEvent'); }
     expect(video.currentTime).toBe(12);
-    expect(screen.getByText(/não é possível avançar/)).toBeVisible();
+    expect(await screen.findByText(/não é possível avançar/)).toBeVisible();
   });
 
   it('saves when the video is paused and after a seek', async () => {
