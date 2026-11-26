@@ -2,7 +2,10 @@ import { Search, Settings2, X } from 'lucide-react';
 import type { CourseCategory, VideoSubject } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
+import { phaseLabel, type SipatPhase } from '@/sipatBuilder/sipatPhase';
 import type { CatalogFilters, StatusFilter } from './catalogFilters';
+
+const phases: SipatPhase[] = ['draft', 'created', 'published', 'running', 'finished', 'cancelled'];
 
 export type CatalogTab = 'courses' | 'videos' | 'modules' | 'plans';
 
@@ -66,10 +69,10 @@ export default function CatalogToolbar({
 
       {tab === 'courses' && (
         <>
-          <NativeSelect aria-label="Status" className="w-auto max-sm:flex-1" onChange={(event) => onChange({ status: event.target.value as StatusFilter })} value={filters.status}>
-            <option value="all">Todos os status</option>
-            <option value="Draft">Rascunho</option>
-            <option value="Published">Publicado</option>
+          <NativeSelect aria-label="Fase" className="w-auto max-sm:flex-1" onChange={(event) => onChange({ status: event.target.value as StatusFilter })} value={filters.status}>
+            <option value="active">Ativos</option>
+            <option value="all">Todas as fases</option>
+            {phases.map((item) => <option key={item} value={item}>{phaseLabel[item].text}</option>)}
           </NativeSelect>
           <NativeSelect aria-label="Filtrar por categoria" className="w-auto max-sm:flex-1" onChange={(event) => onChange({ category: event.target.value })} value={filters.category}>
             <option value="all">Todas as categorias</option>
@@ -77,8 +80,8 @@ export default function CatalogToolbar({
             {hasUncategorized && categories.length > 0 && <option value="none">Sem categoria</option>}
           </NativeSelect>
           {companies.length > 0 && <NativeSelect aria-label="Filtrar por empresa" className="w-auto max-w-56 max-sm:flex-1" onChange={(event) => onChange({ owner: event.target.value })} value={filters.owner}>
-            <option value="all">Modelos e empresas</option>
-            <option value="models">Só modelos</option>
+            <option value="all">Templates e empresas</option>
+            <option value="models">Só templates</option>
             {companies.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </NativeSelect>}
           <Button className="text-muted-foreground max-sm:order-3" onClick={onManageCategories} size="sm" variant="ghost"><Settings2 /> Gerenciar categorias</Button>

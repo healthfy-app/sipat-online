@@ -604,6 +604,16 @@ export function getCompanyAdministrationId(): string | null {
   return companyAdministrationId;
 }
 
+/**
+ * Runs one company-administration call for a company, from the operation's own list (which is in no company). The
+ * call reads the company as it starts, so `action` must make a single request; chain several with one call each.
+ */
+export function inCompany<T>(companyId: string, action: () => Promise<T>): Promise<T> {
+  const previous = companyAdministrationId;
+  companyAdministrationId = companyId;
+  try { return action(); } finally { companyAdministrationId = previous; }
+}
+
 async function readError(response: Response): Promise<ApiError> {
   let message = `Não foi possível concluir a solicitação (HTTP ${response.status}).`;
 
@@ -943,7 +953,10 @@ export function changeVideosCompanies(change: BulkVideoChange): Promise<void> {
 }
 
 /** A SIPAT's week opened in the video editor: a copy training whose Títulos are the days of that SIPAT. */
-export interface SipatWeek { courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string; sipatStatus?: 'Draft' | 'Published' | 'Cancelled' }
+export interface SipatWeek {
+  courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string; sipatStatus?: 'Draft' | 'Published' | 'Cancelled';
+  startsAt?: string; endsAt?: string; days?: number;
+}
 export function listSipatWeeks(): Promise<SipatWeek[]> {
   return requestJson<SipatWeek[]>('/api/platform/catalog/sipat-weeks');
 }

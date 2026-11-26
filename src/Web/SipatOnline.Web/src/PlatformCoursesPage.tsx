@@ -111,7 +111,7 @@ export default function PlatformCoursesPage() {
   const week = selectedCourse ? weeks.find((item) => item.courseId === selectedCourse.id) : undefined;
   // Conteúdo lists the companies' trainings beside the models: whose each is, and where it stands
   const owners = useMemo(() => new Map<string, CourseOwner>(weeks.map((item) => [item.courseId,
-    { tenantId: item.tenantId, companyName: item.companyName, status: item.sipatStatus ?? 'Draft' }])), [weeks]);
+    { tenantId: item.tenantId, companyName: item.companyName, status: item.sipatStatus ?? 'Draft', sipatEventId: item.sipatEventId, startsAt: item.startsAt, endsAt: item.endsAt, days: item.days }])), [weeks]);
   // back from a week: to that company's planner, which reads the days from the week's títulos
   const backToWeek = week ? () => navigate(`/platform/companies/${week.tenantId}/treinamentos/${week.sipatEventId}`) : undefined;
 
