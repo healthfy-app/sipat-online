@@ -675,7 +675,8 @@ function ProtectedPortal({
   const sidebarNav = (
     <>
       {/* the unit the company is looked at through: it sits above the menu it filters, in the side bar and in the phone's menu */}
-      {companyPages && <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
+      {/* inside a company the operation's menu shows the unit in the company's own card (see CompanyNav) */}
+      {companyPages && !(isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId) && <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
       {session.roles.includes('Participant') && !isPlatformCompanyContext && (
         <>
           <p className="sidebar-label">APRENDIZAGEM</p>
