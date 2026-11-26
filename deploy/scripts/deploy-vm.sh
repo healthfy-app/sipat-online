@@ -13,7 +13,7 @@
 #           CERTIFICATE_MODE (http01|dns-azure|manual) ACME_EMAIL DEPLOY_ENVIRONMENT IMAGE_TAG
 #           DEPLOY_PLATFORM (linux/amd64 default; linux/arm64 for Azure *p* sizes such as B2pts_v2)
 #           VIDEO_STORAGE_PROVIDER (File|R2) R2_SERVICE_URL R2_VIDEO_BUCKET R2_ACCESS_KEY_ID
-#           R2_SECRET_ACCESS_KEY R2_DIRECT_UPLOAD OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
+#           R2_SECRET_ACCESS_KEY R2_DIRECT_UPLOAD R2_BACKUP_BUCKET OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
@@ -44,6 +44,11 @@ echo "==> Environment file"
 provider="${VIDEO_STORAGE_PROVIDER:-File}"
 if [ "$provider" = "R2" ] && { [ -z "${R2_SERVICE_URL:-}" ] || [ -z "${R2_VIDEO_BUCKET:-}" ] \
     || [ -z "${R2_ACCESS_KEY_ID:-}" ] || [ -z "${R2_SECRET_ACCESS_KEY:-}" ]; }; then
+  if [ "$environment" = "production" ]; then
+    # in production a silent fallback would leave new uploads only on the VM disk
+    echo "VIDEO_STORAGE_PROVIDER=R2 but the R2 settings are incomplete. Production does not fall back to File." >&2
+    exit 1
+  fi
   echo "WARNING: VIDEO_STORAGE_PROVIDER=R2 but the R2 settings are incomplete; videos stay on the VM volume (File)." >&2
   [ -n "${GITHUB_ACTIONS:-}" ] && echo "::warning::R2 settings incomplete; this deploy uses File video storage."
   provider=File
@@ -76,6 +81,10 @@ if [ "$provider" = "R2" ]; then
   put R2_SECRET_ACCESS_KEY "$R2_SECRET_ACCESS_KEY"
   put R2_VIDEO_BUCKET "$R2_VIDEO_BUCKET"
   put R2_DIRECT_UPLOAD "${R2_DIRECT_UPLOAD:-false}"
+fi
+# read by deploy/scripts/backup-postgres.sh: without it here, every deploy would switch the daily backup off
+if [ -n "${R2_BACKUP_BUCKET:-}" ]; then
+  put R2_BACKUP_BUCKET "$R2_BACKUP_BUCKET"
 fi
 if [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then
   put OTEL_EXPORTER_OTLP_ENDPOINT "$OTEL_EXPORTER_OTLP_ENDPOINT"
