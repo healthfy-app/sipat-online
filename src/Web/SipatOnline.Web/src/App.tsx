@@ -1,5 +1,5 @@
 import { Menu } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
 import {
   BrowserRouter,
   Link,
@@ -28,37 +28,40 @@ import {
 } from './api';
 import { Button } from './components/ui/button';
 import { Sheet } from './components/ui/sheet';
-import SipatsPage from './sipatBuilder/SipatsPage';
 import { LegacySipatRedirect } from './trainings/LegacySipatRedirect';
 import CompanyContext from './companies/CompanyContext';
 import { UnitMenu, UnitScopeProvider } from './trainings/unitScope';
-import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
-import CollaboratorsPage from './collaborators/CollaboratorsPage';
-import RegistryPage from './registry/RegistryPage';
-import TenantLearningDashboardPage from './TenantLearningDashboardPage';
 import { isCompanyPanelMode } from './companies/companyContextMode';
-import PlatformCompaniesPage from './PlatformCompaniesPage';
-import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
-import PlatformUsersPage from './PlatformUsersPage';
-import PlatformHomePage from './PlatformHomePage';
-import PlatformCoursesPage from './PlatformCoursesPage';
-import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
-import TrainingEditorPage from './trainings/TrainingEditorPage';
 import { linkedTraining } from './trainings/trainingLink';
 
 import CompanyNav from './companies/CompanyNav';
 import PlanMedal from './companies/PlanMedal';
-import PlaybackQualityPage from './quality/PlaybackQualityPage';
-import PlaybackQualityComparisonPage from './quality/PlaybackQualityComparisonPage';
-import PlatformSettingsPage from './PlatformSettingsPage';
-import CertificatesPage from './CertificatesPage';
-import TenantAppearancePage from './TenantAppearancePage';
 import { BrandThemeContext, tenantTheme } from './branding';
 import { imageEdgeColor } from './imageEdgeColor';
 import LoadingState from './LoadingState';
 import VideoUploadTray from './videoUploads/VideoUploadTray';
-import VideoLibraryPage from './videoLibrary/VideoLibraryPage';
+
+// The pages of the company's administration and of the operation load when they are opened: a participant, who only
+// ever sees the learning pages, does not download them.
+const SipatsPage = lazy(() => import('./sipatBuilder/SipatsPage'));
+const CompanyHome = lazy(() => import('./companies/CompanyHome'));
+const CollaboratorsPage = lazy(() => import('./collaborators/CollaboratorsPage'));
+const RegistryPage = lazy(() => import('./registry/RegistryPage'));
+const TenantLearningDashboardPage = lazy(() => import('./TenantLearningDashboardPage'));
+const PlatformCompaniesPage = lazy(() => import('./PlatformCompaniesPage'));
+const PlatformCompanyEmployeesPage = lazy(() => import('./PlatformCompanyEmployeesPage'));
+const PlatformUsersPage = lazy(() => import('./PlatformUsersPage'));
+const PlatformHomePage = lazy(() => import('./PlatformHomePage'));
+const PlatformCoursesPage = lazy(() => import('./PlatformCoursesPage'));
+const SipatBuilderPage = lazy(() => import('./sipatBuilder/SipatBuilderPage'));
+const TrainingEditorPage = lazy(() => import('./trainings/TrainingEditorPage'));
+const PlaybackQualityPage = lazy(() => import('./quality/PlaybackQualityPage'));
+const PlaybackQualityComparisonPage = lazy(() => import('./quality/PlaybackQualityComparisonPage'));
+const PlatformSettingsPage = lazy(() => import('./PlatformSettingsPage'));
+const CertificatesPage = lazy(() => import('./CertificatesPage'));
+const TenantAppearancePage = lazy(() => import('./TenantAppearancePage'));
+const VideoLibraryPage = lazy(() => import('./videoLibrary/VideoLibraryPage'));
 
 type AppState =
   | { status: 'loading' }
@@ -849,9 +852,12 @@ function ProtectedPortal({
         >
           {error && <p className="form-error" role="alert">{error}</p>}
           {/* an administrator who also takes trainings keeps the admin menu, and the participant pages keep their look */}
-          {!isLearnerOnly && location.pathname.startsWith('/learning')
-            ? <div className="portal-layout-learner contents"><Outlet /></div>
-            : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
+          {/* a page that loads on demand shows this for the moment it takes; the menu around it stays */}
+          <Suspense fallback={<LoadingState>Carregando...</LoadingState>}>
+            {!isLearnerOnly && location.pathname.startsWith('/learning')
+              ? <div className="portal-layout-learner contents"><Outlet /></div>
+              : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
+          </Suspense>
         </section>
       </div>
     </div>

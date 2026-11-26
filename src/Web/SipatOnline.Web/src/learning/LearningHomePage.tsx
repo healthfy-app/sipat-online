@@ -33,7 +33,6 @@ import {
   type CourseSort,
   type LearningSummary,
 } from './learningHelpers';
-import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
 import { orderTrainings, pickDefaultTraining } from '@/trainings/defaultTraining';
 import WeekVideos from './WeekVideos';
@@ -373,7 +372,18 @@ export default function LearningHomePage({ participantName, participantId, setSu
         </p>
       </header>}
 
-      {isLoading && <LoadingState className="learning-state">Carregando o seu treinamento...</LoadingState>}
+      {/* the first visit on a device: the shape of the page while the answer comes, instead of a line of text on an empty screen */}
+      {isLoading && <div aria-busy="true" className="grid gap-6" role="status">
+        <span className="sr-only">Carregando o seu treinamento...</span>
+        <div aria-hidden="true" className="h-56 animate-pulse rounded-[1.25rem] bg-[#e3e9e6] motion-reduce:animate-none max-[760px]:h-72" />
+        <div aria-hidden="true" className="h-8 w-56 animate-pulse rounded-lg bg-[#e3e9e6] motion-reduce:animate-none" />
+        <div aria-hidden="true" className="grid gap-4 rounded-[1.25rem] border border-[#dfe6e3] bg-white p-5">
+          <div className="h-10 w-2/3 animate-pulse rounded-lg bg-[#e3e9e6] motion-reduce:animate-none" />
+          <div className="grid grid-cols-5 gap-3 max-[1100px]:grid-cols-2">
+            {[0, 1, 2, 3, 4].map(item => <div className="aspect-[4/3] animate-pulse rounded-xl bg-[#e3e9e6] motion-reduce:animate-none max-[1100px]:nth-[n+3]:hidden" key={item} />)}
+          </div>
+        </div>
+      </div>}
       {linkUnavailable && <p className="m-0 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground" role="status">O treinamento deste link não está disponível para você. Aqui estão os seus treinamentos.</p>}
       {error && (
         <div className="learning-state learning-error" role="alert">
