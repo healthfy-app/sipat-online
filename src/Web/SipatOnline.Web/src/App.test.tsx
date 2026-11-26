@@ -81,7 +81,7 @@ describe('tenant portal', () => {
     render(<App />);
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
-    expect(screen.queryByRole('link', { name: 'Treinamentos' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Conteúdos' })).not.toBeInTheDocument();
     const user = userEvent.setup();
     await user.click(screen.getByRole('link', { name: 'Acompanhamento' }));
     expect(await screen.findByText(/Modo de consulta/)).toBeVisible();
@@ -358,7 +358,7 @@ describe('tenant portal', () => {
     expect(await screen.findByRole('heading', { name: 'Visão geral' })).toBeVisible();
     expect(window.location.pathname).toBe('/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
-    expect(screen.getByRole('link', { name: 'Treinamentos' })).toHaveAttribute('href', '/admin/treinamentos');
+    expect(screen.getByRole('link', { name: 'Conteúdos' })).toHaveAttribute('href', '/admin/treinamentos');
     expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
     // the page's own calls, plus the units for the switch at the top, and where each person is and the lists of the company (the overview by unit)
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(11));
@@ -527,7 +527,7 @@ describe('tenant portal', () => {
     expect(screen.queryByRole('link', { name: 'Cadastrar empresa' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Painel' })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Usuários' })).not.toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Conteúdo' })).toHaveAttribute('href', '/platform/courses');
+    expect(screen.getByRole('link', { name: 'Conteúdos' })).toHaveAttribute('href', '/platform/courses');
     expect(screen.getByRole('link', { name: 'Biblioteca de vídeos' })).toHaveAttribute('href', '/platform/videos');
     expect(screen.getByRole('link', { name: 'Monitor de Desempenho' })).toHaveAttribute('href', '/platform/qualidade');
     await waitFor(() => {

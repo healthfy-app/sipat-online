@@ -14,7 +14,7 @@ describe('company sidebar', () => {
 
     expect(await screen.findByText('Acme')).toBeVisible();
     expect(screen.getByRole('link', { name: /Todas as empresas/ })).toHaveAttribute('href', '/platform');
-    expect(screen.getByRole('link', { name: 'Treinamentos' })).toHaveClass('active');
+    expect(screen.getByRole('link', { name: 'Conteúdos' })).toHaveClass('active');
     expect(screen.getByRole('link', { name: 'Participantes' })).toHaveAttribute('href', '/platform/companies/c-1/participantes');
     expect(screen.getByRole('link', { name: 'Administradores' })).toHaveAttribute('href', '/platform/companies/c-1/administradores');
   });

@@ -10,6 +10,7 @@ function render(element: ReactElement, path = '/platform/courses') {
   return renderView(<MemoryRouter initialEntries={[path]}><Routes>
     <Route path="/platform/videos" element={<p>Biblioteca de vídeos aberta</p>} />
     <Route path="/platform/courses" element={element} />
+    <Route path="/platform/courses/:courseId" element={<p>Tela de dias aberta</p>} />
     <Route path="/platform/courses/:courseId/edit" element={element} />
   </Routes></MemoryRouter>);
 }
@@ -199,7 +200,8 @@ describe('Platform course catalog', () => {
     await user.keyboard('{Escape}');
     expect(screen.getByRole('dialog')).toBeVisible();
     finish(fire);
-    expect(await screen.findByRole('heading', { name: 'Combate a incêndio', level: 1 })).toBeVisible();
+    // a new template opens on its days
+    expect(await screen.findByText('Tela de dias aberta')).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
@@ -237,7 +239,7 @@ describe('Platform course catalog', () => {
     });
 
     expect(api.setPlatformCourseCover).toHaveBeenCalledWith('c-2', photo);
-    expect(await screen.findByRole('heading', { name: 'Combate a incêndio', level: 1 })).toBeVisible();
+    expect(await screen.findByText('Tela de dias aberta')).toBeVisible();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Nome do treinamento')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Título do vídeo')).not.toBeInTheDocument();
@@ -339,7 +341,7 @@ describe('Platform course catalog', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('O treinamento foi criado, mas não foi possível salvar a capa.');
     await user.click(screen.getByRole('button', { name: 'Tentar salvar capa' }));
 
-    expect(await screen.findByRole('heading', { name: 'Combate a incêndio', level: 1 })).toBeVisible();
+    expect(await screen.findByText('Tela de dias aberta')).toBeVisible();
     expect(api.createPlatformCourse).toHaveBeenCalledOnce();
     expect(api.setPlatformCourseCover).toHaveBeenCalledTimes(2);
   });
@@ -476,7 +478,7 @@ describe('Platform course catalog', () => {
     vi.mocked(api.setPlatformCourseCover).mockResolvedValue({ ...ergonomics, coverUrl: '/cover?v=1' });
     render(<PlatformCoursesPage />);
 
-    await user.click(await screen.findByRole('link', { name: 'Abrir Ergonomia' }));
+    await user.click(await screen.findByRole('button', { name: 'Editar treinamento: Ergonomia' }));
     await user.click(screen.getByRole('button', { name: 'Configurar' }));
     expect(screen.getByRole('heading', { name: 'Detalhes do treinamento' })).toBeVisible();
     expect(screen.getByRole('heading', { name: 'Informações e preferências' })).toBeVisible();
@@ -496,7 +498,7 @@ describe('Platform course catalog', () => {
     });
     render(<PlatformCoursesPage />);
 
-    await user.click(await screen.findByRole('link', { name: 'Abrir Ergonomia' }));
+    await user.click(await screen.findByRole('button', { name: 'Editar treinamento: Ergonomia' }));
     await user.click(screen.getByRole('button', { name: 'Mover Abertura para baixo' }));
 
     expect(api.setPlatformCourseStructure).toHaveBeenCalledWith('c-1', [
@@ -512,7 +514,7 @@ describe('Platform course catalog', () => {
     const user = userEvent.setup();
     vi.mocked(api.setPlatformCourseStructure).mockResolvedValue(ergonomics);
     render(<PlatformCoursesPage />);
-    await user.click(await screen.findByRole('link', { name: 'Abrir Ergonomia' }));
+    await user.click(await screen.findByRole('button', { name: 'Editar treinamento: Ergonomia' }));
 
     const videoTitle = screen.getByLabelText('Título do vídeo 1');
     await user.clear(videoTitle);
@@ -531,7 +533,7 @@ describe('Platform course catalog', () => {
     vi.mocked(api.listGameModules).mockResolvedValue([memoryModule]);
     vi.mocked(api.setPlatformCourseModules).mockResolvedValue(ergonomics);
     render(<PlatformCoursesPage />);
-    await user.click(await screen.findByRole('link', { name: 'Abrir Ergonomia' }));
+    await user.click(await screen.findByRole('button', { name: 'Editar treinamento: Ergonomia' }));
 
     const buttons = screen.getAllByRole('button', { name: 'Atividade depois deste vídeo' });
     await user.click(buttons[0]);
@@ -550,7 +552,7 @@ describe('Platform course catalog', () => {
     vi.mocked(api.createGameModule).mockResolvedValue(created);
     vi.mocked(api.setPlatformCourseModules).mockResolvedValue(ergonomics);
     render(<PlatformCoursesPage />);
-    await user.click(await screen.findByRole('link', { name: 'Abrir Ergonomia' }));
+    await user.click(await screen.findByRole('button', { name: 'Editar treinamento: Ergonomia' }));
 
     await user.click(screen.getAllByRole('button', { name: 'Atividade depois deste vídeo' })[0]);
     await user.click(within(await screen.findByRole('dialog', { name: 'Adicionar atividade' })).getByRole('button', { name: 'Criar jogo' }));
@@ -572,7 +574,7 @@ describe('Platform course catalog', () => {
     vi.mocked(api.updatePlatformCourse).mockResolvedValue({ ...fire, gamificationEnabled: true, gameType: 'Puzzle' });
     render(<PlatformCoursesPage />);
 
-    await user.click(await screen.findByRole('link', { name: 'Abrir Combate a incêndio' }));
+    await user.click(await screen.findByRole('button', { name: 'Editar treinamento: Combate a incêndio' }));
     await user.click(screen.getByRole('button', { name: 'Configurar' }));
     await user.click(screen.getByLabelText(/Gamificação após os vídeos/));
     await user.click(screen.getByLabelText(/Quebra-cabeça/));
@@ -589,9 +591,9 @@ describe('Platform course catalog', () => {
 
   it('shows existing courses directly without opening a popup', async () => {
     render(<PlatformCoursesPage />);
-    expect(await screen.findByRole('heading', { name: 'Conteúdo', level: 1 })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Conteúdos', level: 1 })).toBeVisible();
     expect(screen.queryByRole('tab', { name: /Vídeos/ })).not.toBeInTheDocument();
-    expect(screen.getByText('2 treinamentos no acervo da plataforma')).toBeVisible();
+    expect(screen.getByText('2 treinamentos, entre templates e os das empresas')).toBeVisible();
     expect(await screen.findByRole('link', { name: 'Abrir Ergonomia' })).toBeVisible();
     expect(screen.getByRole('link', { name: 'Abrir Combate a incêndio' })).toBeVisible();
     expect(screen.getByText('2 vídeos · 3 min')).toBeVisible();

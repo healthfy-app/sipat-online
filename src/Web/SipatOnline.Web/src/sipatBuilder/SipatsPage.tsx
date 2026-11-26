@@ -1,6 +1,6 @@
 import { Plus, Search } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   cancelSipatEvent, copySipatPlan, createSipatEvent, deleteSipat, setTrainingCover, getCompanyAdministrationId, getCompanyCapabilities, getCompanyRegistry, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, reactivateSipatEvent,
   type CompanyRegistry, type SipatEvent, type SipatPlanSummary,
@@ -8,6 +8,8 @@ import {
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import CompanyGamesTab from '@/courseCatalog/CompanyGamesTab';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
 import { phaseLabel, sipatPhase, type SipatPhase } from './sipatPhase';
@@ -31,6 +33,10 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
   const navigate = useNavigate();
   const unitScope = useUnitScope();
   const [viewOnly, setViewOnly] = useState(false);
+  // the company's own games are of the plan that has quizzes (Diamante): only then does their tab show
+  const [hasGames, setHasGames] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const tab = hasGames && params.get('aba') === 'jogos' ? 'games' : 'trainings';
   const [events, setEvents] = useState<SipatEvent[] | null>(null);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
   // the units and sectors, to say who each training is for; the list works without them
@@ -47,7 +53,7 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
 
   useEffect(() => {
     let current = true;
-    if (!operator) getCompanyCapabilities().then(capabilities => { if (current) setViewOnly(!capabilities.customizeGrid); }, () => undefined);
+    getCompanyCapabilities().then(capabilities => { if (current) { setViewOnly(!operator && !capabilities.customizeGrid); setHasGames(!!capabilities.quizzes); } }, () => undefined);
     getCompanyRegistry().then(loaded => { if (current) setRegistry(loaded); }, () => undefined);
     Promise.all([listSipatEvents(0, 100), listSipatPlans()])
       .then(([page, summaries]) => { if (current) { setEvents(page.items); setPlans(summaries); } })
@@ -159,7 +165,14 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
   const showAll = () => { setQuery(''); setPhase('all'); setAudience(new Map()); };
   const create = viewOnly ? undefined : <Link className={buttonVariants()} to={`${basePath}/nova`}><Plus /> Novo treinamento</Link>;
   return <Page>
-    <PageHeader actions={create} description="Cada treinamento tem os seus dias ou módulos. Vários podem estar publicados ao mesmo tempo; os anteriores continuam no histórico." eyebrow="Programação" title="Treinamentos" />
+    <PageHeader actions={tab === 'trainings' ? create : undefined} description="Os treinamentos da empresa, cada um com os seus dias, e os jogos e perguntas que entram neles." title="Conteúdos" />
+    {hasGames && <Tabs onValueChange={value => setParams(value === 'games' ? { aba: 'jogos' } : {}, { replace: true })} value={tab}>
+      <TabsList aria-label="Seções de Conteúdos">
+        <TabsTrigger value="trainings">Treinamentos</TabsTrigger>
+        <TabsTrigger value="games">Jogos e perguntas</TabsTrigger>
+      </TabsList>
+    </Tabs>}
+    {tab === 'games' ? <CompanyGamesTab /> : <>
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
     {!events && !error && <LoadingState>Carregando os treinamentos...</LoadingState>}
@@ -225,5 +238,6 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
         })}
       </ul>
     </section>)}
+    </>}
   </Page>;
 }

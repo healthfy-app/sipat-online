@@ -379,6 +379,15 @@ export default function App() {
                   : <AccessDenied />
               }
             />
+            {/* a template of the operation on the same board of days a company's training uses */}
+            <Route
+              path="/platform/courses/:courseId"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <SipatBuilderPage basePath="/platform/courses" canEditThemes template />
+                  : <AccessDenied />
+              }
+            />
             <Route
               path="/platform/courses/:courseId/edit"
               element={
@@ -647,7 +656,7 @@ function ProtectedPortal({
           <p className="sidebar-label">GESTÃO DA EMPRESA</p>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
           {hasAdminRole(session) && <>
-            <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
+            <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Conteúdos</NavLink>
             {capabilities?.internalVideos && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/videos">Vídeos da empresa</NavLink>}
             {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
           </>}
@@ -661,7 +670,7 @@ function ProtectedPortal({
         <>
           <p className="sidebar-label sidebar-label-spaced">OPERAÇÃO</p>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Conteúdo</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Conteúdos</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/videos">Biblioteca de vídeos</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Monitor de Desempenho</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>

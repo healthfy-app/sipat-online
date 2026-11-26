@@ -152,8 +152,8 @@ export default function PlatformCoursesPage() {
           onCreated={async (course) => {
             setError('');
             setCourses((current) => [course, ...current.filter((item) => item.id !== course.id)]);
-            openCourse(course.id);
-            setNotice(`O treinamento "${course.title}" foi criado no catálogo global.`);
+            // a new template opens on its days, as a company's new training does
+            navigate(`/platform/courses/${course.id}`);
           }}
           onDuplicate={(course) => void duplicate(course)}
           onError={setError}

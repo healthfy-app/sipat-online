@@ -49,7 +49,9 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, onUpload, onSendToDay, onEdit, arriving, canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false }: {
+export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, onUpload, onSendToDay, onEdit, arriving, canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false, undated = false }: {
+  /** A template: its days carry no date (they are "Dia 1, Dia 2…"); the dates come when a company makes its training from it. */
+  undated?: boolean;
   /** Opens this training in the video editor, the same as "Editar treinamento" in the top bar; a pencil on each day. */
   onEdit?: () => void;
   /** The days came whole from a ready SIPAT (Bronze): their videos stay as they are, and no day is added or taken out. */
@@ -77,7 +79,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   const themes = canCustomizeGrid ? (catalog.filters ?? []) : catalog.subjects.filter(subject => subject.id !== 'none');
   const canAddDay = days.length < maxDays && !locked;
   // "Dia" when the training has dates, "Módulo" when none of its parts has one
-  const word = partWord(days.map(day => day.date));
+  const word = undated ? 'Dia' : partWord(days.map(day => day.date));
   const lower = word.toLowerCase();
   // up to 7 days always fit the width of the page, however many there are; beyond that the days keep a minimum width and scroll
   const fits = days.length <= 7;
@@ -91,7 +93,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   }, [days.length]);
 
   // every change keeps the untyped names in step with the word: a date set turns "Módulo 2" into "Dia 2"
-  const change = (next: DaySlots[]) => onChange(withDayWord(next, partWord(next.map(day => day.date))));
+  const change = (next: DaySlots[]) => onChange(withDayWord(next, undated ? 'Dia' : partWord(next.map(day => day.date))));
   const patchDay = (index: number, patch: Partial<DaySlots>) => change(days.map((day, position) => (position === index ? { ...day, ...patch } : day)));
   const addDay = () => {
     const last = days[days.length - 1];
@@ -163,7 +165,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
                   {onEdit && <Button aria-label={`Editar treinamento a partir do ${lower} ${index + 1}`} className="max-[760px]:hidden" onClick={onEdit} size="icon-sm" title="Editar treinamento" variant="ghost"><Pencil /></Button>}
                   <Button aria-label={`Remover o ${lower} ${index + 1}`} className="max-[760px]:-my-1.5 max-[760px]:-mr-2.5 max-[760px]:size-11 max-[760px]:min-h-11" disabled={days.length === 1} hidden={locked} onClick={() => removeDay(index)} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </div>
-                <Input aria-label={`Data do ${lower} ${index + 1}`} disabled={readOnly} className={cn('h-9 min-w-0 px-2 text-sm', phoneField)} onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />
+                {!undated && <Input aria-label={`Data do ${lower} ${index + 1}`} disabled={readOnly} className={cn('h-9 min-w-0 px-2 text-sm', phoneField)} onChange={event => patchDay(index, { date: event.target.value })} type="date" value={day.date} />}
                 <Input aria-describedby={dayIssues ? `day-issues-${day.key}` : undefined} aria-invalid={!!dayIssues && !day.title.trim()}
                   disabled={readOnly} aria-label={`Título do ${lower} ${index + 1}`} className={cn('font-medium', phoneField)} maxLength={160}
                   onChange={event => patchDay(index, { title: event.target.value })} placeholder={`Slogan do ${lower}`}

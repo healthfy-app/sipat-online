@@ -255,12 +255,12 @@ export default function CourseCatalog({
     <Page>
       <header className="ops-hero" data-slot="page-header">
         <div className="ops-hero-copy">
-          <p className="ops-hero-eyebrow">Acervo da plataforma</p>
+          <p className="ops-hero-eyebrow">Plataforma</p>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="ops-hero-title">Conteúdo</h1>
+            <h1 className="ops-hero-title">Conteúdos</h1>
             {import.meta.env.DEV && <Badge variant="outline">Apresentação demo</Badge>}
           </div>
-          <p className="ops-hero-lead">{`${pluralize(courses.length, 'treinamento', 'treinamentos')} no acervo da plataforma`}</p>
+          <p className="ops-hero-lead">{`${pluralize(courses.length, 'treinamento', 'treinamentos')}, entre templates e os das empresas`}</p>
         </div>
         {primaryAction && <div className="ops-hero-actions">{primaryAction}</div>}
       </header>
@@ -320,6 +320,7 @@ export default function CourseCatalog({
               onCreate={() => setDialog({ kind: 'game', module: null })}
               onDelete={(module) => void removeGame(module)}
               onEdit={(module) => setDialog({ kind: 'game', module })}
+              ownerLabel={(module) => module.companyName}
             />
           )}
         </TabsContent>

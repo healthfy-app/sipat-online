@@ -70,8 +70,8 @@ export default function CoursesPanel({
                 onPublish={owner && phase === 'created' ? () => actions.onPublish(course, owner) : undefined}
                 onReactivate={owner && phase === 'cancelled' ? () => actions.onReactivate(course, owner) : undefined}
                 onShare={owner?.status === 'Published' ? () => actions.onShare(course, owner) : undefined}
-                // a company's training opens its days, in that company; a template still opens in the video editor
-                openTo={owner ? `/platform/companies/${owner.tenantId}/treinamentos/${owner.sipatEventId}` : `/platform/courses/${course.id}/edit`}
+                // the card opens the days: a company's training in that company, a template on the same board without dates
+                openTo={owner ? `/platform/companies/${owner.tenantId}/treinamentos/${owner.sipatEventId}` : `/platform/courses/${course.id}`}
                 owner={owner?.companyName ?? 'Template'}
                 period={owner?.startsAt && owner.endsAt ? periodLabel(owner.startsAt, owner.endsAt) : null}
                 phase={phaseLabel[phase]}

@@ -43,7 +43,7 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
       <strong className="min-w-0 text-sm font-semibold leading-snug text-balance [overflow-wrap:anywhere]" title={name || undefined}>{name ? breakAtSeparator(name) : 'Carregando...'}</strong>
       {plan && <CompanyPlanButton companyId={companyId} onChanged={setPlan} plan={plan} />}
     </div>
-    <NavLink className={link(inSipat)} to={`${base}/treinamentos`}>Treinamentos</NavLink>
+    <NavLink className={link(inSipat)} to={`${base}/treinamentos`}>Conteúdos</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/participantes`}>Participantes</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/administradores`}>Administradores</NavLink>
     <NavLink className={({ isActive }) => link(isActive)} to={`${base}/qualidade`}>Monitor de Desempenho</NavLink>

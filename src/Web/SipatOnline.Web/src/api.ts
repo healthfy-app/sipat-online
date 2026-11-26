@@ -111,6 +111,10 @@ export interface GameQuestion {
 }
 
 export interface GameModule {
+  /** The company the game belongs to (its own, private to it); absent or null for the operation's. */
+  tenantId?: string | null;
+  /** That company's name, in the operation's list. */
+  companyName?: string | null;
   id: string;
   title: string;
   gameType: GamificationGameType;
@@ -257,6 +261,13 @@ export async function getSipatPlan(sipatId: string): Promise<ProgramDay[]> {
 }
 export async function saveSipatPlan(sipatId: string, days: ProgramDay[]): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify({ days }) }));
+}
+/** The days of a template (a training of the operation, of no company): the same board, without dates. */
+export async function getTemplateDays(courseId: string): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`));
+}
+export async function saveTemplateDays(courseId: string, days: ProgramDay[]): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`, { method: 'PUT', body: JSON.stringify({ days }) }));
 }
 export async function copySipatPlan(sipatId: string, sourceId: string): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan/copy-from/${sourceId}`, { method: 'POST', body: '{}' }));
@@ -938,7 +949,7 @@ export function setGameSubjects(moduleId: string, subjectIds: string[]): Promise
 export async function uploadGameImage(image: File): Promise<string> {
   const form = new FormData();
   form.append('image', image);
-  return (await requestJson<{ imageUrl: string }>('/api/platform/catalog/game-images', { method: 'POST', body: form })).imageUrl;
+  return (await requestJson<{ imageUrl: string }>(`${editorBase}/game-images`, { method: 'POST', body: form })).imageUrl;
 }
 export function changeVideosSubjects(change: BulkVideoChange): Promise<void> {
   return request('/api/platform/catalog/videos/subjects', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
@@ -1285,21 +1296,26 @@ export function listGameModules(): Promise<GameModule[]> {
 }
 
 export function createGameModule(data: GameModuleData): Promise<GameModule> {
-  return requestJson<GameModule>('/api/platform/catalog/modules', {
+  return requestJson<GameModule>(`${editorBase}/modules`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
 }
 
 export function updateGameModule(moduleId: string, data: GameModuleData): Promise<GameModule> {
-  return requestJson<GameModule>(`/api/platform/catalog/modules/${moduleId}`, {
+  return requestJson<GameModule>(`${editorBase}/modules/${moduleId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 }
 
 export async function deleteGameModule(moduleId: string): Promise<void> {
-  await request(`/api/platform/catalog/modules/${moduleId}`, { method: 'DELETE' });
+  await request(`${editorBase}/modules/${moduleId}`, { method: 'DELETE' });
+}
+
+/** A copy of a game the company can use (the operation's, or its own), made the company's own so it can change it. */
+export function duplicateCompanyGame(moduleId: string): Promise<GameModule> {
+  return requestJson<GameModule>(`${trainingEditor}/modules/${moduleId}/duplicate`, { method: 'POST' });
 }
 
 export function setPlatformCourseModules(
