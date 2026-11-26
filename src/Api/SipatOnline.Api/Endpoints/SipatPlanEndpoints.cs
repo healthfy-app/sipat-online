@@ -95,6 +95,27 @@ public static class SipatPlanEndpoints
         .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("LaunchSipat");
 
+        // a template (the operation's own training, of no company) is built on the same board of days
+        var templates = endpoints.MapGroup("/api/platform/catalog/courses/{courseId:guid}/days")
+            .WithTags("SIPAT plan")
+            .RequireAuthorization("ManagePlatform");
+
+        templates.MapGet("/", async (Guid courseId, SipatPlanService service, CancellationToken token) =>
+        {
+            var result = await service.GetTemplateAsync(courseId, token);
+            return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("GetTemplateDays");
+
+        templates.MapPut("/", async (Guid courseId, SaveSipatPlanRequest request, SipatPlanService service, CancellationToken token) =>
+        {
+            var days = request.Days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, null, day.Subject,
+                day.VideoIds ?? [], day.GameIds ?? [])).ToArray();
+            var result = await service.SaveTemplateAsync(courseId, days, token);
+            return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("SaveTemplateDays");
+
         return endpoints;
     }
 

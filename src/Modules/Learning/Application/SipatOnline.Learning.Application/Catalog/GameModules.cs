@@ -8,7 +8,8 @@ public sealed record GameModule(
     GamificationGameType GameType,
     IReadOnlyList<GameQuestion> Questions,
     DateTimeOffset CreatedAt,
-    GameContent? Content = null);
+    GameContent? Content = null,
+    Guid? TenantId = null);
 
 public sealed record GamePair(string First, string Second);
 

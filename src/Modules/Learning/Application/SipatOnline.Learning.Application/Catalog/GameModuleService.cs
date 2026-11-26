@@ -31,7 +31,8 @@ public sealed class GameModuleService(
         GamificationGameType gameType,
         IReadOnlyList<GameQuestion>? questions,
         CancellationToken cancellationToken,
-        GameContent? content = null)
+        GameContent? content = null,
+        Guid? ownerTenantId = null)
     {
         var permission = EnsurePlatformOperator();
         if (!permission.IsSuccess)
@@ -51,7 +52,8 @@ public sealed class GameModuleService(
             gameType,
             validated.Value.Questions,
             timeProvider.GetUtcNow(),
-            content);
+            content,
+            ownerTenantId);
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         await moduleStore.AddAsync(module, cancellationToken);
         await WriteAuditAsync("learning.game_module.created", "game_module", module.Id, cancellationToken);

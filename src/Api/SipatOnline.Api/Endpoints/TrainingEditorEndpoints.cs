@@ -154,6 +154,8 @@ public static partial class PlatformCourseCatalogEndpoints
         {
             var (_, _, denied) = await AuthorizeAsync(context, courseId, TrainingNeed.EditActivities, token);
             if (denied is not null) return denied;
+            if (!await CanPlaceGamesAsync(context, (request.Items ?? []).Select(item => item.ModuleId), token))
+                return Denied(StatusCodes.Status404NotFound, "learning.game_module.not_found", "O jogo não foi encontrado.");
             var result = await moduleService.SetCourseModulesAsync(courseId,
                 request.Items?.Select(item => new CourseModulePlacement(item.ModuleId, item.AfterVideoCount)).ToArray(), token);
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
@@ -165,18 +167,78 @@ public static partial class PlatformCourseCatalogEndpoints
         {
             var (_, _, denied) = await AuthorizeAsync(context, courseId, TrainingNeed.EditActivities, token);
             if (denied is not null) return denied;
+            if (!await CanPlaceGamesAsync(context, (request.Items ?? []).Select(item => item.ModuleId), token))
+                return Denied(StatusCodes.Status404NotFound, "learning.game_module.not_found", "O jogo não foi encontrado.");
             var result = await moduleService.SetVideoCheckpointsAsync(courseId, videoId,
                 request.Items?.Select(item => new VideoCheckpoint(item.TimeMilliseconds, item.ModuleId)).ToArray(), token);
             return result.IsSuccess ? Results.Ok(ToResponse(result.Value)) : ToProblem(result.Error);
         })
         .WithName("SetTrainingEditorCheckpoints");
 
-        // the games the company may place: the operation's library, on the plan that has quizzes
-        editor.MapGet("/modules", async (TenantPlanService plans, IGameModuleStore modules, CancellationToken token) =>
-            Results.Ok((await plans.CapabilitiesAsync(token)).Quizzes
-                ? (await modules.ListAsync(token)).Select(item => ToResponse(item.Module, item.UsageCount)).ToArray()
-                : []))
+        // the games the company may place: the operation's library and its own, on the plan that has quizzes
+        editor.MapGet("/modules", async (TenantPlanService plans, ITenantContext tenantContext, IGameModuleStore modules, CancellationToken token) =>
+        {
+            var tenant = tenantContext.CurrentTenantId?.Value;
+            return Results.Ok((await plans.CapabilitiesAsync(token)).Quizzes
+                ? (await modules.ListAsync(token)).Where(item => item.Module.TenantId is null || item.Module.TenantId == tenant)
+                    .Select(item => ToResponse(item.Module, item.UsageCount)).ToArray()
+                : []);
+        })
         .WithName("ListTrainingEditorModules");
+
+        // the company's own games: made, changed and deleted by it, private to it (the operation's are used as they are)
+        editor.MapPost("/modules", async (SaveGameModuleRequest request, HttpContext context, GameModuleService moduleService, CancellationToken token) =>
+        {
+            var (tenant, denied) = await OwnGamesAsync(context, null, token);
+            if (denied is not null) return denied;
+            if (!TryParseGameType(request.GameType, out var gameType)) return ToProblem(GameTypeInvalid);
+            var result = await moduleService.CreateAsync(request.Title, gameType, ToQuestions(request.Questions), token, request.Content, tenant);
+            return result.IsSuccess ? Results.Created($"/api/admin/training-editor/modules/{result.Value.Id:D}", ToResponse(result.Value, 0)) : ToProblem(result.Error);
+        })
+        .WithName("CreateCompanyGame");
+
+        editor.MapPut("/modules/{moduleId:guid}", async (Guid moduleId, SaveGameModuleRequest request, HttpContext context, GameModuleService moduleService, CancellationToken token) =>
+        {
+            var (_, denied) = await OwnGamesAsync(context, moduleId, token);
+            if (denied is not null) return denied;
+            if (!TryParseGameType(request.GameType, out var gameType)) return ToProblem(GameTypeInvalid);
+            var result = await moduleService.UpdateAsync(moduleId, request.Title, gameType, ToQuestions(request.Questions), token, request.Content);
+            return result.IsSuccess ? Results.Ok(ToResponse(result.Value, 0)) : ToProblem(result.Error);
+        })
+        .WithName("UpdateCompanyGame");
+
+        editor.MapDelete("/modules/{moduleId:guid}", async (Guid moduleId, HttpContext context, GameModuleService moduleService, CancellationToken token) =>
+        {
+            var (_, denied) = await OwnGamesAsync(context, moduleId, token);
+            if (denied is not null) return denied;
+            var result = await moduleService.DeleteAsync(moduleId, token);
+            return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
+        })
+        .WithName("DeleteCompanyGame");
+
+        // a copy of a game the company can use (the operation's, or its own), to change as its own
+        editor.MapPost("/modules/{moduleId:guid}/duplicate", async (Guid moduleId, HttpContext context, IGameModuleStore modules, GameModuleService moduleService, CancellationToken token) =>
+        {
+            var (tenant, denied) = await OwnGamesAsync(context, null, token);
+            if (denied is not null) return denied;
+            var source = await modules.FindAsync(moduleId, token);
+            if (source is null || (source.TenantId is not null && source.TenantId != tenant))
+                return Denied(StatusCodes.Status404NotFound, "learning.game_module.not_found", "O jogo não foi encontrado.");
+            var title = $"{source.Title} (cópia)";
+            var result = await moduleService.CreateAsync(title.Length > 200 ? title[..200] : title, source.GameType, source.Questions, token, source.Content, tenant);
+            return result.IsSuccess ? Results.Created($"/api/admin/training-editor/modules/{result.Value.Id:D}", ToResponse(result.Value, 0)) : ToProblem(result.Error);
+        })
+        .WithName("DuplicateCompanyGame");
+
+        // the picture of a game of the company (a puzzle, a scene with risks)
+        editor.MapPost("/game-images", async (HttpContext context, PlatformDbContext db, TimeProvider clock, CancellationToken token) =>
+        {
+            var (_, denied) = await OwnGamesAsync(context, null, token);
+            return denied ?? await SaveGameImageAsync(context, db, clock, token);
+        })
+        .WithMetadata(new RequestSizeLimitAttribute(MaximumGameImageBytes + 1_048_576))
+        .WithMetadata(new RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaximumGameImageBytes + 1_048_576 })
+        .WithName("UploadCompanyGameImage");
 
         // the preview of a video the company can use
         editor.MapGet("/videos/{videoId:guid}/file", async (
@@ -196,7 +258,7 @@ public static partial class PlatformCourseCatalogEndpoints
     }
 
     /// <summary>
-    /// The training has to be the company's, not cancelled, and the plan has to allow what is asked. On success the
+    /// The training has to be the company's and the plan has to allow what is asked (an ended one can be edited too). On success the
     /// request is granted the catalog services; otherwise the answer says why.
     /// </summary>
     private static async Task<(TrainingAccess? Access, SipatOnline.Infrastructure.Sipats.SipatEventEntity? Sipat, IResult? Denied)> AuthorizeAsync(
@@ -216,8 +278,6 @@ public static partial class PlatformCourseCatalogEndpoints
         var isOperator = services.GetRequiredService<ICurrentActor>().IsInRole(PlatformRoles.PlatformOperator);
         var access = new TrainingAccess(capabilities.CustomizeGrid || isOperator, capabilities.CustomizeGrid, capabilities.Quizzes, capabilities.InternalVideos, plan.ToString());
 
-        if (need != TrainingNeed.View && sipat.Status == SipatEventStatus.Cancelled)
-            return (access, sipat, Denied(StatusCodes.Status409Conflict, "sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado."));
         var (allowed, from) = need switch
         {
             TrainingNeed.EditDetails => (access.EditDetails, "Prata"),
@@ -237,6 +297,41 @@ public static partial class PlatformCourseCatalogEndpoints
     {
         var blocked = await context.RequestServices.GetRequiredService<SipatPlanService>().BlockedVideosAsync(token);
         return course.Videos.Select(video => video.Id).Where(blocked.Contains).ToArray();
+    }
+
+    /// <summary>
+    /// The company's own games are of the plan that has quizzes. With a game given, it has to be the company's: the
+    /// operation's are used as they are (a copy can be changed). On success the request is granted the catalog services.
+    /// </summary>
+    private static async Task<(Guid Tenant, IResult? Denied)> OwnGamesAsync(HttpContext context, Guid? moduleId, CancellationToken token)
+    {
+        var services = context.RequestServices;
+        if (services.GetRequiredService<ITenantContext>().CurrentTenantId is not { IsEmpty: false } tenant)
+            return (default, Denied(StatusCodes.Status400BadRequest, "tenant.context.required", "Não foi possível identificar a empresa."));
+        if (!(await services.GetRequiredService<TenantPlanService>().CapabilitiesAsync(token)).Quizzes)
+            return (tenant.Value, Denied(StatusCodes.Status403Forbidden, "sipat.plan_required", "Disponível a partir do plano Diamante."));
+        if (moduleId is { } id)
+        {
+            var owner = await services.GetRequiredService<PlatformDbContext>().GameModules.AsNoTracking()
+                .Where(module => module.Id == id).Select(module => new { module.TenantId }).SingleOrDefaultAsync(token);
+            if (owner is null || (owner.TenantId is not null && owner.TenantId != tenant.Value))
+                return (tenant.Value, Denied(StatusCodes.Status404NotFound, "learning.game_module.not_found", "O jogo não foi encontrado."));
+            if (owner.TenantId is null)
+                return (tenant.Value, Denied(StatusCodes.Status403Forbidden, "learning.game_module.not_yours", "Este jogo é da operação. Duplique-o para ter uma cópia sua e alterá-la."));
+        }
+
+        services.GetRequiredService<CatalogAccessGrant>().Grant();
+        return (tenant.Value, null);
+    }
+
+    /// <summary>Whether every game given is one the company can place: the operation's, or its own.</summary>
+    private static async Task<bool> CanPlaceGamesAsync(HttpContext context, IEnumerable<Guid> moduleIds, CancellationToken token)
+    {
+        var ids = moduleIds.Distinct().ToArray();
+        if (ids.Length == 0) return true;
+        var tenant = context.RequestServices.GetRequiredService<ITenantContext>().CurrentTenantId?.Value;
+        return !await context.RequestServices.GetRequiredService<PlatformDbContext>().GameModules.AsNoTracking()
+            .AnyAsync(module => ids.Contains(module.Id) && module.TenantId != null && module.TenantId != tenant, token);
     }
 
     private static IResult Denied(int status, string code, string message) =>

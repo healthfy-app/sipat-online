@@ -47,8 +47,6 @@ public sealed class SipatPlanService(
             return Failure<Guid>("sipat.week.forbidden", "Só a operação edita a semana no editor de vídeos.");
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<Guid>.Failure(found.Error);
-        if (found.Value.Status == SipatEventStatus.Cancelled)
-            return Failure<Guid>("sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado.");
         return Result<Guid>.Success(found.Value.CourseId);
     }
 
@@ -204,6 +202,39 @@ public sealed class SipatPlanService(
         }
     }
 
+    /// <summary>The days of a template (a training of the operation, of no company): its Títulos, without dates.</summary>
+    public async Task<Result<IReadOnlyList<ProgramDay>>> GetTemplateAsync(Guid courseId, CancellationToken token)
+    {
+        if (!await db.PlatformCourses.AnyAsync(course => course.Id == courseId && course.TenantId == null, token))
+            return Failure<IReadOnlyList<ProgramDay>>("sipat.not_found", "O treinamento não foi encontrado.");
+        return Result<IReadOnlyList<ProgramDay>>.Success(await ReadDaysAsync(courseId, token));
+    }
+
+    /// <summary>
+    /// Saves the days of a template, built on the same board a company uses. A template belongs to no company, so no
+    /// plan limits it and its days carry no date: the dates come when a company makes its training from it.
+    /// </summary>
+    public async Task<Result<IReadOnlyList<ProgramDay>>> SaveTemplateAsync(Guid courseId, IReadOnlyList<ProgramDay>? days, CancellationToken token)
+    {
+        if (!await db.PlatformCourses.AnyAsync(course => course.Id == courseId && course.TenantId == null, token))
+            return Failure<IReadOnlyList<ProgramDay>>("sipat.not_found", "O treinamento não foi encontrado.");
+        var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token, allowEmptyDays: true);
+        if (!cleaned.IsSuccess) return cleaned;
+        var repeated = cleaned.Value.SelectMany(day => day.VideoIds).GroupBy(id => id).FirstOrDefault(group => group.Count() > 1);
+        if (repeated is not null)
+        {
+            var video = await catalog.FindVideoAsync(repeated.Key, token);
+            return Failure<IReadOnlyList<ProgramDay>>("learning.program.video_repeated_across_days",
+                $"O vídeo \"{video?.Title}\" está em dois dias. Cada vídeo entra uma vez no treinamento.");
+        }
+
+        await WriteDaysAsync(courseId, cleaned.Value.Select(day => day with { Date = null }).ToArray(), token);
+        await db.SaveChangesAsync(token);
+        await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId ?? default, "learning.template.days_saved", "platform_course",
+            courseId.ToString("D"), clock.GetUtcNow()), token);
+        return Result<IReadOnlyList<ProgramDay>>.Success(await ReadDaysAsync(courseId, token));
+    }
+
     public async Task<Result<IReadOnlyList<SipatPlanSummary>>> SummariesAsync(CancellationToken token)
     {
         var tenant = Tenant();
@@ -277,12 +308,16 @@ public sealed class SipatPlanService(
     {
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<IReadOnlyList<ProgramDay>>.Failure(found.Error);
+        // an ended training can still be put in order; it stays ended (out of the participants' reach) until brought back
         var sipat = found.Value;
-        if (sipat.Status == SipatEventStatus.Cancelled)
-            return Failure<IReadOnlyList<ProgramDay>>("sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado.");
 
         var cleaned = await ApplyPlanAsync(days, token, allowEmptyDays: true, legacyModules: sipat.Status == SipatEventStatus.Published);
         if (!cleaned.IsSuccess) return cleaned;
+
+        // a day takes the operation's games and the company's own, never another company's
+        var gameIds = cleaned.Value.SelectMany(day => day.GameIds).Distinct().ToArray();
+        if (gameIds.Length > 0 && await db.GameModules.AnyAsync(module => gameIds.Contains(module.Id) && module.TenantId != null && module.TenantId != sipat.TenantId, token))
+            return Failure<IReadOnlyList<ProgramDay>>("learning.game_module.not_found", "Um dos jogos não foi encontrado.");
 
         // a training holds each video once
         var repeated = cleaned.Value.SelectMany(day => day.VideoIds).GroupBy(id => id).FirstOrDefault(group => group.Count() > 1);

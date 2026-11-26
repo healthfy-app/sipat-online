@@ -120,6 +120,9 @@ public sealed class GameModuleEntity
     public string? ContentJson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The company the game belongs to (its own, private to it); null for the operation's, which every company can use.</summary>
+    public Guid? TenantId { get; set; }
 }
 
 public sealed class PlatformCourseModuleLinkEntity
