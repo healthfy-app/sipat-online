@@ -74,12 +74,19 @@ public sealed class R2PlatformCourseVideoStorage(
     public Task<Uri?> GetPlaybackUrlAsync(
         Guid videoId, VideoRendition rendition, TimeSpan validFor, CancellationToken cancellationToken)
     {
+        var key = KeyFor(videoId, rendition);
+        var expiresAt = clock.GetUtcNow().Add(validFor);
+        if (!string.IsNullOrEmpty(options.PublicBaseUrl))
+        {
+            return Task.FromResult<Uri?>(SignedVideoUrl.Create(options.PublicBaseUrl, options.UrlSigningKey, key, expiresAt));
+        }
+
         var url = s3.GetPreSignedURL(new GetPreSignedUrlRequest
         {
             BucketName = options.Bucket,
-            Key = KeyFor(videoId, rendition),
+            Key = key,
             Verb = HttpVerb.GET,
-            Expires = clock.GetUtcNow().UtcDateTime.Add(validFor),
+            Expires = expiresAt.UtcDateTime,
             Protocol = UsesHttp ? Protocol.HTTP : Protocol.HTTPS
         });
         return Task.FromResult<Uri?>(new Uri(url));
