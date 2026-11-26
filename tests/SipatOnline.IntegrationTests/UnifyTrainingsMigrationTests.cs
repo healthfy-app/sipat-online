@@ -45,9 +45,11 @@ public sealed class UnifyTrainingsMigrationTests
                     INSERT INTO learning."PlatformCourseVideos" ("Id", "Title", "ContentType", "SizeBytes", "DurationMilliseconds", "CreatedAt")
                     VALUES ({id}, {title}, 'video/mp4', 1000, 60000, now())
                     """);
-            // this table did not change: the current model writes it
-            db.GameModules.Add(new GameModuleEntity { Id = game, Title = "Quiz", CreatedAt = DateTimeOffset.UtcNow });
-            await db.SaveChangesAsync();
+            // the game goes in by hand as well: its table gained the owner company after this point
+            await db.Database.ExecuteSqlInterpolatedAsync($"""
+                INSERT INTO learning."GameModules" ("Id", "Title", "GameType", "QuestionsJson", "CreatedAt")
+                VALUES ({game}, 'Quiz', 0, '[]', now())
+                """);
 
             foreach (var (id, title) in new[] { (edited, "Editado"), (planned, "Planejado"), (empty, "Vazio"), (orphan, "Órfão") })
                 await db.Database.ExecuteSqlInterpolatedAsync($"""
