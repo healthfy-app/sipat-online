@@ -170,6 +170,7 @@ export default function App() {
       <a className="skip-link" href="#app-content">Ir para o conteúdo</a>
       <BrowserRouter>
         <ScrollToTopOnNavigate />
+        <LeaveCompanyPanel active={isPlatformPortal && state.tenant.tenantKey !== 'platform'} />
         <Routes>
           <Route
             path="/"
@@ -762,7 +763,8 @@ function ProtectedPortal({
             <Link
               aria-label={`${tenant.tenantName} - início`}
               className="brand-link sidebar-brand-link"
-              to={getLandingPage(session)}
+              // inside a company's panel the logo is that company's: it leads to its overview, not out of it
+              to={isPlatformCompanyContext ? '/admin/dashboard' : getLandingPage(session)}
             >
               <TenantIdentity tenant={tenant} compact />
             </Link>
@@ -888,6 +890,21 @@ function canViewCompany(session: IdentitySession): boolean {
 function clearCompanyAdministration(): void {
   configureCompanyAdministration(null);
   sessionStorage.removeItem(companyContextKey);
+}
+
+/**
+ * The operation's portal painted as a company (the operator administering it): every /platform screen needs the
+ * operation's own look and data, so reaching one leaves the company and loads it fresh, as "Voltar à plataforma" does.
+ */
+function LeaveCompanyPanel({ active }: { active: boolean }) {
+  const location = useLocation();
+  const leaving = active && /^\/platform(\/|$)/.test(location.pathname);
+  useEffect(() => {
+    if (!leaving) return;
+    clearCompanyAdministration();
+    window.location.assign(`${location.pathname}${location.search}${location.hash}`);
+  }, [leaving, location.pathname, location.search, location.hash]);
+  return null;
 }
 
 function getLandingPage(session: IdentitySession): string {
