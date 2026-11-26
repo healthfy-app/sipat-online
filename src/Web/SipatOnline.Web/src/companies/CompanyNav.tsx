@@ -44,7 +44,7 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
       {plan && <CompanyPlanButton companyId={companyId} onChanged={setPlan} plan={plan} />}
     </div>
     {/* the company's own panel, as its administrator sees it: at hand on every page of the company */}
-    <a className="mx-3 mb-3 flex min-h-9 items-center justify-center gap-2 rounded-[0.625rem] border border-primary/30 bg-accent px-3 text-[0.8125rem] font-semibold text-primary no-underline transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground [&_svg]:size-4"
+    <a className="mx-3 mb-3 flex min-h-9 items-center justify-center gap-2 rounded-[0.625rem] border border-primary/30 bg-accent px-2 text-xs font-semibold whitespace-nowrap text-primary no-underline transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground [&_svg]:size-4"
       href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}>
       <LogIn aria-hidden="true" /> Entrar como administrador
     </a>

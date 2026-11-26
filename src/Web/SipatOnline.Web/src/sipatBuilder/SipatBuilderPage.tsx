@@ -1,5 +1,5 @@
 import { saveFile } from '@/lib/saveFile';
-import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Ban, Clock, Copy, FileDown, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -20,8 +20,7 @@ import { partWord } from '@/trainings/partWord';
 import { courseLessons as titlesOf } from '@/courseEditor/courseTrack';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
-import { planToCsv, sampleCsv } from './csv';
-import ImportDialog from './ImportDialog';
+import { planToCsv } from './csv';
 import AudienceRow from '@/trainings/AudienceRow';
 import { useUnitScope } from '@/trainings/unitScope';
 import { copyTrainingLink } from '@/trainings/trainingLink';
@@ -103,7 +102,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   // the last day the training can be taken, when it runs past its last day ('': it ends with its last day)
   const [limit, setLimit] = useState('');
   const [busy, setBusy] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [copying, setCopying] = useState(false);
   const [confirmingLaunch, setConfirmingLaunch] = useState(false);
   // where the user tried to go while the SIPAT had unsaved changes
@@ -479,7 +477,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
     </div></Page>;
   }
 
-  const csvTemplate = () => download('modelo-sipat.csv', sampleCsv(catalog));
   // Bronze takes the ready modules as they are: a CSV with a grid of its own is a personalization (Prata and above)
   const canCustomizeGrid = capabilities?.customizeGrid !== false;
   // Bronze: the operation builds the training from a ready SIPAT (its videos stay as they come); the company only views it
@@ -547,7 +544,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
           <DropdownMenuTrigger asChild><Button className={phoneAction} disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
           <DropdownMenuContent>
             {canCopy && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
-            {canCustomizeGrid && <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>}
             <DropdownMenuItem disabled={days.length === 0} onSelect={exportCsv}><FileDown /> Exportar CSV</DropdownMenuItem>
             {sipat && <DropdownMenuItem onSelect={() => coverPicker.current?.click()}><ImagePlus /> Capa do treinamento</DropdownMenuItem>}
             {sipat && !cancelled && <>
@@ -583,8 +579,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
     {catalog.subjects.length === 0 && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">O acervo ainda não tem assuntos publicados. Peça à operação para publicar os assuntos.</p>}
 
     {stage === 'setup'
-      ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={canCustomizeGrid ? () => setImporting(true) : undefined} onName={setName} onStart={start}
-        onStartDate={setStartDate} onTemplate={csvTemplate} startDate={startDate}
+      ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} limit={limit} onLimit={setLimit} onName={setName} onStart={start}
+        onStartDate={setStartDate} startDate={startDate}
         onCopy={canCopy ? () => setCopying(true) : undefined}
         onTraining={setTraining} readyOnly={readyOnly} training={training}
         trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
@@ -593,10 +589,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         onEdit={viewOnly ? undefined : () => { if (!busy) void editWeek(); }}
         // every day has its own "Enviar vídeo", for a company that has its own videos (Diamante)
         arriving={arriving} onSendToDay={capabilities?.internalVideos ? (dayKey, files) => void sendToDay(dayKey, files) : undefined} />}
-
-    {importing && <ImportDialog catalog={catalog} hasPlan={stage === 'grid' && days.some(day => day.videos.some(Boolean))} onClose={() => setImporting(false)}
-      onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${pluralize(imported.length, 'dia importado', 'dias importados')}. Revise e salve.`); }}
-      onTemplate={csvTemplate} />}
 
     {copying && <Dialog description="Escolha o treinamento de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outro treinamento">
       <div className="grid max-h-[60vh] gap-4 overflow-auto">

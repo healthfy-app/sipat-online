@@ -1,4 +1,4 @@
-import { CalendarDays, Copy, FileSpreadsheet, Minus, Plus } from 'lucide-react';
+import { CalendarDays, Copy, Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, NativeSelect } from '@/components/ui/input';
@@ -8,12 +8,14 @@ import { maxDays } from './model';
 /** First step of "Novo treinamento": name it and say how many days it has. The grid comes next. */
 export interface TrainingChoice { id: string; title: string; titles: number }
 
-export default function BuilderSetup({ name, dayCount, startDate, onName, onDayCount, onStartDate, onStart, onImport, onTemplate, onCopy, trainings, training, onTraining, readyOnly = false }: {
+export default function BuilderSetup({ name, dayCount, startDate, onName, onDayCount, onStartDate, onStart, onCopy, limit = '', onLimit, trainings, training, onTraining, readyOnly = false }: {
   /** The plan takes a ready SIPAT whole (Bronze): one has to be picked, and nothing is built from scratch. */
   readyOnly?: boolean;
   name: string; dayCount: number; startDate: string;
   onName: (value: string) => void; onDayCount: (value: number) => void; onStartDate: (value: string) => void;
-  onStart: () => void; onImport?: () => void; onTemplate: () => void; onCopy?: () => void;
+  onStart: () => void; onCopy?: () => void;
+  /** The last day the training can be taken, when it runs past its last day ('': it ends with its last day). */
+  limit?: string; onLimit?: (value: string) => void;
   /** The trainings of Conteúdo the company can start from; each Título becomes a day. */
   trainings?: TrainingChoice[]; training?: string; onTraining?: (id: string) => void;
 }) {
@@ -67,18 +69,24 @@ export default function BuilderSetup({ name, dayCount, startDate, onName, onDayC
       <p className="m-0 text-xs text-muted-foreground">De 1 a {maxDays} dias. Dá para acrescentar ou tirar dias depois, na grade.</p>
     </fieldset>}
 
-    <Field hint="Os dias seguintes recebem as datas em sequência, e você pode ajustar cada uma na grade." htmlFor="builder-start" label="Data do primeiro dia">
-      <div className="relative max-w-56">
-        <CalendarDays aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
-        <Input id="builder-start" onChange={event => onStartDate(event.target.value)} type="date" value={startDate} />
-      </div>
-    </Field>
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field hint="Os dias seguintes recebem as datas em sequência, e você pode ajustar cada uma na grade." htmlFor="builder-start" label="Data do primeiro dia">
+        <div className="relative max-w-56">
+          <CalendarDays aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input id="builder-start" onChange={event => onStartDate(event.target.value)} type="date" value={startDate} />
+        </div>
+      </Field>
+      {onLimit && <Field hint="Até quando o treinamento pode ser feito. Em branco, termina no último dia." htmlFor="builder-limit" label="Data limite">
+        <div className="relative max-w-56">
+          <CalendarDays aria-hidden="true" className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input id="builder-limit" min={startDate || undefined} onChange={event => onLimit(event.target.value)} type="date" value={limit} />
+        </div>
+      </Field>}
+    </div>
 
     <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-5">
       <div className="flex flex-wrap gap-2">
         {onCopy && <Button onClick={onCopy} variant="outline"><Copy /> Duplicar de outro treinamento</Button>}
-        {onImport && <Button onClick={onImport} variant="outline"><FileSpreadsheet /> Importar de um CSV</Button>}
-        <Button onClick={onTemplate} variant="ghost">Baixar modelo</Button>
       </div>
       <Button disabled={!name.trim() || !startDate || (readyOnly && !picked)} onClick={onStart} size="lg">{readyOnly ? 'Ver os dias' : 'Montar a grade'}</Button>
     </div>
