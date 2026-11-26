@@ -2,7 +2,7 @@ import { CalendarDays, Copy, Film, ImagePlus, Link2, Pencil, Plus, RotateCcw, Se
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  copySipatPlan, createSipatEvent, deleteSipat, setTrainingCover, getCompanyCapabilities, getCompanyRegistry, listSipatEvents, listSipatPlans, openSipatWeek, reactivateSipatEvent,
+  copySipatPlan, createSipatEvent, deleteSipat, setTrainingCover, getCompanyAdministrationId, getCompanyCapabilities, getCompanyRegistry, listSipatEvents, listSipatPlans, openSipatWeek, reactivateSipatEvent,
   type CompanyRegistry, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -182,9 +182,9 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
           const label = phaseLabel[phaseOf(event)];
           const cancelled = event.status === 'Cancelled';
           const busy = working === event.id;
-          // an <img> cannot send the header that says which company the operation is in: it loads the photo from its own route
+          // an <img> cannot send the header that says which company the operation is in (also in the company's own screens, in operator mode): it loads the photo from its own route
           const cover = plan?.courseId && plan.coverVersion != null
-            ? `${operator ? '/api/platform/catalog' : '/api/admin/training-editor'}/courses/${plan.courseId}/cover?v=${plan.coverVersion}`
+            ? `${operator || getCompanyAdministrationId() ? '/api/platform/catalog' : '/api/admin/training-editor'}/courses/${plan.courseId}/cover?v=${plan.coverVersion}`
             : null;
           // same card as Conteúdo: cover on top, phase over it, period and days below
           const details = <>
