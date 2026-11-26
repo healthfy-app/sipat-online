@@ -4,6 +4,9 @@ import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   deleteGameModule,
   deletePlatformCourse,
+  listGameSubjects,
+  listSubjects,
+  type VideoSubject,
   type GameModule,
   type PlatformCourse,
 } from '@/api';
@@ -76,6 +79,8 @@ export default function CourseCatalog({
     category: params.get('categoria') ?? 'all',
     owner: params.get('empresa') ?? 'all',
   };
+  // the games tab: '' every game, 'none' those without an assunto, or one assunto
+  const subjectFilter = params.get('assunto') ?? '';
 
   function patchParams(updates: Record<string, string | null>) {
     setParams((current) => {
@@ -93,7 +98,7 @@ export default function CourseCatalog({
     ...('category' in patch ? { categoria: patch.category ?? 'all' } : {}),
     ...('owner' in patch ? { empresa: patch.owner ?? 'all' } : {}),
   });
-  const clearFilters = () => patchParams({ q: null, status: null, categoria: null, empresa: null });
+  const clearFilters = () => patchParams({ q: null, status: null, categoria: null, empresa: null, assunto: null });
 
   // coming back to the library (from an editor, another screen) restores the view it had
   useEffect(() => {
@@ -110,15 +115,30 @@ export default function CourseCatalog({
   const [dialog, setDialog] = useState<CatalogDialog | null>(null);
   const [dialogBusy, setDialogBusy] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  // the assuntos come apart from the games: the list still shows if they fail
+  const [subjects, setSubjects] = useState<VideoSubject[]>([]);
+  const [gameSubjects, setGameSubjects] = useState<Map<string, string[]>>(new Map());
+  async function loadSubjects() {
+    try {
+      const [list, links] = await Promise.all([listSubjects(), listGameSubjects()]);
+      setSubjects([...list].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
+      setGameSubjects(new Map(links.map((item) => [item.moduleId, item.subjectIds])));
+    } catch { /* the games show without their assuntos */ }
+  }
+  useEffect(() => { void loadSubjects(); }, []);
+  const subjectNames = useMemo(() => {
+    const names = new Map(subjects.map((item) => [item.id, item.name]));
+    return new Map([...gameSubjects].map(([moduleId, ids]) => [moduleId, ids.map((id) => names.get(id)).filter((name): name is string => !!name).sort((a, b) => a.localeCompare(b, 'pt-BR'))]));
+  }, [subjects, gameSubjects]);
 
   const shownCourses = useMemo(() => filterCourses(courses, categories, filters, owners), [courses, categories, owners, filters.query, filters.status, filters.category, filters.owner]); // eslint-disable-line react-hooks/exhaustive-deps
   // the companies that have trainings, by name, for the filter
   const companies = useMemo(() => [...new Map([...owners.values()].map((owner) => [owner.tenantId, owner.companyName])).entries()]
     .map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')), [owners]);
-  const shownModules = useMemo(() => filterModules(modules, filters.query), [modules, filters.query]);
+  const shownModules = useMemo(() => filterModules(modules, filters.query, subjectFilter, gameSubjects), [modules, filters.query, subjectFilter, gameSubjects]);
   const knownCategories = new Set(categories.map((item) => item.id));
   const hasUncategorized = courses.some((course) => !course.categoryId || !knownCategories.has(course.categoryId));
-  const isFiltered = tab === 'courses' ? hasCourseFilters(filters) : filters.query.trim() !== '';
+  const isFiltered = tab === 'courses' ? hasCourseFilters(filters) : filters.query.trim() !== '' || (tab === 'modules' && subjectFilter !== '');
   const countText = {
     courses: isFiltered ? `${shownCourses.length} de ${courses.length}` : pluralize(courses.length, 'treinamento', 'treinamentos'),
     videos: '',
@@ -221,6 +241,9 @@ export default function CourseCatalog({
             onChange={changeFilters}
             onClear={clearFilters}
             onManageCategories={() => setDialog({ kind: 'categories' })}
+            onSubject={(value) => patchParams({ assunto: value })}
+            subject={subjectFilter}
+            subjects={subjects}
             tab={tab}
           />
         )}
@@ -239,6 +262,7 @@ export default function CourseCatalog({
               busy={isDeleting}
               hasModules={modules.length > 0}
               modules={shownModules}
+              subjectNames={subjectNames}
               onClearFilters={clearFilters}
               onCreate={() => setDialog({ kind: 'game', module: null })}
               onDelete={(module) => void removeGame(module)}
@@ -268,8 +292,10 @@ export default function CourseCatalog({
             onCancel={() => setDialog(null)}
             onSaved={async (message) => {
               setDialog(null);
-              await onModulesChanged(message);
+              await Promise.all([onModulesChanged(message), loadSubjects()]);
             }}
+            subjectIds={dialog.module ? gameSubjects.get(dialog.module.id) ?? [] : []}
+            subjects={subjects}
           />
         </Dialog>
       )}

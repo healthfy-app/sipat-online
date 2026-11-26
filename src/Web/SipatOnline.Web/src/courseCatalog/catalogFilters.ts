@@ -37,7 +37,13 @@ export function filterVideos(library: PlatformLibraryVideo[], query: string): Pl
   return term ? library.filter((item) => fold(item.video.title).includes(term)) : library;
 }
 
-export function filterModules(modules: GameModule[], query: string): GameModule[] {
+/** `subject`: '' every game, 'none' those without an assunto, or one assunto. */
+export function filterModules(modules: GameModule[], query: string, subject = '', gameSubjects = new Map<string, string[]>()): GameModule[] {
   const term = fold(query.trim());
-  return term ? modules.filter((module) => fold(module.title).includes(term)) : modules;
+  return modules.filter((module) => {
+    if (term && !fold(module.title).includes(term)) return false;
+    if (!subject) return true;
+    const ids = gameSubjects.get(module.id) ?? [];
+    return subject === 'none' ? ids.length === 0 : ids.includes(subject);
+  });
 }

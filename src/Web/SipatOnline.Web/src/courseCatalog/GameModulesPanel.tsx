@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Puzzle } from 'lucide-react';
+import { Play, Puzzle, Tags } from 'lucide-react';
 import type { GameModule } from '@/api';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/page';
@@ -13,6 +13,7 @@ const warmTypes = new Set(['RiskSpotting', 'Scenario', 'SafeOrRisky']);
 
 export default function GameModulesPanel({
   modules,
+  subjectNames = new Map(),
   hasModules = false,
   onClearFilters = () => undefined,
   busy,
@@ -21,6 +22,8 @@ export default function GameModulesPanel({
   onDelete,
 }: {
   modules: GameModule[];
+  /** The names of the assuntos each game is filed under, by game. */
+  subjectNames?: Map<string, string[]>;
   hasModules?: boolean;
   onClearFilters?: () => void;
   busy: boolean;
@@ -59,6 +62,12 @@ export default function GameModulesPanel({
                   {' · '}
                   {module.usageCount === 0 ? 'não usado em treinamentos' : `usado ${module.usageCount}×`}
                 </span>
+                {(subjectNames.get(module.id)?.length ?? 0) > 0 && (
+                  <span className="flex min-w-0 items-center gap-1.5 text-[0.8125rem] text-muted-foreground">
+                    <Tags aria-hidden="true" className="size-3.5 shrink-0" />
+                    <span className="truncate">{subjectNames.get(module.id)!.join(' · ')}</span>
+                  </span>
+                )}
               </div>
               <div className="flex gap-1.5 max-sm:col-span-2 max-sm:justify-end">
                 <Button aria-label={`Testar jogo ${module.title}`} disabled={busy} onClick={() => setTesting(module)} size="sm" variant="ghost">

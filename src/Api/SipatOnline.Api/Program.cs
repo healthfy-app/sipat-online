@@ -248,6 +248,7 @@ app.MapSipatCatalogEndpoints();
 app.MapTrainingEditorEndpoints();
 app.MapCompanyVideoEndpoints();
 app.MapVideoDetailsEndpoints();
+app.MapGameExtrasEndpoints();
 app.MapPlanSubjectEndpoints();
 app.MapLearningEndpoints();
 app.MapLearningEngagementEndpoints();

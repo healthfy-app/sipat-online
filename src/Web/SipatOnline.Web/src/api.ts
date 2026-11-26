@@ -914,6 +914,20 @@ export function setVideoSubjects(videoId: string, subjectIds: string[]): Promise
 
 /** Many videos at once: `add` is put on every one, `remove` taken from every one, the rest stays. */
 export interface BulkVideoChange { videoIds: string[]; add: string[]; remove: string[] }
+/** The assuntos each game is filed under: the same list the videos use. */
+export interface GameSubjects { moduleId: string; subjectIds: string[] }
+export function listGameSubjects(): Promise<GameSubjects[]> {
+  return requestJson<GameSubjects[]>('/api/platform/catalog/game-subjects');
+}
+export function setGameSubjects(moduleId: string, subjectIds: string[]): Promise<GameSubjects> {
+  return requestJson<GameSubjects>(`/api/platform/catalog/modules/${moduleId}/subjects`, { method: 'PUT', body: JSON.stringify({ subjectIds }) });
+}
+/** A game's picture sent from the computer (PNG, JPEG or WebP, up to 2 MB); answers the address to keep in the game. */
+export async function uploadGameImage(image: File): Promise<string> {
+  const form = new FormData();
+  form.append('image', image);
+  return (await requestJson<{ imageUrl: string }>('/api/platform/catalog/game-images', { method: 'POST', body: form })).imageUrl;
+}
 export function changeVideosSubjects(change: BulkVideoChange): Promise<void> {
   return request('/api/platform/catalog/videos/subjects', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
 }

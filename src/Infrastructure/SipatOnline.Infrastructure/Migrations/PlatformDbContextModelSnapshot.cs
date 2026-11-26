@@ -1066,6 +1066,43 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("VideoSubjectLinks", "learning");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.GameSubjectLinkEntity", b =>
+                {
+                    b.Property<Guid>("SubjectId")
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ModuleId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("SubjectId", "ModuleId");
+
+                    b.HasIndex("ModuleId");
+
+                    b.ToTable("GameSubjectLinks", "learning");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.GameImageEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ContentType")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<byte[]>("Data")
+                        .IsRequired()
+                        .HasColumnType("bytea");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("GameImages", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformCourseVideoLinkEntity", b =>
                 {
                     b.Property<Guid>("CourseId")
@@ -1766,6 +1803,21 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.Navigation("Course");
 
                     b.Navigation("Video");
+                });
+
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.GameSubjectLinkEntity", b =>
+                {
+                    b.HasOne("SipatOnline.Infrastructure.Learning.GameModuleEntity", null)
+                        .WithMany()
+                        .HasForeignKey("ModuleId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("SipatOnline.Infrastructure.Learning.VideoSubjectEntity", null)
+                        .WithMany()
+                        .HasForeignKey("SubjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.PlatformVideoThumbnailEntity", b =>
