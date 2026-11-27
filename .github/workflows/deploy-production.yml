@@ -1,7 +1,8 @@
 name: Deploy production
 
-# Every push to main (a merged PR) is tested and goes to the production VM (GitHub environment "production").
-# Run it by hand to redeploy main, or with restore_backup=latest when moving to a new VM.
+# Every push to main (a merged PR, already tested by its CI) goes straight to the production VM (GitHub environment
+# "production"). Run it by hand to redeploy main (run_tests to test again first), or with restore_backup=latest when
+# moving to a new VM.
 on:
   push:
     branches: [main]
@@ -12,6 +13,11 @@ on:
         required: false
         type: string
         default: ""
+      run_tests:
+        description: Run the tests again before the deploy (the PR already ran them).
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -23,12 +29,13 @@ concurrency:
 jobs:
   verify:
     name: Verify release
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && inputs.run_tests
     uses: ./.github/workflows/ci.yml
 
   deploy:
     name: Deploy
-    if: github.ref == 'refs/heads/main'
+    # skipped tests are fine (the PR ran them); failed tests stop the deploy
+    if: ${{ !cancelled() && github.ref == 'refs/heads/main' && contains(fromJSON('["success", "skipped"]'), needs.verify.result) }}
     needs: verify
     uses: ./.github/workflows/deploy-vm.yml
     # the images are signed with the workflow's OIDC identity and get a provenance attestation
