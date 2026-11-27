@@ -65,12 +65,16 @@ public sealed record PlatformCourseVideo(
     // when a picture was chosen for the video; null shows a frame of the video itself
     DateTimeOffset? ThumbnailUpdatedAt = null);
 
-/// <summary>A video is "Processing" while it is converted; only "Ready" videos can enter a Day.</summary>
+/// <summary>
+/// A video is "Uploading" while the browser still sends it, "Processing" while it is converted; only "Ready" videos can
+/// enter a Day.
+/// </summary>
 public enum PlatformVideoStatus
 {
     Ready,
     Processing,
-    Failed
+    Failed,
+    Uploading
 }
 
 /// <summary>The operator preview: a signed link to follow, or the file itself.</summary>
