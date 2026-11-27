@@ -1,7 +1,10 @@
 name: Deploy production
 
-# Manual, from main only, to the production VM (GitHub environment "production", which can require approval).
+# Every push to main (a merged PR) is tested and goes to the production VM (GitHub environment "production").
+# Run it by hand to redeploy main, or with restore_backup=latest when moving to a new VM.
 on:
+  push:
+    branches: [main]
   workflow_dispatch:
     inputs:
       restore_backup:
