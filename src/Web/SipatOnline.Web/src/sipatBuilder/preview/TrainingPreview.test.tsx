@@ -1,8 +1,8 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameModule, PlatformCourseVideo } from '@/api';
-import type { Catalog, CatalogVideo, DaySlots } from '../model';
+import { placedGames, type Catalog, type CatalogVideo, type DaySlots } from '../model';
 import { buildPreviewDays } from './previewModel';
 import { reducePreview, startPreview, withWatched } from './previewSession';
 import TrainingPreview from './TrainingPreview';
@@ -45,7 +45,8 @@ describe('the preview of a training, from the board', () => {
     expect(first.lessons.map(lesson => !!lesson.isBonus)).toEqual([false, true, false]);
     expect(first.sources[first.lessons[0].id]).toEqual({ kind: 'house', url: '/videos/v1.mp4' });
     expect(first.sources[first.lessons[1].id]).toEqual({ kind: 'external', provider: 'YouTube', externalId: 'abc' });
-    expect(first.games).toEqual([quiz]);
+    // a game added to the day comes after its last video: the second that counts (the extra does not)
+    expect(first.games).toEqual([{ module: quiz, afterHouse: 2 }]);
     // a day with no slogan gets the name the server gives it
     expect(second).toMatchObject({ title: 'Dia 2', position: 2, date: '2026-12-05', lessons: [] });
   });
@@ -63,16 +64,30 @@ describe('the preview of a training, from the board', () => {
     // going back does not undo what was watched
     state = reducePreview(state, { type: 'progress', lessonId: lesson.id, positionMs: 10_000, reachedMs: 10_000, durationMs: 60_000 });
     expect(withWatched(days[0].lessons, state.watched)[0]).toMatchObject({ watchedPercentage: 50, lastPlaybackPositionMilliseconds: 10_000, isCompleted: false });
-    state = reducePreview(state, { type: 'ended', lessonId: lesson.id, durationMs: 60_000, upNext: 'next', game: null });
+    state = reducePreview(state, { type: 'ended', lessonId: lesson.id, durationMs: 60_000, upNext: 'next' });
     expect(withWatched(days[0].lessons, state.watched)[0]).toMatchObject({ watchedPercentage: 100, isCompleted: true });
     expect(state.upNext).toBe('next');
 
-    state = reducePreview(state, { type: 'startGame', id: 'quiz' });
+    state = reducePreview(state, { type: 'openGame', id: 'quiz', at: null, resume: false });
     state = reducePreview(state, { type: 'closeGame', outcome: 'completed', next: null });
-    state = reducePreview(state, { type: 'startGame', id: 'quiz' });
+    state = reducePreview(state, { type: 'openGame', id: 'quiz', at: null, resume: false });
     state = reducePreview(state, { type: 'closeGame', outcome: 'skipped', next: null });
     expect(state.outcomes.quiz).toBe('completed');
     expect(state.game).toBeNull();
+  });
+
+  it('opens the games of a video end one after another, and the countdown to the next video only then', () => {
+    const days = buildPreviewDays(board, catalog, 'Dia', { games: true });
+    let state = startPreview(days);
+    // the end of the video opened a game: the countdown waits
+    state = reducePreview(state, { type: 'openGame', id: 'first', at: 1, resume: false });
+    state = reducePreview(state, { type: 'ended', lessonId: days[0].lessons[0].id, durationMs: 60_000, upNext: 'next' });
+    expect(state.upNext).toBeNull();
+    // the next game due at the same point follows, then the countdown shows
+    state = reducePreview(state, { type: 'closeGame', outcome: 'completed', next: 'second' });
+    expect(state.game).toMatchObject({ id: 'second', at: 1 });
+    state = reducePreview(state, { type: 'closeGame', outcome: 'skipped', next: null });
+    expect(state).toMatchObject({ game: null, upNext: 'next', outcomes: { first: 'completed', second: 'skipped' } });
   });
 
   it('shows the day on the participant pieces, goes through the days on the bar and closes with Escape', async () => {
@@ -101,5 +116,24 @@ describe('the preview of a training, from the board', () => {
 
     await user.keyboard('{Escape}');
     expect(onClose).toHaveBeenCalledOnce();
+  });
+
+  it('opens a game put before the first video as that video starts, as the participant gets it', async () => {
+    const days = [{ ...day('a', 'Abertura', '2026-12-04', ['v1', 'v2'], ['g1']), places: [{ gameId: 'g1', afterVideo: 0 }] }];
+    const { container } = render(<TrainingPreview catalog={catalog} days={days} games name="SIPAT" onClose={() => undefined} word="Dia" />);
+    expect(screen.queryByRole('dialog', { name: 'Quiz do EPI' })).not.toBeInTheDocument();
+
+    const player = container.ownerDocument.querySelector<HTMLVideoElement>('.day-player video');
+    expect(player).not.toBeNull();
+    fireEvent.playing(player!);
+    expect(await screen.findByRole('dialog', { name: 'Quiz do EPI' })).toBeInTheDocument();
+  });
+});
+
+describe('the games of a day, where the participant gets them', () => {
+  it('keeps a game where it was, counted from the first video, and puts a new one after the last', () => {
+    const slots = { videos: ['v1', null, 'v2', 'v3'], games: ['g1', 'g2', 'g1', null], places: [{ gameId: 'g1', afterVideo: 1 }, { gameId: 'g1', afterVideo: 9 }] };
+    // the second g1 was past the end (videos taken out since): it stays after the last one
+    expect(placedGames(slots)).toEqual([{ id: 'g1', afterVideo: 1 }, { id: 'g2', afterVideo: 3 }, { id: 'g1', afterVideo: 3 }]);
   });
 });

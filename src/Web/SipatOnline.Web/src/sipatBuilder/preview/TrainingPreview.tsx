@@ -6,7 +6,6 @@ import GameStage from '@/games/GameStage';
 import GamePlayer from '@/games/LazyGamePlayer';
 import DayActivities from '@/learning/day/DayActivities';
 import { DayControls, DayDone, DayPlaylist, DayStageHead, DayTop } from '@/learning/day/DayParts';
-import { dayStanding } from '@/learning/day/dayLessons';
 import UpNextCard from '@/learning/UpNextCard';
 import { formatDayDate } from '@/learning/WeekVideos';
 import { keepTabInside, useIsolatedLayer } from '@/lib/isolatedLayer';
@@ -118,8 +117,7 @@ function PreviewBar({ days, openDay, word, name, titleId, onDay, onClose }: {
 function PreviewDayPage({ day, days, word, session, onClose }: {
   day: PreviewDay; days: PreviewDay[]; word: string; session: PreviewSession; onClose: () => void;
 }) {
-  const { lessons, current, upNext, activities, game } = session;
-  const standing = dayStanding(lessons);
+  const { lessons, standing, current, upNext, activities, game } = session;
   const index = current ? lessons.findIndex(lesson => lesson.id === current.id) : -1;
   const source = current ? day.sources[current.id] : undefined;
   const nextDay = days[days.indexOf(day) + 1];

@@ -1,5 +1,5 @@
 import { isExtra, isExternal, type GameModule, type LearningLessonProgress } from '@/api';
-import type { Catalog, DaySlots } from '../model';
+import { placedGames, type Catalog, type DaySlots } from '../model';
 
 /** How one video of the preview plays: our player with its file, or the provider's frame. */
 export type PreviewSource =
@@ -20,8 +20,15 @@ export interface PreviewDay {
   lessons: LearningLessonProgress[];
   /** How each lesson plays, by lesson id. */
   sources: Record<string, PreviewSource>;
-  games: GameModule[];
+  /** In the order they open. */
+  games: PreviewGame[];
 }
+
+/**
+ * A game of the day and when it opens: after `afterHouse` of the day's videos that count (0: as the first one starts).
+ * Extras do not count, as for the participant: a game put after one opens after the last video before it that counts.
+ */
+export interface PreviewGame { module: GameModule; afterHouse: number }
 
 /**
  * The board's days as the participant's days. Videos the catalog no longer has are left out, as the server would refuse
@@ -32,8 +39,12 @@ export function buildPreviewDays(days: DaySlots[], catalog: Catalog, word: strin
   return days.map((day, index) => {
     const lessons: LearningLessonProgress[] = [];
     const sources: Record<string, PreviewSource> = {};
+    // how many videos that count come before the end of each of the board's videos (by its count on the day)
+    const houseAfter = [0];
     for (const videoId of day.videos) {
-      const video = videoId ? catalog.videos.get(videoId) : undefined;
+      if (!videoId) continue;
+      const video = catalog.videos.get(videoId);
+      houseAfter.push(houseAfter[houseAfter.length - 1] + (video && !isExtra(video) ? 1 : 0));
       if (!video) continue;
       const position = lessons.length + 1;
       // the same video may sit twice on a board being built: the position keeps each one apart
@@ -50,7 +61,10 @@ export function buildPreviewDays(days: DaySlots[], catalog: Catalog, word: strin
       sources[id] = external ? { kind: 'external', ...external }
         : video.source?.fileUrl ? { kind: 'house', url: video.source.fileUrl } : { kind: 'unavailable' };
     }
-    const games = !withGames ? [] : day.games.flatMap(id => { const game = id ? catalog.games.get(id) : undefined; return game ? [game] : []; });
+    // each game where the participant gets it, in the order they open
+    const games = !withGames ? [] : placedGames(day)
+      .flatMap(game => { const module = catalog.games.get(game.id); return module ? [{ module, afterHouse: houseAfter[game.afterVideo] ?? 0 }] : []; })
+      .sort((a, b) => a.afterHouse - b.afterHouse);
     const position = index + 1;
     return { key: day.key, position, date: day.date || null, title: day.title.trim() || `${word} ${position}`, lessons, sources, games };
   });
