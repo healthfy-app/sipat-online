@@ -41,7 +41,7 @@ export default function PreviewPlayer({ lesson, source, onEvent, ref }: {
     }}
     ref={ref}
     resumeAt={resumeAt}
-    sources={[{ src: source.url }]}
+    sources={source.sources}
     title={lesson.title}
   />;
 }

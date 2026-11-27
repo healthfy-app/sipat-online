@@ -995,9 +995,11 @@ public sealed class PlatformCourseCatalogService(
     }
 
     /// <summary>The operator preview: asks for a signed link first and opens the file only when there is none.</summary>
+    /// <param name="rendition">The version asked for; one the video does not have comes as its 720p, which every video has.</param>
     public async Task<Result<PlatformVideoFile>> GetVideoFileAsync(
         Guid videoId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        VideoRendition rendition = VideoRendition.Hd720)
     {
         var permission = EnsurePlatformOperator();
         if (!permission.IsSuccess)
@@ -1036,14 +1038,20 @@ public sealed class PlatformCourseCatalogService(
                     "O vídeo ainda está sendo enviado.");
         }
 
+        // a version is only there once made (R2 signs a link even for a missing object)
+        if ((rendition == VideoRendition.Fhd1080 && !video.HasFhd1080) || (rendition == VideoRendition.Sd480 && !video.HasSd480))
+        {
+            rendition = VideoRendition.Hd720;
+        }
+
         var link = await videoStorage.GetPlaybackUrlAsync(
-            videoId, VideoRendition.Hd720, PreviewLinkLifetime, cancellationToken);
+            videoId, rendition, PreviewLinkLifetime, cancellationToken);
         if (link is not null)
         {
             return Result<PlatformVideoFile>.Success(new PlatformVideoFile(link, null, video.ContentType));
         }
 
-        var content = await videoStorage.OpenReadAsync(videoId, VideoRendition.Hd720, cancellationToken);
+        var content = await videoStorage.OpenReadAsync(videoId, rendition, cancellationToken);
         return content is null
             ? Failure<PlatformVideoFile>(
                 "learning.platform_course.video_file_missing",

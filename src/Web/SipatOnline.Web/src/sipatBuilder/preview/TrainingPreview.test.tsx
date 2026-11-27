@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameModule, PlatformCourseVideo } from '@/api';
 import { placedGames, type Catalog, type CatalogVideo, type DaySlots } from '../model';
-import { buildPreviewDays } from './previewModel';
+import { buildPreviewDays, versions } from './previewModel';
 import { reducePreview, startPreview, withWatched } from './previewSession';
 import TrainingPreview from './TrainingPreview';
 
@@ -43,12 +43,19 @@ describe('the preview of a training, from the board', () => {
     expect(first.lessons.map(lesson => [lesson.title, lesson.position])).toEqual([['Uso do capacete', 1], ['Palestra no YouTube', 2], ['Protetor auricular', 3]]);
     // a YouTube video with no length is an extra: it never counts
     expect(first.lessons.map(lesson => !!lesson.isBonus)).toEqual([false, true, false]);
-    expect(first.sources[first.lessons[0].id]).toEqual({ kind: 'house', url: '/videos/v1.mp4' });
+    expect(first.sources[first.lessons[0].id]).toEqual({ kind: 'house', sources: [{ src: '/videos/v1.mp4', quality: undefined }] });
     expect(first.sources[first.lessons[1].id]).toEqual({ kind: 'external', provider: 'YouTube', externalId: 'abc' });
     // a game added to the day comes after its last video: the second that counts (the extra does not)
     expect(first.games).toEqual([{ module: quiz, afterHouse: 2 }]);
     // a day with no slogan gets the name the server gives it
     expect(second).toMatchObject({ title: 'Dia 2', position: 2, date: '2026-12-05', lessons: [] });
+  });
+
+  it('offers the versions a participant gets, best first, so the 1080p plays in the preview too', () => {
+    expect(versions('/api/platform/catalog/videos/v/file', { hasFhd1080: true, hasSd480: false })).toEqual([
+      { src: '/api/platform/catalog/videos/v/file?quality=1080p', quality: '1080p' },
+      { src: '/api/platform/catalog/videos/v/file', quality: '720p' },
+    ]);
   });
 
   it('leaves the games out when the company plan has none', () => {

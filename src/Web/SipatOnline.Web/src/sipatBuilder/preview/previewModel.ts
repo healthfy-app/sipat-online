@@ -1,9 +1,9 @@
 import { isExtra, isExternal, type GameModule, type LearningLessonProgress } from '@/api';
 import { placedGames, type Catalog, type DaySlots } from '../model';
 
-/** How one video of the preview plays: our player with its file, or the provider's frame. */
+/** How one video of the preview plays: our player with its versions (best first), or the provider's frame. */
 export type PreviewSource =
-  | { kind: 'house'; url: string }
+  | { kind: 'house'; sources: { src: string; quality?: '1080p' | '720p' | '480p' }[] }
   | { kind: 'external'; provider: 'YouTube' | 'Vimeo'; externalId: string }
   | { kind: 'unavailable' };
 
@@ -29,6 +29,20 @@ export interface PreviewDay {
  * Extras do not count, as for the participant: a game put after one opens after the last video before it that counts.
  */
 export interface PreviewGame { module: GameModule; afterHouse: number }
+
+/**
+ * The versions a participant gets of a video, best first, as the server lists them for a lesson: the 1080p and the
+ * 480p when they were made, the 720p (the file itself) always. The player picks by the connection and offers the rest.
+ */
+export function versions(fileUrl: string, made: { hasFhd1080?: boolean; hasSd480?: boolean }): { src: string; quality?: '1080p' | '720p' | '480p' }[] {
+  const at = (quality: string) => `${fileUrl}${fileUrl.includes('?') ? '&' : '?'}quality=${quality}`;
+  const several = !!made.hasFhd1080 || !!made.hasSd480;
+  return [
+    ...(made.hasFhd1080 ? [{ src: at('1080p'), quality: '1080p' as const }] : []),
+    { src: fileUrl, quality: several ? '720p' as const : undefined },
+    ...(made.hasSd480 ? [{ src: at('480p'), quality: '480p' as const }] : []),
+  ];
+}
 
 /**
  * The board's days as the participant's days. Videos the catalog no longer has are left out, as the server would refuse
@@ -59,7 +73,7 @@ export function buildPreviewDays(days: DaySlots[], catalog: Catalog, word: strin
         thumbnailUrl: video.source?.thumbnailUrl ?? null,
       });
       sources[id] = external ? { kind: 'external', ...external }
-        : video.source?.fileUrl ? { kind: 'house', url: video.source.fileUrl } : { kind: 'unavailable' };
+        : video.source?.fileUrl ? { kind: 'house', sources: versions(video.source.fileUrl, video.source) } : { kind: 'unavailable' };
     }
     // each game where the participant gets it, in the order they open
     const games = !withGames ? [] : placedGames(day)

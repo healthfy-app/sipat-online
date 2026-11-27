@@ -525,10 +525,17 @@ public static partial class PlatformCourseCatalogEndpoints
 
         catalog.MapGet("/videos/{videoId:guid}/file", async (
             Guid videoId,
+            string? quality,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var result = await catalogService.GetVideoFileAsync(videoId, cancellationToken);
+            // the previews offer the versions a participant gets: ?quality=1080p, 720p (none) or 480p
+            if (VideoRenditions.FromQuality(quality) is not { } rendition)
+            {
+                return Results.NotFound();
+            }
+
+            var result = await catalogService.GetVideoFileAsync(videoId, cancellationToken, rendition);
             if (!result.IsSuccess)
             {
                 return ToProblem(result.Error);
