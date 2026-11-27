@@ -3,6 +3,12 @@ name: Deploy production
 # Manual, from main only, to the production VM (GitHub environment "production", which can require approval).
 on:
   workflow_dispatch:
+    inputs:
+      restore_backup:
+        description: Moving to a NEW VM? "latest" loads the last R2 backup into its empty database. Leave empty otherwise.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -24,4 +30,5 @@ jobs:
     uses: ./.github/workflows/deploy-vm.yml
     with:
       environment: production
+      restore_backup: ${{ inputs.restore_backup || '' }}
     secrets: inherit

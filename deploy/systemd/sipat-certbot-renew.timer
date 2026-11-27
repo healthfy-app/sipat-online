@@ -1,0 +1,10 @@
+[Unit]
+Description=Check the SIPAT Online HTTPS certificates for renewal every day
+
+[Timer]
+OnCalendar=daily
+RandomizedDelaySec=12h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

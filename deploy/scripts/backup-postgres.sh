@@ -7,6 +7,7 @@
 #
 # Settings (environment variables, all optional except the bucket):
 #   R2_BACKUP_BUCKET  bucket of the backups. If unset, read from deploy/.env.production.
+#                     The R2 key comes from deploy/.env.production too (see r2-backup-env.sh).
 #   COMPOSE_ARGS      arguments for `docker compose`, to point at another stack.
 #                     Default: --env-file deploy/.env.production -f deploy/compose.production.yaml
 #   RCLONE            rclone command. Default: rclone. May hold a prefix (for example a
@@ -23,9 +24,8 @@ COMPOSE_ARGS="${COMPOSE_ARGS:---env-file deploy/.env.production -f deploy/compos
 RCLONE="${RCLONE:-rclone}"
 RCLONE_REMOTE="${RCLONE_REMOTE:-r2}"
 
-if [ -z "${R2_BACKUP_BUCKET:-}" ] && [ -f deploy/.env.production ]; then
-  R2_BACKUP_BUCKET="$(sed -n 's/^R2_BACKUP_BUCKET=//p' deploy/.env.production | tail -n 1 | tr -d '"'"'"'\r')"
-fi
+# shellcheck source=deploy/scripts/r2-backup-env.sh
+. deploy/scripts/r2-backup-env.sh
 if [ -z "${R2_BACKUP_BUCKET:-}" ]; then
   echo "R2_BACKUP_BUCKET is not set (environment or deploy/.env.production)." >&2
   exit 1

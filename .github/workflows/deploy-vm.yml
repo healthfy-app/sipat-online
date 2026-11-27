@@ -4,12 +4,14 @@ name: Deploy to VM
 # The script builds the images on the runner, copies them over SSH and starts the stack on the VM.
 #
 # variables: DEPLOY_HOST, DEPLOY_USER, DEPLOY_APP_PATH, DEPLOY_PLATFORM (linux/amd64 | linux/arm64),
-#            TENANT_BASE_DOMAIN, PLATFORM_HOST,
+#            TENANT_BASE_DOMAIN, PLATFORM_HOST (both empty = from the IP of DEPLOY_HOST, sslip.io),
 #            PLATFORM_OPERATOR_LOGIN_IDENTIFIER, PLATFORM_OPERATOR_DISPLAY_NAME,
 #            CERTIFICATE_MODE (http01 | dns-azure | manual), ACME_EMAIL (optional),
-#            VIDEO_STORAGE_PROVIDER (File | R2), R2_SERVICE_URL, R2_VIDEO_BUCKET, R2_DIRECT_UPLOAD
+#            VIDEO_STORAGE_PROVIDER (File | R2), R2_SERVICE_URL, R2_VIDEO_BUCKET, R2_DIRECT_UPLOAD,
+#            R2_BACKUP_BUCKET (optional: daily backup, and where a new VM restores from)
 # secrets:   DEPLOY_SSH_PRIVATE_KEY, DEPLOY_SSH_KNOWN_HOSTS, POSTGRES_PASSWORD,
 #            PLATFORM_OPERATOR_PASSWORD, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
+#            R2_BACKUP_ACCESS_KEY_ID and R2_BACKUP_SECRET_ACCESS_KEY (optional: key of the backup bucket),
 #            OTEL_EXPORTER_OTLP_ENDPOINT and OTEL_EXPORTER_OTLP_HEADERS (optional)
 # See deploy/PIPELINE-VM.md.
 
@@ -20,6 +22,11 @@ on:
         description: GitHub environment with the variables and secrets of the target VM.
         required: true
         type: string
+      restore_backup:
+        description: Only on a NEW VM, with an empty database - "latest" or the name of a backup in R2.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -30,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: ${{ inputs.environment }}
-      url: https://${{ vars.PLATFORM_HOST }}
+      url: ${{ steps.deploy.outputs.url }}
     concurrency:
       group: deploy-${{ inputs.environment }}
       cancel-in-progress: false
@@ -47,6 +54,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Deploy
+        id: deploy
         env:
           DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
           DEPLOY_PLATFORM: ${{ vars.DEPLOY_PLATFORM }}
@@ -64,10 +72,14 @@ jobs:
           R2_SERVICE_URL: ${{ vars.R2_SERVICE_URL }}
           R2_VIDEO_BUCKET: ${{ vars.R2_VIDEO_BUCKET }}
           R2_DIRECT_UPLOAD: ${{ vars.R2_DIRECT_UPLOAD }}
+          R2_BACKUP_BUCKET: ${{ vars.R2_BACKUP_BUCKET }}
+          RESTORE_BACKUP: ${{ inputs.restore_backup }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PLATFORM_OPERATOR_PASSWORD: ${{ secrets.PLATFORM_OPERATOR_PASSWORD }}
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_BACKUP_ACCESS_KEY_ID: ${{ secrets.R2_BACKUP_ACCESS_KEY_ID }}
+          R2_BACKUP_SECRET_ACCESS_KEY: ${{ secrets.R2_BACKUP_SECRET_ACCESS_KEY }}
           OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}
           OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
           DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
