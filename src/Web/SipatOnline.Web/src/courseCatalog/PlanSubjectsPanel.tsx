@@ -137,7 +137,9 @@ export default function PlanSubjectsPanel() {
       </div>
 
       {groups.length === 0
-        ? <p className="m-0 px-4 py-10 text-center text-sm text-muted-foreground">Nenhum treinamento com “{query.trim()}”.</p>
+        ? <p className="m-0 px-4 py-10 text-center text-sm text-muted-foreground">{query.trim()
+          ? <>Nenhum treinamento com “{query.trim()}”.</>
+          : 'Ainda não há template publicado com vídeos. Publique um template em Treinamentos e ele aparece aqui, para você escolher quais planos podem usá-lo.'}</p>
         : groups.map(group => <div key={group.name || 'todos'} role="group" aria-label={group.name || 'Treinamentos'}>
           {group.name && <h3 className="m-0">
             <button aria-expanded={isOpen(group.name)} className={cn('flex w-full cursor-pointer items-center gap-2 px-4 text-left text-sm font-bold text-foreground hover:bg-muted/25',

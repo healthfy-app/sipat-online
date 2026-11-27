@@ -532,7 +532,7 @@ public sealed class EfLearningStore(
                 counted.Length > 0 && completed == counted.Length
                     ? 100
                     : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
-                revisionsWithCover.Contains(revisionId) ? $"/api/learning/tracks/{trackId:D}/cover" : null,
+                revisionsWithCover.Contains(revisionId) ? $"/api/learning/tracks/{trackId:D}/cover?v={revisionId:N}" : null,
                 trackEntity.DayTitle,
                 trackEntity.DayPosition,
                 trackEntity.CoursePosition,

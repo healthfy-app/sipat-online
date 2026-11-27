@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace SipatOnline.Api.Endpoints;
 
@@ -37,6 +38,21 @@ public static class ClientErrorEndpoints
             .RequireRateLimiting(RateLimitPolicy)
             .WithMetadata(new RequestSizeLimitAttribute(16_384))
             .WithTags("Observability");
+
+        // a training link made on the operation's address (copied there before it was fixed) names a training but not
+        // its company: this says which company's address it lives on, so the page can send the person there. It gives
+        // only the company's key, and only for a training that is out for its participants; the id cannot be guessed.
+        endpoints.MapGet("/api/training-links/{sipatId:guid}", async (Guid sipatId, SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken token) =>
+            {
+                var key = await (from sipat in db.SipatEvents.AsNoTracking()
+                                 join tenant in db.Tenants.AsNoTracking() on sipat.TenantId equals tenant.Id
+                                 where sipat.Id == sipatId && tenant.IsActive && sipat.Status == SipatOnline.Sipats.Domain.Sipats.SipatEventStatus.Published
+                                 select tenant.Key).SingleOrDefaultAsync(token);
+                return key is null ? Results.NotFound() : Results.Ok(new { companyKey = key });
+            })
+            .AllowAnonymous()
+            .RequireRateLimiting(RateLimitPolicy)
+            .WithTags("Learning");
         return endpoints;
     }
 

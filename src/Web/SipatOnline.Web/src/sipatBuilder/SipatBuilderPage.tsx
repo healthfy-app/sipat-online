@@ -1,9 +1,9 @@
 import { saveFile } from '@/lib/saveFile';
-import { ArrowLeft, Ban, Clock, Copy, FileDown, FileSpreadsheet, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Ban, Clock, Copy, FileDown, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, listCompanyVideos, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
+  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, getTrainingLimit, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -20,8 +20,7 @@ import { partWord } from '@/trainings/partWord';
 import { courseLessons as titlesOf } from '@/courseEditor/courseTrack';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
-import { planToCsv, sampleCsv } from './csv';
-import ImportDialog from './ImportDialog';
+import { planToCsv } from './csv';
 import AudienceRow from '@/trainings/AudienceRow';
 import { useUnitScope } from '@/trainings/unitScope';
 import { copyTrainingLink } from '@/trainings/trainingLink';
@@ -59,7 +58,11 @@ export function findIssues(name: string, days: DaySlots[]): { name: string | nul
  * One SIPAT of a company: a week of training. It is built as a draft (start date, days, a theme for each day),
  * can start from another SIPAT, and goes live when published. The company's administrator and the operator use it alike.
  */
-export default function SipatBuilderPage({ basePath, canEditThemes = false }: { basePath: string; canEditThemes?: boolean }) {
+export default function SipatBuilderPage({ basePath, canEditThemes = false, template = false }: {
+  basePath: string; canEditThemes?: boolean;
+  /** A template of the operation (the route's `courseId`): the same board, of no company, so without dates, audience, link or publishing. */
+  template?: boolean;
+}) {
   const navigate = useNavigate();
   const params = useParams();
   const [search] = useSearchParams();
@@ -70,7 +73,16 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     if (unitScope.unitId) await saveTrainingAudience(created.id, { targets: [{ unitId: unitScope.unitId, sectorId: null }] }).catch(() => undefined);
     return created;
   };
-  const isNew = params.sipatId === 'nova';
+  const isNew = !template && params.sipatId === 'nova';
+  const templateId = template ? params.courseId ?? '' : '';
+  // what the days can be made of: the company's catalog, or, for a template, everything the operation has
+  const fetchContent = useCallback(async (): Promise<Awaited<ReturnType<typeof getSipatCatalog>>> => {
+    if (!template) return getSipatCatalog();
+    const [courses, videos, games, categories, subjects, videoSubjects] = await Promise.all([
+      listPlatformCourses(), listPlatformLibraryVideos(), listGameModules(), listCourseCategories().catch(() => []), listSubjects().catch(() => []), listVideoSubjects().catch(() => [])]);
+    // the ready trainings to drag from are the other templates: never a company's own, nor this one
+    return { courses: courses.filter(course => !course.tenantId && course.id !== params.courseId), videos, games, categories, subjects, videoSubjects };
+  }, [template, params.courseId]);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [others, setOthers] = useState<SipatEvent[]>([]);
   const [plans, setPlans] = useState<SipatPlanSummary[]>([]);
@@ -87,8 +99,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const [startDate, setStartDate] = useState('');
   const [days, setDays] = useState<DaySlots[]>([]);
   const [dirty, setDirty] = useState(false);
+  // the last day the training can be taken, when it runs past its last day ('': it ends with its last day)
+  const [limit, setLimit] = useState('');
   const [busy, setBusy] = useState(false);
-  const [importing, setImporting] = useState(false);
   const [copying, setCopying] = useState(false);
   const [confirmingLaunch, setConfirmingLaunch] = useState(false);
   // where the user tried to go while the SIPAT had unsaved changes
@@ -117,14 +130,24 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
 
   // back from the video editor (opened in another tab): the trainings and videos come again, the days being built stay as they are
   useEffect(() => {
-    const refresh = () => { if (document.visibilityState === 'visible') getSipatCatalog().then(applyContent, () => undefined); };
+    const refresh = () => { if (document.visibilityState === 'visible') fetchContent().then(applyContent, () => undefined); };
     document.addEventListener('visibilitychange', refresh);
     return () => document.removeEventListener('visibilitychange', refresh);
-  }, [applyContent]);
+  }, [applyContent, fetchContent]);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
     try {
+      if (template) {
+        const [content, all] = await Promise.all([fetchContent(), listPlatformCourses()]);
+        const found = all.find(item => item.id === templateId && !item.tenantId);
+        applyContent(content);
+        if (!found) { setError('Não encontrei este treinamento.'); return; }
+        setName(found.title);
+        setDays((await getTemplateDays(templateId)).map(fromProgramDay));
+        setLimit(await getTrainingLimit(templateId).catch(() => null) ?? '');
+        return;
+      }
       const [content, events, summaries] = await Promise.all([getSipatCatalog(), listSipatEvents(0, 100), listSipatPlans()]);
       getCompanyCapabilities().then(setCapabilities).catch(() => setCapabilities(null));
       applyContent(content);
@@ -134,6 +157,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         const found = events.items.find(item => item.id === params.sipatId);
         if (!found) { setError('Não encontrei este treinamento.'); return; }
         setSipat(found); setName(found.title);
+        // the training ends the day before `endsAt`: its last day, or its limit date when that is further ahead
+        setLimit(addDays(found.endsAt.slice(0, 10), -1));
         setDays((await getSipatPlan(found.id)).map(fromProgramDay));
       } else {
         const year = new Date().getFullYear();
@@ -142,7 +167,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     } catch (failure) {
       setError(getErrorMessage(failure));
     } finally { setLoading(false); }
-  }, [isNew, params.sipatId, applyContent]);
+  }, [isNew, params.sipatId, applyContent, template, templateId, fetchContent]);
   useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
@@ -186,14 +211,14 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   useEffect(() => onVideoUploaded(item => {
     const video = item.video;
     if (video && item.tag?.startsWith(dayTag)) setPreparing(current => [...current, { videoId: video.id, dayKey: item.tag!.slice(dayTag.length), title: item.title }]);
-    getSipatCatalog().then(applyContent, () => undefined);
-  }), [applyContent]);
+    fetchContent().then(applyContent, () => undefined);
+  }), [applyContent, fetchContent]);
   // while one is being prepared, look again quietly
   useEffect(() => {
     if (preparing.length === 0) return;
-    const timer = window.setInterval(() => { getSipatCatalog().then(applyContent, () => undefined); }, 8000);
+    const timer = window.setInterval(() => { fetchContent().then(applyContent, () => undefined); }, 8000);
     return () => window.clearInterval(timer);
-  }, [preparing.length, applyContent]);
+  }, [preparing.length, applyContent, fetchContent]);
   // ready: it goes onto the day it was sent from
   useEffect(() => {
     if (!catalog) return;
@@ -234,6 +259,18 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     setStage('grid'); setDirty(true);
   }
 
+  const dated = days.map(day => day.date).filter(isValidDate).sort();
+  const firstDate = dated[0] ?? '';
+  const lastDate = dated[dated.length - 1] ?? '';
+  // the limit shown: the one chosen, never behind the last day
+  const shownLimit = lastDate && (!isValidDate(limit) || limit < lastDate) ? lastDate : limit;
+  /** A new start carries every day with it, keeping the gaps between them (and the limit as far ahead as it was). */
+  function moveStart(next: string) {
+    if (!isValidDate(next)) return;
+    const shift = firstDate ? Math.round((Date.parse(`${next}T00:00:00Z`) - Date.parse(`${firstDate}T00:00:00Z`)) / 86_400_000) : 0;
+    edit(days.map((day, index) => ({ ...day, date: firstDate ? (isValidDate(day.date) ? addDays(day.date, shift) : day.date) : addDays(next, index) })));
+    if (firstDate && isValidDate(limit)) setLimit(addDays(limit, shift));
+  }
   const issues = useMemo(() => findIssues(name, days), [name, days]);
   const issueCount = Object.keys(issues.days).length + (issues.name ? 1 : 0);
 
@@ -264,7 +301,15 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   async function save(skipChecks = false): Promise<string | null> {
     if (!skipChecks && !checkIssues()) return null;
     setBusy(true); setError(''); setNotice('');
+    // a limit behind the last day would end the training before its days: it follows the last day then
+    const endsOn = lastDate ? (isValidDate(limit) && limit > lastDate ? limit : lastDate) : null;
     try {
+      if (template) {
+        const saved = await saveTemplateDays(templateId, withDayWord(days, partWord(days.map(day => day.date))).map(toProgramDay), endsOn);
+        setDays(saved.map(fromProgramDay)); setDirty(false);
+        setNotice('Template salvo.');
+        return templateId;
+      }
       let current = sipat;
       if (!current) {
         // only a new training needs a schedule; days without dates (Módulos) keep the one it has
@@ -277,7 +322,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
         current = await updateSipatEvent(current.id, { title: name.trim(), description: current.description, startsAt: current.startsAt, endsAt: current.endsAt });
       }
       // untyped names go out as the board shows them ("Módulo 2" without dates, "Dia 2" with)
-      const saved = await saveSipatPlan(current.id, withDayWord(days, partWord(days.map(day => day.date))).map(toProgramDay));
+      const saved = await saveSipatPlan(current.id, withDayWord(days, partWord(days.map(day => day.date))).map(toProgramDay), endsOn);
+      // the training's period follows what was just saved
+      if (firstDate && lastDate) current = { ...current, startsAt: `${firstDate}T00:00:00.000Z`, endsAt: `${addDays(endsOn ?? lastDate, 1)}T00:00:00.000Z` };
       setDays(saved.map(fromProgramDay)); setDirty(false); setSipat(current);
       setNotice('Rascunho salvo.');
       if (isNew) navigate(`${basePath}/${current.id}`, { replace: true });
@@ -290,6 +337,11 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
 
   /** The pencil: saves what is pending and opens this same training in the video editor. */
   async function editWeek() {
+    if (template) {
+      if (dirty && !(await save(true))) return;
+      navigate(`/platform/courses/${templateId}/edit`);
+      return;
+    }
     const id = dirty || !sipat ? await save(true) : sipat.id;
     if (!id) return;
     // the company's administrator has its own editor page; the operation edits in Conteúdo
@@ -383,6 +435,17 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     } finally { setBusy(false); }
   }
 
+  /** Starts from a template of the operation: each of its Títulos becomes a day, with its videos; the dates follow the start chosen, or stay open. */
+  function copyFromTemplate(source: PlatformCourse) {
+    if (!catalog) return;
+    setCopying(false);
+    const base = isValidDate(startDate) ? startDate : firstDate;
+    const known = (ids: string[]) => ids.filter(id => catalog.videos.has(id));
+    setDays(titlesOf(source).slice(0, maxDays).map((title, index) => dayFromTitle(index, base ? addDays(base, index) : '', title.title, known(title.videoIds))));
+    setStage('grid'); setDirty(true);
+    setNotice(`Dias copiados de "${source.title}". Confira as datas e os vídeos antes de salvar.`);
+  }
+
   async function copyFrom(sourceId: string) {
     setCopying(false);
     setBusy(true); setError('');
@@ -414,7 +477,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     </div></Page>;
   }
 
-  const template = () => download('modelo-sipat.csv', sampleCsv(catalog));
   // Bronze takes the ready modules as they are: a CSV with a grid of its own is a personalization (Prata and above)
   const canCustomizeGrid = capabilities?.customizeGrid !== false;
   // Bronze: the operation builds the training from a ready SIPAT (its videos stay as they come); the company only views it
@@ -422,9 +484,12 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
   const viewOnly = readyOnly && !canEditThemes;
   const readySipats = trainings.filter(item => item.isReadySipat);
   const sources = others.filter(item => item.id !== sipat?.id && (plans.find(plan => plan.sipatEventId === item.id)?.days ?? 0) > 0);
+  // the operation's templates to start from, beside the company's own trainings (Bronze: only the ready SIPATs)
+  const templateSources = (readyOnly ? readySipats : trainings).filter(item => titlesOf(item).length > 0);
+  const canCopy = sources.length > 0 || templateSources.length > 0;
   const label = sipat ? phaseLabel[sipatPhase(sipat, days.filter(day => day.videos.some(Boolean)).length)] : null;
   // the name is edited in the title itself, while the SIPAT is a draft; after publishing it stays as it is
-  const canRename = stage === 'grid' && !cancelled && (sipat === null || sipat.status === 'Draft');
+  const canRename = !template && stage === 'grid' && !cancelled && (sipat === null || sipat.status === 'Draft');
   const nameMissing = showIssues && !!issues.name;
   const showNameInput = canRename && (editingName || nameMissing);
   const exportCsv = () => download(`${(name || 'sipat').trim().toLowerCase().replace(/[^a-z0-9]+/gi, '-')}.csv`, planToCsv(days, catalog));
@@ -433,7 +498,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     <header className="ops-hero max-[760px]:gap-4! max-[760px]:px-4! max-[760px]:pt-3! max-[760px]:pb-4!" data-slot="page-header">
       <div className="ops-hero-copy max-[760px]:gap-2!">
         <Link className="ops-hero-back max-[760px]:-mb-1! max-[760px]:min-h-11" to={basePath}><ArrowLeft aria-hidden="true" /> Todos os treinamentos</Link>
-        <p className="ops-hero-eyebrow">Treinamento</p>
+        <p className="ops-hero-eyebrow">{template ? 'Template' : 'Treinamento'}</p>
         <div className="flex flex-wrap items-center gap-3 max-[760px]:min-w-0 max-[760px]:basis-full max-[760px]:gap-x-2 max-[760px]:gap-y-1.5">
           {showNameInput
             ? <Input aria-invalid={nameMissing} aria-label="Nome do treinamento" autoFocus className="ops-hero-title h-auto w-[min(100%,28rem)] border-dashed bg-transparent px-2 py-1 max-[760px]:text-[1.5rem]!"
@@ -444,6 +509,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
             : <h1 className="ops-hero-title max-[760px]:text-[1.5rem]!">{isNew && stage === 'setup' ? 'Novo treinamento' : name || 'Treinamento'}</h1>}
           {canRename && !showNameInput && <Button aria-label="Renomear o treinamento" className="max-[760px]:-my-1.5 max-[760px]:size-11 max-[760px]:min-h-11" onClick={() => setEditingName(true)} size="icon-sm" variant="ghost"><Pencil /></Button>}
           {label && <Badge variant={label.variant}>{label.text}</Badge>}
+          {template && <Badge variant="outline">Sem empresa</Badge>}
           {dirty && <Badge variant="outline">Alterações não salvas</Badge>}
           {stage === 'grid' && sipat && sipat.status === 'Published' && <span className="text-xs text-muted-foreground">O nome fica fixo depois de publicado.</span>}
         </div>
@@ -459,28 +525,38 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
           <li><Gamepad2 aria-hidden="true" /><strong>{totals.games}</strong> {totals.games === 1 ? 'jogo' : 'jogos'}</li>
           <li><Clock aria-hidden="true" />{totals.time > 0 ? formatSpan(totals.time) : 'sem vídeos'}</li>
         </ul>}
+        {/* when it runs: from its first day to its limit date, which can go past the last day */}
+        {stage === 'grid' && <div className="flex flex-wrap items-end gap-3">
+          <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Início
+            <Input aria-label="Início do treinamento" className="h-9 w-auto text-sm" disabled={viewOnly || busy} onChange={event => moveStart(event.target.value)} type="date" value={firstDate} />
+          </label>
+          <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Data limite
+            <Input aria-label="Data limite do treinamento" className="h-9 w-auto text-sm" disabled={viewOnly || busy || !lastDate} min={lastDate || undefined}
+              onChange={event => { setLimit(event.target.value); setDirty(true); }} type="date" value={shownLimit} />
+          </label>
+          <p className="m-0 max-w-sm pb-1.5 text-xs text-muted-foreground">O treinamento pode ser feito até a data limite, mesmo depois do último dia.</p>
+        </div>}
         {/* who it is for: the whole company, or the units and sectors marked */}
         {stage === 'grid' && sipat && !cancelled && <AudienceRow canEdit={!viewOnly} openAtStart={search.get('para-quem') === '1'} sipatId={sipat.id} />}
       </div>
-      {stage === 'grid' && !cancelled && !viewOnly && <div className="ops-hero-actions max-[760px]:grid! max-[760px]:w-full max-[760px]:grid-cols-[auto_minmax(0,1fr)] max-[760px]:gap-2">
+      {stage === 'grid' && !viewOnly && <div className="ops-hero-actions max-[760px]:grid! max-[760px]:w-full max-[760px]:grid-cols-[auto_minmax(0,1fr)] max-[760px]:gap-2">
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild><Button className={phoneAction} disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
           <DropdownMenuContent>
-            {sources.length > 0 && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
-            {canCustomizeGrid && <DropdownMenuItem onSelect={() => setImporting(true)}><FileSpreadsheet /> Importar CSV</DropdownMenuItem>}
+            {canCopy && <DropdownMenuItem onSelect={() => setCopying(true)}><Copy /> Duplicar de outro treinamento</DropdownMenuItem>}
             <DropdownMenuItem disabled={days.length === 0} onSelect={exportCsv}><FileDown /> Exportar CSV</DropdownMenuItem>
             {sipat && <DropdownMenuItem onSelect={() => coverPicker.current?.click()}><ImagePlus /> Capa do treinamento</DropdownMenuItem>}
-            {sipat && <>
+            {sipat && !cancelled && <>
               <DropdownMenuSeparator />
               <DropdownMenuItem onSelect={() => setConfirmingEnd(true)} variant="destructive"><Ban /> Encerrar este treinamento</DropdownMenuItem>
             </>}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
+        <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {template ? 'Salvar' : published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
         {/* the pencil: this same training in the video editor (títulos, player, questions, cover) */}
         {published && <Button className={phoneAction} disabled={busy} onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
         <Button className={cn(phoneAction, 'max-[760px]:hidden')} disabled={busy || days.length === 0} onClick={() => void editWeek()} variant="outline"><Pencil /> Editar treinamento</Button>
-        <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>
+        {!template && !cancelled && <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>}
       </div>}
       {stage === 'grid' && viewOnly && sipat && <div className="ops-hero-actions max-[760px]:hidden">
         {published && <Button onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
@@ -489,7 +565,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     </header>
 
     <input accept="image/png,image/jpeg,image/webp" aria-label="Capa do treinamento" className="sr-only" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void changeCover(file); }} ref={coverPicker} tabIndex={-1} type="file" />
-    {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Este treinamento foi encerrado e não pode ser alterado. Para usá-lo de novo, reative-o na lista de treinamentos, ou use "Duplicar" em um novo treinamento.</p>}
+    {cancelled && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">Este treinamento está encerrado: os participantes não o veem. Você pode editá-lo; para publicar de novo, reative-o na lista de treinamentos.</p>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {showIssues && issueCount > 0 && stage === 'grid' && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">
       {issues.name ? 'Dê um nome ao treinamento. ' : ''}
@@ -503,23 +579,22 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
     {catalog.subjects.length === 0 && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">O acervo ainda não tem assuntos publicados. Peça à operação para publicar os assuntos.</p>}
 
     {stage === 'setup'
-      ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} onImport={canCustomizeGrid ? () => setImporting(true) : undefined} onName={setName} onStart={start}
-        onStartDate={setStartDate} onTemplate={template} startDate={startDate}
-        onCopy={sources.length > 0 ? () => setCopying(true) : undefined}
+      ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} limit={limit} onLimit={setLimit} onName={setName} onStart={start}
+        onStartDate={setStartDate} startDate={startDate}
+        onCopy={canCopy ? () => setCopying(true) : undefined}
         onTraining={setTraining} readyOnly={readyOnly} training={training}
         trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
       : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
-        onChange={cancelled || viewOnly ? () => undefined : edit} onRemoveDay={cancelled ? undefined : removeDay}
-        onEdit={cancelled || viewOnly ? undefined : () => { if (!busy) void editWeek(); }}
+        onChange={viewOnly ? () => undefined : edit} onRemoveDay={removeDay}
+        onEdit={viewOnly ? undefined : () => { if (!busy) void editWeek(); }}
         // every day has its own "Enviar vídeo", for a company that has its own videos (Diamante)
-        arriving={arriving} onSendToDay={capabilities?.internalVideos && !cancelled ? (dayKey, files) => void sendToDay(dayKey, files) : undefined} />}
-
-    {importing && <ImportDialog catalog={catalog} hasPlan={stage === 'grid' && days.some(day => day.videos.some(Boolean))} onClose={() => setImporting(false)}
-      onImport={imported => { setDays(imported); setDirty(true); setStage('grid'); setImporting(false); setNotice(`${pluralize(imported.length, 'dia importado', 'dias importados')}. Revise e salve.`); }}
-      onTemplate={template} />}
+        arriving={arriving} onSendToDay={capabilities?.internalVideos ? (dayKey, files) => void sendToDay(dayKey, files) : undefined} />}
 
     {copying && <Dialog description="Escolha o treinamento de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outro treinamento">
-      <ul className="m-0 grid max-h-72 list-none gap-2 overflow-auto p-0">
+      <div className="grid max-h-[60vh] gap-4 overflow-auto">
+      {sources.length > 0 && <section className="grid gap-2">
+      <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">{template ? 'Treinamentos' : 'Da empresa'}</h3>
+      <ul className="m-0 grid list-none gap-2 p-0">
         {sources.map(item => {
           const plan = plans.find(entry => entry.sipatEventId === item.id);
           return <li key={item.id}>
@@ -531,6 +606,20 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false }: { 
           </li>;
         })}
       </ul>
+      </section>}
+      {templateSources.length > 0 && <section className="grid gap-2">
+        <h3 className="m-0 text-xs font-semibold uppercase tracking-[0.06em] text-muted-foreground">Templates da operação</h3>
+        <ul className="m-0 grid list-none gap-2 p-0">
+          {templateSources.map(item => <li key={item.id}>
+            <button className="flex w-full items-center justify-between gap-3 rounded-lg border border-border bg-card px-3 py-2.5 text-left hover:border-primary" onClick={() => copyFromTemplate(item)} type="button">
+              <span className="grid"><strong className="text-sm">{item.title}</strong>
+                <span className="text-xs text-muted-foreground">{pluralize(titlesOf(item).length, 'dia', 'dias')} · {pluralize(item.videos.length, 'vídeo', 'vídeos')}</span></span>
+              <Badge variant="outline">Template</Badge>
+            </button>
+          </li>)}
+        </ul>
+      </section>}
+      </div>
       <DialogActions><Button onClick={() => setCopying(false)} variant="outline">Cancelar</Button></DialogActions>
     </Dialog>}
 

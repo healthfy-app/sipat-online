@@ -8,7 +8,8 @@ using SipatOnline.Sipats.Domain.Sipats;
 namespace SipatOnline.Infrastructure.Learning;
 
 /// <summary>A company's training as Conteúdo and the editor need it: which training, of which company, it is.</summary>
-public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName, string SipatStatus);
+public sealed record SipatWeekInfo(Guid CourseId, Guid SipatEventId, Guid TenantId, string SipatTitle, string CompanyName, string SipatStatus,
+    DateTimeOffset StartsAt, DateTimeOffset EndsAt, int Days);
 
 /// <summary>A training as its card shows it: how much it has, how long it runs, and its cover (the version changes with the photo).</summary>
 public sealed record SipatPlanSummary(Guid SipatEventId, int Days, int Videos, Guid CourseId, long DurationMilliseconds, long? CoverVersion,
@@ -46,8 +47,6 @@ public sealed class SipatPlanService(
             return Failure<Guid>("sipat.week.forbidden", "Só a operação edita a semana no editor de vídeos.");
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<Guid>.Failure(found.Error);
-        if (found.Value.Status == SipatEventStatus.Cancelled)
-            return Failure<Guid>("sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado.");
         return Result<Guid>.Success(found.Value.CourseId);
     }
 
@@ -55,9 +54,20 @@ public sealed class SipatPlanService(
     public async Task<IReadOnlyList<SipatWeekInfo>> WeeksAsync(CancellationToken token) =>
         (await (from sipat in db.SipatEvents.AsNoTracking()
                 join tenant in db.Tenants.AsNoTracking() on sipat.TenantId equals tenant.Id
-                select new { sipat.CourseId, sipat.Id, sipat.TenantId, sipat.Title, tenant.Name, sipat.Status })
+                select new
+                {
+                    sipat.CourseId,
+                    sipat.Id,
+                    sipat.TenantId,
+                    sipat.Title,
+                    tenant.Name,
+                    sipat.Status,
+                    sipat.StartsAt,
+                    sipat.EndsAt,
+                    Days = db.PlatformCourseLessons.Count(lesson => lesson.CourseId == sipat.CourseId),
+                })
             .ToListAsync(token))
-        .Select(row => new SipatWeekInfo(row.CourseId, row.Id, row.TenantId, row.Title, row.Name, row.Status.ToString()))
+        .Select(row => new SipatWeekInfo(row.CourseId, row.Id, row.TenantId, row.Title, row.Name, row.Status.ToString(), row.StartsAt, row.EndsAt, row.Days))
         .ToArray();
 
     /// <summary>The trainings that belong to a company, kept out of every list of models to pick from.</summary>
@@ -192,6 +202,56 @@ public sealed class SipatPlanService(
         }
     }
 
+    /// <summary>The days of a template (a training of the operation, of no company): its Títulos, without dates.</summary>
+    public async Task<Result<IReadOnlyList<ProgramDay>>> GetTemplateAsync(Guid courseId, CancellationToken token)
+    {
+        if (!await db.PlatformCourses.AnyAsync(course => course.Id == courseId && course.TenantId == null, token))
+            return Failure<IReadOnlyList<ProgramDay>>("sipat.not_found", "O treinamento não foi encontrado.");
+        return Result<IReadOnlyList<ProgramDay>>.Success(await ReadDaysAsync(courseId, token));
+    }
+
+    /// <summary>
+    /// Saves the days of a template, built on the same board a company uses, with its dates and its limit date.
+    /// A template belongs to no company, so no plan limits it.
+    /// </summary>
+    public async Task<Result<IReadOnlyList<ProgramDay>>> SaveTemplateAsync(Guid courseId, IReadOnlyList<ProgramDay>? days, DateOnly? endsOn, CancellationToken token)
+    {
+        var template = await db.PlatformCourses.SingleOrDefaultAsync(course => course.Id == courseId && course.TenantId == null, token);
+        if (template is null)
+            return Failure<IReadOnlyList<ProgramDay>>("sipat.not_found", "O treinamento não foi encontrado.");
+        var cleaned = await ProgramDayRules.CleanAsync(days, catalog, games, token, allowEmptyDays: true);
+        if (!cleaned.IsSuccess) return cleaned;
+        var repeated = cleaned.Value.SelectMany(day => day.VideoIds).GroupBy(id => id).FirstOrDefault(group => group.Count() > 1);
+        if (repeated is not null)
+        {
+            var video = await catalog.FindVideoAsync(repeated.Key, token);
+            return Failure<IReadOnlyList<ProgramDay>>("learning.program.video_repeated_across_days",
+                $"O vídeo \"{video?.Title}\" está em dois dias. Cada vídeo entra uma vez no treinamento.");
+        }
+
+        var limit = Limit(cleaned.Value, endsOn);
+        if (!limit.IsSuccess) return Result<IReadOnlyList<ProgramDay>>.Failure(limit.Error);
+        await WriteDaysAsync(courseId, cleaned.Value, token);
+        template.EndsOn = endsOn;
+        await db.SaveChangesAsync(token);
+        await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId ?? default, "learning.template.days_saved", "platform_course",
+            courseId.ToString("D"), clock.GetUtcNow()), token);
+        return Result<IReadOnlyList<ProgramDay>>.Success(await ReadDaysAsync(courseId, token));
+    }
+
+    /// <summary>The limit date of a training (the last day it can be taken), when it has one of its own.</summary>
+    public async Task<DateOnly?> LimitAsync(Guid courseId, CancellationToken token) =>
+        await db.PlatformCourses.AsNoTracking().Where(course => course.Id == courseId).Select(course => course.EndsOn).SingleOrDefaultAsync(token);
+
+    /// <summary>The limit date has to reach the last day: a training runs past its days, never ends before them.</summary>
+    private static Result<bool> Limit(IReadOnlyList<ProgramDay> days, DateOnly? endsOn)
+    {
+        var last = days.Where(day => day.Date is not null).Select(day => day.Date!.Value).DefaultIfEmpty().Max();
+        return endsOn is { } limit && last != default && limit < last
+            ? Result<bool>.Failure(new DomainError("sipat.limit_before_last_day", "A data limite não pode ser antes do último dia do treinamento."))
+            : Result<bool>.Success(true);
+    }
+
     public async Task<Result<IReadOnlyList<SipatPlanSummary>>> SummariesAsync(CancellationToken token)
     {
         var tenant = Tenant();
@@ -218,16 +278,34 @@ public sealed class SipatPlanService(
     }
 
     /// <summary>
-    /// Deletes a training that was never delivered (it has no days with the participants): the training and its content
-    /// go. One that was published stays in the history; it can be ended, not deleted.
+    /// Deletes a training nobody took: the training, its content and the days it had delivered go. One that is over, or
+    /// that a participant has started, stays in the history for everyone (the operation too); it can be ended, not deleted.
     /// </summary>
     public async Task<Result<bool>> DeleteAsync(Guid sipatId, CancellationToken token)
     {
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<bool>.Failure(found.Error);
         var sipat = found.Value;
-        if (await db.LearningTracks.AnyAsync(track => track.SipatEventId == sipatId, token))
-            return Failure<bool>("sipat.delivered", "Este treinamento já foi entregue aos participantes e fica no histórico. Use \"Encerrar este treinamento\".");
+        var trackIds = await db.LearningTracks.Where(track => track.SipatEventId == sipatId).Select(track => track.Id).ToListAsync(token);
+        if (trackIds.Count > 0 && sipat.Status == SipatEventStatus.Published && sipat.EndsAt <= clock.GetUtcNow())
+            return Failure<bool>("sipat.delivered", "Este treinamento já foi concluído e fica no histórico. Ele não pode ser excluído.");
+        var revisionIds = await db.LearningTrackRevisions.Where(revision => trackIds.Contains(revision.TrackId)).Select(revision => revision.Id).ToListAsync(token);
+        if (await db.LearningProgress.AnyAsync(progress => trackIds.Contains(progress.TrackId), token)
+            || await db.LearningActivityOutcomes.AnyAsync(outcome => revisionIds.Contains(outcome.RevisionId), token)
+            || await db.ParticipationCertificates.AnyAsync(certificate => certificate.SipatEventId == sipatId, token))
+            return Failure<bool>("sipat.delivered", "Algum participante já começou este treinamento, então ele fica no histórico. Use \"Encerrar\" para tirá-lo dos participantes.");
+
+        await using var transaction = await db.Database.BeginTransactionAsync(token);
+        if (trackIds.Count > 0)
+        {
+            // the days it delivered, which nobody opened, leave with it
+            await db.LearningAssignments.Where(item => trackIds.Contains(item.TrackId)).ExecuteDeleteAsync(token);
+            await db.LearningContentSnapshots.Where(item => revisionIds.Contains(item.RevisionId)).ExecuteDeleteAsync(token);
+            await db.LearningLessons.Where(item => trackIds.Contains(item.TrackId)).ExecuteDeleteAsync(token);
+            await db.LearningTrackRevisions.Where(item => trackIds.Contains(item.TrackId)).ExecuteDeleteAsync(token);
+            await db.LearningTracks.Where(item => trackIds.Contains(item.Id)).ExecuteDeleteAsync(token);
+        }
+
         var course = await db.PlatformCourses.SingleOrDefaultAsync(item => item.Id == sipat.CourseId, token);
         db.SipatEvents.Remove(sipat);
         await db.SaveChangesAsync(token);
@@ -238,20 +316,28 @@ public sealed class SipatPlanService(
         }
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(sipat.TenantId), "sipat.deleted", "sipat_event",
             sipatId.ToString("D"), clock.GetUtcNow()), token);
+        await transaction.CommitAsync(token);
         return Result<bool>.Success(true);
     }
 
-    /// <summary>Saves the days. The training's dates follow the dates of its days, so a week is always what the table says.</summary>
-    public async Task<Result<IReadOnlyList<ProgramDay>>> SaveAsync(Guid sipatId, IReadOnlyList<ProgramDay>? days, CancellationToken token)
+    /// <summary>
+    /// Saves the days. The training starts on its first day and ends on its last one, or on its limit date when it has
+    /// one further ahead (the training runs past its days).
+    /// </summary>
+    public async Task<Result<IReadOnlyList<ProgramDay>>> SaveAsync(Guid sipatId, IReadOnlyList<ProgramDay>? days, CancellationToken token, DateOnly? endsOn = null, bool keepLimit = true)
     {
         var found = await FindEventAsync(sipatId, token);
         if (!found.IsSuccess) return Result<IReadOnlyList<ProgramDay>>.Failure(found.Error);
+        // an ended training can still be put in order; it stays ended (out of the participants' reach) until brought back
         var sipat = found.Value;
-        if (sipat.Status == SipatEventStatus.Cancelled)
-            return Failure<IReadOnlyList<ProgramDay>>("sipat.cancelled", "Este treinamento foi cancelado e não pode mais ser alterado.");
 
         var cleaned = await ApplyPlanAsync(days, token, allowEmptyDays: true, legacyModules: sipat.Status == SipatEventStatus.Published);
         if (!cleaned.IsSuccess) return cleaned;
+
+        // a day takes the operation's games and the company's own, never another company's
+        var gameIds = cleaned.Value.SelectMany(day => day.GameIds).Distinct().ToArray();
+        if (gameIds.Length > 0 && await db.GameModules.AnyAsync(module => gameIds.Contains(module.Id) && module.TenantId != null && module.TenantId != sipat.TenantId, token))
+            return Failure<IReadOnlyList<ProgramDay>>("learning.game_module.not_found", "Um dos jogos não foi encontrado.");
 
         // a training holds each video once
         var repeated = cleaned.Value.SelectMany(day => day.VideoIds).GroupBy(id => id).FirstOrDefault(group => group.Count() > 1);
@@ -263,13 +349,19 @@ public sealed class SipatPlanService(
         }
 
         var now = clock.GetUtcNow();
+        var content = await db.PlatformCourses.SingleAsync(course => course.Id == sipat.CourseId, token);
+        // a caller that does not know the limit (an older screen) leaves it as it is
+        if (!keepLimit) content.EndsOn = endsOn;
+        var limit = Limit(cleaned.Value, content.EndsOn);
+        if (!limit.IsSuccess) return Result<IReadOnlyList<ProgramDay>>.Failure(limit.Error);
         await WriteDaysAsync(sipat.CourseId, cleaned.Value, token);
 
         var dates = cleaned.Value.Where(day => day.Date is not null).Select(day => day.Date!.Value).ToArray();
         if (dates.Length > 0)
         {
+            var last = content.EndsOn is { } ahead && ahead > dates.Max() ? ahead : dates.Max();
             sipat.StartsAt = new DateTimeOffset(dates.Min().ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
-            sipat.EndsAt = new DateTimeOffset(dates.Max().AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
+            sipat.EndsAt = new DateTimeOffset(last.AddDays(1).ToDateTime(TimeOnly.MinValue), TimeSpan.Zero);
         }
 
         await db.SaveChangesAsync(token);

@@ -86,12 +86,9 @@ describe('registry page', () => {
     expect(await within(names).findByText('Desativado')).toBeVisible();
   });
 
-  it('checking Setor saves the rules with requireSector true', async () => {
-    const user = userEvent.setup();
-    vi.mocked(api.saveProfileRules).mockResolvedValue({ ...rules, requireSector: true });
+  it('asks for no required fields: a person is never held back for a missing one', async () => {
     render(<RegistryPage />);
-    await user.click(await screen.findByRole('checkbox', { name: 'Setor' }));
-    expect(api.saveProfileRules).toHaveBeenCalledWith({ ...rules, requireSector: true });
-    expect(await screen.findByText('Salvo.')).toBeVisible();
+    await screen.findByRole('heading', { name: 'Cadastro' });
+    expect(screen.queryByText('Campos obrigatórios')).not.toBeInTheDocument();
   });
 });

@@ -45,7 +45,8 @@ public sealed class EfGameModuleStore(PlatformDbContext dbContext) : IGameModule
             GameType = (int)module.GameType,
             QuestionsJson = JsonSerializer.Serialize(module.Questions, JsonOptions),
             ContentJson = module.Content is null ? null : JsonSerializer.Serialize(module.Content, JsonOptions),
-            CreatedAt = module.CreatedAt
+            CreatedAt = module.CreatedAt,
+            TenantId = module.TenantId
         });
         await dbContext.SaveChangesAsync(cancellationToken);
     }
@@ -144,5 +145,6 @@ public sealed class EfGameModuleStore(PlatformDbContext dbContext) : IGameModule
             (GamificationGameType)entity.GameType,
             JsonSerializer.Deserialize<GameQuestion[]>(entity.QuestionsJson, JsonOptions) ?? [],
             entity.CreatedAt,
-            entity.ContentJson is null ? null : JsonSerializer.Deserialize<GameContent>(entity.ContentJson, JsonOptions));
+            entity.ContentJson is null ? null : JsonSerializer.Deserialize<GameContent>(entity.ContentJson, JsonOptions),
+            entity.TenantId);
 }

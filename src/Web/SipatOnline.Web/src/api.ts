@@ -111,6 +111,10 @@ export interface GameQuestion {
 }
 
 export interface GameModule {
+  /** The company the game belongs to (its own, private to it); absent or null for the operation's. */
+  tenantId?: string | null;
+  /** That company's name, in the operation's list. */
+  companyName?: string | null;
   id: string;
   title: string;
   gameType: GamificationGameType;
@@ -255,8 +259,21 @@ export function listSipatPlans(): Promise<SipatPlanSummary[]> {
 export async function getSipatPlan(sipatId: string): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`));
 }
-export async function saveSipatPlan(sipatId: string, days: ProgramDay[]): Promise<ProgramDay[]> {
-  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify({ days }) }));
+/** `endsOn`: the limit date (the last day the training can be taken); left out, the limit stays as it is; null, it ends with its last day. */
+export async function saveSipatPlan(sipatId: string, days: ProgramDay[], endsOn?: string | null): Promise<ProgramDay[]> {
+  const body = endsOn === undefined ? { days } : { days, endsOn, setLimit: true };
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify(body) }));
+}
+/** The days of a template (a training of the operation, of no company): the same board of days. */
+export async function getTemplateDays(courseId: string): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`));
+}
+export async function saveTemplateDays(courseId: string, days: ProgramDay[], endsOn: string | null): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`, { method: 'PUT', body: JSON.stringify({ days, endsOn }) }));
+}
+/** The limit date of a training, when it has one of its own ("2026-12-10"). */
+export async function getTrainingLimit(courseId: string): Promise<string | null> {
+  return (await requestJson<{ endsOn: string | null }>(`/api/platform/catalog/courses/${courseId}/days/limit`)).endsOn ?? null;
 }
 export async function copySipatPlan(sipatId: string, sourceId: string): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan/copy-from/${sourceId}`, { method: 'POST', body: '{}' }));
@@ -600,8 +617,31 @@ export function configureCompanyAdministration(companyId: string | null): void {
   companyAdministrationId = companyId;
 }
 
+/**
+ * The first calls of the portal are started by `public/boot.js` while the app is still downloading. Each answer is
+ * taken once; a missing or failed one gives null, and the caller asks the usual way.
+ */
+async function takeBoot<T>(name: 'branding' | 'session' | 'home', read: (response: Response) => Promise<T | undefined>): Promise<T | undefined> {
+  const boot = (globalThis as { __sipatBoot?: Record<string, Promise<Response> | undefined> }).__sipatBoot;
+  const pending = boot?.[name];
+  if (!boot || !pending) return undefined;
+  boot[name] = undefined;
+  try { return await read(await pending); } catch { return undefined; }
+}
+const okJson = async <T,>(response: Response): Promise<T | undefined> => (response.ok ? await response.json() as T : undefined);
+
 export function getCompanyAdministrationId(): string | null {
   return companyAdministrationId;
+}
+
+/**
+ * Runs one company-administration call for a company, from the operation's own list (which is in no company). The
+ * call reads the company as it starts, so `action` must make a single request; chain several with one call each.
+ */
+export function inCompany<T>(companyId: string, action: () => Promise<T>): Promise<T> {
+  const previous = companyAdministrationId;
+  companyAdministrationId = companyId;
+  try { return action(); } finally { companyAdministrationId = previous; }
 }
 
 async function readError(response: Response): Promise<ApiError> {
@@ -806,8 +846,13 @@ export function getTrainingEditor(sipatId: string): Promise<TrainingEditorData> 
   return requestJson<TrainingEditorData>(`${trainingEditor}/sipats/${sipatId}`);
 }
 
-export function getTenantBranding(): Promise<TenantBranding> {
-  return requestJson<TenantBranding>('/api/tenant/branding');
+export async function getTenantBranding(): Promise<TenantBranding> {
+  // the answer started with the page, unless the operator is inside a company (that one is asked with its header)
+  const early = companyAdministrationId ? undefined : await takeBoot('branding', okJson<TenantBranding>);
+  if (early) return early;
+  // the same address answers as the operation or as the company the operator is inside (by a header): a copy kept by
+  // the browser of one must never be served as the other
+  return requestJson<TenantBranding>('/api/tenant/branding', { cache: 'no-store' });
 }
 
 export interface TenantAppearanceData {
@@ -848,6 +893,11 @@ export function saveTenantAppearance(data: TenantAppearanceData): Promise<Tenant
   });
 }
 export async function getSession(platform = false): Promise<IdentitySession | null> {
+  if (!platform) {
+    // null: nobody signed in; undefined: no early answer, ask now
+    const early = await takeBoot<IdentitySession | null>('session', async response => (response.status === 401 ? null : okJson<IdentitySession>(response)));
+    if (early !== undefined) return early;
+  }
   try {
     return await requestJson<IdentitySession>(
       platform ? '/api/platform/identity/session' : '/api/identity/session',
@@ -950,7 +1000,7 @@ export function setGameSubjects(moduleId: string, subjectIds: string[]): Promise
 export async function uploadGameImage(image: File): Promise<string> {
   const form = new FormData();
   form.append('image', image);
-  return (await requestJson<{ imageUrl: string }>('/api/platform/catalog/game-images', { method: 'POST', body: form })).imageUrl;
+  return (await requestJson<{ imageUrl: string }>(`${editorBase}/game-images`, { method: 'POST', body: form })).imageUrl;
 }
 export function changeVideosSubjects(change: BulkVideoChange): Promise<void> {
   return request('/api/platform/catalog/videos/subjects', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
@@ -965,7 +1015,10 @@ export function changeVideosCompanies(change: BulkVideoChange): Promise<void> {
 }
 
 /** A SIPAT's week opened in the video editor: a copy training whose Títulos are the days of that SIPAT. */
-export interface SipatWeek { courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string; sipatStatus?: 'Draft' | 'Published' | 'Cancelled' }
+export interface SipatWeek {
+  courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string; sipatStatus?: 'Draft' | 'Published' | 'Cancelled';
+  startsAt?: string; endsAt?: string; days?: number;
+}
 export function listSipatWeeks(): Promise<SipatWeek[]> {
   return requestJson<SipatWeek[]>('/api/platform/catalog/sipat-weeks');
 }
@@ -1294,21 +1347,26 @@ export function listGameModules(): Promise<GameModule[]> {
 }
 
 export function createGameModule(data: GameModuleData): Promise<GameModule> {
-  return requestJson<GameModule>('/api/platform/catalog/modules', {
+  return requestJson<GameModule>(`${editorBase}/modules`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
 }
 
 export function updateGameModule(moduleId: string, data: GameModuleData): Promise<GameModule> {
-  return requestJson<GameModule>(`/api/platform/catalog/modules/${moduleId}`, {
+  return requestJson<GameModule>(`${editorBase}/modules/${moduleId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 }
 
 export async function deleteGameModule(moduleId: string): Promise<void> {
-  await request(`/api/platform/catalog/modules/${moduleId}`, { method: 'DELETE' });
+  await request(`${editorBase}/modules/${moduleId}`, { method: 'DELETE' });
+}
+
+/** A copy of a game the company can use (the operation's, or its own), made the company's own so it can change it. */
+export function duplicateCompanyGame(moduleId: string): Promise<GameModule> {
+  return requestJson<GameModule>(`${trainingEditor}/modules/${moduleId}/duplicate`, { method: 'POST' });
 }
 
 export function setPlatformCourseModules(
@@ -1555,6 +1613,15 @@ export async function cancelSipatEvent(id: string): Promise<SipatEvent> {
 
 export function listAssignedLearningTracks(): Promise<LearningTrackCard[]> {
   return requestJson<LearningTrackCard[]>('/api/learning/tracks');
+}
+
+/** The participant's home in one answer: every day assigned, and each with its videos and the progress in them. */
+export interface LearningHome { tracks: LearningTrackCard[]; experiences: LearningExperience[] }
+export async function getLearningHome(): Promise<LearningHome> {
+  const home = (await takeBoot('home', okJson<LearningHome>)) ?? await requestJson<LearningHome>('/api/learning/home');
+  // anything that is not the home (an older server, a proxy's page) is refused, and the caller asks the older way
+  if (!Array.isArray(home?.tracks) || !Array.isArray(home?.experiences)) throw new Error('A resposta do treinamento veio incompleta.');
+  return home;
 }
 
 export function getAssignedLearningTrack(trackId: string): Promise<LearningExperience> {

@@ -157,8 +157,8 @@ public sealed class CompanyRegistryApiTests
 
         var after = await admin.GetFromJsonAsync<CompanyRegistry>("/api/admin/registry");
         Assert.NotNull(after);
-        Assert.True(after.Rules.RequireSector);
-        Assert.False(after.Rules.RequireEmail);
+        // no field is required any more: what a company once marked is kept, and asks nothing of anyone
+        Assert.Equal(new ProfileRules(false, false, false, false, false), after.Rules);
     }
 
     [DockerFact]

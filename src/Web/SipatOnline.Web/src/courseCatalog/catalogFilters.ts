@@ -1,6 +1,8 @@
-import type { CourseCategory, GameModule, PlatformCourse, PlatformCourseStatus, PlatformLibraryVideo } from '@/api';
+import type { CourseCategory, GameModule, PlatformCourse, PlatformLibraryVideo } from '@/api';
+import { sipatPhase, type SipatPhase } from '@/sipatBuilder/sipatPhase';
 
-export type StatusFilter = 'all' | PlatformCourseStatus;
+/** 'active' (what the list opens on: everything but the ended and the finished), 'all', or one phase. */
+export type StatusFilter = 'active' | 'all' | SipatPhase;
 /** 'all', 'none' (subjects without a category) or the id of a category. */
 export type CategoryFilter = string;
 
@@ -13,19 +15,35 @@ export interface CatalogFilters {
 }
 
 /** A company's training in the list: whose it is and where it stands (its own status, not the content's). */
-export interface CourseOwner { tenantId: string; companyName: string; status: 'Draft' | 'Published' | 'Cancelled' }
+export interface CourseOwner {
+  tenantId: string; companyName: string; status: 'Draft' | 'Published' | 'Cancelled';
+  /** The company's training this content belongs to, with its period and how many days it has. */
+  sipatEventId: string; startsAt?: string; endsAt?: string; days?: number;
+}
 
 const fold = (text: string) => text.toLocaleLowerCase('pt-BR');
 
+/** Where a training stands. A company's follows its dates; a template (no company) is only a draft or published. */
+export function coursePhase(course: Pick<PlatformCourse, 'status'>, owner?: CourseOwner, now: Date = new Date()): SipatPhase {
+  if (!owner) return course.status === 'Published' ? 'published' : 'draft';
+  if (!owner.startsAt || !owner.endsAt) return owner.status === 'Cancelled' ? 'cancelled' : owner.status === 'Published' ? 'published' : 'draft';
+  return sipatPhase({ status: owner.status, startsAt: owner.startsAt, endsAt: owner.endsAt }, owner.days ?? 0, now);
+}
+
 export function hasCourseFilters(filters: CatalogFilters): boolean {
-  return filters.query.trim() !== '' || filters.status !== 'all' || filters.category !== 'all' || filters.owner !== 'all';
+  return filters.query.trim() !== '' || filters.status !== 'active' || filters.category !== 'all' || filters.owner !== 'all';
 }
 
 export function filterCourses(courses: PlatformCourse[], categories: CourseCategory[], filters: CatalogFilters, owners: Map<string, CourseOwner> = new Map()): PlatformCourse[] {
   const known = new Set(categories.map((item) => item.id));
   const term = fold(filters.query.trim());
+  const inPhase = (course: PlatformCourse) => {
+    if (filters.status === 'all') return true;
+    const phase = coursePhase(course, owners.get(course.id));
+    return filters.status === 'active' ? phase !== 'cancelled' && phase !== 'finished' : phase === filters.status;
+  };
   return courses.filter((course) =>
-    (filters.status === 'all' || (owners.get(course.id)?.status ?? course.status) === filters.status)
+    inPhase(course)
     && (filters.owner === 'all' || (filters.owner === 'models' ? !owners.has(course.id) : owners.get(course.id)?.tenantId === filters.owner))
     && (filters.category === 'all'
       || (filters.category === 'none' ? !course.categoryId || !known.has(course.categoryId) : course.categoryId === filters.category))

@@ -1,5 +1,5 @@
 import { Menu } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
 import {
   BrowserRouter,
   Link,
@@ -28,38 +28,54 @@ import {
 } from './api';
 import { Button } from './components/ui/button';
 import { Sheet } from './components/ui/sheet';
-import SipatsPage from './sipatBuilder/SipatsPage';
 import { LegacySipatRedirect } from './trainings/LegacySipatRedirect';
 import CompanyContext from './companies/CompanyContext';
 import { UnitMenu, UnitScopeProvider } from './trainings/unitScope';
-import CompanyHome from './companies/CompanyHome';
 import LearningPage, { type LearningSummary } from './LearningPage';
-import CollaboratorsPage from './collaborators/CollaboratorsPage';
-import RegistryPage from './registry/RegistryPage';
-import TenantLearningDashboardPage from './TenantLearningDashboardPage';
 import { isCompanyPanelMode } from './companies/companyContextMode';
-import PlatformCompaniesPage from './PlatformCompaniesPage';
-import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
-import PlatformUsersPage from './PlatformUsersPage';
-import PlatformHomePage from './PlatformHomePage';
-import PlatformCoursesPage from './PlatformCoursesPage';
-import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
-import TrainingEditorPage from './trainings/TrainingEditorPage';
 import { linkedTraining } from './trainings/trainingLink';
 
 import CompanyNav from './companies/CompanyNav';
 import PlanMedal from './companies/PlanMedal';
-import PlaybackQualityPage from './quality/PlaybackQualityPage';
-import PlaybackQualityComparisonPage from './quality/PlaybackQualityComparisonPage';
-import PlatformSettingsPage from './PlatformSettingsPage';
-import CertificatesPage from './CertificatesPage';
-import TenantAppearancePage from './TenantAppearancePage';
-import CertificateTemplatePage from './CertificateTemplatePage';
 import { BrandThemeContext, tenantTheme } from './branding';
 import { imageEdgeColor } from './imageEdgeColor';
 import LoadingState from './LoadingState';
+import { useNewVersionReload } from './versionWatch';
 import VideoUploadTray from './videoUploads/VideoUploadTray';
-import VideoLibraryPage from './videoLibrary/VideoLibraryPage';
+
+/**
+ * A page that loads on demand is a file of the version the browser opened. After a new version goes up that file is
+ * gone: the page is loaded again, once, to pick the new version up, instead of failing where it stands.
+ */
+function reloadForNewVersion(error: unknown): never | Promise<never> {
+  const key = 'sipat:reloaded-for-version';
+  let already = true;
+  try { already = sessionStorage.getItem(key) === '1'; if (!already) sessionStorage.setItem(key, '1'); } catch { /* no storage: do not risk a loop */ }
+  if (already) throw error;
+  window.location.reload();
+  return new Promise<never>(() => undefined);
+}
+// The pages of the company's administration and of the operation load when they are opened: a participant, who only
+// ever sees the learning pages, does not download them.
+const SipatsPage = lazy(() => import('./sipatBuilder/SipatsPage').catch(reloadForNewVersion));
+const CompanyHome = lazy(() => import('./companies/CompanyHome').catch(reloadForNewVersion));
+const CollaboratorsPage = lazy(() => import('./collaborators/CollaboratorsPage').catch(reloadForNewVersion));
+const RegistryPage = lazy(() => import('./registry/RegistryPage').catch(reloadForNewVersion));
+const TenantLearningDashboardPage = lazy(() => import('./TenantLearningDashboardPage').catch(reloadForNewVersion));
+const PlatformCompaniesPage = lazy(() => import('./PlatformCompaniesPage').catch(reloadForNewVersion));
+const PlatformCompanyEmployeesPage = lazy(() => import('./PlatformCompanyEmployeesPage').catch(reloadForNewVersion));
+const PlatformUsersPage = lazy(() => import('./PlatformUsersPage').catch(reloadForNewVersion));
+const PlatformHomePage = lazy(() => import('./PlatformHomePage').catch(reloadForNewVersion));
+const PlatformCoursesPage = lazy(() => import('./PlatformCoursesPage').catch(reloadForNewVersion));
+const SipatBuilderPage = lazy(() => import('./sipatBuilder/SipatBuilderPage').catch(reloadForNewVersion));
+const TrainingEditorPage = lazy(() => import('./trainings/TrainingEditorPage').catch(reloadForNewVersion));
+const PlaybackQualityPage = lazy(() => import('./quality/PlaybackQualityPage').catch(reloadForNewVersion));
+const PlaybackQualityComparisonPage = lazy(() => import('./quality/PlaybackQualityComparisonPage').catch(reloadForNewVersion));
+const PlatformSettingsPage = lazy(() => import('./PlatformSettingsPage').catch(reloadForNewVersion));
+const CertificatesPage = lazy(() => import('./CertificatesPage').catch(reloadForNewVersion));
+const TenantAppearancePage = lazy(() => import('./TenantAppearancePage').catch(reloadForNewVersion));
+const VideoLibraryPage = lazy(() => import('./videoLibrary/VideoLibraryPage').catch(reloadForNewVersion));
+const CertificateTemplatePage = lazy(() => import('./CertificateTemplatePage').catch(reloadForNewVersion));
 
 type AppState =
   | { status: 'loading' }
@@ -113,6 +129,19 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  // the operation's portal painted as a company (the operator was inside one) and nobody signed in any more (the
+  // session ended): the login is the operation's own, so the company is left and the operation's look comes back
+  const strandedInCompany = state.status === 'ready' && state.platformPortal && !state.session && state.tenant.tenantKey !== 'platform';
+  useEffect(() => {
+    if (!strandedInCompany) return;
+    let active = true;
+    clearCompanyAdministration();
+    getTenantBranding().then(tenant => {
+      if (active) setState(current => (current.status === 'ready' ? { ...current, tenant } : current));
+    }, () => undefined);
+    return () => { active = false; };
+  }, [strandedInCompany]);
 
   if (state.status === 'loading') {
     return <main className="app-loading"><LoadingState>Carregando o portal...</LoadingState></main>;
@@ -278,6 +307,7 @@ export default function App() {
               element={
                 state.session?.roles.includes('Participant') ? (
                   <LearningPage
+                    participantId={state.session.id}
                     participantName={state.session.displayName}
                     tenantName={state.tenant.tenantName}
                   />
@@ -292,6 +322,7 @@ export default function App() {
               element={
                 state.session?.roles.includes('Participant') ? (
                   <LearningPage
+                    participantId={state.session.id}
                     participantName={state.session.displayName}
                     tenantName={state.tenant.tenantName}
                   />
@@ -381,6 +412,15 @@ export default function App() {
               element={
                 state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
                   ? <VideoLibraryPage />
+                  : <AccessDenied />
+              }
+            />
+            {/* a template of the operation on the same board of days a company's training uses */}
+            <Route
+              path="/platform/courses/:courseId"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <SipatBuilderPage basePath="/platform/courses" canEditThemes template />
                   : <AccessDenied />
               }
             />
@@ -597,6 +637,8 @@ function ProtectedPortal({
   // the phone menu (sheet) closes whenever the page changes, including after tapping one of its links
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
+  // a tab left open picks a new version up on the next change of page, instead of showing screens that were replaced
+  useNewVersionReload(location.pathname);
 
   if (!session) {
     return <Navigate to="/login" replace />;
@@ -638,7 +680,8 @@ function ProtectedPortal({
   const sidebarNav = (
     <>
       {/* the unit the company is looked at through: it sits above the menu it filters, in the side bar and in the phone's menu */}
-      {companyPages && <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
+      {/* inside a company the operation's menu shows the unit in the company's own card (see CompanyNav) */}
+      {companyPages && !(isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId) && <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
       {session.roles.includes('Participant') && !isPlatformCompanyContext && (
         <>
           <p className="sidebar-label">APRENDIZAGEM</p>
@@ -652,7 +695,7 @@ function ProtectedPortal({
           <p className="sidebar-label">GESTÃO DA EMPRESA</p>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
           {hasAdminRole(session) && <>
-            <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
+            <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Conteúdos</NavLink>
             {capabilities?.internalVideos && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/videos">Vídeos da empresa</NavLink>}
             {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
             {capabilities?.customCertificate !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/certificate">Certificado</NavLink>}
@@ -667,7 +710,7 @@ function ProtectedPortal({
         <>
           <p className="sidebar-label sidebar-label-spaced">OPERAÇÃO</p>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Conteúdo</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Conteúdos</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/videos">Biblioteca de vídeos</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Monitor de Desempenho</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
@@ -831,9 +874,12 @@ function ProtectedPortal({
         >
           {error && <p className="form-error" role="alert">{error}</p>}
           {/* an administrator who also takes trainings keeps the admin menu, and the participant pages keep their look */}
-          {!isLearnerOnly && location.pathname.startsWith('/learning')
-            ? <div className="portal-layout-learner contents"><Outlet /></div>
-            : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
+          {/* a page that loads on demand shows this for the moment it takes; the menu around it stays */}
+          <Suspense fallback={<LoadingState>Carregando...</LoadingState>}>
+            {!isLearnerOnly && location.pathname.startsWith('/learning')
+              ? <div className="portal-layout-learner contents"><Outlet /></div>
+              : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
+          </Suspense>
         </section>
       </div>
     </div>

@@ -169,6 +169,33 @@ public static class LearningEndpoints
         })
         .WithName("ListAssignedLearningTracks");
 
+        // the participant's home in one answer: the days of every training and the videos of each, so the page asks once
+        // instead of once for the list and once more for every day
+        participant.MapGet("/home", async (
+            LearningService learningService,
+            SipatOnline.Infrastructure.Learning.LearningDistributionService distribution,
+            ITenantContext tenantContext,
+            ICurrentActor actor,
+            CancellationToken cancellationToken) =>
+        {
+            if (tenantContext.CurrentTenantId is { IsEmpty: false } tenant && Guid.TryParse(actor.UserId, out var participantId))
+            {
+                await distribution.EnsureAssignmentsAsync(tenant.Value, [participantId], cancellationToken);
+            }
+
+            var tracks = await learningService.ListAssignedAsync(cancellationToken);
+            if (!tracks.IsSuccess) return ToProblem(tracks.Error);
+            var experiences = new List<LearningExperience>(tracks.Value.Count);
+            foreach (var track in tracks.Value.Take(100))
+            {
+                var experience = await learningService.GetAssignedAsync(track.Id, cancellationToken);
+                if (experience.IsSuccess) experiences.Add(experience.Value);
+            }
+
+            return Results.Ok(new LearningHomeResponse(tracks.Value, experiences));
+        })
+        .WithName("GetLearningHome");
+
         participant.MapGet("/tracks/{trackId:guid}", async (
             Guid trackId,
             LearningService learningService,
@@ -405,3 +432,6 @@ public sealed record LearningProgressResponse(
     DateTimeOffset FirstStartedAt,
     DateTimeOffset LastAccessedAt,
     DateTimeOffset? CompletedAt);
+
+/// <summary>The participant's home: every day assigned, and each one with its videos and the progress in them.</summary>
+public sealed record LearningHomeResponse(IReadOnlyList<LearningTrackCard> Tracks, IReadOnlyList<LearningExperience> Experiences);

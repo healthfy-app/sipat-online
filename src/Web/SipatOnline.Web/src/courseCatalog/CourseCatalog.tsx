@@ -2,8 +2,15 @@ import { Plus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import {
+  cancelSipatEvent,
+  copySipatPlan,
+  createSipatEvent,
   deleteGameModule,
   deletePlatformCourse,
+  deleteSipat,
+  inCompany,
+  launchSipat,
+  reactivateSipatEvent,
   listGameSubjects,
   listSubjects,
   type VideoSubject,
@@ -20,7 +27,8 @@ import LoadingState from '@/LoadingState';
 import CatalogToolbar, { type CatalogTab } from './CatalogToolbar';
 import { filterCourses, filterModules, hasCourseFilters, type CatalogFilters, type CourseOwner, type StatusFilter } from './catalogFilters';
 import CourseStartOptions from './CourseStartOptions';
-import CoursesPanel from './CoursesPanel';
+import CoursesPanel, { type CourseActions } from './CoursesPanel';
+import { copyTrainingLink } from '@/trainings/trainingLink';
 import CreateCourseDialog from './CreateCourseDialog';
 import ManageCategoriesDialog from './ManageCategoriesDialog';
 import { useCourseCategories } from './useCourseCategories';
@@ -75,7 +83,8 @@ export default function CourseCatalog({
   const tab: CatalogTab = catalogTabs.includes(requestedTab as CatalogTab) ? (requestedTab as CatalogTab) : 'courses';
   const filters: CatalogFilters = {
     query: params.get('q') ?? '',
-    status: (params.get('status') as StatusFilter | null) ?? 'all',
+    // the list opens without the ended and the finished; the filter brings them back
+    status: (params.get('status') as StatusFilter | null) ?? 'active',
     category: params.get('categoria') ?? 'all',
     owner: params.get('empresa') ?? 'all',
   };
@@ -86,7 +95,8 @@ export default function CourseCatalog({
     setParams((current) => {
       const next = new URLSearchParams(current);
       for (const [key, value] of Object.entries(updates)) {
-        if (value === null || value === '' || value === 'all') next.delete(key); else next.set(key, value);
+        // "all" is where every filter starts, except the phase, which starts on the active ones
+        if (value === null || value === '' || value === (key === 'status' ? 'active' : 'all')) next.delete(key); else next.set(key, value);
       }
       return next;
     }, { replace: true });
@@ -97,11 +107,13 @@ export default function CourseCatalog({
   });
   const changeFilters = (patch: Partial<CatalogFilters>) => patchParams({
     ...('query' in patch ? { q: patch.query ?? '' } : {}),
-    ...('status' in patch ? { status: patch.status ?? 'all' } : {}),
+    ...('status' in patch ? { status: patch.status ?? 'active' } : {}),
     ...('category' in patch ? { categoria: patch.category ?? 'all' } : {}),
     ...('owner' in patch ? { empresa: patch.owner ?? 'all' } : {}),
   });
   const clearFilters = () => patchParams({ q: null, status: null, categoria: null, empresa: null, assunto: null });
+  /** From an empty list: every training, the ended and the finished too. */
+  const showEverything = () => patchParams({ q: null, status: 'all', categoria: null, empresa: null, assunto: null });
 
   // coming back to the library (from an editor, another screen) restores the view it had
   useEffect(() => {
@@ -176,19 +188,60 @@ export default function CourseCatalog({
     }
   }
 
-  async function removeCourse(course: PlatformCourse) {
-    if (!window.confirm(`Excluir o treinamento "${course.title}"? As empresas que já receberam este conteúdo continuam com o conteúdo, e os vídeos continuam na biblioteca.`)) return;
+  /** One change to a training from the list: the list reloads and says what happened, or says why it could not. */
+  async function change(action: () => Promise<string>) {
     onError('');
     setIsDeleting(true);
     try {
-      await deletePlatformCourse(course.id);
-      await onProgramsChanged(`O treinamento "${course.title}" foi excluído.`);
-    } catch (deleteError) {
-      onError(getErrorMessage(deleteError));
+      await onProgramsChanged(await action());
+    } catch (failure) {
+      onError(getErrorMessage(failure));
     } finally {
       setIsDeleting(false);
     }
   }
+
+  // a company's training is changed in that company, from here: the same calls its own list makes
+  const courseActions: CourseActions = {
+    onEdit: onOpen,
+    onDuplicate: (course) => {
+      const owner = owners.get(course.id);
+      if (!owner) { onDuplicate(course); return; }
+      void change(async () => {
+        const today = new Date().toISOString().slice(0, 10);
+        const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10);
+        const copy = await inCompany(owner.tenantId, () => createSipatEvent({ title: `${course.title} (cópia)`.slice(0, 200), description: course.description, startsAt: `${today}T00:00:00.000Z`, endsAt: `${tomorrow}T00:00:00.000Z` }));
+        if ((owner.days ?? 0) > 0) await inCompany(owner.tenantId, () => copySipatPlan(copy.id, owner.sipatEventId));
+        return `"${copy.title}" foi criado como rascunho em ${owner.companyName}. Abra para acertar as datas.`;
+      });
+    },
+    onDelete: (course) => {
+      const owner = owners.get(course.id);
+      if (!window.confirm(owner
+        ? `Excluir "${course.title}", de ${owner.companyName}? Os dias montados e a capa são apagados. Isso não pode ser desfeito.`
+        : `Excluir o template "${course.title}"? As empresas que já copiaram este treinamento continuam com a cópia delas, e os vídeos continuam na biblioteca.`)) return;
+      void change(async () => {
+        if (owner) await inCompany(owner.tenantId, () => deleteSipat(owner.sipatEventId)); else await deletePlatformCourse(course.id);
+        return `O treinamento "${course.title}" foi excluído.`;
+      });
+    },
+    onPublish: (course, owner) => {
+      if (!window.confirm(`Publicar "${course.title}", de ${owner.companyName}? Os participantes passam a ver os dias do treinamento.`)) return;
+      void change(async () => { await inCompany(owner.tenantId, () => launchSipat(owner.sipatEventId)); return `"${course.title}" foi publicado.`; });
+    },
+    onEnd: (course, owner) => {
+      if (!window.confirm(`Encerrar "${course.title}", de ${owner.companyName}? Ele sai da área dos participantes. O que já foi feito continua no histórico, e dá para reativar depois.`)) return;
+      void change(async () => { await inCompany(owner.tenantId, () => cancelSipatEvent(owner.sipatEventId)); return `"${course.title}" foi encerrado. Para vê-lo de novo, escolha "Encerrado" no filtro.`; });
+    },
+    onReactivate: (course, owner) => void change(async () => {
+      await inCompany(owner.tenantId, () => reactivateSipatEvent(owner.sipatEventId));
+      return `"${course.title}" voltou como rascunho. Abra, confira os dias e publique de novo.`;
+    }),
+    onShare: (course, owner) => void change(async () => {
+      const { link, copied } = await copyTrainingLink(owner.sipatEventId, `/platform/companies/${owner.tenantId}/treinamentos`, true);
+      return copied ? `Link de "${course.title}" copiado. Quem abrir entra com o seu login e cai neste treinamento.` : `Link de "${course.title}": ${link}`;
+    }),
+  };
 
   const primaryAction = {
     courses: <Button className="ops-primary" onClick={() => setDialog({ kind: 'create' })}><Plus /> Criar treinamento</Button>,
@@ -208,12 +261,12 @@ export default function CourseCatalog({
     <Page>
       <header className="ops-hero" data-slot="page-header">
         <div className="ops-hero-copy">
-          <p className="ops-hero-eyebrow">Acervo da plataforma</p>
+          <p className="ops-hero-eyebrow">Plataforma</p>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="ops-hero-title">Conteúdo</h1>
+            <h1 className="ops-hero-title">Conteúdos</h1>
             {import.meta.env.DEV && <Badge variant="outline">Apresentação demo</Badge>}
           </div>
-          <p className="ops-hero-lead">{`${pluralize(courses.length, 'treinamento', 'treinamentos')} no acervo da plataforma`}</p>
+          <p className="ops-hero-lead">{`${pluralize(courses.length, 'treinamento', 'treinamentos')}, entre templates e os das empresas`}</p>
         </div>
         {primaryAction && <div className="ops-hero-actions">{primaryAction}</div>}
       </header>
@@ -257,7 +310,7 @@ export default function CourseCatalog({
         <TabsContent value="courses">
           {body ?? (isEmptyCatalog
             ? <CourseStartOptions onCreate={() => setDialog({ kind: 'create' })} onReuse={() => navigate('/platform/videos')} />
-            : courses.length > 0 && <CoursesPanel busy={busy || isDeleting} categories={categories} courses={shownCourses} owners={owners} onClearFilters={clearFilters} onDelete={(course) => void removeCourse(course)} onDuplicate={onDuplicate} onOpen={onOpen} />)}
+            : courses.length > 0 && <CoursesPanel actions={courseActions} busy={busy || isDeleting} categories={categories} courses={shownCourses} owners={owners} onClearFilters={showEverything} />)}
         </TabsContent>
         <TabsContent value="plans">
           {body ?? <PlanSubjectsPanel />}
@@ -273,6 +326,7 @@ export default function CourseCatalog({
               onCreate={() => setDialog({ kind: 'game', module: null })}
               onDelete={(module) => void removeGame(module)}
               onEdit={(module) => setDialog({ kind: 'game', module })}
+              ownerLabel={(module) => module.companyName}
             />
           )}
         </TabsContent>

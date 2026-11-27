@@ -11,6 +11,8 @@ afterEach(() => { cleanup(); vi.useRealTimers(); });
 
 const event = (id: string, title: string, startsAt: string, status: 'Draft' | 'Published' | 'Cancelled') =>
   ({ id, tenantId: 't', title, description: null, startsAt, endsAt: new Date(new Date(startsAt).getTime() + 5 * 86_400_000).toISOString(), status, createdAt: startsAt });
+/** A day inside the week of the trainings that start on 2026-11-09: they are in progress, which is what the list opens on. */
+const duringTheWeek = () => { vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date('2026-11-11T12:00:00Z')); };
 
 describe('SIPATs of a company', () => {
   it('lists them by year, newest first, with status and the days built', async () => {
@@ -27,6 +29,11 @@ describe('SIPATs of a company', () => {
     vi.mocked(api.listSipatPlans).mockResolvedValue([{ sipatEventId: 'b', days: 5, videos: 18 }]);
     render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
 
+    // the list opens on what is in progress; the others are a choice of the filter away
+    expect(await screen.findByRole('link', { name: 'Abrir SIPAT 2026' })).toBeVisible();
+    expect(screen.queryByRole('region', { name: 'Treinamentos de 2027' })).not.toBeInTheDocument();
+    await userEvent.setup().selectOptions(screen.getByRole('combobox', { name: 'Fase' }), 'all');
+
     const first = await screen.findByRole('region', { name: 'Treinamentos de 2027' });
     const second = screen.getByRole('region', { name: 'Treinamentos de 2026' });
     const third = screen.getByRole('region', { name: 'Treinamentos de 2025' });
@@ -41,6 +48,7 @@ describe('SIPATs of a company', () => {
   });
 
   it('says on the card who the training is for, when it is not the whole company', async () => {
+    duringTheWeek();
     vi.mocked(api.listSipatEvents).mockResolvedValue({
       offset: 0, limit: 100, totalCount: 2,
       items: [event('a', 'LGPD', '2026-11-09T00:00:00Z', 'Published'), event('b', 'SIPAT geral', '2026-11-09T00:00:00Z', 'Published')],
@@ -61,6 +69,7 @@ describe('SIPATs of a company', () => {
   });
 
   it('with a unit chosen at the top, shows its trainings and the ones of the whole company', async () => {
+    duringTheWeek();
     localStorage.setItem('sipat:unit:acme', 'sp');
     vi.mocked(api.listSipatEvents).mockResolvedValue({
       offset: 0, limit: 100, totalCount: 3,
@@ -93,12 +102,13 @@ describe('SIPATs of a company', () => {
     vi.mocked(api.reactivateSipatEvent).mockResolvedValue(event('a', 'SIPAT 2026', '2026-11-09T00:00:00Z', 'Draft'));
     render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
 
-    expect(await screen.findByRole('group', { name: 'SIPAT 2026 (encerrada)' })).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.queryByRole('link', { name: 'Abrir SIPAT 2026' })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole('button', { name: 'Reativar' }));
-    expect(api.reactivateSipatEvent).toHaveBeenCalledWith('a');
+    // an ended training is out of the list until the filter asks for it, and keeps its actions
+    await user.click(await screen.findByRole('button', { name: 'Ver todos os treinamentos' }));
     expect(await screen.findByRole('link', { name: 'Abrir SIPAT 2026' })).toHaveAttribute('href', '/admin/sipats/a');
-    expect(screen.getByRole('status')).toHaveTextContent('voltou como rascunho');
+
+    await user.click(screen.getByRole('button', { name: 'Mais ações de SIPAT 2026' }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Reativar' }));
+    expect(api.reactivateSipatEvent).toHaveBeenCalledWith('a');
+    expect(await screen.findByRole('status')).toHaveTextContent('voltou como rascunho');
   });
 });

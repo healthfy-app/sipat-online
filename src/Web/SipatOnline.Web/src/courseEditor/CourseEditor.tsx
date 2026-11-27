@@ -222,7 +222,7 @@ export default function CourseEditor({
             headingRef={heading}
             selectedKey={selectedLesson ? `lesson-${selectedLesson.id}` : selectedItem?.key ?? null}
             status={status}
-            title={values.title}
+            title={week ? week.sipatTitle : values.title}
             week={!!week}
             locks={locks}
             onCover={week ? () => setCoverOpen(true) : undefined}

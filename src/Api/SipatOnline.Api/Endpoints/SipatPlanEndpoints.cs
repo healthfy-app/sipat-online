@@ -51,7 +51,7 @@ public static class SipatPlanEndpoints
         {
             var days = request.Days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, day.Date, day.Subject,
                 day.VideoIds ?? [], day.GameIds ?? [])).ToArray();
-            var result = await service.SaveAsync(sipatId, days, token);
+            var result = await service.SaveAsync(sipatId, days, token, request.EndsOn, keepLimit: request.SetLimit != true);
             return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
         })
         .AddEndpointFilter(TrainingEditing.RequireEditor)
@@ -95,6 +95,32 @@ public static class SipatPlanEndpoints
         .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("LaunchSipat");
 
+        // a template (the operation's own training, of no company) is built on the same board of days
+        var templates = endpoints.MapGroup("/api/platform/catalog/courses/{courseId:guid}/days")
+            .WithTags("SIPAT plan")
+            .RequireAuthorization("ManagePlatform");
+
+        templates.MapGet("/", async (Guid courseId, SipatPlanService service, CancellationToken token) =>
+        {
+            var result = await service.GetTemplateAsync(courseId, token);
+            return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("GetTemplateDays");
+
+        templates.MapPut("/", async (Guid courseId, SaveSipatPlanRequest request, SipatPlanService service, CancellationToken token) =>
+        {
+            var days = request.Days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, day.Date, day.Subject,
+                day.VideoIds ?? [], day.GameIds ?? [])).ToArray();
+            var result = await service.SaveTemplateAsync(courseId, days, request.EndsOn, token);
+            return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
+        })
+        .WithName("SaveTemplateDays");
+
+        // the limit date of a training (a template's, or a company's from the operation): the board shows it beside the start
+        templates.MapGet("/limit", async (Guid courseId, SipatPlanService service, CancellationToken token) =>
+            Results.Ok(new { endsOn = await service.LimitAsync(courseId, token) }))
+        .WithName("GetTrainingLimit");
+
         return endpoints;
     }
 
@@ -113,4 +139,5 @@ public static class SipatPlanEndpoints
 
 }
 
-public sealed record SaveSipatPlanRequest(IReadOnlyList<ProgramDayDto>? Days);
+/// <param name="EndsOn">The limit date (the last day the training can be taken); read only when <paramref name="SetLimit"/> is true, so a caller that does not send it leaves the limit as it is.</param>
+public sealed record SaveSipatPlanRequest(IReadOnlyList<ProgramDayDto>? Days, DateOnly? EndsOn = null, bool? SetLimit = null);

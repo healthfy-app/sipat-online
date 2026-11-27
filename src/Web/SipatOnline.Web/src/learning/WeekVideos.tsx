@@ -21,10 +21,13 @@ export function formatDayDate(date: string | null | undefined): string | null {
 type LessonsByTrack = Record<string, LearningLessonProgress[] | 'error'>;
 
 /** The videos of the SIPAT week, grouped by day. Each video opens the day at that video. */
-export default function WeekVideos({ days, allTracks }: {
+export default function WeekVideos({ days, allTracks, known }: {
   days: DayGroup[]; allTracks: LearningTrackCard[];
+  /** The videos of the days that already came with the home; a day missing here is asked for. */
+  known?: Readonly<Record<string, LearningLessonProgress[]>>;
 }) {
-  const [lessons, setLessons] = useState<LessonsByTrack>({});
+  const [asked, setLessons] = useState<LessonsByTrack>({});
+  const lessons: LessonsByTrack = { ...asked, ...known };
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const toggle = (key: string) => setClosed(known => { const next = new Set(known); if (!next.delete(key)) next.add(key); return next; });
   const trackIds = days.flatMap(day => day.tracks.map(track => track.id)).join(',');
@@ -34,12 +37,15 @@ export default function WeekVideos({ days, allTracks }: {
   useEffect(() => {
     let current = true;
     for (const id of trackIds.split(',').filter(Boolean)) {
+      if (known?.[id]) continue;
       getAssignedLearningTrack(id)
         .then(result => { if (current) setLessons(known => ({ ...known, [id]: result.lessons })); })
         .catch(() => { if (current) setLessons(known => ({ ...known, [id]: 'error' })); });
     }
     return () => { current = false; };
-  }, [trackIds]);
+    // the days that came with the home need no call of their own
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackIds, known === undefined]);
 
   return <section aria-labelledby="week-videos-title" className="week-videos">
     <div className="week-videos-heading">

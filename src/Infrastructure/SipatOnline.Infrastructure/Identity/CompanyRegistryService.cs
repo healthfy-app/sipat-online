@@ -282,13 +282,11 @@ public sealed class CompanyRegistryService(
         return Result<ProfileRules>.Success(rules);
     }
 
-    public async Task<ProfileRules> GetRulesAsync(Guid tenantId, CancellationToken token)
-    {
-        var row = await db.CompanyProfileRules.AsNoTracking().SingleOrDefaultAsync(item => item.TenantId == tenantId, token);
-        return row is null
-            ? NoRules
-            : new ProfileRules(row.RequireRegistration, row.RequireEmail, row.RequirePhone, row.RequireUnit, row.RequireSector);
-    }
+    /// <summary>
+    /// No participant field is required any more: a person who has a registration, an e-mail, a phone, a unit or a
+    /// sector keeps it, and one who has not is never held back for it. What a company once marked stays stored, unused.
+    /// </summary>
+    public Task<ProfileRules> GetRulesAsync(Guid tenantId, CancellationToken token) => Task.FromResult(NoRules);
 
     private async Task<CompanyRegistry> LoadAsync(Guid tenant, CancellationToken token)
     {

@@ -8,8 +8,10 @@ export type { LearningSummary } from './learning/learningHelpers';
 
 export default function LearningPage({
   participantName,
+  participantId,
 }: {
   participantName?: string;
+  participantId?: string;
   tenantName?: string;
 }) {
   const { trackId } = useParams();
@@ -22,6 +24,6 @@ export default function LearningPage({
       trackId={trackId}
     />
   ) : (
-    <LearningHomePage participantName={participantName} setSummary={setSummary} />
+    <LearningHomePage participantId={participantId} participantName={participantName} setSummary={setSummary} />
   );
 }

@@ -28,6 +28,9 @@ public sealed class PlatformCourseEntity
     /// <summary>A model offered whole as a ready SIPAT (what a Bronze company picks). Only on models.</summary>
     public bool IsReadySipat { get; set; }
 
+    /// <summary>The last day the training can be taken, when it runs past its last day; null ends with the last day.</summary>
+    public DateOnly? EndsOn { get; set; }
+
     public ICollection<PlatformCourseVideoLinkEntity> VideoLinks { get; set; } = [];
 
     public ICollection<PlatformCourseModuleLinkEntity> ModuleLinks { get; set; } = [];
@@ -120,6 +123,9 @@ public sealed class GameModuleEntity
     public string? ContentJson { get; set; }
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    /// <summary>The company the game belongs to (its own, private to it); null for the operation's, which every company can use.</summary>
+    public Guid? TenantId { get; set; }
 }
 
 public sealed class PlatformCourseModuleLinkEntity

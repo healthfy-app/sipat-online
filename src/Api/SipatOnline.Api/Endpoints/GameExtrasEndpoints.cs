@@ -45,24 +45,7 @@ public static partial class PlatformCourseCatalogEndpoints
         })
         .WithName("SetGameSubjects");
 
-        catalog.MapPost("/game-images", async (HttpContext context, PlatformDbContext db, TimeProvider clock, CancellationToken token) =>
-        {
-            var form = await context.Request.ReadFormAsync(token);
-            var file = form.Files.GetFile("image");
-            if (file is null || file.Length is < 1 or > MaximumGameImageBytes)
-                return Results.Problem(statusCode: 400, title: "game.image_size_invalid", detail: "Escolha uma imagem de até 2 MB.");
-            using var buffer = new MemoryStream();
-            await file.CopyToAsync(buffer, token);
-            var data = buffer.ToArray();
-            // the type is read from the image itself, not from what the sender says it is
-            var contentType = new[] { "image/png", "image/jpeg", "image/webp" }.FirstOrDefault(type => PlatformCourseCatalogService.HasCoverSignature(data, type));
-            if (contentType is null)
-                return Results.Problem(statusCode: 400, title: "game.image_content_invalid", detail: "Envie uma imagem PNG, JPEG ou WebP.");
-            var image = new GameImageEntity { Id = Guid.NewGuid(), ContentType = contentType, Data = data, CreatedAt = clock.GetUtcNow() };
-            db.GameImages.Add(image);
-            await db.SaveChangesAsync(token);
-            return Results.Ok(new GameImageResponse($"/api/game-images/{image.Id:D}"));
-        })
+        catalog.MapPost("/game-images", (HttpContext context, PlatformDbContext db, TimeProvider clock, CancellationToken token) => SaveGameImageAsync(context, db, clock, token))
         .WithMetadata(new RequestSizeLimitAttribute(MaximumGameImageBytes + 1_048_576))
         .WithMetadata(new RequestFormLimitsAttribute { MultipartBodyLengthLimit = MaximumGameImageBytes + 1_048_576 })
         .WithName("UploadGameImage");
@@ -82,6 +65,28 @@ public static partial class PlatformCourseCatalogEndpoints
         .WithName("GetGameImage");
 
         return endpoints;
+    }
+
+    /// <summary>Keeps a picture sent for a game and gives its address.</summary>
+    private static async Task<IResult> SaveGameImageAsync(HttpContext context, PlatformDbContext db, TimeProvider clock, CancellationToken token)
+    {
+        {
+            var form = await context.Request.ReadFormAsync(token);
+            var file = form.Files.GetFile("image");
+            if (file is null || file.Length is < 1 or > MaximumGameImageBytes)
+                return Results.Problem(statusCode: 400, title: "game.image_size_invalid", detail: "Escolha uma imagem de até 2 MB.");
+            using var buffer = new MemoryStream();
+            await file.CopyToAsync(buffer, token);
+            var data = buffer.ToArray();
+            // the type is read from the image itself, not from what the sender says it is
+            var contentType = new[] { "image/png", "image/jpeg", "image/webp" }.FirstOrDefault(type => PlatformCourseCatalogService.HasCoverSignature(data, type));
+            if (contentType is null)
+                return Results.Problem(statusCode: 400, title: "game.image_content_invalid", detail: "Envie uma imagem PNG, JPEG ou WebP.");
+            var image = new GameImageEntity { Id = Guid.NewGuid(), ContentType = contentType, Data = data, CreatedAt = clock.GetUtcNow() };
+            db.GameImages.Add(image);
+            await db.SaveChangesAsync(token);
+            return Results.Ok(new GameImageResponse($"/api/game-images/{image.Id:D}"));
+        }
     }
 }
 

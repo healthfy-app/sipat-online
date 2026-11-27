@@ -1,4 +1,4 @@
-import { Award, FileSpreadsheet, LogIn, MoreHorizontal, Search, TriangleAlert, UserPlus } from 'lucide-react';
+import { Award, FileSpreadsheet, MoreHorizontal, Search, TriangleAlert, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 import {
@@ -12,7 +12,7 @@ import {
 } from '@/api';
 import CompanyCertificateLogoPanel from '@/CompanyCertificateLogoPanel';
 import { Badge } from '@/components/ui/badge';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
@@ -164,7 +164,6 @@ export default function CompanyPage() {
           <PageHeader
             actions={(
               <>
-                <a className={buttonVariants({ variant: 'default' })} href={`/admin/dashboard?companyId=${encodeURIComponent(companyId)}`}><LogIn /> Entrar como administrador</a>
                 {canSetCertificateLogo && <DropdownMenu modal={false}>
                   <DropdownMenuTrigger asChild><Button variant="outline"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
                   <DropdownMenuContent>
