@@ -460,9 +460,7 @@ function LoginPage({
   onSignIn: (loginIdentifier: string, password: string) => Promise<IdentitySession>;
 }) {
   const navigate = useNavigate();
-  const [loginIdentifier, setLoginIdentifier] = useState(
-    tenant.tenantKey === 'platform' ? 'sipat.online.admin' : '',
-  );
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
