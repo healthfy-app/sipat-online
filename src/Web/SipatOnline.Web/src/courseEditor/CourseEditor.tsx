@@ -5,6 +5,7 @@ import {
   setPlatformCourseModules,
   setPlatformCourseStructure,
   type CourseLessonDraft,
+  type CourseModulePlacement,
   updatePlatformCourse,
   type GameModule,
   type PlatformCourse,
@@ -23,7 +24,7 @@ import CoursePreviewCanvas, { type PreviewSize } from './CoursePreviewCanvas';
 import CoursePropertiesPanel from './CoursePropertiesPanel';
 import CoursePublishStep from './CoursePublishStep';
 import { getCourseDescription, getErrorMessage } from './courseFormat';
-import { buildTrack, groupTrackByLesson } from './courseTrack';
+import { buildTrack, groupTrackByLesson, moveActivity, removeActivity } from './courseTrack';
 import {
   addLesson, addVideoToLesson, describeLesson, moveLesson, moveVideoInStructure,
   removeLesson, removeVideo, renameLesson, retitleVideo, toDrafts,
@@ -168,6 +169,11 @@ export default function CourseEditor({
     onMoveVideo: (videoId, offset) => void changeStructure(moveVideoInStructure(drafts(), videoId, offset), 'A ordem dos vídeos foi atualizada.'),
     onRemoveVideo: (videoId) => void changeStructure(removeVideo(drafts(), videoId), 'O vídeo foi removido do treinamento; continua na biblioteca.'),
     onManageActivities: () => openDialog('games'),
+    onMoveActivity: (placementIndex, delta) => {
+      const placements = moveActivity(course, placementIndex, delta);
+      if (placements) void saveActivities(placements, 'A atividade mudou de lugar.');
+    },
+    onRemoveActivity: (placementIndex) => void saveActivities(removeActivity(course, placementIndex), 'A atividade saiu do treinamento; o jogo continua na lista de jogos.'),
     onAddActivity: (afterVideoCount) => {
       onError('');
       setActivityPosition(afterVideoCount);
@@ -176,6 +182,20 @@ export default function CourseEditor({
       if (!dirty || window.confirm('Há alterações não salvas. Deseja duplicar a versão salva?')) onDuplicate();
     },
   };
+
+  /** The training's activities, saved as given (moved or one taken out). */
+  async function saveActivities(placements: CourseModulePlacement[], message: string) {
+    onError('');
+    setIsMediaBusy(true);
+    try {
+      await setPlatformCourseModules(course.id, placements);
+      await onChanged(message);
+    } catch (activityError) {
+      onError(getErrorMessage(activityError));
+    } finally {
+      setIsMediaBusy(false);
+    }
+  }
 
   async function addActivity(moduleId: string) {
     if (activityPosition === null) return;

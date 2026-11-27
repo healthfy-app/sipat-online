@@ -1,4 +1,4 @@
-import type { GameModule, PlatformCourse, PlatformCourseVideo } from '../api';
+import type { CourseModulePlacement, GameModule, PlatformCourse, PlatformCourseVideo } from '../api';
 import { gameTypeOptions } from '../gamificationGames';
 
 /** A game that pauses a video at a given moment, with its module already resolved. */
@@ -41,6 +41,44 @@ export function buildTrack(course: PlatformCourse, modules: GameModule[]): Track
   });
   items.push(...activitiesAt(lastSlot));
   return items;
+}
+
+/** The index of an activity's placement in `course.modules`, from its key in the track. */
+export function placementOf(item: Extract<TrackItem, { kind: 'activity' }>): number {
+  return Number(/^activity-(\d+)-/.exec(item.key)?.[1] ?? -1);
+}
+
+/**
+ * The training's activities after one moves a step in the participant's order: past a video it changes place (before
+ * or after that video), past another activity the two change turns. Null when it is already at that end.
+ */
+export function moveActivity(course: PlatformCourse, placementIndex: number, delta: -1 | 1): CourseModulePlacement[] | null {
+  const lastSlot = course.videos.length;
+  // the order the participant gets them in: by place, then in the training's order
+  const steps: ({ kind: 'video' } | { kind: 'activity'; index: number })[] = [];
+  const at = (slot: number) => course.modules.forEach((placement, index) => {
+    if (Math.min(placement.afterVideoCount, lastSlot) === slot) steps.push({ kind: 'activity', index });
+  });
+  at(0);
+  course.videos.forEach((_, videoIndex) => { steps.push({ kind: 'video' }); at(videoIndex + 1); });
+  const from = steps.findIndex(step => step.kind === 'activity' && step.index === placementIndex);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= steps.length) return null;
+  [steps[from], steps[to]] = [steps[to], steps[from]];
+  // written back in the new order, each after as many videos as come before it
+  let videos = 0;
+  const placements: CourseModulePlacement[] = [];
+  for (const step of steps) {
+    if (step.kind === 'video') videos++;
+    else placements.push({ moduleId: course.modules[step.index].moduleId, afterVideoCount: videos });
+  }
+  return placements;
+}
+
+/** The training's activities without one placement; the others stay where they are. */
+export function removeActivity(course: PlatformCourse, placementIndex: number): CourseModulePlacement[] {
+  return course.modules.filter((_, index) => index !== placementIndex)
+    .map(placement => ({ moduleId: placement.moduleId, afterVideoCount: Math.min(placement.afterVideoCount, course.videos.length) }));
 }
 
 export function gameTypeLabel(module: GameModule): string {
