@@ -34,7 +34,7 @@ jobs:
   deploy:
     name: Deploy
     # skipped tests are fine (the PR ran them); failed tests stop the deploy
-    if: !cancelled() && contains(fromJSON('["success", "skipped"]'), needs.verify.result)
+    if: ${{ !cancelled() && contains(fromJSON('["success", "skipped"]'), needs.verify.result) }}
     needs: verify
     uses: ./.github/workflows/deploy-vm.yml
     # the images are signed with the workflow's OIDC identity and get a provenance attestation
