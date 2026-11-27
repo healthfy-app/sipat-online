@@ -13,6 +13,19 @@ export default function GameStage({ label, onClose, busy = false, children }: {
 }) {
   const panel = useRef<HTMLDivElement>(null);
   const theme = useContext(BrandThemeContext);
+  // Escape closes the game wherever the focus is: a button that went away ("Jogar de novo") leaves it on the page
+  const escape = useRef({ busy, onClose });
+  escape.current = { busy, onClose };
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented || panel.current?.contains(event.target as Node)) return;
+      event.stopPropagation();
+      panel.current?.focus();
+      if (!escape.current.busy) escape.current.onClose();
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, []);
   useEffect(() => {
     const previousFocus = document.activeElement;
     const previousOverflow = document.body.style.overflow;
