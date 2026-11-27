@@ -1,7 +1,8 @@
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { ArrowDown, ArrowUp, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Play, Search, X } from 'lucide-react';
-import { Fragment, useMemo, useState } from 'react';
-import { isExternal, isExtra, videoProvider } from '@/api';
+import { useMemo, useState } from 'react';
+import { isExternal, isExtra, videoProvider, type GameModule } from '@/api';
+import { gameTypeLabel } from '@/courseEditor/courseTrack';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
 import { ExternalVideoFrame } from '@/ExternalVideoPreview';
@@ -11,8 +12,8 @@ import { extrasSuffix } from '@/courseEditor/courseFormat';
 import ExtraBadge from '@/courseEditor/ExtraBadge';
 import { cn } from '@/lib/utils';
 import {
-  formatClock, formatSpan, maxVideoRows, normalize, subjectColor, themeLabel,
-  type Catalog, type CatalogVideo, type Subject,
+  daySteps, formatClock, formatSpan, maxGameRows, maxVideoRows, normalize, subjectColor, themeLabel,
+  type Catalog, type CatalogVideo, type DayStep, type Subject,
 } from './model';
 
 export const dropId = (dayIndex: number) => `theme-day-${dayIndex}`;
@@ -33,36 +34,58 @@ const videoTime = (video: CatalogVideo) => (isExtra(video) && video.durationMs <
 
 /**
  * What goes onto the days. A plan that personalizes the grid sees the complete list of videos, narrowed by an assunto
- * (a filter); Bronze sees the ready trainings, each one a whole day.
+ * (a filter), and, when its plan has games, the list of games beside it; Bronze sees the ready trainings, each one a
+ * whole day.
  */
-export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, canEditThemes = false, usedIn, onUpload }: {
+export function ThemeTray({ subjects, videos = [], games = [], canCustomizeGrid = false, canEditThemes = false, usedIn, gamesUsedIn, onUpload, onOpenGame }: {
   /** Opens the sending of videos, for who may send them; they join this list when ready. */
   onUpload?: () => void;
   subjects: Subject[]; videos?: CatalogVideo[]; canCustomizeGrid?: boolean; canEditThemes?: boolean;
+  /** The games that can go onto the days (the plan has games). */
+  games?: GameModule[];
   /** Where each video already is, as "Dia 2", so the operator sees what is placed. */
   usedIn?: Map<string, string>;
+  /** Where each game already is, as "Dia 2". */
+  gamesUsedIn?: Map<string, string>;
+  /** Opens a game (to see or edit its texts), from the joystick of its card. */
+  onOpenGame?: (game: GameModule) => void;
 }) {
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState('');
   // the video being watched from its card, before placing it on a day
   const [playing, setPlaying] = useState<CatalogVideo | null>(null);
-  // personalized grid: one complete list of videos, narrowed by an assunto
-  const current = canCustomizeGrid ? 'videos' : 'subjects';
+  // personalized grid: one complete list of videos, narrowed by an assunto, and the games beside it
+  const hasGames = canCustomizeGrid && games.length > 0;
+  const [mode, setMode] = useState<'videos' | 'games'>('videos');
+  const current = !canCustomizeGrid ? 'subjects' : hasGames && mode === 'games' ? 'games' : 'videos';
   const shownSubjects = useMemo(() => subjects.filter(subject => normalize(subject.title).includes(normalize(query))), [subjects, query]);
   const filterIds = subjects.find(item => item.id === filter)?.videoIds;
   const shownVideos = useMemo(() => videos.filter(video => normalize(video.title).includes(normalize(query)) && (!filterIds || filterIds.includes(video.id))), [videos, query, filterIds]);
+  const shownGames = useMemo(() => games.filter(game => normalize(game.title).includes(normalize(query))), [games, query]);
   const empty = shownVideos.length === 0;
+  const search = current === 'videos' ? 'Buscar vídeo' : current === 'games' ? 'Buscar jogo' : 'Buscar assunto';
 
-  return <section aria-label={current === 'videos' ? 'Biblioteca de vídeos' : 'Assuntos do acervo'} className="builder-tray ops-card grid gap-3 p-4 max-[760px]:hidden">
+  return <section aria-label={current === 'videos' ? 'Biblioteca de vídeos' : current === 'games' ? 'Jogos' : 'Assuntos do acervo'} className="builder-tray ops-card grid gap-3 p-4 max-[760px]:hidden">
     <div className="flex flex-wrap items-center gap-2">
       {canCustomizeGrid
         ? <>
-          <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Film aria-hidden="true" className="size-4" /> Lista completa
-            <span className="text-xs font-normal tabular-nums text-muted-foreground">{shownVideos.length}</span></h2>
-          <NativeSelect aria-label="Filtrar por assunto" className="h-9 w-auto max-w-64" onChange={event => setFilter(event.target.value)} value={filter}>
+          {hasGames
+            // two lists, side by side: what is dragged onto the days
+            ? <div aria-label="O que pôr nos dias" className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-muted p-1" role="group">
+              {([['videos', Film, 'Vídeos', shownVideos.length], ['games', Gamepad2, 'Jogos', shownGames.length]] as const).map(([value, Icon, label, count]) =>
+                <button aria-pressed={current === value} className={cn('inline-flex h-8 min-h-0 cursor-pointer items-center gap-1.5 rounded-full border-0 px-3.5 text-sm font-bold transition-[background-color,color,box-shadow] duration-150',
+                  current === value ? 'bg-card text-foreground shadow-card' : 'bg-transparent text-muted-foreground hover:text-foreground')}
+                key={value} onClick={() => setMode(value)} type="button">
+                  <Icon aria-hidden="true" className="size-4" />{label}
+                  <span className="text-xs font-semibold tabular-nums text-muted-foreground">{count}</span>
+                </button>)}
+            </div>
+            : <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Film aria-hidden="true" className="size-4" /> Lista completa
+              <span className="text-xs font-normal tabular-nums text-muted-foreground">{shownVideos.length}</span></h2>}
+          {current === 'videos' && <NativeSelect aria-label="Filtrar por assunto" className="h-9 w-auto max-w-64" onChange={event => setFilter(event.target.value)} value={filter}>
             <option value="">Filtrar por assunto</option>
             {subjects.map(item => <option key={item.id} value={item.id}>{item.title} ({item.videoIds.length})</option>)}
-          </NativeSelect>
+          </NativeSelect>}
         </>
         : <h2 className="m-0 flex items-center gap-2 text-base font-extrabold tracking-[-0.01em] text-foreground"><Layers aria-hidden="true" className="size-4" /> Assuntos do acervo</h2>}
       <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -73,16 +96,24 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
         </a>}
         <label className="relative">
           <Search aria-hidden="true" className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input aria-label={current === 'videos' ? 'Buscar vídeo' : 'Buscar assunto'} className="h-9 w-44 pl-8 max-[640px]:w-full" onChange={event => setQuery(event.target.value)}
-            placeholder={current === 'videos' ? 'Buscar vídeo' : 'Buscar assunto'} value={query} />
+          <Input aria-label={search} className="h-9 w-44 pl-8 max-[640px]:w-full" onChange={event => setQuery(event.target.value)}
+            placeholder={search} value={query} />
         </label>
       </div>
     </div>
     {/* the hint gets its own quiet line: next to the filters it pushed the search to a row of its own */}
     <p className="-mt-1 m-0 text-[0.8125rem] text-muted-foreground">
-      {current !== 'videos' ? 'Arraste para um dia e ele traz todos os vídeos e jogos.' : 'Arraste um vídeo para um dia.'}
+      {current === 'subjects' ? 'Arraste para um dia e ele traz todos os vídeos e jogos.'
+        : current === 'games' ? 'Arraste um jogo para um dia; lá as setas mudam onde ele entra. O joystick abre o jogo.'
+          : 'Arraste um vídeo para um dia.'}
     </p>
-    {current === 'videos'
+    {current === 'games'
+      ? shownGames.length === 0
+        ? <p className="m-0 py-3 text-sm text-muted-foreground">Nenhum jogo encontrado.</p>
+        : <ul className="m-0 flex list-none gap-2 overflow-x-auto p-0 pb-1">
+          {shownGames.map(game => <li className="shrink-0" key={game.id}><GameCard game={game} onOpen={onOpenGame} place={gamesUsedIn?.get(game.id)} /></li>)}
+        </ul>
+    : current === 'videos'
       ? empty
         ? <p className="m-0 py-3 text-sm text-muted-foreground">{videos.length === 0 ? 'A biblioteca ainda não tem vídeos prontos. Envie em Biblioteca de vídeos.'
           : 'Nenhum vídeo encontrado.'}</p>
@@ -135,12 +166,39 @@ function VideoCard({ video, place, dragId = `video:${video.id}`, onPlay }: { vid
   </div>;
 }
 
+/** A game in the list: the whole card drags onto a day; its joystick opens the game. */
+function GameCard({ game, place, onOpen }: { game: GameModule; place?: string; onOpen?: (game: GameModule) => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: `game:${game.id}`, data: { game } });
+  return <div aria-label={`Arrastar o jogo ${game.title}`} className={cn('flex h-[4.25rem] w-60 cursor-grab touch-none items-center gap-2.5 rounded-[0.875rem] border border-warning/40 bg-card py-2 pr-2.5 pl-3 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-warning hover:shadow-card active:cursor-grabbing motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef} {...attributes} {...listeners}>
+    {onOpen
+      ? <button aria-label={`Abrir o jogo ${game.title}`} className="m-0 grid size-8 min-h-0 shrink-0 cursor-pointer place-items-center rounded-full border border-warning/50 bg-warning-soft p-0 text-warning transition-colors hover:border-warning hover:bg-warning hover:text-white"
+        onClick={() => onOpen(game)} onKeyDown={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} title="Abrir o jogo" type="button">
+        <Gamepad2 aria-hidden="true" className="size-4" />
+      </button>
+      : <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full border border-warning/50 bg-warning-soft text-warning"><Gamepad2 className="size-4" /></span>}
+    <div className="grid min-w-0 flex-1 gap-0.5">
+      <strong className="line-clamp-2 text-[0.8125rem] leading-tight" title={game.title}>{game.title}</strong>
+      <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs whitespace-nowrap text-muted-foreground">
+        <span className="truncate">{gameTypeLabel(game)}</span>
+        {place && <span className="shrink-0 rounded-full bg-accent px-1.5 py-px text-[0.625rem] leading-tight font-bold text-primary" title={`Já está no ${place}`}>{place}</span>}
+      </span>
+    </div>
+  </div>;
+}
+
 /**
  * What rides under the pointer while dragging: the same card, lifted (a little bigger, tilted, with a deep shadow), so
  * the operator sees what is being carried the whole way to the day.
  */
-export function DragPreview({ data }: { data: { video?: CatalogVideo; subject?: Subject } }) {
+export function DragPreview({ data }: { data: { video?: CatalogVideo; subject?: Subject; game?: GameModule } }) {
   const lifted = 'flex w-60 rotate-[-2deg] scale-[1.03] cursor-grabbing items-center gap-2 rounded-[0.875rem] border p-2 shadow-overlay motion-reduce:rotate-0 motion-reduce:scale-100';
+  if (data.game) return <div className={cn(lifted, 'border-warning bg-card')}>
+    <span className="grid size-8 shrink-0 place-items-center rounded-full border border-warning/50 bg-warning-soft text-warning"><Gamepad2 aria-hidden="true" className="size-4" /></span>
+    <div className="grid min-w-0 flex-1 gap-0.5">
+      <strong className="line-clamp-2 text-[0.8125rem] leading-tight">{data.game.title}</strong>
+      <span className="text-xs text-muted-foreground">{gameTypeLabel(data.game)}</span>
+    </div>
+  </div>;
   if (data.video) return <div className={cn(lifted, 'border-primary bg-card')}>
     <span className="grid size-8 shrink-0 place-items-center rounded-full border border-border text-muted-foreground"><Play aria-hidden="true" className="size-3.5 translate-x-px" /></span>
     <div className="grid min-w-0 flex-1 gap-0.5">
@@ -163,7 +221,12 @@ export function DragPreview({ data }: { data: { video?: CatalogVideo; subject?: 
  * the videos where the participant gets it. With a plan that personalizes the grid the videos are the operator's:
  * videos are dropped or picked one by one, reordered and removed right here.
  */
-export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false, locked = false, onSend, arriving = [] }: {
+export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, onChoose, onClear, onVideos, onMoveGame, onRemoveGame, onOpenGame, canEditThemes = true, canCustomizeGrid = false, locked = false, onSend, arriving = [] }: {
+  /** Moves a game one step among the day's videos and games; with it the game rows get their arrows and x. */
+  onMoveGame?: (gameId: string, delta: -1 | 1) => void;
+  onRemoveGame?: (gameId: string) => void;
+  /** Opens a game of the day (to see or edit its texts). */
+  onOpenGame?: (gameId: string) => void;
   /** Sends videos to this day: they join the company's videos and come onto the day when ready. */
   onSend?: (files: File[]) => void;
   /** The videos on their way to this day: sending, or being prepared. */
@@ -184,12 +247,15 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
   const full = videoIds.length >= maxVideoRows;
   // a day with only games (its videos taken out) still shows them, where the participant gets them
   const empty = !subject && videoIds.length === 0 && arriving.length === 0 && games.length === 0;
+  const gamesEditable = !!onMoveGame && !locked;
   // while something is dragged every day shows it can take it; the one under the pointer says what the drop will do
-  const dragged = active?.data.current as { video?: CatalogVideo; subject?: Subject } | undefined;
+  const dragged = active?.data.current as { video?: CatalogVideo; subject?: Subject; game?: GameModule } | undefined;
   const preview = !isOver || !dragged ? ''
     : dragged.video
       ? videoIds.includes(dragged.video.id) ? 'Já está neste dia' : full ? `Dia cheio (${maxVideoRows} vídeos)` : '+ 1 vídeo'
-      : dragged.subject ? dragged.subject.title : '';
+      : dragged.game
+        ? games.some(game => game.id === dragged.game?.id) ? 'Já está neste dia' : games.length >= maxGameRows ? `Dia cheio (${maxGameRows} jogos)` : '+ 1 jogo'
+        : dragged.subject ? dragged.subject.title : '';
   // on the phone the day card is the frame: no box inside the box, the chooser under the subject, then the videos and games
   const frame = cn('relative grid content-start gap-2 rounded-[0.875rem] border p-2 transition-[border-color,background-color,box-shadow] duration-150',
     isOver ? 'border-primary bg-accent ring-2 ring-primary/40' : dragged ? 'border-dashed border-primary/60 bg-accent/30' : 'border-border bg-card',
@@ -238,15 +304,28 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
     next.splice(to, 0, item);
     onVideos!(next);
   };
-  // the same game can sit on a day twice: its order on the day keeps each row apart
-  const placed = games.map((game, order) => ({ ...game, key: `game-${order}-${game.id}` }));
-  /** The games that open after `count` of the day's videos (0: before the first). */
-  const gamesAfter = (count: number) => placed.filter(game => game.afterVideo === count).map(game =>
-    <li className="flex items-center gap-2 rounded-lg border border-warning/50 bg-warning-soft px-2 py-1.5 text-warning" key={game.key}>
+  // the day in the participant's order: each game right after the video it comes after (before the first, at the top)
+  const steps = daySteps(videoIds, games);
+  const rowButton = 'grid size-6 min-h-0 place-items-center rounded border-0 bg-transparent p-0 hover:bg-card disabled:opacity-30 max-[640px]:size-8';
+  /** A game of the day: it opens on a click; its arrows move it a step among the videos and games. */
+  const gameRow = (step: Extract<DayStep, { kind: 'game' }>, position: number) => {
+    const title = catalog.games.get(step.id)?.title ?? 'Jogo removido';
+    const name = <>
       <Gamepad2 aria-hidden="true" className="size-4 shrink-0" />
-      <span className="min-w-0 flex-1 text-xs leading-snug font-semibold break-words">{catalog.games.get(game.id)?.title ?? 'Jogo removido'}</span>
-      <span className="shrink-0 rounded bg-warning/15 px-1.5 text-[0.625rem] font-bold tracking-wide uppercase">Jogo</span>
-    </li>);
+      <span className="min-w-0 flex-1 text-xs leading-snug font-semibold break-words">{title}</span>
+    </>;
+    return <li className="group/game flex items-center gap-2 rounded-lg border border-warning/50 bg-warning-soft px-2 py-1.5 text-warning max-[760px]:px-2.5 max-[760px]:py-2" key={step.key}>
+      {onOpenGame
+        ? <button aria-label={`Abrir o jogo ${title}`} className="m-0 flex min-h-0 min-w-0 flex-1 cursor-pointer items-center gap-2 border-0 bg-transparent p-0 text-left text-warning hover:underline hover:underline-offset-2" onClick={() => onOpenGame(step.id)} title="Abrir o jogo" type="button">{name}</button>
+        : name}
+      <span className={cn('shrink-0 rounded bg-warning/15 px-1.5 text-[0.625rem] font-bold tracking-wide uppercase', gamesEditable && 'group-hover/game:hidden group-focus-within/game:hidden max-[640px]:hidden')}>Jogo</span>
+      {gamesEditable && <span className="hidden shrink-0 items-center text-warning group-hover/game:flex group-focus-within/game:flex max-[640px]:flex">
+        <button aria-label={`Subir ${title}`} className={rowButton} disabled={position === 0} onClick={() => onMoveGame?.(step.id, -1)} type="button"><ArrowUp className="size-3.5" /></button>
+        <button aria-label={`Descer ${title}`} className={rowButton} disabled={position === steps.length - 1} onClick={() => onMoveGame?.(step.id, 1)} type="button"><ArrowDown className="size-3.5" /></button>
+        <button aria-label={`Tirar ${title} do dia ${dayIndex + 1}`} className={cn(rowButton, 'hover:text-destructive')} onClick={() => onRemoveGame?.(step.id)} type="button"><X className="size-3.5" /></button>
+      </span>}
+    </li>;
+  };
 
   if (empty) {
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
@@ -276,14 +355,14 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
       : !editable && <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground max-[760px]:px-3 max-[760px]:py-2.5 max-[760px]:text-sm">Vídeos vindos de uma importação. <span className="max-[760px]:hidden">Arraste um assunto para trocar.</span><span className="hidden max-[760px]:inline">Escolha um assunto abaixo para trocar.</span></p>}
 
     <div aria-label={`Conteúdo do dia ${dayIndex + 1}`} className="builder-day-content grid max-h-72 gap-1 overflow-y-auto pr-0.5 max-[760px]:order-2 max-[760px]:max-h-none max-[760px]:gap-1.5 max-[760px]:overflow-visible max-[760px]:pr-0" role="group">
-      {/* in the participant's order: each game sits right after the video it comes after (before the first, at the top) */}
       <ol className="m-0 grid list-none gap-1 p-0">
-        {gamesAfter(0)}
-        {videoIds.map((id, index) => {
+        {steps.map((step, position) => {
+          if (step.kind === 'game') return gameRow(step, position);
+          const { id, index } = step;
           const video = catalog.videos.get(id);
           // out of the company's catalog: taken out of the library, or of an assunto outside its plan
           const title = video?.title ?? 'Vídeo indisponível para a empresa';
-          return <Fragment key={id}><li className="group/video flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5 max-[760px]:px-2.5 max-[760px]:py-2"
+          return <li className="group/video flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5 max-[760px]:px-2.5 max-[760px]:py-2" key={id}
             title={video ? undefined : 'Este vídeo saiu da biblioteca ou é de um assunto fora do plano da empresa: o participante não consegue assistir. Troque por outro.'}>
             <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[0.6875rem] font-bold text-primary-foreground">{index + 1}</span>
             <span className="min-w-0 flex-1 text-xs leading-snug font-medium break-words max-[760px]:text-sm">{title}{video && isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</span>
@@ -293,7 +372,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
               <button aria-label={`Descer ${title}`} className="grid size-6 min-h-0 place-items-center rounded border-0 bg-transparent p-0 text-muted-foreground hover:bg-card disabled:opacity-30 max-[640px]:size-8" disabled={index === videoIds.length - 1} onClick={() => move(index, index + 1)} type="button"><ArrowDown className="size-3.5" /></button>
               <button aria-label={`Tirar ${title} do dia ${dayIndex + 1}`} className="grid size-6 min-h-0 place-items-center rounded border-0 bg-transparent p-0 text-muted-foreground hover:bg-card hover:text-destructive max-[640px]:size-8" onClick={() => onVideos!(videoIds.filter(item => item !== id))} type="button"><X className="size-3.5" /></button>
             </span>}
-          </li>{gamesAfter(index + 1)}</Fragment>;
+          </li>;
         })}
       </ol>
       {editable && full && <p className="m-0 px-1 text-[0.6875rem] text-muted-foreground">Limite de {maxVideoRows} vídeos por dia.</p>}

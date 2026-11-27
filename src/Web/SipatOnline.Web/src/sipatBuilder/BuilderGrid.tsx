@@ -8,9 +8,12 @@ import { extrasSuffix } from '@/courseEditor/courseFormat';
 import { cn } from '@/lib/utils';
 import { partWord } from '@/trainings/partWord';
 import {
-  addDays, dayDuration, dayVideoCounts, formatClock, isGenericDayTitle, maxDays, maxVideoRows, newDay, placedGames, shortDate, subjectColor, themeOfDay, withDayWord,
+  addDays, addGame, dayDuration, dayVideoCounts, formatClock, isGenericDayTitle, maxDays, maxVideoRows, moveGame, newDay, placedGames, removeGame, replaceGame,
+  shortDate, subjectColor, themeOfDay, withDayWord,
   type Catalog, type CatalogVideo, type DaySlots, type Subject,
 } from './model';
+import type { GameModule } from '@/api';
+import GameDialog from './GameDialog';
 import { DayBox, DragPreview, dropId, ThemeTray } from './ThemeCards';
 import './builder.css';
 
@@ -49,7 +52,11 @@ const filled = (items: (string | null)[]) => items.filter((id): id is string => 
  * videos and games; the box only shows them. Changing the content of a day is done in the theme editor. A last
  * column adds a day.
  */
-export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, onUpload, onSendToDay, onEdit, arriving, canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false, undated = false }: {
+export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issues, onUpload, onSendToDay, onEdit, arriving, onGamesChanged, canEditThemes = true, canCustomizeGrid = false, locked = false, readOnly = false, undated = false, template = false }: {
+  /** A game was edited or duplicated from the board: the page reads the catalog again (and says what happened). */
+  onGamesChanged?: (message: string) => Promise<void> | void;
+  /** A template of the operation: its games are the operation's own, edited as they are. */
+  template?: boolean;
   /** A template: its days carry no date (they are "Dia 1, Dia 2…"); the dates come when a company makes its training from it. */
   undated?: boolean;
   /** Opens this training in the video editor, the same as "Editar treinamento" in the top bar; a pencil on each day. */
@@ -121,31 +128,41 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
     if (current.includes(videoId) || current.length >= maxVideoRows) return;
     patchDay(index, { videos: [...current, videoId] });
   };
-  // where each video already is, shown on its card in the list
-  const usedIn = useMemo(() => {
+  // where each video and each game already is, shown on its card in the list
+  const placesOf = (pick: (day: DaySlots) => (string | null)[]) => {
     const places = new Map<string, string>();
-    days.forEach((day, index) => filled(day.videos).forEach(id => { if (!places.has(id)) places.set(id, `${word} ${index + 1}`); }));
+    days.forEach((day, index) => filled(pick(day)).forEach(id => { if (!places.has(id)) places.set(id, `${word} ${index + 1}`); }));
     return places;
-  }, [days, word]);
+  };
+  const usedIn = useMemo(() => placesOf(day => day.videos), [days, word]); // eslint-disable-line react-hooks/exhaustive-deps
+  const gamesUsedIn = useMemo(() => placesOf(day => day.games), [days, word]); // eslint-disable-line react-hooks/exhaustive-deps
   const looseVideos = useMemo(() => [...catalog.videos.values()].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [catalog]);
+  // a plan with games (Diamante) puts them on the days one by one, like the videos, and moves them among the videos
+  const gamesEditable = canCustomizeGrid && !readOnly && !locked;
+  const games = useMemo(() => [...catalog.games.values()].sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')), [catalog]);
+  const [openGame, setOpenGame] = useState<{ game: GameModule; dayIndex: number | null } | null>(null);
+  const patchGames = (index: number, patch: Pick<DaySlots, 'games' | 'places'> | null) => { if (patch) patchDay(index, patch); };
   // what is being dragged rides under the pointer until it is dropped
-  const [carried, setCarried] = useState<{ video?: CatalogVideo; subject?: Subject } | null>(null);
+  const [carried, setCarried] = useState<{ video?: CatalogVideo; subject?: Subject; game?: GameModule } | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }), useSensor(KeyboardSensor));
   const onDragStart = ({ active }: DragStartEvent) => setCarried((active.data.current as typeof carried) ?? null);
   const onDragEnd = ({ active, over }: DragEndEvent) => {
     setCarried(null);
     const subject = active.data.current?.subject as { id: string } | undefined;
     const video = active.data.current?.video as { id: string } | undefined;
+    const game = active.data.current?.game as { id: string } | undefined;
     const target = typeof over?.id === 'string' ? days.findIndex((_, index) => dropId(index) === over.id) : -1;
     if (target < 0) return;
     if (subject) applyTheme(target, subject.id);
     else if (video && canCustomizeGrid) addVideo(target, video.id);
+    // a game comes after the day's last video; its arrows on the day move it among the videos
+    else if (game && gamesEditable) patchGames(target, addGame(days[target], game.id));
   };
   const column = (index: number, order: number): CSSProperties => ({ '--i': index, '--order': order } as CSSProperties);
 
   // what a screen reader hears while something is carried: the item and the day by their names, in Portuguese
-  const carriedName = (data: { video?: { title?: string }; subject?: { title?: string } } | undefined) =>
-    data?.video?.title ?? data?.subject?.title ?? 'O item';
+  const carriedName = (data: { video?: { title?: string }; subject?: { title?: string }; game?: { title?: string } } | undefined) =>
+    data?.video?.title ?? data?.game?.title ?? data?.subject?.title ?? 'O item';
   const dayName = (id: unknown) => {
     const index = days.findIndex((_, position) => dropId(position) === id);
     return index < 0 ? null : `dia ${index + 1}`;
@@ -170,6 +187,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
     <DragOverlay modifiers={[followPointer]} dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>{carried && <DragPreview data={carried} />}</DragOverlay>
     <div className="grid gap-4">
       {!locked && <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} onUpload={onUpload} subjects={themes}
+        games={gamesEditable ? games : []} gamesUsedIn={gamesUsedIn} onOpenGame={game => setOpenGame({ game, dayIndex: null })}
         usedIn={canCustomizeGrid ? usedIn : undefined} videos={looseVideos} />}
       <div className="builder-board-card ops-card overflow-hidden max-[760px]:overflow-visible max-[760px]:border-0! max-[760px]:bg-transparent! max-[760px]:shadow-none">
         <div className="builder-board-scroller overflow-x-auto max-[760px]:overflow-visible" ref={scroller}>
@@ -204,6 +222,9 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
               return <Cell index={index} key={`box-${day.key}`} order={index * 3 + 1} row={2}>
                 <DayBox canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} dayIndex={index} locked={locked}
                   onVideos={videoIds => patchDay(index, { videos: videoIds })} games={placedGames(day)} onChoose={themeId => applyTheme(index, themeId)}
+                  onMoveGame={gamesEditable ? (gameId, delta) => patchGames(index, moveGame(day, gameId, delta)) : undefined}
+                  onRemoveGame={gamesEditable ? gameId => patchGames(index, removeGame(day, gameId)) : undefined}
+                  onOpenGame={gamesEditable ? gameId => { const game = catalog.games.get(gameId); if (game) setOpenGame({ game, dayIndex: index }); } : undefined}
                   onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)}
                   arriving={arriving?.get(day.key)} onSend={onSendToDay && !readOnly ? files => onSendToDay(day.key, files) : undefined} />
               </Cell>;
@@ -227,6 +248,14 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
         </div>
       </div>
     </div>
+    {openGame && <GameDialog game={openGame.game} onClose={() => setOpenGame(null)} template={template}
+      onDuplicated={async copy => {
+        // the company's copy takes the game's place on the day it was opened from
+        const at = openGame.dayIndex;
+        if (at !== null) patchDay(at, replaceGame(days[at], openGame.game.id, copy.id));
+        await onGamesChanged?.(`"${copy.title}" é um jogo da sua empresa agora: edite como quiser.`);
+      }}
+      onSaved={message => onGamesChanged?.(message)} />}
   </DndContext>;
 }
 

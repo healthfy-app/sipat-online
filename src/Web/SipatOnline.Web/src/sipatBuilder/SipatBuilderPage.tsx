@@ -676,7 +676,10 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         onChange={viewOnly ? () => undefined : edit} onRemoveDay={removeDay}
         onEdit={viewOnly ? undefined : () => { if (!busy) void editWeek(); }}
         // every day has its own "Enviar vídeo", for a company that has its own videos (Diamante)
-        arriving={arriving} onSendToDay={capabilities?.internalVideos ? (dayKey, files) => void sendToDay(dayKey, files) : undefined} />}
+        arriving={arriving} onSendToDay={capabilities?.internalVideos ? (dayKey, files) => void sendToDay(dayKey, files) : undefined}
+        // a game edited or duplicated from the board: its name and texts come again with the catalog
+        onGamesChanged={async message => { applyContent(await fetchContent()); setNotice(message); }}
+        template={template} />}
 
     {copying && <Dialog description="Escolha o treinamento de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outro treinamento">
       <div className="grid max-h-[60vh] gap-4 overflow-auto">

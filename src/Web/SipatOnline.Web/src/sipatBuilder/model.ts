@@ -112,6 +112,62 @@ export function placedGames(day: Pick<DaySlots, 'videos' | 'games' | 'places'>):
   });
 }
 
+/** One step of a day as the participant goes through it: a video (with its number on the day) or a game. */
+export type DayStep = { kind: 'video'; id: string; index: number } | { kind: 'game'; id: string; key: string };
+
+/** The day's videos with its games between them, where the participant gets each one. */
+export function daySteps(videoIds: string[], games: { id: string; afterVideo: number }[]): DayStep[] {
+  const steps: DayStep[] = [];
+  // the same game can sit on a day twice: its order on the day keeps each step apart
+  const gamesAt = (count: number) => games.forEach((game, order) => {
+    if (game.afterVideo === count) steps.push({ kind: 'game', id: game.id, key: `game-${order}-${game.id}` });
+  });
+  gamesAt(0);
+  videoIds.forEach((id, index) => { steps.push({ kind: 'video', id, index }); gamesAt(index + 1); });
+  return steps;
+}
+
+type DayGames = Pick<DaySlots, 'games' | 'places'>;
+const writeGames = (games: { id: string; afterVideo: number }[]): DayGames =>
+  ({ games: games.map(game => game.id), places: games.map(game => ({ gameId: game.id, afterVideo: game.afterVideo })) });
+const videoIdsOf = (day: Pick<DaySlots, 'videos'>) => day.videos.filter((id): id is string => !!id);
+
+/**
+ * A game moved one step in the day: past a video it changes place (it comes before or after that video), past another
+ * game the two change turns. Null when it is already at that end of the day.
+ */
+export function moveGame(day: DaySlots, gameId: string, delta: -1 | 1): DayGames | null {
+  const steps = daySteps(videoIdsOf(day), placedGames(day));
+  const at = steps.findIndex(step => step.kind === 'game' && step.id === gameId);
+  const to = at + delta;
+  if (at < 0 || to < 0 || to >= steps.length) return null;
+  [steps[at], steps[to]] = [steps[to], steps[at]];
+  let videos = 0;
+  const games: { id: string; afterVideo: number }[] = [];
+  for (const step of steps) {
+    if (step.kind === 'video') videos++;
+    else games.push({ id: step.id, afterVideo: videos });
+  }
+  return writeGames(games);
+}
+
+/** A game put on a day comes after its last video, once, up to the day's limit. Null when it cannot come in. */
+export function addGame(day: DaySlots, gameId: string): DayGames | null {
+  const games = placedGames(day);
+  if (games.some(game => game.id === gameId) || games.length >= maxGameRows) return null;
+  return writeGames([...games, { id: gameId, afterVideo: videoIdsOf(day).length }]);
+}
+
+/** The day without that game; the others keep their places. */
+export function removeGame(day: DaySlots, gameId: string): DayGames {
+  return writeGames(placedGames(day).filter(game => game.id !== gameId));
+}
+
+/** Another game in the place of one (its company copy, say), where the first one was. */
+export function replaceGame(day: DaySlots, gameId: string, withId: string): DayGames {
+  return writeGames(placedGames(day).map(game => (game.id === gameId ? { ...game, id: withId } : game)));
+}
+
 let keyCounter = 0;
 const nextKey = () => `day-${++keyCounter}`;
 
@@ -146,6 +202,8 @@ export function toProgramDay(day: DaySlots): ProgramDay {
     ...(day.id ? { id: day.id } : {}),
     title: day.title.trim(), date: day.date || null, subject: day.subject.trim() || null,
     videoIds: filled(day.videos), gameIds: filled(day.games),
+    // where the board shows each game is where it is saved
+    gamePlaces: placedGames(day).map(game => ({ gameId: game.id, afterVideo: game.afterVideo })),
   };
 }
 
