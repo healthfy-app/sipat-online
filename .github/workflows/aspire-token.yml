@@ -1,0 +1,56 @@
+name: Aspire token
+
+# Run by hand after changing the ASPIRE_BROWSER_TOKEN secret: writes it on the VM and recreates only the
+# aspire-dashboard container (deploy/scripts/set-aspire-token.sh). No build, no tests, the rest keeps running.
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: GitHub environment of the VM.
+        required: true
+        type: choice
+        options: [production, dev]
+        default: production
+
+permissions:
+  contents: read
+
+jobs:
+  token:
+    name: Aspire token (${{ inputs.environment }})
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    concurrency:
+      # never at the same time as a full deploy, which also writes deploy/.env.production
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Write the token on the VM
+        env:
+          DEPLOY_HOST: ${{ vars.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ vars.DEPLOY_USER }}
+          DEPLOY_APP_PATH: ${{ vars.DEPLOY_APP_PATH }}
+          ASPIRE_BROWSER_TOKEN: ${{ secrets.ASPIRE_BROWSER_TOKEN }}
+          DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
+          DEPLOY_SSH_KNOWN_HOSTS: ${{ secrets.DEPLOY_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          : "${ASPIRE_BROWSER_TOKEN:?Set secret ASPIRE_BROWSER_TOKEN in the ${{ inputs.environment }} environment}"
+          case "$ASPIRE_BROWSER_TOKEN" in *$'\n'*|*$'\r'*) echo "The token has a line break." >&2; exit 1;; esac
+          key="$RUNNER_TEMP/deploy_key"
+          hosts="$RUNNER_TEMP/known_hosts"
+          (umask 077 && printf '%s\n' "$DEPLOY_SSH_PRIVATE_KEY" > "$key" && printf '%s\n' "$DEPLOY_SSH_KNOWN_HOSTS" > "$hosts")
+          unset DEPLOY_SSH_PRIVATE_KEY
+          ssh_options=(-i "$key" -o BatchMode=yes -o StrictHostKeyChecking=yes -o UserKnownHostsFile="$hosts")
+          target="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh "${ssh_options[@]}" "$target" "cat > /tmp/set-aspire-token.sh" < deploy/scripts/set-aspire-token.sh
+          # the token goes on stdin, never on a command line
+          printf '%s\n' "$ASPIRE_BROWSER_TOKEN" \
+            | ssh "${ssh_options[@]}" "$target" "bash /tmp/set-aspire-token.sh '$DEPLOY_APP_PATH'; status=\$?; rm -f /tmp/set-aspire-token.sh; exit \$status"
+
+      - name: Clean up
+        if: always()
+        run: rm -f "$RUNNER_TEMP/deploy_key" "$RUNNER_TEMP/known_hosts"

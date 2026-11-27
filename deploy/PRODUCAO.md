@@ -149,7 +149,7 @@ Todo deploy pelo GitHub Actions **assina** o pacote com as imagens da API e do s
 ### Aspire Dashboard (traces, logs e métricas da API)
 Com a variável `ASPIRE_DASHBOARD=true` no ambiente `production` do GitHub (ou no `prod.env`), o deploy sobe o container `aspire-dashboard` na VM e a API manda para ele a telemetria (OTLP). Ele mostra cada requisição com a rota, o tempo, o SQL e as chamadas ao R2, os logs estruturados e as métricas.
 
-- **Página pública com token.** Com o segredo `ASPIRE_BROWSER_TOKEN` (no ambiente do GitHub ou no `prod.env`), a página fica em `https://aspire.<domínio>` e pede esse token no primeiro acesso de cada navegador. O certificado inclui o host sozinho. Sem o segredo, a página só existe pelo túnel. Para trocar o token (vazou, saiu alguém), troque o segredo e rode o deploy de novo.
+- **Página pública com token.** Com o segredo `ASPIRE_BROWSER_TOKEN` (no ambiente do GitHub ou no `prod.env`), a página fica em `https://aspire.<domínio>` e pede esse token no primeiro acesso de cada navegador. O certificado inclui o host sozinho. Sem o segredo, a página só existe pelo túnel. Para trocar o token (vazou, saiu alguém), troque o segredo e rode o workflow **Aspire token** (Actions → Aspire token → Run workflow): ele grava o token na VM e recria só o container do Aspire, sem build nem testes, em segundos.
 - **Pelo túnel SSH**, sem passar pela internet: a página também escuta em `127.0.0.1:18888` da VM.
   ```powershell
   ssh -i $HOME\.sipat-online\prod_deploy -N -L 18888:127.0.0.1:18888 sipat@<IP da VM>
