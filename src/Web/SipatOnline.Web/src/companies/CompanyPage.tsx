@@ -291,7 +291,7 @@ export default function CompanyPage() {
                 </div>}
               </>
             ) : (
-              <EmptyState title={search ? 'Nenhum participante encontrado. Tente outro nome ou identificador.' : 'Nenhum participante para exibir.'} />
+              <EmptyState title={search ? 'Nenhum participante encontrado. Tente outro nome ou login.' : 'Nenhum participante para exibir.'} />
             )}
           </section>
         ) : (
