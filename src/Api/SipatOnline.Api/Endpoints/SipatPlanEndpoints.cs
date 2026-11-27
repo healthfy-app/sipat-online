@@ -125,7 +125,8 @@ public static class SipatPlanEndpoints
     }
 
     private static IReadOnlyList<ProgramDayDto> ToDays(IReadOnlyList<ProgramDay> days) =>
-        days.Select(day => new ProgramDayDto(day.Id, day.Title, day.Date, day.Subject, day.VideoIds, day.GameIds)).ToArray();
+        days.Select(day => new ProgramDayDto(day.Id, day.Title, day.Date, day.Subject, day.VideoIds, day.GameIds,
+            day.GamePlaces?.Select(place => new ProgramGamePlaceDto(place.GameId, place.AfterVideo)).ToArray())).ToArray();
 
     private static IResult ToProblem(DomainError error) => Results.Problem(
         statusCode: error.Code switch

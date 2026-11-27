@@ -7,6 +7,7 @@ namespace SipatOnline.Learning.Application.Catalog;
 /// One day of a SIPAT program, as in the "Seletor de módulos" sheet: a title or slogan, an optional date,
 /// a main subject, the videos picked for the day (in order) and the games, quizzes or forms.
 /// <paramref name="Id"/> is stable across edits, so applying the program again finds the same day.
+/// <paramref name="GamePlaces"/>: where each game opens in the day, when it is read from a training (null when written).
 /// </summary>
 public sealed record ProgramDay(
     Guid Id,
@@ -14,7 +15,11 @@ public sealed record ProgramDay(
     DateOnly? Date,
     string? Subject,
     IReadOnlyList<Guid> VideoIds,
-    IReadOnlyList<Guid> GameIds);
+    IReadOnlyList<Guid> GameIds,
+    IReadOnlyList<ProgramGamePlace>? GamePlaces = null);
+
+/// <summary>A game of a day and when the participant gets it: after how many of the day's videos (0: before the first).</summary>
+public sealed record ProgramGamePlace(Guid GameId, int AfterVideo);
 
 /// <summary>A SIPAT program built once by the operator and applied to any company's SIPAT.</summary>
 public sealed record SipatProgram(Guid Id, string Title, IReadOnlyList<ProgramDay> Days, DateTimeOffset CreatedAt);

@@ -1,6 +1,6 @@
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
 import { ArrowDown, ArrowUp, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Play, Search, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { isExternal, isExtra, videoProvider } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
@@ -159,18 +159,20 @@ export function DragPreview({ data }: { data: { video?: CatalogVideo; subject?: 
 }
 
 /**
- * One day, whole: the subject dropped on it (a label and a shortcut), its videos and the games that came with the
- * subject. With a plan that personalizes the grid the videos are the operator's: videos are dropped or picked one
- * by one, reordered and removed right here.
+ * One day, whole: the subject dropped on it (a label and a shortcut), its videos and its games, each game between
+ * the videos where the participant gets it. With a plan that personalizes the grid the videos are the operator's:
+ * videos are dropped or picked one by one, reordered and removed right here.
  */
-export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false, locked = false, onSend, arriving = [] }: {
+export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, onChoose, onClear, onVideos, canEditThemes = true, canCustomizeGrid = false, locked = false, onSend, arriving = [] }: {
   /** Sends videos to this day: they join the company's videos and come onto the day when ready. */
   onSend?: (files: File[]) => void;
   /** The videos on their way to this day: sending, or being prepared. */
   arriving?: { id: string; title: string; status: string }[];
   /** The day came from a ready SIPAT: its videos are shown as they are, nothing to pick or change. */
   locked?: boolean;
-  dayIndex: number; subject: Subject | undefined; themes: Subject[]; catalog: Catalog; videoIds: string[]; gameIds: string[];
+  dayIndex: number; subject: Subject | undefined; themes: Subject[]; catalog: Catalog; videoIds: string[];
+  /** The day's games and after how many of its videos each one opens (0: before the first), from `placedGames`. */
+  games: { id: string; afterVideo: number }[];
   onChoose: (title: string) => void; onClear: () => void; canEditThemes?: boolean;
   canCustomizeGrid?: boolean;
   /** The new list of videos of the day; only with canCustomizeGrid. */
@@ -180,7 +182,8 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
   const { active } = useDndContext();
   const editable = canCustomizeGrid && !!onVideos && !locked;
   const full = videoIds.length >= maxVideoRows;
-  const empty = !subject && videoIds.length === 0 && arriving.length === 0;
+  // a day with only games (its videos taken out) still shows them, where the participant gets them
+  const empty = !subject && videoIds.length === 0 && arriving.length === 0 && games.length === 0;
   // while something is dragged every day shows it can take it; the one under the pointer says what the drop will do
   const dragged = active?.data.current as { video?: CatalogVideo; subject?: Subject } | undefined;
   const preview = !isOver || !dragged ? ''
@@ -235,6 +238,15 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
     next.splice(to, 0, item);
     onVideos!(next);
   };
+  // the same game can sit on a day twice: its order on the day keeps each row apart
+  const placed = games.map((game, order) => ({ ...game, key: `game-${order}-${game.id}` }));
+  /** The games that open after `count` of the day's videos (0: before the first). */
+  const gamesAfter = (count: number) => placed.filter(game => game.afterVideo === count).map(game =>
+    <li className="flex items-center gap-2 rounded-lg border border-warning/50 bg-warning-soft px-2 py-1.5 text-warning" key={game.key}>
+      <Gamepad2 aria-hidden="true" className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1 text-xs leading-snug font-semibold break-words">{catalog.games.get(game.id)?.title ?? 'Jogo removido'}</span>
+      <span className="shrink-0 rounded bg-warning/15 px-1.5 text-[0.625rem] font-bold tracking-wide uppercase">Jogo</span>
+    </li>);
 
   if (empty) {
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
@@ -264,11 +276,15 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
       : !editable && <p className="m-0 rounded-md bg-muted px-2 py-1.5 text-xs text-muted-foreground max-[760px]:px-3 max-[760px]:py-2.5 max-[760px]:text-sm">Vídeos vindos de uma importação. <span className="max-[760px]:hidden">Arraste um assunto para trocar.</span><span className="hidden max-[760px]:inline">Escolha um assunto abaixo para trocar.</span></p>}
 
     <div aria-label={`Conteúdo do dia ${dayIndex + 1}`} className="builder-day-content grid max-h-72 gap-1 overflow-y-auto pr-0.5 max-[760px]:order-2 max-[760px]:max-h-none max-[760px]:gap-1.5 max-[760px]:overflow-visible max-[760px]:pr-0" role="group">
+      {/* in the participant's order: each game sits right after the video it comes after (before the first, at the top) */}
       <ol className="m-0 grid list-none gap-1 p-0">
+        {gamesAfter(0)}
         {videoIds.map((id, index) => {
           const video = catalog.videos.get(id);
-          const title = video?.title ?? 'Vídeo removido do catálogo';
-          return <li className="group/video flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5 max-[760px]:px-2.5 max-[760px]:py-2" key={id}>
+          // out of the company's catalog: taken out of the library, or of an assunto outside its plan
+          const title = video?.title ?? 'Vídeo indisponível para a empresa';
+          return <Fragment key={id}><li className="group/video flex items-center gap-2 rounded-lg bg-muted px-2 py-1.5 max-[760px]:px-2.5 max-[760px]:py-2"
+            title={video ? undefined : 'Este vídeo saiu da biblioteca ou é de um assunto fora do plano da empresa: o participante não consegue assistir. Troque por outro.'}>
             <span aria-hidden="true" className="grid size-5 shrink-0 place-items-center rounded-full bg-primary text-[0.6875rem] font-bold text-primary-foreground">{index + 1}</span>
             <span className="min-w-0 flex-1 text-xs leading-snug font-medium break-words max-[760px]:text-sm">{title}{video && isExtra(video) && <> <ExtraBadge className="align-middle" /></>}</span>
             {video && <span className={cn('shrink-0 text-[0.6875rem] tabular-nums text-muted-foreground', editable && 'group-hover/video:hidden group-focus-within/video:hidden max-[640px]:hidden')}>{videoTime(video)}</span>}
@@ -277,17 +293,10 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, gameIds, 
               <button aria-label={`Descer ${title}`} className="grid size-6 min-h-0 place-items-center rounded border-0 bg-transparent p-0 text-muted-foreground hover:bg-card disabled:opacity-30 max-[640px]:size-8" disabled={index === videoIds.length - 1} onClick={() => move(index, index + 1)} type="button"><ArrowDown className="size-3.5" /></button>
               <button aria-label={`Tirar ${title} do dia ${dayIndex + 1}`} className="grid size-6 min-h-0 place-items-center rounded border-0 bg-transparent p-0 text-muted-foreground hover:bg-card hover:text-destructive max-[640px]:size-8" onClick={() => onVideos!(videoIds.filter(item => item !== id))} type="button"><X className="size-3.5" /></button>
             </span>}
-          </li>;
+          </li>{gamesAfter(index + 1)}</Fragment>;
         })}
       </ol>
       {editable && full && <p className="m-0 px-1 text-[0.6875rem] text-muted-foreground">Limite de {maxVideoRows} vídeos por dia.</p>}
-      {gameIds.length > 0 && <ul aria-label="Jogos do dia" className="m-0 mt-1 grid list-none gap-1 p-0">
-        {gameIds.map(id => <li className="flex items-center gap-2 rounded-lg border border-warning/50 bg-warning-soft px-2 py-1.5 text-warning" key={id}>
-          <Gamepad2 aria-hidden="true" className="size-4 shrink-0" />
-          <span className="min-w-0 flex-1 text-xs leading-snug font-semibold break-words">{catalog.games.get(id)?.title ?? 'Jogo removido'}</span>
-          <span className="shrink-0 rounded bg-warning/15 px-1.5 text-[0.625rem] font-bold tracking-wide uppercase">Jogo</span>
-        </li>)}
-      </ul>}
     </div>
     {videoPicker}
   </div>;

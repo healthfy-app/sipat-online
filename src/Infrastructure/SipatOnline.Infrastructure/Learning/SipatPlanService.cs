@@ -91,8 +91,11 @@ public sealed class SipatPlanService(
         var result = new List<ProgramDay>(lessons.Count);
         foreach (var range in Ranges(lessons, links))
         {
-            var gameIds = modules.Where(link => range.Holds(link.AfterVideoCount)).Select(link => link.ModuleId).Distinct().ToArray();
-            result.Add(new ProgramDay(range.Lesson.Id, range.Lesson.Title, range.Lesson.Date, range.Lesson.Subject, range.VideoIds, gameIds));
+            var held = modules.Where(link => range.Holds(link.AfterVideoCount)).ToArray();
+            var gameIds = held.Select(link => link.ModuleId).Distinct().ToArray();
+            // where each one opens in the day, counted from the day's first video, as the participant gets it
+            var places = held.Select(link => new ProgramGamePlace(link.ModuleId, Math.Clamp(link.AfterVideoCount - range.Start, 0, range.VideoIds.Length))).ToArray();
+            result.Add(new ProgramDay(range.Lesson.Id, range.Lesson.Title, range.Lesson.Date, range.Lesson.Subject, range.VideoIds, gameIds, places));
         }
         return result;
     }

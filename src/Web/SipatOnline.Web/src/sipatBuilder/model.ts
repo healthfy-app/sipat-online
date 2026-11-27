@@ -1,4 +1,4 @@
-import { isExtra, videoProvider, type GameModule, type PlatformCourse, type PlatformLibraryVideo, type ProgramDay, type VideoProvider } from '@/api';
+import { isExtra, videoProvider, type GameModule, type PlatformCourse, type PlatformLibraryVideo, type ProgramDay, type ProgramGamePlace, type VideoProvider } from '@/api';
 
 /** Rows shown for videos and games in the planner, as in the sheet (VÍDEO 1 to 5, and the games slots). */
 export const defaultVideoRows = 5;
@@ -93,6 +93,23 @@ export interface DaySlots {
   subject: string;
   videos: (string | null)[];
   games: (string | null)[];
+  /** Where the games that were on the day when it was read open, counted from its first video (the server's word). */
+  places?: ProgramGamePlace[];
+}
+
+/**
+ * The day's games where the participant gets them, as the server keeps them on save: one that was already on the day
+ * stays as far from the day's first video as it was (never past its last one), and one added since comes after the
+ * last video. `afterVideo` counts the day's videos: 0 is before the first.
+ */
+export function placedGames(day: Pick<DaySlots, 'videos' | 'games' | 'places'>): { id: string; afterVideo: number }[] {
+  const videoCount = day.videos.filter(Boolean).length;
+  const unused = [...(day.places ?? [])];
+  return day.games.filter((id): id is string => !!id).map(id => {
+    const at = unused.findIndex(place => place.gameId === id);
+    const place = at >= 0 ? unused.splice(at, 1)[0] : undefined;
+    return { id, afterVideo: place ? Math.min(Math.max(place.afterVideo, 0), videoCount) : videoCount };
+  });
 }
 
 let keyCounter = 0;
@@ -119,6 +136,7 @@ export function fromProgramDay(day: ProgramDay): DaySlots {
   return {
     key: nextKey(), id: day.id, title: day.title, date: day.date ?? '', subject: day.subject ?? '',
     videos: pad(day.videoIds, defaultVideoRows), games: pad(day.gameIds, defaultGameRows),
+    places: day.gamePlaces ?? [],
   };
 }
 

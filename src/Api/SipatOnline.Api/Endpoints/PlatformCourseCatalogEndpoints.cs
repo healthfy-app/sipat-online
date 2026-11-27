@@ -1131,7 +1131,11 @@ public sealed record ProgramDayDto(
     DateOnly? Date,
     string? Subject,
     IReadOnlyList<Guid>? VideoIds,
-    IReadOnlyList<Guid>? GameIds);
+    IReadOnlyList<Guid>? GameIds,
+    IReadOnlyList<ProgramGamePlaceDto>? GamePlaces = null);
+
+/// <summary>Read only: a game of the day opens after <paramref name="AfterVideo"/> of the day's videos (0: before the first).</summary>
+public sealed record ProgramGamePlaceDto(Guid GameId, int AfterVideo);
 
 public sealed record SaveProgramRequest(string? Title, IReadOnlyList<ProgramDayDto>? Days);
 

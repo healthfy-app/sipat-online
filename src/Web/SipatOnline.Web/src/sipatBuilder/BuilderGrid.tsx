@@ -8,7 +8,7 @@ import { extrasSuffix } from '@/courseEditor/courseFormat';
 import { cn } from '@/lib/utils';
 import { partWord } from '@/trainings/partWord';
 import {
-  addDays, dayDuration, dayVideoCounts, formatClock, isGenericDayTitle, maxDays, maxVideoRows, newDay, shortDate, subjectColor, themeOfDay, withDayWord,
+  addDays, dayDuration, dayVideoCounts, formatClock, isGenericDayTitle, maxDays, maxVideoRows, newDay, placedGames, shortDate, subjectColor, themeOfDay, withDayWord,
   type Catalog, type CatalogVideo, type DaySlots, type Subject,
 } from './model';
 import { DayBox, DragPreview, dropId, ThemeTray } from './ThemeCards';
@@ -203,7 +203,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
               const subject = themeOfDay(themes, day);
               return <Cell index={index} key={`box-${day.key}`} order={index * 3 + 1} row={2}>
                 <DayBox canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} dayIndex={index} locked={locked}
-                  onVideos={videoIds => patchDay(index, { videos: videoIds })} gameIds={filled(day.games)} onChoose={themeId => applyTheme(index, themeId)}
+                  onVideos={videoIds => patchDay(index, { videos: videoIds })} games={placedGames(day)} onChoose={themeId => applyTheme(index, themeId)}
                   onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)}
                   arriving={arriving?.get(day.key)} onSend={onSendToDay && !readOnly ? files => onSendToDay(day.key, files) : undefined} />
               </Cell>;

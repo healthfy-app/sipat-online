@@ -213,7 +213,11 @@ export interface ProgramDay {
   subject: string | null;
   videoIds: string[];
   gameIds: string[];
+  /** Read only, from a training: where each game opens in the day, as the participant gets it. */
+  gamePlaces?: ProgramGamePlace[] | null;
 }
+/** A game of a day opens after `afterVideo` of the day's videos (0: before the first). */
+export interface ProgramGamePlace { gameId: string; afterVideo: number }
 export interface SipatProgram { id: string; title: string; days: ProgramDay[]; createdAt: string }
 export interface SipatProgramData { title: string; days: ProgramDay[] }
 
