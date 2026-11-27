@@ -63,8 +63,7 @@
 .portal-layout-learner .week-video-body { display: grid; align-content: start; gap: 0.2rem; padding: 0.65rem 0.75rem 0.8rem; }
 .portal-layout-learner .week-video-kicker { color: var(--learner-text-secondary); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .portal-layout-learner .week-video-body strong {
-  display: -webkit-box; overflow: hidden; font-size: 0.9375rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere;
-  -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  font-size: 0.9375rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere;
 }
 .portal-layout-learner .week-video-state { margin-top: 0.15rem; color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 600; }
 .portal-layout-learner .week-video.is-done .week-video-state { color: var(--learner-complete-text, #0b5a2c); }
