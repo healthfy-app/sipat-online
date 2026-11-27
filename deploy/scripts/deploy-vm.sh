@@ -143,7 +143,9 @@ if [ "${ASPIRE_DASHBOARD:-}" = "true" ]; then
   put OTEL_SERVICE_NAME "sipat-online-api-$environment"
   # the public page (https://aspire.<TENANT_BASE_DOMAIN>) only with a token: without one, SSH tunnel only
   if [ -n "${ASPIRE_BROWSER_TOKEN:-}" ]; then
-    put ASPIRE_BROWSER_TOKEN "$ASPIRE_BROWSER_TOKEN"
+    case "$ASPIRE_BROWSER_TOKEN" in *"'"*) echo "ASPIRE_BROWSER_TOKEN cannot have a single quote (')." >&2; exit 1;; esac
+    # in single quotes: Compose would read a $ in it as a variable and change the token
+    put ASPIRE_BROWSER_TOKEN "'$ASPIRE_BROWSER_TOKEN'"
     put ASPIRE_HOST "${ASPIRE_HOST:-aspire.$TENANT_BASE_DOMAIN}"
   fi
 elif [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then
