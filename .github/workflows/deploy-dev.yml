@@ -28,6 +28,11 @@ jobs:
     name: Deploy
     needs: verify
     uses: ./.github/workflows/deploy-vm.yml
+    # the images are signed with the workflow's OIDC identity and get a provenance attestation
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
     with:
       environment: dev
       restore_backup: ${{ inputs.restore_backup || '' }}

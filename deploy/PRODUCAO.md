@@ -139,6 +139,13 @@ Com `DEPLOY_ENVIRONMENT=production`, o script **para** se faltar alguma variáve
 
 É o mesmo passo da primeira subida (2.1 a 2.3), sempre a partir da `main` e fora do horário de uso. O `db-init` roda sozinho antes da API nova. O que muda entre uma versão e outra (comandos de migração de dados, como `--convert-catalog-videos`) vem descrito no PR. Leia antes de subir.
 
+### Imagens assinadas (Sigstore)
+Todo deploy pelo GitHub Actions **assina** o pacote com as imagens da API e do site antes de mandar para a VM, com a identidade do próprio workflow (token OIDC do GitHub, sem chave privada guardada em lugar nenhum). A assinatura fica registrada no log público de transparência da Sigstore (Rekor). Na VM, o deploy **confere a assinatura antes de carregar as imagens**: o pacote tem de ser exatamente o que o workflow `deploy-vm.yml` deste repositório assinou, a partir da branch do ambiente (`main` na produção). Se não conferir, o deploy para e a VM continua com a versão anterior.
+
+- **Produção só aceita imagens assinadas.** Subir da sua máquina com `deploy-vm.sh` para a produção é recusado. Numa emergência (GitHub fora do ar), `ALLOW_UNSIGNED_IMAGES=true` libera uma subida sem assinatura.
+- Cada deploy também grava uma **atestação de proveniência (SLSA)**: de qual commit e de qual workflow saiu o pacote. Ela aparece em *Attestations* no GitHub e pode ser conferida com `gh attestation verify --repo healthfy-app/sipat-online <arquivo>`.
+- O `cosign` da VM é instalado pelo `prepare-vm.sh` a partir do release oficial, com o checksum fixado no script. As actions do GitHub que assinam estão fixadas por commit.
+
 ### Aspire Dashboard (traces, logs e métricas da API)
 Com a variável `ASPIRE_DASHBOARD=true` no ambiente `production` do GitHub (ou no `prod.env`), o deploy sobe o container `aspire-dashboard` na VM e a API manda para ele a telemetria (OTLP). Ele mostra cada requisição com a rota, o tempo, o SQL e as chamadas ao R2, os logs estruturados e as métricas.
 

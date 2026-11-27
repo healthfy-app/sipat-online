@@ -26,7 +26,7 @@ export default function PlatformSettingsPage({
         </div>
         <dl className="settings-list">
           <div><dt>Nome</dt><dd>{session.displayName}</dd></div>
-          <div><dt>Login</dt><dd>sipat.online.admin</dd></div>
+          <div><dt>Login</dt><dd>{session.loginIdentifier}</dd></div>
           <div><dt>Perfil</dt><dd>Operador da plataforma</dd></div>
         </dl>
         <p className="field-hint">
