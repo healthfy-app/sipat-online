@@ -21,6 +21,7 @@ import {
   getRemainingCourseMinutes,
   getTrackPath,
   getTrackProgress,
+  getTrackShare,
   getOverallProgress,
   getMotivation,
   groupTracksByDay,
@@ -297,9 +298,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
         </div>
         <h3><Link to={getTrackPath(track, tracks)}>{title}</Link></h3>
         <div className="learning-catalog-course-progress">
-          <span>{track.completedLessonCount} de {track.lessonCount} vídeos{started && !completed ? ` · ${percentage}%` : ''}</span>
+          <span>{track.completedLessonCount} de {track.lessonCount} vídeos{started && !completed ? ` · ${getTrackShare(track)}%` : ''}</span>
         </div>
-        <ProgressBar value={percentage} label={`Progresso de ${title}`} />
+        <ProgressBar value={getTrackShare(track)} label={`Progresso de ${title}`} />
         <Link
           aria-label={`${completed ? 'Ver certificado de' : started ? 'Continuar curso' : 'Começar curso'} ${title}`}
           className={`learning-catalog-course-action${isRecommended && !started ? ' is-primary' : ''}${completed ? ' is-complete' : ''}${started && !completed ? ' is-started' : ''}`}
@@ -408,7 +409,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                   label={`Progresso do treinamento: ${completedCourses} de ${tracks.length} cursos concluídos`}
                   value={overallProgress}
                 />
-                <p className="learning-completion-motivation">{getMotivation(overallProgress)}</p>
+                <p className="learning-completion-motivation">{getMotivation(Math.max(1, overallProgress))}</p>
               </div>
               {!isFormationComplete && continueTrack && (
                 <>

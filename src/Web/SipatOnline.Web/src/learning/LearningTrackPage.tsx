@@ -535,7 +535,8 @@ export default function LearningTrackPage({
   // "Dia" when the training has dates, "Módulo" when none of its parts has one
   const word = partWord(assignedTracks.filter(track => track.sipatEventId === experience.track.sipatEventId).map(track => track.dayDate).concat(experience.track.dayDate));
   const dayDate = formatDayDate(experience.track.dayDate);
-  const percentage = getTrackProgress(experience.track);
+  // videos finished out of the day's videos: the same count the company's reports use
+  const percentage = countedLessons.length === 0 ? 0 : Math.round(completedLessons * 100 / countedLessons.length);
   const markers = activities
     .filter(item => item.lessonId === selectedLesson?.id && item.timeMilliseconds !== null)
     .map(item => ({ id: item.id, seconds: item.timeMilliseconds! / 1000, title: item.module.title, done: item.outcome !== null }));

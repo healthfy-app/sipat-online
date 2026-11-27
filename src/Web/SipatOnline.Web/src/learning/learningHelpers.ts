@@ -140,6 +140,19 @@ export function getTrackProgress(track: LearningTrackCard): number {
     : Math.min(99, Math.max(0, track.progressPercentage));
 }
 
+/**
+ * The number shown as the progress of a day: the videos finished out of its videos, the same count the company's
+ * reports use. (How far into a video the person is shows on the video itself.)
+ */
+export function getTrackShare(track: LearningTrackCard): number {
+  if (track.lessonCount <= 0) {
+    return 0;
+  }
+  return track.completedLessonCount >= track.lessonCount
+    ? 100
+    : Math.min(99, Math.max(0, Math.round(track.completedLessonCount * 100 / track.lessonCount)));
+}
+
 /** Where to start: never an extra on its own, unless the day has nothing else. */
 export function getNextLesson(allLessons: LearningLessonProgress[]): LearningLessonProgress | null {
   const lessons = houseLessons(allLessons);
@@ -159,12 +172,14 @@ export function getOverallProgress(tracks: LearningTrackCard[]): number {
     return 0;
   }
 
-  const weightedProgress = tracks.reduce(
-    (total, track) =>
-      total + Math.max(0, track.lessonCount) * getTrackProgress(track),
+  // videos finished out of all the videos, as in the company's reports
+  const completedLessons = tracks.reduce(
+    (total, track) => total + Math.min(Math.max(0, track.lessonCount), Math.max(0, track.completedLessonCount)),
     0,
   );
-  return Math.floor(weightedProgress / totalLessons);
+  return completedLessons >= totalLessons
+    ? 100
+    : Math.min(99, Math.round(completedLessons * 100 / totalLessons));
 }
 
 export function resolveAssignedTrackId(routeValue: string, tracks: LearningTrackCard[]): string {
