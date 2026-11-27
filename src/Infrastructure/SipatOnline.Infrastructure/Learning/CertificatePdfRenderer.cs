@@ -27,6 +27,7 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         page.Height = XUnit.FromPoint(595);
         using var graphics = XGraphics.FromPdfPage(page);
         PdfAccentGlyphs.Embed(graphics, "SipatCertificate");
+        PdfAccentGlyphs.Embed(graphics, "SipatCertificate", bold: true);
         var inkColor = XColor.FromArgb(16, 45, 38);
         var greenColor = XColor.FromArgb(20, 105, 75);
         var goldColor = XColor.FromArgb(201, 162, 39);
@@ -59,14 +60,9 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         var template = certificate.Template;
         var cover = template?.Cover;
         var emblem = template?.Emblem;
-        // paper, a double frame and a band of the product's colors on the left
+        // a clean white page: the company's cover, when there is one, takes the top, in the place of the row of logos
         graphics.DrawRectangle(XBrushes.White, 0, 0, page.Width.Point, page.Height.Point);
-        graphics.DrawRectangle(green, 0, 0, 14, page.Height.Point);
-        graphics.DrawRectangle(new XSolidBrush(goldColor), 14, 0, 4, page.Height.Point);
-        // the company's cover takes the top of the page, in the place of the row of logos
         if (cover is not null) Picture(cover, new XRect(40, 28, 774, 106), fill: true);
-        graphics.DrawRectangle(new XPen(greenColor, 1.6), 34, 22, 786, 551);
-        graphics.DrawRectangle(new XPen(XColor.FromArgb(200, 214, 206), 0.6), 40, 28, 774, 539);
 
         if (cover is null)
         {
@@ -86,11 +82,11 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
             Picture(emblem, new XRect(387, 100, 68, 68), round: true);
         }
         var small = new XFont("SipatCertificate", 9);
-        void Block(string text, double top, double height, double preferredSize, XBrush? brush = null)
+        void Block(string text, double top, double height, double preferredSize, XBrush? brush = null, bool bold = false)
         {
             for (var size = preferredSize; size >= 8; size--)
             {
-                var font = new XFont("SipatCertificate", size);
+                var font = new XFont("SipatCertificate", size, bold ? XFontStyleEx.Bold : XFontStyleEx.Regular);
                 var lineHeight = font.GetHeight();
                 var lines = new List<string>();
                 var line = "";
@@ -118,34 +114,78 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
             throw new InvalidOperationException("Certificate text exceeds its bounded layout.");
         }
 
+        // The contents the participant concluded, each with its check mark: one column while they fit, then two or
+        // three. What still does not fit is counted in the last place, and a name wider than its column is cut short.
+        void Checklist(IReadOnlyList<string> courses, double top)
+        {
+            const double bottom = 474, left = 76, width = 690, headingHeight = 18, gap = 32;
+            graphics.DrawString("CONTEÚDOS CONCLUÍDOS", new XFont("SipatCertificate", 8, XFontStyleEx.Bold), green,
+                new XRect(left, top, width, 11), XStringFormats.TopCenter);
+            top += headingHeight;
+            // fewer columns first (a single list reads best), each from the largest letter down; the last try always draws
+            var tries = new[] { 1, 2, 3 }.SelectMany(most => new[] { 13d, 12d, 11d, 10d }.Select(size => (Size: size, Most: most, Last: false)))
+                .Append((Size: 9d, Most: 3, Last: true));
+            foreach (var (size, most, last) in tries)
+            {
+                var font = new XFont("SipatCertificate", size);
+                var rowHeight = size + 6;
+                var mark = size + 7;
+                var rows = (int)((bottom - top) / rowHeight);
+                if (rows < 1)
+                {
+                    if (last) return;
+                    continue;
+                }
+
+                var columns = Math.Min(most, (courses.Count + rows - 1) / rows);
+                if (!last && columns * rows < courses.Count) continue;
+                var names = courses.ToList();
+                var more = names.Count > columns * rows ? names.Count - (columns * rows - 1) : 0;
+                if (more > 0) names = [.. names.Take(columns * rows - 1), $"e mais {more}"];
+                var room = (width - (columns - 1) * gap) / columns - mark;
+                if (!last && names.Any(name => graphics.MeasureString(name, font).Width > room)) continue;
+                for (var index = 0; index < names.Count; index++)
+                {
+                    var name = names[index];
+                    while (name.Length > 2 && graphics.MeasureString(name, font).Width > room) name = name[..^2].TrimEnd() + "…";
+                    names[index] = name;
+                }
+
+                var columnWidth = names.Max(name => graphics.MeasureString(name, font).Width) + mark;
+                var perColumn = (names.Count + columns - 1) / columns;
+                var x0 = left + (width - (columns * columnWidth + (columns - 1) * gap)) / 2;
+                var white = new XPen(XColors.White, 1.3) { LineCap = XLineCap.Round, LineJoin = XLineJoin.Round };
+                for (var index = 0; index < names.Count; index++)
+                {
+                    var x = x0 + index / perColumn * (columnWidth + gap);
+                    var y = top + index % perColumn * rowHeight;
+                    var middle = y + rowHeight / 2;
+                    if (more == 0 || index < names.Count - 1)
+                    {
+                        var radius = size / 2;
+                        graphics.DrawEllipse(green, x, middle - radius, size, size);
+                        graphics.DrawLines(white, [new XPoint(x + size * 0.27, middle + size * 0.02), new XPoint(x + size * 0.44, middle + size * 0.19), new XPoint(x + size * 0.74, middle - size * 0.18)]);
+                    }
+
+                    graphics.DrawString(names[index], font, ink, new XRect(x + mark, y, columnWidth - mark, rowHeight), XStringFormats.CenterLeft);
+                }
+
+                return;
+            }
+        }
+
         var period = Period(certificate.StartsAt, certificate.EndsAt);
-        var heading = certificate.IsDemonstration ? "CERTIFICADO DEMONSTRATIVO" : "CERTIFICADO";
-        if (cover is null)
-        {
-            Block(heading, 128, 22, 13, green);
-            Block("de participação", 150, 44, 32);
-            graphics.DrawLine(new XPen(goldColor, 2), 391, 200, 451, 200);
-            Block("Certificamos que", 216, 22, 13, muted);
-            Block(certificate.ParticipantName, 240, 60, 28);
-            graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.8), 231, 304, 611, 304);
-            Block($"da empresa {certificate.CompanyName}, participou do treinamento", 316, 40, 14);
-            Block(certificate.EventTitle, 358, 50, 18, green);
-            Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", 412, 24, 13, muted);
-        }
-        else
-        {
-            // under a cover the same text is set closer together, below the emblem when there is one
-            var top = emblem is null ? 146d : 176d;
-            Block(heading, top, 22, 13, green);
-            Block("de participação", top + 20, 40, 28);
-            graphics.DrawLine(new XPen(goldColor, 2), 391, top + 66, 451, top + 66);
-            Block("Certificamos que", top + 76, 20, 13, muted);
-            Block(certificate.ParticipantName, top + 98, 52, 26);
-            graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.8), 231, top + 154, 611, top + 154);
-            Block($"da empresa {certificate.CompanyName}, participou do treinamento", top + 162, 36, 13);
-            Block(certificate.EventTitle, top + 200, 44, 17, green);
-            Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", top + 248, 22, 12, muted);
-        }
+        var courses = certificate.Courses is { Count: > 0 } listed ? listed : null;
+        // the text starts under the logos, the cover or the emblem; with no contents to list it sits a little lower
+        var top = (cover is null ? 116d : emblem is null ? 150d : 180d) + (courses is null ? 30 : 0);
+        Block(certificate.IsDemonstration ? "Certificado demonstrativo de" : "Certificado de", top, 26, 20);
+        Block("Participação", top + 24, 44, 34, bold: true);
+        Block("Este certificado reconhece que", top + 78, 18, 12, muted);
+        Block(certificate.ParticipantName, top + 98, 44, 24, bold: true);
+        Block($"da empresa {certificate.CompanyName}, participou do treinamento", top + 146, 30, 12);
+        Block(certificate.EventTitle, top + 178, 36, 16, green, bold: true);
+        Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", top + 216, 18, 11, muted);
+        if (courses is not null) Checklist(courses, top + 246);
 
         // footer: issue date on the left, the code on the right, the notice in the middle
         graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.6), 64, 478, 790, 478);
