@@ -25,6 +25,9 @@
 #           ASPIRE_DASHBOARD (true: Aspire Dashboard on the VM receives the telemetry; wins over OTEL_*)
 #           ASPIRE_BROWSER_TOKEN (login of the page; with it the page is at https://ASPIRE_HOST,
 #           default aspire.<TENANT_BASE_DOMAIN>; without it, SSH tunnel only)
+#           IMAGES_SIGNATURE (cosign: sign the images with the OIDC identity of GitHub Actions and check it on
+#           the VM) IMAGES_SIGNER_IDENTITY (the signing workflow, set by deploy-vm.yml)
+#           ALLOW_UNSIGNED_IMAGES (true: production takes images built outside Actions; emergencies only)
 #           R2_BACKUP_BUCKET R2_BACKUP_ACCESS_KEY_ID R2_BACKUP_SECRET_ACCESS_KEY (the key falls back to
 #           R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY, for a key that can also write the backup bucket)
 #           RESTORE_BACKUP (latest | sipat-online-YYYYMMDD-HHMMSS.dump: only on a new, empty VM)
@@ -157,6 +160,28 @@ docker buildx build --load --platform "$platform" --file deploy/nginx/Dockerfile
 docker save "sipat-online-api:$tag" "sipat-online-web:$tag" | gzip -1 > "$work/images.tar.gz"
 echo "images: $(du -h "$work/images.tar.gz" | cut -f1)"
 
+# Signature of the images (Sigstore, keyless): in GitHub Actions the workflow signs the package with its own identity
+# (its OIDC token; no key to keep or leak, and the signature goes to the public Rekor log), and the VM checks it before
+# loading anything. Production refuses a package without it, so it only takes images built by the workflow.
+signer_identity=""
+if [ "${IMAGES_SIGNATURE:-}" = "cosign" ]; then
+  signer_identity="${IMAGES_SIGNER_IDENTITY:-}"
+  if ! [[ "$signer_identity" =~ ^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/\.github/workflows/[A-Za-z0-9_.-]+@refs/heads/[A-Za-z0-9_./-]+$ ]]; then
+    echo "IMAGES_SIGNER_IDENTITY must be the workflow that signs: https://github.com/<owner>/<repo>/.github/workflows/<file>@refs/heads/<branch>." >&2
+    exit 1
+  fi
+  echo "==> Sign images ($signer_identity)"
+  cosign sign-blob --yes --bundle "$work/images.sigstore.json" "$work/images.tar.gz" > /dev/null
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    # for the build provenance attestation of the workflow
+    echo "images_digest=sha256:$(sha256sum "$work/images.tar.gz" | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+  fi
+elif [ "$environment" = "production" ] && [ "${ALLOW_UNSIGNED_IMAGES:-}" != "true" ]; then
+  echo "Production only takes images signed by GitHub Actions (merge to main, or Actions -> Deploy production)." >&2
+  echo "In an emergency, ALLOW_UNSIGNED_IMAGES=true deploys from this machine without a signature." >&2
+  exit 1
+fi
+
 echo "==> Prepare $DEPLOY_HOST"
 # its own SSH session: the docker group it may add only counts from the next login
 remote "sudo bash -s -- '$DEPLOY_APP_PATH' '$DEPLOY_USER'" < deploy/scripts/prepare-vm.sh
@@ -167,15 +192,31 @@ tar --create --gzip --exclude=deploy/terraform --exclude=deploy/cloudflare --exc
   | remote "tar --extract --gzip --directory '$DEPLOY_APP_PATH'"
 remote "umask 077 && cat > '$DEPLOY_APP_PATH/deploy/.env.production'" < "$env_file"
 remote "cat > /tmp/sipat-online-images.tar.gz" < "$work/images.tar.gz"
+if [ -n "$signer_identity" ]; then
+  remote "cat > /tmp/sipat-online-images.sigstore.json" < "$work/images.sigstore.json"
+fi
 
 echo "==> Start the stack"
-remote "bash -s -- '$DEPLOY_APP_PATH' '$restore'" <<'REMOTE' | tee "$work/remote.log"
+remote "bash -s -- '$DEPLOY_APP_PATH' '$restore' '$signer_identity'" <<'REMOTE' | tee "$work/remote.log"
 set -euo pipefail
 cd "$1"
 restore="$2"
+signer="$3"
 chmod 0755 deploy/scripts/*.sh
+if [ -n "$signer" ]; then
+  # nothing is loaded unless the package is exactly what that workflow signed
+  if ! cosign verify-blob --bundle /tmp/sipat-online-images.sigstore.json \
+      --certificate-identity "$signer" \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      /tmp/sipat-online-images.tar.gz; then
+    rm -f /tmp/sipat-online-images.tar.gz /tmp/sipat-online-images.sigstore.json
+    echo "The signature of the images does not check out: nothing was changed on this VM." >&2
+    exit 1
+  fi
+  echo "Images signed by $signer"
+fi
 gunzip -c /tmp/sipat-online-images.tar.gz | docker load
-rm -f /tmp/sipat-online-images.tar.gz
+rm -f /tmp/sipat-online-images.tar.gz /tmp/sipat-online-images.sigstore.json
 
 compose=(docker compose --env-file deploy/.env.production --file deploy/compose.production.yaml)
 "${compose[@]}" up -d --no-build --wait postgres
