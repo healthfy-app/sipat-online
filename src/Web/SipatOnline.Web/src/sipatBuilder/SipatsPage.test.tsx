@@ -29,10 +29,8 @@ describe('SIPATs of a company', () => {
     vi.mocked(api.listSipatPlans).mockResolvedValue([{ sipatEventId: 'b', days: 5, videos: 18 }]);
     render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
 
-    // the list opens on what is in progress; the others are a choice of the filter away
+    // the list opens on all of them, so a new draft shows up right away
     expect(await screen.findByRole('link', { name: 'Abrir SIPAT 2026' })).toBeVisible();
-    expect(screen.queryByRole('region', { name: 'Treinamentos de 2027' })).not.toBeInTheDocument();
-    await userEvent.setup().selectOptions(screen.getByRole('combobox', { name: 'Fase' }), 'all');
 
     const first = await screen.findByRole('region', { name: 'Treinamentos de 2027' });
     const second = screen.getByRole('region', { name: 'Treinamentos de 2026' });

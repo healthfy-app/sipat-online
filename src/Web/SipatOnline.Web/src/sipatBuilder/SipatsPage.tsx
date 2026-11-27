@@ -12,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import CompanyGamesTab from '@/courseCatalog/CompanyGamesTab';
 import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import LoadingState from '@/LoadingState';
-import { phaseLabel, sipatPhase, type SipatPhase } from './sipatPhase';
+import { phaseGroup, phaseGroups, phaseLabel, sipatPhase, type PhaseGroup } from './sipatPhase';
 import AudienceFilter from '@/trainings/AudienceFilter';
 import { audienceLabel } from '@/trainings/audienceLabel';
 import TrainingCard from '@/trainings/TrainingCard';
@@ -21,11 +21,9 @@ import { copyTrainingLink } from '@/trainings/trainingLink';
 import { inChoice } from '@/trainings/UnitTree';
 import { trainingInUnit, useUnitScope } from '@/trainings/unitScope';
 
-const phases: SipatPhase[] = ['draft', 'created', 'published', 'running', 'finished', 'cancelled'];
-
 /**
  * The trainings of a company, the way Conteúdos lists its own: a search, a filter by phase and by who they are for, and
- * the same card for each. It always opens on the ones in progress; the others are a choice of the filter away.
+ * the same card for each. It opens on all of them, so a training just created shows up right away.
  * Newest year first; several can be published at the same time.
  * `operator`: the operation, inside a company. On a plan that only views (Bronze) it is the one that builds the trainings.
  */
@@ -46,8 +44,8 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
   // the training an action is running on (reactivate, duplicate, delete, open in the editor)
   const [working, setWorking] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  // every visit starts on what is happening now
-  const [phase, setPhase] = useState<SipatPhase | 'all'>('running');
+  // every visit starts on all of them: a new draft must show up right away
+  const [phase, setPhase] = useState<PhaseGroup | 'all'>('all');
   // the units and sectors marked in "Para quem" (none: everyone's)
   const [audience, setAudience] = useState(() => new Map<string, Set<string>>());
 
@@ -71,7 +69,7 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
   );
   const shown = useMemo(() => {
     const text = query.trim().toLocaleLowerCase('pt-BR');
-    return inScope.filter(event => (phase === 'all' || phaseOf(event) === phase)
+    return inScope.filter(event => (phase === 'all' || phaseGroup(phaseOf(event)) === phase)
       && inChoice(plans.find(item => item.sipatEventId === event.id)?.targets ?? [], audience)
       && (!text || event.title.toLocaleLowerCase('pt-BR').includes(text)));
     // phaseOf reads the summaries
@@ -185,9 +183,9 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
         <Search aria-hidden="true" className="pointer-events-none absolute left-3 size-4" />
         <Input aria-label="Buscar treinamento" className="pl-9" onChange={event => setQuery(event.target.value)} placeholder="Buscar por nome" type="search" value={query} />
       </label>
-      <NativeSelect aria-label="Fase" className="w-auto max-sm:flex-1" onChange={event => setPhase(event.target.value as SipatPhase | 'all')} value={phase}>
+      <NativeSelect aria-label="Fase" className="w-auto max-sm:flex-1" onChange={event => setPhase(event.target.value as PhaseGroup | 'all')} value={phase}>
         <option value="all">Todas as fases</option>
-        {phases.map(item => <option key={item} value={item}>{phaseLabel[item].text}</option>)}
+        {phaseGroups.map(item => <option key={item.value} value={item.value}>{item.text}</option>)}
       </NativeSelect>
       {registry && <AudienceFilter choice={audience} onChange={setAudience} registry={registry} />}
       {filtered && <Button onClick={showAll} size="sm" variant="ghost">Ver todos</Button>}
@@ -195,9 +193,7 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
         {filtered ? `${shown.length} de ${pluralize(total, 'treinamento', 'treinamentos')}` : pluralize(total, 'treinamento', 'treinamentos')}
       </span>
     </div>}
-    {total > 0 && shown.length === 0 && (phase === 'running' && query.trim() === '' && audience.size === 0
-      ? <EmptyState action={<Button onClick={showAll} variant="outline">Ver todos os treinamentos</Button>} description="Os rascunhos, os publicados que ainda não começaram e os anteriores aparecem ao trocar o filtro." title="Nenhum treinamento em andamento." />
-      : <EmptyState action={<Button onClick={showAll} variant="outline">Ver todos os treinamentos</Button>} description="Tente outro nome, outra fase ou outro setor." title="Nenhum treinamento encontrado." />)}
+    {total > 0 && shown.length === 0 && <EmptyState action={<Button onClick={showAll} variant="outline">Ver todos os treinamentos</Button>} description="Tente outro nome, outra fase ou outro setor." title="Nenhum treinamento encontrado." />}
 
     {years.map(([year, items]) => <section aria-label={`Treinamentos de ${year}`} className="grid gap-3" key={year}>
       <h2 className="m-0 text-sm font-semibold tracking-wide text-muted-foreground">{year}</h2>

@@ -2,10 +2,8 @@ import { Search, Settings2, X } from 'lucide-react';
 import type { CourseCategory, VideoSubject } from '@/api';
 import { Button } from '@/components/ui/button';
 import { Input, NativeSelect } from '@/components/ui/input';
-import { phaseLabel, type SipatPhase } from '@/sipatBuilder/sipatPhase';
+import { phaseGroups } from '@/sipatBuilder/sipatPhase';
 import type { CatalogFilters, StatusFilter } from './catalogFilters';
-
-const phases: SipatPhase[] = ['draft', 'created', 'published', 'running', 'finished', 'cancelled'];
 
 export type CatalogTab = 'courses' | 'videos' | 'modules' | 'plans';
 
@@ -72,7 +70,7 @@ export default function CatalogToolbar({
           <NativeSelect aria-label="Fase" className="w-auto max-sm:flex-1" onChange={(event) => onChange({ status: event.target.value as StatusFilter })} value={filters.status}>
             <option value="active">Ativos</option>
             <option value="all">Todas as fases</option>
-            {phases.map((item) => <option key={item} value={item}>{phaseLabel[item].text}</option>)}
+            {phaseGroups.map((item) => <option key={item.value} value={item.value}>{item.text}</option>)}
           </NativeSelect>
           <NativeSelect aria-label="Filtrar por categoria" className="w-auto max-sm:flex-1" onChange={(event) => onChange({ category: event.target.value })} value={filters.category}>
             <option value="all">Todas as categorias</option>

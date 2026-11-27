@@ -1,8 +1,8 @@
 import type { CourseCategory, GameModule, PlatformCourse, PlatformLibraryVideo } from '@/api';
-import { sipatPhase, type SipatPhase } from '@/sipatBuilder/sipatPhase';
+import { phaseGroup, sipatPhase, type PhaseGroup, type SipatPhase } from '@/sipatBuilder/sipatPhase';
 
-/** 'active' (what the list opens on: everything but the ended and the finished), 'all', or one phase. */
-export type StatusFilter = 'active' | 'all' | SipatPhase;
+/** 'active' (what the list opens on: everything but the ended and the finished), 'all', or one group of phases. */
+export type StatusFilter = 'active' | 'all' | PhaseGroup;
 /** 'all', 'none' (subjects without a category) or the id of a category. */
 export type CategoryFilter = string;
 
@@ -40,7 +40,7 @@ export function filterCourses(courses: PlatformCourse[], categories: CourseCateg
   const inPhase = (course: PlatformCourse) => {
     if (filters.status === 'all') return true;
     const phase = coursePhase(course, owners.get(course.id));
-    return filters.status === 'active' ? phase !== 'cancelled' && phase !== 'finished' : phase === filters.status;
+    return filters.status === 'active' ? phase !== 'cancelled' && phase !== 'finished' : phaseGroup(phase) === filters.status;
   };
   return courses.filter((course) =>
     inPhase(course)
