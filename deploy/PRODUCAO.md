@@ -142,11 +142,13 @@ Com `DEPLOY_ENVIRONMENT=production`, o script **para** se faltar alguma variáve
 ### Aspire Dashboard (traces, logs e métricas da API)
 Com a variável `ASPIRE_DASHBOARD=true` no ambiente `production` do GitHub (ou no `prod.env`), o deploy sobe o container `aspire-dashboard` na VM e a API manda para ele a telemetria (OTLP). Ele mostra cada requisição com a rota, o tempo, o SQL e as chamadas ao R2, os logs estruturados e as métricas.
 
-- **Não fica na internet.** A página escuta só em `127.0.0.1:18888` da VM, sem login próprio: quem chega nela já tem a chave SSH. Abra um túnel e use o navegador da sua máquina:
+- **Página pública com token.** Com o segredo `ASPIRE_BROWSER_TOKEN` (no ambiente do GitHub ou no `prod.env`), a página fica em `https://aspire.<domínio>` e pede esse token no primeiro acesso de cada navegador. O certificado inclui o host sozinho. Sem o segredo, a página só existe pelo túnel. Para trocar o token (vazou, saiu alguém), troque o segredo e rode o deploy de novo.
+- **Pelo túnel SSH**, sem passar pela internet: a página também escuta em `127.0.0.1:18888` da VM.
   ```powershell
   ssh -i $HOME\.sipat-online\prod_deploy -N -L 18888:127.0.0.1:18888 sipat@<IP da VM>
   ```
-  Com o túnel aberto, acesse `http://localhost:18888`. Feche o terminal para encerrar.
+  Com o túnel aberto, acesse `http://localhost:18888` (pede o mesmo token). Feche o terminal para encerrar.
+- `aspire` é uma chave reservada: nenhuma empresa pode usá-la.
 - **Guarda tudo em memória.** Reiniciar o container ou a VM apaga o histórico. Para guardar dias de histórico, use o Grafana Cloud ([CLOUDFLARE-VM.md](CLOUDFLARE-VM.md), seção 7); os dois não funcionam juntos, e o `ASPIRE_DASHBOARD=true` tem prioridade.
 - Para desligar, apague a variável e rode o deploy de novo: o container é removido.
 

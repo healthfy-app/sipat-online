@@ -10,6 +10,8 @@ public sealed record TenantKey
         "api",
         "admin",
         "app",
+        // the Aspire Dashboard page of the production (deploy/scripts/deploy-vm.sh, ASPIRE_HOST)
+        "aspire",
         "videos",
         "www"
     };

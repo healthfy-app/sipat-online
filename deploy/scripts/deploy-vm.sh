@@ -21,6 +21,8 @@
 #           VIDEO_STORAGE_PROVIDER (File|R2) R2_SERVICE_URL R2_VIDEO_BUCKET R2_ACCESS_KEY_ID
 #           R2_SECRET_ACCESS_KEY R2_DIRECT_UPLOAD OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
 #           ASPIRE_DASHBOARD (true: Aspire Dashboard on the VM receives the telemetry; wins over OTEL_*)
+#           ASPIRE_BROWSER_TOKEN (login of the page; with it the page is at https://ASPIRE_HOST,
+#           default aspire.<TENANT_BASE_DOMAIN>; without it, SSH tunnel only)
 #           R2_BACKUP_BUCKET R2_BACKUP_ACCESS_KEY_ID R2_BACKUP_SECRET_ACCESS_KEY (the key falls back to
 #           R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY, for a key that can also write the backup bucket)
 #           RESTORE_BACKUP (latest | sipat-online-YYYYMMDD-HHMMSS.dump: only on a new, empty VM)
@@ -128,6 +130,11 @@ if [ "${ASPIRE_DASHBOARD:-}" = "true" ]; then
   put OTEL_EXPORTER_OTLP_ENDPOINT "http://aspire-dashboard:18889"
   put OTEL_EXPORTER_OTLP_PROTOCOL grpc
   put OTEL_SERVICE_NAME "sipat-online-api-$environment"
+  # the public page (https://aspire.<TENANT_BASE_DOMAIN>) only with a token: without one, SSH tunnel only
+  if [ -n "${ASPIRE_BROWSER_TOKEN:-}" ]; then
+    put ASPIRE_BROWSER_TOKEN "$ASPIRE_BROWSER_TOKEN"
+    put ASPIRE_HOST "${ASPIRE_HOST:-aspire.$TENANT_BASE_DOMAIN}"
+  fi
 elif [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then
   put OTEL_EXPORTER_OTLP_ENDPOINT "$OTEL_EXPORTER_OTLP_ENDPOINT"
   put OTEL_EXPORTER_OTLP_HEADERS "${OTEL_EXPORTER_OTLP_HEADERS:-}"
