@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type RefObject } from 'react';
 import { getLearningActivities, saveLearningActivityOutcome, type LearningActivity } from './api';
-import CourseDialog from './CourseDialog';
+import DayActivities from '@/learning/day/DayActivities';
 import GamePlayer from '@/games/LazyGamePlayer';
 import { Button } from '@/components/ui/button';
 import type { GameOutcome } from '@/games/gameKit';
@@ -141,48 +141,14 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
   if (error) return <section className="learning-lesson-details" role="alert">
     <p>{error}</p><button className="button button-secondary" onClick={() => setRetry(value => value + 1)} type="button">Recarregar atividades</button>
   </section>;
-  if (!activities.length) return null;
-  return <section aria-labelledby="learning-activities-title" className="learning-lesson-details learning-activities-panel">
-    <div className="learning-activities-intro">
-      <div className="learning-activities-heading">
-        <h2 id="learning-activities-title">Atividades para praticar</h2>
-        <span>{activities.length}</span>
-      </div>
-      <p>Jogos opcionais para praticar. Pular não bloqueia a conclusão do treinamento.</p>
-    </div>
-    <button aria-expanded={activitiesOpen} aria-haspopup="dialog" className="learning-activities-open"
-      onClick={openActivityList} type="button">
-      Ver atividades <span aria-hidden="true">→</span>
-    </button>
-    {notice && <p role="status">{notice}</p>}
-    {activitiesOpen && (
-      <CourseDialog className="learning-dialog learning-activities-dialog" onClose={closeActivityList} title="Atividades para praticar" wide>
-        <p className="learning-dialog-intro">Escolha uma atividade para revisar o conteúdo. Todas são opcionais e não bloqueiam seu progresso.</p>
-        <div className="learning-activity-grid">
-          {activities.map(activity => {
-            const status = activity.outcome === 'completed'
-              ? 'Concluída'
-              : activity.outcome === 'skipped'
-                ? 'Pulada'
-                : 'Iniciar atividade';
-            return (
-              <button
-                aria-label={`${activity.module.title} · ${status}`}
-                className="learning-activity-card"
-                key={activity.id}
-                onClick={() => startFromList(activity)}
-                type="button"
-              >
-                <span className="learning-activity-title">{activity.module.title}</span>
-                <span aria-hidden="true" className={`learning-activity-status${activity.outcome ? ` is-${activity.outcome}` : ' is-available'}`}>
-                  {activity.outcome === 'completed' ? '✓' : activity.outcome === 'skipped' ? 'Pulada' : '→'}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </CourseDialog>
-    )}
+  return <DayActivities
+    activities={activities.map(item => ({ id: item.id, title: item.module.title, outcome: item.outcome }))}
+    listOpen={activitiesOpen}
+    notice={notice}
+    onCloseList={closeActivityList}
+    onOpenList={openActivityList}
+    onStart={id => { const activity = activities.find(item => item.id === id); if (activity) startFromList(activity); }}
+  >
     {active && <GameStage busy={busy} label={active.module.title} onClose={() => void close('skipped')}>
       <GamePlayer key={active.id} module={active.module} onClose={outcome => void close(outcome)} />
       {saveError && <div className="mt-2 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-destructive-soft px-4 py-3 font-sans text-sm text-destructive" role="alert">
@@ -193,5 +159,5 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
         }} size="sm" variant="outline">Fechar sem registrar</Button>
       </div>}
     </GameStage>}
-  </section>;
+  </DayActivities>;
 }

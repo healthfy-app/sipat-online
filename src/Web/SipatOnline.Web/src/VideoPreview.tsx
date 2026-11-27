@@ -3,14 +3,17 @@ import type { PreviewCheckpoint } from '@/courseEditor/courseTrack';
 import GameStage from '@/games/GameStage';
 import GamePlayer from '@/games/LazyGamePlayer';
 import { SipatVideoPlayer, type PlayerEvent } from '@sipat/video-player';
+import { videoVersions, type MadeVersions } from '@/videoVersions';
 
 /**
- * Free playback (no rules) of a library video, on the same SIPAT player participants use.
- * When the video has games at given moments, they open here too, so creators see what
+ * Free playback (no rules) of a library video, on the same SIPAT player participants use, with the same versions
+ * (the 1080p when it was made). When the video has games at given moments, they open here too, so creators see what
  * participants will see. Seeking back before a game makes it open again.
  */
-export default function VideoPreview({ src, title, preload = 'metadata', checkpoints = [] }: {
+export default function VideoPreview({ src, versions, title, preload = 'metadata', checkpoints = [] }: {
   src: string;
+  /** The versions made of the video (the library video itself): the player offers each one. */
+  versions?: MadeVersions;
   title: string;
   preload?: 'none' | 'metadata';
   checkpoints?: PreviewCheckpoint[];
@@ -30,6 +33,6 @@ export default function VideoPreview({ src, title, preload = 'metadata', checkpo
         <GamePlayer key={active.id} module={active.module} onClose={closeGame} />
       </GameStage>}
       checkpoints={checkpoints.map(item => ({ id: item.id, seconds: item.timeMilliseconds / 1000, title: item.module.title, done: false }))}
-      key={src} onEvent={onEvent} preload={preload} sources={[{ src }]} title={title} />
+      key={src} onEvent={onEvent} preload={preload} sources={videoVersions(src, versions)} title={title} />
   </div>;
 }

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { durationLabel, extrasSuffix, formatDuration, houseVideos, pluralize, statusLabels } from './courseFormat';
 import ExtraBadge from './ExtraBadge';
-import { gameTypeLabel, type LessonGroup } from './courseTrack';
+import { gameTypeLabel, placementOf, type LessonGroup } from './courseTrack';
 import InlineText from './InlineText';
 
 export const editorPanel = 'relative z-[1] flex min-h-0 min-w-0 flex-col overflow-y-auto bg-card shadow-panel max-[1180px]:min-h-auto max-[1180px]:overflow-visible';
@@ -28,6 +28,10 @@ export interface OutlineActions {
   onRemoveVideo: (videoId: string) => void;
   onManageActivities: () => void;
   onAddActivity: (afterVideoCount: number) => void;
+  /** Moves an activity (by its placement) one step in the participant's order. */
+  onMoveActivity: (placementIndex: number, delta: -1 | 1) => void;
+  /** Takes an activity (by its placement) out of the training; the game stays in the list of games. */
+  onRemoveActivity: (placementIndex: number) => void;
   onDuplicate: () => void;
 }
 
@@ -227,6 +231,18 @@ export default function CourseOutlinePanel({
                               <MiniButton danger disabled={gridBusy} label={`Remover ${item.title} do treinamento`} onClick={() => actions.onRemoveVideo(item.video.id)}>×</MiniButton>
                             </span>
                           </>}
+                          {/* an activity moves like a video: past a video it changes place, past another activity it changes turn */}
+                          {item.kind === 'activity' && <span
+                            className={cn(
+                              'relative z-[1] col-start-3 row-start-1 hidden gap-0.5',
+                              'group-hover/item:flex group-focus-within/item:flex max-[860px]:flex',
+                              selected && 'flex',
+                            )}
+                          >
+                            <MiniButton disabled={actBusy || flatItems.indexOf(item) === 0} label={`Mover ${item.title} para cima`} onClick={() => actions.onMoveActivity(placementOf(item), -1)}>↑</MiniButton>
+                            <MiniButton disabled={actBusy || flatItems.indexOf(item) === flatItems.length - 1} label={`Mover ${item.title} para baixo`} onClick={() => actions.onMoveActivity(placementOf(item), 1)}>↓</MiniButton>
+                            <MiniButton danger disabled={actBusy} label={`Tirar ${item.title} do treinamento`} onClick={() => actions.onRemoveActivity(placementOf(item))}>×</MiniButton>
+                          </span>}
                         </li>
                         {item.kind === 'video' && (
                           <li className="min-h-0">

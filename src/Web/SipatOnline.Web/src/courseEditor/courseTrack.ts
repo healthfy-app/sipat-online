@@ -1,4 +1,4 @@
-import type { GameModule, PlatformCourse, PlatformCourseVideo } from '../api';
+import type { CourseModulePlacement, GameModule, PlatformCourse, PlatformCourseVideo } from '../api';
 import { gameTypeOptions } from '../gamificationGames';
 
 /** A game that pauses a video at a given moment, with its module already resolved. */
@@ -43,6 +43,44 @@ export function buildTrack(course: PlatformCourse, modules: GameModule[]): Track
   return items;
 }
 
+/** The index of an activity's placement in `course.modules`, from its key in the track. */
+export function placementOf(item: Extract<TrackItem, { kind: 'activity' }>): number {
+  return Number(/^activity-(\d+)-/.exec(item.key)?.[1] ?? -1);
+}
+
+/**
+ * The training's activities after one moves a step in the participant's order: past a video it changes place (before
+ * or after that video), past another activity the two change turns. Null when it is already at that end.
+ */
+export function moveActivity(course: PlatformCourse, placementIndex: number, delta: -1 | 1): CourseModulePlacement[] | null {
+  const lastSlot = course.videos.length;
+  // the order the participant gets them in: by place, then in the training's order
+  const steps: ({ kind: 'video' } | { kind: 'activity'; index: number })[] = [];
+  const at = (slot: number) => course.modules.forEach((placement, index) => {
+    if (Math.min(placement.afterVideoCount, lastSlot) === slot) steps.push({ kind: 'activity', index });
+  });
+  at(0);
+  course.videos.forEach((_, videoIndex) => { steps.push({ kind: 'video' }); at(videoIndex + 1); });
+  const from = steps.findIndex(step => step.kind === 'activity' && step.index === placementIndex);
+  const to = from + delta;
+  if (from < 0 || to < 0 || to >= steps.length) return null;
+  [steps[from], steps[to]] = [steps[to], steps[from]];
+  // written back in the new order, each after as many videos as come before it
+  let videos = 0;
+  const placements: CourseModulePlacement[] = [];
+  for (const step of steps) {
+    if (step.kind === 'video') videos++;
+    else placements.push({ moduleId: course.modules[step.index].moduleId, afterVideoCount: videos });
+  }
+  return placements;
+}
+
+/** The training's activities without one placement; the others stay where they are. */
+export function removeActivity(course: PlatformCourse, placementIndex: number): CourseModulePlacement[] {
+  return course.modules.filter((_, index) => index !== placementIndex)
+    .map(placement => ({ moduleId: placement.moduleId, afterVideoCount: Math.min(placement.afterVideoCount, course.videos.length) }));
+}
+
 export function gameTypeLabel(module: GameModule): string {
   return gameTypeOptions.find((option) => option.value === module.gameType)?.label ?? 'Atividade';
 }
@@ -63,8 +101,9 @@ export function courseLessons(course: PlatformCourse) {
 }
 
 /**
- * Agrupa a trilha por aula. Uma atividade fica na aula do vídeo que vem logo depois dela
- * (ou na última aula, se vier depois do último vídeo).
+ * Agrupa a trilha por aula, como o servidor entrega os dias: uma atividade fica na aula do vídeo que vem logo antes
+ * dela (a atividade "depois do vídeo N" é do dia que tem o vídeo N), e uma atividade antes do primeiro vídeo fica na
+ * primeira aula, mesmo sem vídeos. Assim ela não troca de aula quando se põe ou tira um vídeo de uma aula vazia.
  */
 export function groupTrackByLesson(course: PlatformCourse, track: TrackItem[]): LessonGroup[] {
   const lessons = courseLessons(course);
@@ -72,16 +111,16 @@ export function groupTrackByLesson(course: PlatformCourse, track: TrackItem[]): 
   lessons.forEach((lesson) => lesson.videoIds.forEach((id) => lessonOfVideo.set(id, lesson.id)));
   const groups = lessons.map((lesson) => ({ id: lesson.id, title: lesson.title, description: lesson.description, items: [] as TrackItem[] }));
   const byId = new Map(groups.map((group) => [group.id, group]));
-  const lastId = groups[groups.length - 1]?.id;
+  const firstId = groups[0]?.id;
 
   track.forEach((item, index) => {
     let lessonId: string | undefined;
     if (item.kind === 'video') lessonId = lessonOfVideo.get(item.video.id);
     else {
-      const next = track.slice(index + 1).find((candidate) => candidate.kind === 'video');
-      lessonId = next?.kind === 'video' ? lessonOfVideo.get(next.video.id) : lastId;
+      const previous = track.slice(0, index).reverse().find((candidate) => candidate.kind === 'video');
+      lessonId = previous?.kind === 'video' ? lessonOfVideo.get(previous.video.id) : firstId;
     }
-    (byId.get(lessonId ?? lastId ?? '') ?? groups[0])?.items.push(item);
+    (byId.get(lessonId ?? firstId ?? '') ?? groups[0])?.items.push(item);
   });
   return groups;
 }

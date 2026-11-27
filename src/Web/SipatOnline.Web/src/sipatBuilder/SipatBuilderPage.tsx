@@ -1,9 +1,9 @@
 import { saveFile } from '@/lib/saveFile';
-import { ArrowLeft, Ban, Clock, Copy, FileDown, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Ban, Clock, Copy, Eye, FileDown, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, getTrainingLimit, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
+  acceptCompanyVideoTerms, cancelSipatEvent, companyEditorLinks, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, getTrainingLimit, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,8 @@ import { partWord } from '@/trainings/partWord';
 import { courseLessons as titlesOf } from '@/courseEditor/courseTrack';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
+// the participant's look (its player and styles) comes only when someone opens the preview
+const TrainingPreview = lazy(() => import('./preview/TrainingPreview'));
 import { planToCsv } from './csv';
 import AudienceRow from '@/trainings/AudienceRow';
 import { useUnitScope } from '@/trainings/unitScope';
@@ -36,6 +38,13 @@ import {
 
 /** On the phone (up to 760px) the hero buttons are 44px tall: "Mais" and "Salvar" share a row, the main action takes the next one. */
 const phoneAction = 'max-[760px]:h-auto max-[760px]:min-h-11 max-[760px]:text-[0.9375rem]';
+/**
+ * A hero action that stands out from the white ones without being the main one: soft green. The hero paints its
+ * buttons white with !important (OpsIdentity.css), so the classes carry the same parent to win over it.
+ */
+const heroTonal = '[.ops-hero-actions>&]:border-primary/35! [.ops-hero-actions>&]:bg-primary/10! [.ops-hero-actions>&]:text-primary! [.ops-hero-actions>&]:font-bold';
+/** The eye of the participant's view, in the yellow of the preview's own mark. */
+const previewEye = 'text-[#ffd166]';
 
 function download(name: string, text: string) {
   saveFile(new Blob([text], { type: 'text/csv;charset=utf-8' }), name);
@@ -99,6 +108,14 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   const [startDate, setStartDate] = useState('');
   const [days, setDays] = useState<DaySlots[]>([]);
   const [dirty, setDirty] = useState(false);
+  // the draft saves itself a few seconds after each change: 'saving' while it goes, 'saved' once it is on the server
+  const [autoSave, setAutoSave] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
+  // the save on its way, so a second one waits for it (and never creates the training twice)
+  const saving = useRef<Promise<string | null> | null>(null);
+  // what the screen holds right now, read after a save to know whether something changed meanwhile
+  const latest = useRef({ name: '', days: [] as DaySlots[], limit: '' });
+  // the training once created, read by a save that waited for another
+  const sipatRef = useRef<SipatEvent | null>(null);
   // the last day the training can be taken, when it runs past its last day ('': it ends with its last day)
   const [limit, setLimit] = useState('');
   const [busy, setBusy] = useState(false);
@@ -114,19 +131,24 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   // problems are only shown after a save or publish attempt, then they update live as they get fixed
   const [showIssues, setShowIssues] = useState(false);
   const [confirmingEnd, setConfirmingEnd] = useState(false);
+  // the training the way the participant sees it, from what is on the board now
+  const [previewing, setPreviewing] = useState(false);
   const [editingName, setEditingName] = useState(false);
   // the trainings of Conteúdo; starting from one makes a day of each of its Títulos
   const [trainings, setTrainings] = useState<PlatformCourse[]>([]);
   const [training, setTraining] = useState('');
 
-  const applyContent = useCallback((content: Awaited<ReturnType<typeof getSipatCatalog>>) => {
+  const applyContent = useCallback((loaded: Awaited<ReturnType<typeof getSipatCatalog>>) => {
+    // the catalog's video links are the operation's routes: a company's administrator plays them (with every version)
+    // from the company's own, as in its editor; the operation inside a company keeps them, and a template has no company
+    const content = template ? loaded : companyEditorLinks(loaded);
     // an <img> cannot send the company header the admin route needs: the operator loads the photo from the platform route
     const courses = canEditThemes
       ? content.courses.map(course => ({ ...course, coverUrl: course.coverUrl?.replace('/api/admin/sipat-catalog/courses/', '/api/platform/catalog/courses/') ?? null }))
       : content.courses;
     setCatalog(buildCatalog(courses, content.videos, content.games, content.categories ?? [], content.subjects ?? [], content.videoSubjects ?? []));
     setTrainings(courses);
-  }, [canEditThemes]);
+  }, [canEditThemes, template]);
 
   // back from the video editor (opened in another tab): the trainings and videos come again, the days being built stay as they are
   useEffect(() => {
@@ -243,6 +265,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
 
   const cancelled = sipat?.status === 'Cancelled';
   const published = sipat?.status === 'Published';
+  latest.current = { name, days, limit };
+  sipatRef.current = sipat;
   const edit = (next: DaySlots[]) => { setDays(next); setDirty(true); setNotice(''); };
 
   function start() {
@@ -296,11 +320,12 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
     setRemoved(null);
   }
 
-  /** Saves the SIPAT (creating it the first time) and its days; returns its id. */
+  /** Saves the SIPAT (creating it the first time) and its days; returns its id. A save already on its way goes first. */
   // the video editor fills the days itself, so opening it skips the grid's content checks
   async function save(skipChecks = false): Promise<string | null> {
     if (!skipChecks && !checkIssues()) return null;
     setBusy(true); setError(''); setNotice('');
+    if (saving.current) await saving.current.catch(() => null);
     // a limit behind the last day would end the training before its days: it follows the last day then
     const endsOn = lastDate ? (isValidDate(limit) && limit > lastDate ? limit : lastDate) : null;
     try {
@@ -310,7 +335,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         setNotice('Template salvo.');
         return templateId;
       }
-      let current = sipat;
+      let current = sipatRef.current;
       if (!current) {
         // only a new training needs a schedule; days without dates (Módulos) keep the one it has
         const first = days.find(day => day.date)?.date ?? startDate;
@@ -325,7 +350,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
       const saved = await saveSipatPlan(current.id, withDayWord(days, partWord(days.map(day => day.date))).map(toProgramDay), endsOn);
       // the training's period follows what was just saved
       if (firstDate && lastDate) current = { ...current, startsAt: `${firstDate}T00:00:00.000Z`, endsAt: `${addDays(endsOn ?? lastDate, 1)}T00:00:00.000Z` };
-      setDays(saved.map(fromProgramDay)); setDirty(false); setSipat(current);
+      setDays(saved.map(fromProgramDay)); setDirty(false); setSipat(current); setAutoSave('idle');
       setNotice('Rascunho salvo.');
       if (isNew) navigate(`${basePath}/${current.id}`, { replace: true });
       return current.id;
@@ -334,6 +359,60 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
       return null;
     } finally { setBusy(false); }
   }
+
+  /**
+   * The draft saving itself, quietly: nothing is locked and nothing is checked, the days keep being edited meanwhile.
+   * The server takes a half-built draft (days without videos, names filled in). A new training is created on the first one.
+   */
+  async function saveQuietly(): Promise<string | null> {
+    const sent = latest.current;
+    const endsOn = lastDate ? (isValidDate(limit) && limit > lastDate ? limit : lastDate) : null;
+    setAutoSave('saving');
+    try {
+      let current = sipatRef.current;
+      if (!current) {
+        const first = sent.days.find(day => day.date)?.date ?? startDate;
+        if (!isValidDate(first)) { setAutoSave('idle'); return null; }
+        const last = [...sent.days].reverse().find(day => day.date)?.date ?? first;
+        current = await createTraining({ title: sent.name.trim() || `SIPAT ${new Date().getFullYear()}`, description: null, startsAt: `${first}T00:00:00.000Z`, endsAt: `${addDays(last, 1)}T00:00:00.000Z` });
+        sipatRef.current = current;
+        // the address becomes the training's, so a reload opens it; without the router, which would load the page again
+        if (isNew) window.history.replaceState(window.history.state, '', `${basePath}/${current.id}`);
+      } else if (current.status === 'Draft' && sent.name.trim() && current.title !== sent.name.trim()) {
+        current = await updateSipatEvent(current.id, { title: sent.name.trim(), description: current.description, startsAt: current.startsAt, endsAt: current.endsAt });
+        sipatRef.current = current;
+      }
+      const saved = await saveSipatPlan(current.id, withDayWord(sent.days, partWord(sent.days.map(day => day.date))).map(toProgramDay), endsOn);
+      // the new days get the ids the server gave them, so the next save updates them instead of adding them again
+      const idByKey = new Map(sent.days.map((day, index) => [day.key, saved[index]?.id]));
+      setDays(known => known.map(day => (day.id ? day : { ...day, id: idByKey.get(day.key) })));
+      if (firstDate && lastDate) current = { ...current, startsAt: `${firstDate}T00:00:00.000Z`, endsAt: `${addDays(endsOn ?? lastDate, 1)}T00:00:00.000Z` };
+      sipatRef.current = current;
+      setSipat(current);
+      // edited while it went: still unsaved, and the next round saves it
+      const now = latest.current;
+      if (now.days === sent.days && now.name === sent.name && now.limit === sent.limit) setDirty(false);
+      setAutoSave('saved');
+      return current.id;
+    } catch {
+      setAutoSave('failed');
+      return null;
+    }
+  }
+
+  // a draft saves itself 3 seconds after the last change: one save per pause, never on a timer while nothing changes
+  const canAutoSave = !template && stage === 'grid' && !loading && !busy && (sipat === null || sipat.status === 'Draft')
+    && !(capabilities?.customizeGrid === false && !canEditThemes);
+  useEffect(() => {
+    if (!dirty || !canAutoSave) return;
+    const timer = window.setTimeout(() => {
+      if (saving.current) return;
+      saving.current = saveQuietly().finally(() => { saving.current = null; });
+    }, 3000);
+    return () => window.clearTimeout(timer);
+    // saveQuietly reads the latest state through refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dirty, canAutoSave, name, days, limit]);
 
   /** The pencil: saves what is pending and opens this same training in the video editor. */
   async function editWeek() {
@@ -510,7 +589,11 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
           {canRename && !showNameInput && <Button aria-label="Renomear o treinamento" className="max-[760px]:-my-1.5 max-[760px]:size-11 max-[760px]:min-h-11" onClick={() => setEditingName(true)} size="icon-sm" variant="ghost"><Pencil /></Button>}
           {label && <Badge variant={label.variant}>{label.text}</Badge>}
           {template && <Badge variant="outline">Sem empresa</Badge>}
-          {dirty && <Badge variant="outline">Alterações não salvas</Badge>}
+          {canAutoSave && autoSave === 'saving'
+            ? <Badge variant="outline">Salvando...</Badge>
+            : dirty
+              ? <Badge variant="outline">{canAutoSave ? (autoSave === 'failed' ? 'Não foi possível salvar sozinho: use Salvar rascunho' : 'Salvando em instantes...') : 'Alterações não salvas'}</Badge>
+              : canAutoSave && autoSave === 'saved' && <Badge variant="outline">Rascunho salvo automaticamente</Badge>}
           {stage === 'grid' && sipat && sipat.status === 'Published' && <span className="text-xs text-muted-foreground">O nome fica fixo depois de publicado.</span>}
         </div>
         <p className="ops-hero-lead is-keep max-[760px]:text-[0.875rem]! max-[760px]:leading-[1.45]">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : <>
@@ -552,15 +635,23 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
             </>}
           </DropdownMenuContent>
         </DropdownMenu>
-        <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void save()} variant="outline"><Save /> {template ? 'Salvar' : published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
+        {/* a published training: saving also delivers the days to the participants (the days someone started stay as they are) */}
+        <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void (published ? publish() : save())} variant="outline"><Save /> {template ? 'Salvar' : published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
         {/* the pencil: this same training in the video editor (títulos, player, questions, cover) */}
         {published && <Button className={phoneAction} disabled={busy} onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
-        <Button className={cn(phoneAction, 'max-[760px]:hidden')} disabled={busy || days.length === 0} onClick={() => void editWeek()} variant="outline"><Pencil /> Editar treinamento</Button>
-        {!template && !cancelled && <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> {published ? 'Atualizar os dias' : 'Publicar'}</Button>}
+        <Button className={cn(phoneAction, heroTonal, 'max-[760px]:hidden')} disabled={busy || days.length === 0} onClick={() => void editWeek()} variant="outline"><Pencil /> Editar treinamento</Button>
+        {/* published: the main action is to see it as the participant does; a draft still has to be published */}
+        {(!template && !cancelled && !published)
+          ? <>
+            <Button className={cn(phoneAction, heroTonal)} disabled={days.length === 0} onClick={() => setPreviewing(true)} variant="outline"><Eye /> Visão do participante</Button>
+            <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> Publicar</Button>
+          </>
+          : <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye className={previewEye} /> Visão do participante</Button>}
       </div>}
       {stage === 'grid' && viewOnly && sipat && <div className="ops-hero-actions max-[760px]:hidden">
         {published && <Button onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
         <Button onClick={() => navigate(`${basePath}/${sipat.id}/editar`)} variant="outline"><Play /> Ver no editor</Button>
+        <Button className="ops-primary" disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye className={previewEye} /> Visão do participante</Button>
       </div>}
     </header>
 
@@ -588,7 +679,10 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         onChange={viewOnly ? () => undefined : edit} onRemoveDay={removeDay}
         onEdit={viewOnly ? undefined : () => { if (!busy) void editWeek(); }}
         // every day has its own "Enviar vídeo", for a company that has its own videos (Diamante)
-        arriving={arriving} onSendToDay={capabilities?.internalVideos ? (dayKey, files) => void sendToDay(dayKey, files) : undefined} />}
+        arriving={arriving} onSendToDay={capabilities?.internalVideos ? (dayKey, files) => void sendToDay(dayKey, files) : undefined}
+        // a game edited or duplicated from the board: its name and texts come again with the catalog
+        onGamesChanged={async message => { applyContent(await fetchContent()); setNotice(message); }}
+        template={template} />}
 
     {copying && <Dialog description="Escolha o treinamento de onde vêm os assuntos. Os dias são copiados para este rascunho e as datas ficam em aberto." onClose={() => setCopying(false)} title="Duplicar de outro treinamento">
       <div className="grid max-h-[60vh] gap-4 overflow-auto">
@@ -634,6 +728,10 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         <Button aria-label="Fechar aviso" className="text-background/80 hover:bg-background/15 hover:text-background" onClick={() => setRemoved(null)} size="icon-sm" variant="ghost"><X /></Button>
       </div>}
     </div>}
+
+    {previewing && <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-[rgb(11_36_31/0.55)] animate-overlay-in"><LoadingState>Abrindo a prévia...</LoadingState></div>}>
+      <TrainingPreview catalog={catalog} days={days} games={capabilities?.quizzes !== false} name={name} onClose={() => setPreviewing(false)} word={partWord(days.map(day => day.date))} />
+    </Suspense>}
 
     {confirmingEnd && sipat && <Dialog description="Ele deixa de aparecer para os participantes e fica bloqueado para edição. Dá para reativá-lo depois na lista de treinamentos."
       onClose={() => setConfirmingEnd(false)} title={`Encerrar "${sipat.title}"?`}>

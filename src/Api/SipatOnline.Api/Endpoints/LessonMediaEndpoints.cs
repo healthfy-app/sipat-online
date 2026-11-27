@@ -44,13 +44,7 @@ public static class LessonMediaEndpoints
                 IPlatformCourseVideoStorage storage,
                 CancellationToken cancellationToken) =>
             {
-                var rendition = quality switch
-                {
-                    null or "" or "720p" => VideoRendition.Hd720,
-                    "480p" => VideoRendition.Sd480,
-                    "1080p" => VideoRendition.Fhd1080,
-                    _ => (VideoRendition?)null
-                };
+                var rendition = VideoRenditions.FromQuality(quality);
                 if (rendition is null)
                 {
                     return Results.NotFound();

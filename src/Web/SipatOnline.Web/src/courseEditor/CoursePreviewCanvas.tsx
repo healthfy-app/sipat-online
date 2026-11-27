@@ -68,7 +68,7 @@ export default function CoursePreviewCanvas({
             <div className="[&_video]:max-h-[min(40rem,70dvh)] [&_video]:w-full [&_video]:rounded-md [&_video]:bg-black [&_.video-preview-error]:text-white">
               {isExternal(item.video)
                 ? <ExternalVideoPreview key={item.video.id} title={`Prévia de ${item.video.title}`} video={item.video} />
-                : <VideoPreview checkpoints={item.checkpoints} key={item.video.id} src={item.video.fileUrl} title={`Prévia de ${item.video.title}`} />}
+                : <VideoPreview checkpoints={item.checkpoints} key={item.video.id} src={item.video.fileUrl} title={`Prévia de ${item.video.title}`} versions={item.video} />}
             </div>
           </>}
           {item?.kind === 'activity' && (

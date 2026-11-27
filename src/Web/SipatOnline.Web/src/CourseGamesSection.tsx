@@ -18,6 +18,7 @@ import { Input, NativeSelect } from '@/components/ui/input';
 import { houseVideos } from '@/courseEditor/courseFormat';
 import { gameTypeLabel } from '@/courseEditor/courseTrack';
 import { cn } from '@/lib/utils';
+import { videoVersions } from '@/videoVersions';
 
 function errorText(error: unknown) {
   return error instanceof Error ? error.message : 'Não foi possível salvar.';
@@ -293,7 +294,8 @@ function CheckpointEditor({
           onSeeked={() => fired.current.clear()}
           onTimeUpdate={handleTimeUpdate}
           ref={videoRef}
-          src={video.fileUrl}
+          // the best version made (1080p when there is one), as everywhere a video plays
+          src={videoVersions(video.fileUrl, video)[0].src}
         />
         {count > 0 && (
           <ul className="m-0 grid list-none gap-1.5 p-0">

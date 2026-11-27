@@ -38,6 +38,9 @@ public sealed class PlatformCourseCatalogService(
 
     /// <summary>A part link only has to last until its part goes out; after a pause the browser asks for new ones.</summary>
     private static readonly TimeSpan PartLinkLifetime = TimeSpan.FromHours(1);
+
+    /// <summary>The bucket drops unfinished multipart uploads after a day (lifecycle rule on uploads/).</summary>
+    private static readonly TimeSpan UnfinishedUploadWindow = TimeSpan.FromDays(1);
     private const int MaximumUploadIdLength = 1024;
     public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
@@ -434,10 +437,17 @@ public sealed class PlatformCourseCatalogService(
         CancellationToken cancellationToken)
     {
         var permission = EnsurePlatformOperator();
-        return permission.IsSuccess
-            ? Result<IReadOnlyList<PlatformLibraryVideo>>.Success(
-                await catalogStore.ListVideosAsync(cancellationToken))
-            : Result<IReadOnlyList<PlatformLibraryVideo>>.Failure(permission.Error);
+        if (!permission.IsSuccess)
+        {
+            return Result<IReadOnlyList<PlatformLibraryVideo>>.Failure(permission.Error);
+        }
+
+        // what another operator is still sending shows up too; past the bucket's window it was given up
+        var uploading = await catalogStore.ListUploadingVideosAsync(
+            timeProvider.GetUtcNow() - UnfinishedUploadWindow, cancellationToken);
+        var library = await catalogStore.ListVideosAsync(cancellationToken);
+        return Result<IReadOnlyList<PlatformLibraryVideo>>.Success(
+            uploading.Select(video => new PlatformLibraryVideo(video, 0)).Concat(library).ToArray());
     }
 
     public async Task<Result<PlatformCourseVideo>> AddVideoAsync(
@@ -561,10 +571,16 @@ public sealed class PlatformCourseCatalogService(
     /// Opens a chunked upload: the browser sends the file in parts and, after a lost connection or a reload, resumes
     /// from the parts the bucket already holds. A null ticket means direct upload is off: use the multipart form.
     /// </summary>
+    /// <remarks>
+    /// With a <paramref name="title"/>, the video shows up in the library as "Uploading" right away, so other
+    /// operators see it is coming; <see cref="CompleteDirectUploadAsync"/> turns it into the real video.
+    /// </remarks>
     public async Task<Result<ChunkedUploadOpening>> StartChunkedUploadAsync(
         string? contentType,
         long sizeBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? title = null,
+        long? durationMilliseconds = null)
     {
         var permission = EnsurePlatformOperator();
         if (!permission.IsSuccess)
@@ -590,6 +606,26 @@ public sealed class PlatformCourseCatalogService(
         var videoId = Guid.NewGuid();
         var uploadId = await directUploads.StartMultipartAsync(videoId, contentType!, cancellationToken);
         var partCount = (int)((sizeBytes + ChunkedUploadPartSizeBytes - 1) / ChunkedUploadPartSizeBytes);
+        if (!string.IsNullOrWhiteSpace(title))
+        {
+            var details = await ValidateNewVideoAsync(null, title, Math.Max(durationMilliseconds ?? 1, 1), cancellationToken);
+            if (details.IsSuccess)
+            {
+                await catalogStore.AddVideoAsync(
+                    new PlatformCourseVideo(
+                        videoId,
+                        details.Value.Title,
+                        contentType!,
+                        sizeBytes,
+                        Math.Max(durationMilliseconds ?? 1, 1),
+                        timeProvider.GetUtcNow(),
+                        [],
+                        Status: PlatformVideoStatus.Uploading),
+                    null,
+                    cancellationToken);
+            }
+        }
+
         return Result<ChunkedUploadOpening>.Success(new ChunkedUploadOpening(
             new ChunkedUploadStart(videoId, uploadId, ChunkedUploadPartSizeBytes, partCount)));
     }
@@ -671,6 +707,7 @@ public sealed class PlatformCourseCatalogService(
         }
 
         await directUploads.AbortMultipartAsync(videoId, uploadId!, cancellationToken);
+        await catalogStore.DeleteUploadingVideoAsync(videoId, cancellationToken);
         return Result<bool>.Success(true);
     }
 
@@ -720,7 +757,9 @@ public sealed class PlatformCourseCatalogService(
         }
 
         // Checked before the bucket: without conversion the first complete already moved the upload away.
-        if (await catalogStore.FindVideoAsync(videoId, cancellationToken) is not null)
+        // the "Uploading" entry opened with the upload is replaced below; anything else means it was completed
+        var opened = await catalogStore.FindVideoAsync(videoId, cancellationToken);
+        if (opened is not null && opened.Status != PlatformVideoStatus.Uploading)
         {
             return Failure<PlatformCourseVideo>(
                 "learning.platform_course.upload_already_completed",
@@ -769,6 +808,11 @@ public sealed class PlatformCourseCatalogService(
             }
 
             await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
+            if (opened is not null)
+            {
+                await catalogStore.DeleteUploadingVideoAsync(videoId, cancellationToken);
+            }
+
             await catalogStore.AddVideoAsync(video, courseId, cancellationToken);
             if (converts)
             {
@@ -951,9 +995,11 @@ public sealed class PlatformCourseCatalogService(
     }
 
     /// <summary>The operator preview: asks for a signed link first and opens the file only when there is none.</summary>
+    /// <param name="rendition">The version asked for; one the video does not have comes as its 720p, which every video has.</param>
     public async Task<Result<PlatformVideoFile>> GetVideoFileAsync(
         Guid videoId,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        VideoRendition rendition = VideoRendition.Hd720)
     {
         var permission = EnsurePlatformOperator();
         if (!permission.IsSuccess)
@@ -986,16 +1032,26 @@ public sealed class PlatformCourseCatalogService(
                 return Failure<PlatformVideoFile>(
                     "learning.platform_course.video_failed",
                     "A conversão deste vídeo falhou. Envie o arquivo de novo.");
+            case PlatformVideoStatus.Uploading:
+                return Failure<PlatformVideoFile>(
+                    "learning.platform_course.video_uploading",
+                    "O vídeo ainda está sendo enviado.");
+        }
+
+        // a version is only there once made (R2 signs a link even for a missing object)
+        if ((rendition == VideoRendition.Fhd1080 && !video.HasFhd1080) || (rendition == VideoRendition.Sd480 && !video.HasSd480))
+        {
+            rendition = VideoRendition.Hd720;
         }
 
         var link = await videoStorage.GetPlaybackUrlAsync(
-            videoId, VideoRendition.Hd720, PreviewLinkLifetime, cancellationToken);
+            videoId, rendition, PreviewLinkLifetime, cancellationToken);
         if (link is not null)
         {
             return Result<PlatformVideoFile>.Success(new PlatformVideoFile(link, null, video.ContentType));
         }
 
-        var content = await videoStorage.OpenReadAsync(videoId, VideoRendition.Hd720, cancellationToken);
+        var content = await videoStorage.OpenReadAsync(videoId, rendition, cancellationToken);
         return content is null
             ? Failure<PlatformVideoFile>(
                 "learning.platform_course.video_file_missing",

@@ -29,10 +29,8 @@ describe('SIPATs of a company', () => {
     vi.mocked(api.listSipatPlans).mockResolvedValue([{ sipatEventId: 'b', days: 5, videos: 18 }]);
     render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
 
-    // the list opens on what is in progress; the others are a choice of the filter away
+    // the list opens on all of them, so a new draft shows up right away
     expect(await screen.findByRole('link', { name: 'Abrir SIPAT 2026' })).toBeVisible();
-    expect(screen.queryByRole('region', { name: 'Treinamentos de 2027' })).not.toBeInTheDocument();
-    await userEvent.setup().selectOptions(screen.getByRole('combobox', { name: 'Fase' }), 'all');
 
     const first = await screen.findByRole('region', { name: 'Treinamentos de 2027' });
     const second = screen.getByRole('region', { name: 'Treinamentos de 2026' });
@@ -102,8 +100,7 @@ describe('SIPATs of a company', () => {
     vi.mocked(api.reactivateSipatEvent).mockResolvedValue(event('a', 'SIPAT 2026', '2026-11-09T00:00:00Z', 'Draft'));
     render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
 
-    // an ended training is out of the list until the filter asks for it, and keeps its actions
-    await user.click(await screen.findByRole('button', { name: 'Ver todos os treinamentos' }));
+    // the list opens on every training: an ended one is there, with its actions
     expect(await screen.findByRole('link', { name: 'Abrir SIPAT 2026' })).toHaveAttribute('href', '/admin/sipats/a');
 
     await user.click(screen.getByRole('button', { name: 'Mais ações de SIPAT 2026' }));

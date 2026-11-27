@@ -25,3 +25,17 @@ export function sipatPhase(event: Pick<SipatEvent, 'status' | 'startsAt' | 'ends
   if (now >= new Date(event.endsAt)) return 'finished';
   return now >= new Date(event.startsAt) ? 'running' : 'published';
 }
+
+/** What the phase filter offers: the few states people look for. Concluído and Em andamento are still published. */
+export type PhaseGroup = 'draft' | 'published' | 'cancelled';
+
+export const phaseGroups: { value: PhaseGroup; text: string }[] = [
+  { value: 'draft', text: 'Rascunho' },
+  { value: 'published', text: 'Publicado' },
+  { value: 'cancelled', text: 'Encerrado' },
+];
+
+export function phaseGroup(phase: SipatPhase): PhaseGroup {
+  if (phase === 'draft' || phase === 'created') return 'draft';
+  return phase === 'cancelled' ? 'cancelled' : 'published';
+}

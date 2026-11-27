@@ -11,3 +11,15 @@ public enum VideoRendition
     Sd480,
     Fhd1080
 }
+
+public static class VideoRenditions
+{
+    /// <summary>The version a "quality" asks for: none (or 720p) is the 720p every video has; an unknown one is null.</summary>
+    public static VideoRendition? FromQuality(string? quality) => quality switch
+    {
+        null or "" or "720p" => VideoRendition.Hd720,
+        "480p" => VideoRendition.Sd480,
+        "1080p" => VideoRendition.Fhd1080,
+        _ => null,
+    };
+}

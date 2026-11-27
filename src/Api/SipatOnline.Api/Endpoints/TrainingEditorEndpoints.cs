@@ -242,11 +242,12 @@ public static partial class PlatformCourseCatalogEndpoints
 
         // the preview of a video the company can use
         editor.MapGet("/videos/{videoId:guid}/file", async (
-            Guid videoId, SipatPlanService plan, CatalogAccessGrant grant, PlatformCourseCatalogService catalogService, CancellationToken token) =>
+            Guid videoId, string? quality, SipatPlanService plan, CatalogAccessGrant grant, PlatformCourseCatalogService catalogService, CancellationToken token) =>
         {
+            if (VideoRenditions.FromQuality(quality) is not { } rendition) return Results.NotFound();
             if ((await plan.BlockedVideosAsync(token)).Contains(videoId)) return Results.NotFound();
             grant.Grant();
-            var result = await catalogService.GetVideoFileAsync(videoId, token);
+            var result = await catalogService.GetVideoFileAsync(videoId, token, rendition);
             if (!result.IsSuccess) return ToProblem(result.Error);
             return result.Value.RedirectTo is { } link
                 ? Results.Redirect(link.AbsoluteUri)

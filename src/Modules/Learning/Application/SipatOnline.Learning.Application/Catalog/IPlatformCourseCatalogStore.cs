@@ -25,7 +25,14 @@ public interface IPlatformCourseCatalogStore
 
     Task<Result<bool>> AddCourseAsync(PlatformCourse course, CancellationToken cancellationToken);
 
+    /// <summary>The library: every video but the ones still being sent.</summary>
     Task<IReadOnlyList<PlatformLibraryVideo>> ListVideosAsync(CancellationToken cancellationToken);
+
+    /// <summary>Videos the browser is still sending, opened at or after <paramref name="since"/>.</summary>
+    Task<IReadOnlyList<PlatformCourseVideo>> ListUploadingVideosAsync(DateTimeOffset since, CancellationToken cancellationToken);
+
+    /// <summary>Removes a video only while it is still being sent. False when there is no such video.</summary>
+    Task<bool> DeleteUploadingVideoAsync(Guid videoId, CancellationToken cancellationToken);
 
     Task AddVideoAsync(
         PlatformCourseVideo video,

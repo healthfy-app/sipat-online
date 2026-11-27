@@ -55,6 +55,7 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
     {
         var videos = await dbContext.PlatformCourseVideos.AsNoTracking()
             .Include(video => video.Checkpoints)
+            .Where(video => video.Status != Uploading)
             .OrderByDescending(video => video.CreatedAt)
             .ThenBy(video => video.Id)
             .ToListAsync(cancellationToken);
@@ -68,6 +69,25 @@ public sealed class EfPlatformCourseCatalogStore(PlatformDbContext dbContext) :
                 courseCounts.GetValueOrDefault(video.Id)))
             .ToArray();
     }
+
+    private const string Uploading = nameof(PlatformVideoStatus.Uploading);
+
+    public async Task<IReadOnlyList<PlatformCourseVideo>> ListUploadingVideosAsync(
+        DateTimeOffset since,
+        CancellationToken cancellationToken)
+    {
+        var videos = await dbContext.PlatformCourseVideos.AsNoTracking()
+            .Where(video => video.Status == Uploading && video.CreatedAt >= since)
+            .OrderByDescending(video => video.CreatedAt)
+            .ThenBy(video => video.Id)
+            .ToListAsync(cancellationToken);
+        return videos.Select(video => ToDomain(video)).ToArray();
+    }
+
+    public async Task<bool> DeleteUploadingVideoAsync(Guid videoId, CancellationToken cancellationToken) =>
+        await dbContext.PlatformCourseVideos
+            .Where(video => video.Id == videoId && video.Status == Uploading)
+            .ExecuteDeleteAsync(cancellationToken) > 0;
 
     public async Task<bool> DeleteCourseAsync(Guid courseId, CancellationToken cancellationToken)
     {
