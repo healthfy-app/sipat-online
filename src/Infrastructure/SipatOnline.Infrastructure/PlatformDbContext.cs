@@ -22,6 +22,8 @@ public sealed class PlatformDbContext(
 
     public DbSet<CompanySectorEntity> CompanySectors => Set<CompanySectorEntity>();
 
+    public DbSet<CompanyUnitSectorEntity> CompanyUnitSectors => Set<CompanyUnitSectorEntity>();
+
     public DbSet<CompanyProfileRulesEntity> CompanyProfileRules => Set<CompanyProfileRulesEntity>();
 
     public DbSet<TenantEntity> Tenants => Set<TenantEntity>();
@@ -29,6 +31,8 @@ public sealed class PlatformDbContext(
     public DbSet<AuditEntryEntity> AuditEntries => Set<AuditEntryEntity>();
 
     public DbSet<SipatEventEntity> SipatEvents => Set<SipatEventEntity>();
+
+    public DbSet<SipatEventTargetEntity> SipatEventTargets => Set<SipatEventTargetEntity>();
 
     public DbSet<LearningTrackEntity> LearningTracks => Set<LearningTrackEntity>();
 
@@ -56,22 +60,24 @@ public sealed class PlatformDbContext(
 
     public DbSet<PlatformCourseLessonEntity> PlatformCourseLessons => Set<PlatformCourseLessonEntity>();
     public DbSet<PlatformCourseCoverEntity> PlatformCourseCovers => Set<PlatformCourseCoverEntity>();
+    public DbSet<PlatformVideoThumbnailEntity> PlatformVideoThumbnails => Set<PlatformVideoThumbnailEntity>();
     public DbSet<GameModuleEntity> GameModules => Set<GameModuleEntity>();
     public DbSet<SipatProgramEntity> SipatPrograms => Set<SipatProgramEntity>();
 
-    public DbSet<SipatPlanEntity> SipatPlans => Set<SipatPlanEntity>();
-    public DbSet<SipatWeekCourseEntity> SipatWeekCourses => Set<SipatWeekCourseEntity>();
 
     public DbSet<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity> PlanSubjectExclusions => Set<SipatOnline.Infrastructure.Tenancy.PlanSubjectExclusionEntity>();
     public DbSet<SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity> CompanySubjects => Set<SipatOnline.Infrastructure.Tenancy.CompanySubjectEntity>();
     public DbSet<SipatOnline.Infrastructure.Tenancy.CompanyVideoEntity> CompanyVideos => Set<SipatOnline.Infrastructure.Tenancy.CompanyVideoEntity>();
     public DbSet<VideoSubjectEntity> VideoSubjects => Set<VideoSubjectEntity>();
     public DbSet<VideoSubjectLinkEntity> VideoSubjectLinks => Set<VideoSubjectLinkEntity>();
+    public DbSet<GameSubjectLinkEntity> GameSubjectLinks => Set<GameSubjectLinkEntity>();
+    public DbSet<GameImageEntity> GameImages => Set<GameImageEntity>();
     public DbSet<PlatformCourseModuleLinkEntity> PlatformCourseModuleLinks => Set<PlatformCourseModuleLinkEntity>();
     public DbSet<PlatformVideoCheckpointEntity> PlatformVideoCheckpoints => Set<PlatformVideoCheckpointEntity>();
     public DbSet<LearningContentSnapshotEntity> LearningContentSnapshots => Set<LearningContentSnapshotEntity>();
     public DbSet<LearningActivityOutcomeEntity> LearningActivityOutcomes => Set<LearningActivityOutcomeEntity>();
     public DbSet<ParticipationCertificateEntity> ParticipationCertificates => Set<ParticipationCertificateEntity>();
+    public DbSet<CertificateTemplateEntity> CertificateTemplates => Set<CertificateTemplateEntity>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

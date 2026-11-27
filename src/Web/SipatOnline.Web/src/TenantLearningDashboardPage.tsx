@@ -1,7 +1,7 @@
-import { ArrowRight, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { listAllParticipants, listLearningParticipation, type LearningParticipantProgress } from './api';
+import { getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles, type CompanyRegistry, type LearningParticipantProgress, type ParticipantProfile } from './api';
 import {
   participantProgressStatuses,
   summarizeCompanyProgress,
@@ -26,9 +26,11 @@ import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page, PageHeader } from '@/components/ui/page';
 import { cn } from '@/lib/utils';
 import { activeParticipantsByDay, totalWatchedMilliseconds } from './dashboard/activity';
+import { byUnit } from './dashboard/byUnit';
 import { ColumnChart, Donut, type ColumnPoint } from './dashboard/charts';
 import LoadingState from './LoadingState';
 import { TrainingSelect } from './trainings/TrainingSelect';
+import { inUnit, useUnitScope } from './trainings/unitScope';
 import { filterByTraining, useTrainingFilter } from './trainings/useTrainingFilter';
 
 const PAGE_SIZE = 8;
@@ -60,32 +62,62 @@ export default function TenantLearningDashboardPage({
 }: { readOnly?: boolean; companyName?: string; brandColor?: string }) {
   const [loaded, setLoaded] = useState<{ participants: Awaited<ReturnType<typeof listAllParticipants>>; participation: LearningParticipantProgress[] } | null>(null);
   const training = useTrainingFilter(loaded?.participation ?? noRows);
+  // with a unit chosen at the top, every number is about its people (where each one is comes apart: without it, the whole company)
+  const unitScope = useUnitScope();
+  const [profiles, setProfiles] = useState<ReadonlyMap<string, ParticipantProfile> | null>(null);
+  useEffect(() => {
+    let current = true;
+    (unitScope.unitId ? listParticipantProfiles(unitScope.unitId) : listParticipantProfiles()).then(
+      list => { if (current) setProfiles(Array.isArray(list) ? new Map(list.map(item => [item.id, item])) : null); },
+      () => { if (current) setProfiles(null); });
+    return () => { current = false; };
+  }, [unitScope.unitId]);
+  const [registry, setRegistry] = useState<CompanyRegistry | null>(null);
+  useEffect(() => { getCompanyRegistry().then(loaded => setRegistry(Array.isArray(loaded?.units) ? loaded : null), () => setRegistry(null)); }, []);
+  // unit and sector of each person by name, for the spreadsheet
+  const placement = useMemo(() => {
+    if (!profiles || !registry || registry.units.length + registry.sectors.length === 0) return undefined;
+    const name = (items: { id: string; name: string }[], id: string | null) => items.find(item => item.id === id)?.name ?? '—';
+    return new Map([...profiles].map(([id, profile]) => [id, { unit: name(registry.units, profile.unitId), sector: name(registry.sectors, profile.sectorId) }]));
+  }, [profiles, registry]);
   // every number of the page is about the training chosen, so one person's finished SIPAT does not hide a fire drill not started
   const data = useMemo<DashboardData | null>(() => {
     if (!loaded) return null;
-    const participation = filterByTraining(loaded.participation, training.selectedId);
+    const ofUnit = inUnit(profiles ?? new Map(), profiles ? unitScope.unitId : null);
+    const participants = loaded.participants.filter(person => ofUnit(person.id));
+    const participation = filterByTraining(loaded.participation, training.selectedId).filter(row => ofUnit(row.participantId));
     return {
-      overview: summarizeCompanyProgress(loaded.participants, participation),
-      rows: toParticipantRows(summarizeParticipants(loaded.participants, participation)),
+      overview: summarizeCompanyProgress(participants, participation),
+      rows: toParticipantRows(summarizeParticipants(participants, participation)),
       participation,
     };
-  }, [loaded, training.selectedId]);
+  }, [loaded, training.selectedId, profiles, unitScope.unitId]);
+  // how each unit is doing, while the whole company is on screen
+  const unitRows = useMemo(
+    () => data && profiles && unitScope.active && unitScope.unitId === null ? byUnit(data.rows, profiles, unitScope.units) : [],
+    [data, profiles, unitScope.active, unitScope.unitId, unitScope.units],
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [exportState, setExportState] = useState<{ busy: boolean; message: string }>({ busy: false, message: '' });
 
+  const lastLoad = useRef(0);
   const loadOverview = useCallback(async () => {
     setIsLoading(true);
     setError('');
     try {
-      const [participants, participation] = await Promise.all([listAllParticipants(), listLearningParticipation()]);
+      // with a unit chosen at the top, the server sends its people only
+      const unit = unitScope.unitId;
+      const asked = ++lastLoad.current;
+      const [participants, participation] = await Promise.all([unit ? listAllParticipants(unit) : listAllParticipants(), unit ? listLearningParticipation(unit) : listLearningParticipation()]);
+      if (asked !== lastLoad.current) return;
       setLoaded({ participants, participation });
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : 'Não foi possível carregar o painel.');
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [unitScope.unitId]);
 
   useEffect(() => { void loadOverview(); }, [loadOverview]);
 
@@ -94,7 +126,7 @@ export default function TenantLearningDashboardPage({
     setExportState({ busy: true, message: '' });
     try {
       const { downloadCompanyExcelReport } = await import('./dashboard/companyExcelReport');
-      const fileName = await downloadCompanyExcelReport({ companyName, brandColor, ...data, trainingTitle: training.selected?.title });
+      const fileName = await downloadCompanyExcelReport({ companyName, brandColor, ...data, placement, trainingTitle: [training.selected?.title, unitScope.unit?.name].filter(Boolean).join(' · ') || undefined });
       setExportState({ busy: false, message: `Relatório ${fileName} baixado.` });
     } catch (exportError) {
       setExportState({
@@ -105,10 +137,6 @@ export default function TenantLearningDashboardPage({
   };
 
   const overview = data?.overview;
-  const noTracksCount = overview?.participantDistribution.find(({ status }) => status === 'no-tracks')?.count ?? 0;
-  const notStartedCount = overview?.participantDistribution.find(({ status }) => status === 'not-started')?.count ?? 0;
-  const nextStepStatus = noTracksCount > 0 ? 'no-tracks' : 'not-started';
-  const nextStepCount = noTracksCount > 0 ? noTracksCount : notStartedCount;
   const completedCount = overview?.participantDistribution.find(({ status }) => status === 'completed')?.count ?? 0;
 
   return (
@@ -165,32 +193,44 @@ export default function TenantLearningDashboardPage({
               <SummaryCard icon={Clock3} label="Tempo assistido" note="Somando todos os participantes" value={formatDuration(totalWatchedMilliseconds(data.participation))} />
             </section>
 
-            {nextStepCount > 0 && (
-              <section
-                aria-labelledby="tenant-dashboard-next-step"
-                className="flex flex-wrap items-center justify-between gap-4 rounded-lg bg-warning-soft px-5 py-4"
-              >
-                <div className="grid gap-1">
-                  <p className="m-0 text-[0.6875rem] font-bold uppercase tracking-[0.08em] text-warning">PRÓXIMO PASSO</p>
-                  <h2 className="m-0 text-base font-semibold" id="tenant-dashboard-next-step">
-                    {noTracksCount > 0
-                      ? `Entregue o treinamento a ${pluralize(noTracksCount, 'colaborador', 'colaboradores')}`
-                      : `Acompanhe ${pluralize(notStartedCount, 'participante', 'participantes')} sem início`}
-                  </h2>
-                  <p className="m-0 text-sm text-muted-foreground">
-                    {noTracksCount > 0
-                      ? 'Esses colaboradores ainda não receberam nenhum dia de treinamento.'
-                      : 'Veja quem já recebeu os dias do treinamento e ainda não iniciou.'}
-                  </p>
-                </div>
-                <Link className={buttonVariants()} to={`/admin/learning?status=${nextStepStatus}`}>
-                  {noTracksCount > 0
-                    ? readOnly ? 'Ver colaboradores sem dias de treinamento' : 'Escolher participantes'
-                    : readOnly ? 'Ver acompanhamento' : 'Acompanhar progresso'}
-                  <ArrowRight />
-                </Link>
-              </section>
-            )}
+            {/* only when someone is in a unit: a company with no unit in use has nothing to compare */}
+            {unitRows.some(row => row.unitId !== null) && <Panel count={pluralize(unitRows.filter(row => row.unitId !== null).length, 'unidade', 'unidades')} id="by-unit-title" title="Por unidade">
+              <div className="overflow-x-auto">
+                <table aria-labelledby="by-unit-title" className="m-0 w-full min-w-[34rem] border-collapse text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-semibold text-muted-foreground [&>th]:px-2 [&>th]:pb-2">
+                      <th scope="col">Unidade</th>
+                      <th className="text-right" scope="col">Pessoas</th>
+                      <th className="text-right" scope="col">Concluíram</th>
+                      <th className="text-right" scope="col">Em andamento</th>
+                      <th className="text-right" scope="col">Não iniciaram</th>
+                      <th className="w-40" scope="col">Concluído</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {unitRows.map(row => <tr className="border-t border-border [&>td]:px-2 [&>td]:py-2.5" key={row.unitId ?? 'none'}>
+                      <td>
+                        {row.unitId
+                          // the row is the way into the unit: it chooses it on the switch at the top
+                          ? <button className="m-0 cursor-pointer border-0 bg-transparent p-0 text-left text-sm font-semibold text-primary underline-offset-2 hover:underline"
+                            onClick={() => unitScope.setUnitId(row.unitId)} title={`Ver só ${row.name}`} type="button">{row.name}</button>
+                          : <span className="text-muted-foreground">{row.name}</span>}
+                      </td>
+                      <td className="text-right tabular-nums">{row.people}</td>
+                      <td className="text-right tabular-nums">{row.completed}</td>
+                      <td className="text-right tabular-nums">{row.inProgress}</td>
+                      <td className="text-right tabular-nums">{row.notStarted}</td>
+                      <td>
+                        <div aria-label={`${row.completedPercent}% concluído`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={row.completedPercent} className="flex items-center gap-2" role="progressbar">
+                          <span aria-hidden="true" className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary" style={{ width: `${row.completedPercent}%` }} /></span>
+                          <strong className="w-10 text-right text-xs tabular-nums">{row.completedPercent}%</strong>
+                        </div>
+                      </td>
+                    </tr>)}
+                  </tbody>
+                </table>
+              </div>
+            </Panel>}
 
             <section aria-label="Progresso de todos os participantes" className="grid gap-4 lg:grid-cols-2">
               <Panel count={pluralize(overview.participantCount, 'participante', 'participantes')} id="participant-distribution-title" title="Situação dos participantes">

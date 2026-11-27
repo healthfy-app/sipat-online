@@ -76,11 +76,14 @@ public static class LearningEngagementEndpoints
                 ? Results.File(renderer.Render(result.Value), "application/pdf", $"certificado-sipat-{certificateId:N}.pdf")
                 : Problem(result.Error);
         }).RequireAuthorization();
-        learning.MapGet("/tracks/{trackId:guid}/cover", async (Guid trackId, LearningService service,
+        learning.MapGet("/tracks/{trackId:guid}/cover", async (Guid trackId, string? v, HttpContext context, LearningService service,
             PlatformDbContext db, ITenantContext tenant, CancellationToken token) =>
         {
             var access = await service.GetAssignedAsync(trackId, token);
             if (!access.IsSuccess) return Problem(access.Error);
+            // the address carries the version of the day (a new picture comes with a new one): the browser keeps it,
+            // so the covers do not travel again on every visit. Without the version it is kept for an hour.
+            context.Response.Headers.CacheControl = string.IsNullOrEmpty(v) ? "private, max-age=3600" : "private, max-age=31536000, immutable";
             var snapshot = await db.LearningContentSnapshots.AsNoTracking().SingleOrDefaultAsync(item =>
                 item.TenantId == tenant.CurrentTenantId!.Value.Value &&
                 db.LearningTracks.Any(track => track.Id == trackId && track.TenantId == item.TenantId && track.CurrentRevisionId == item.RevisionId), token);

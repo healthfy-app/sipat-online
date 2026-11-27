@@ -1,3 +1,4 @@
+import { saveFile, XLSX_TYPE } from '@/lib/saveFile';
 import type { Borders, Cell, Fill, Font, Workbook, Worksheet } from 'exceljs';
 import type { LearningParticipantProgress } from '../api';
 import { participantProgressStatuses, type CompanyLearningOverview, type ParticipantProgressStatus } from '../participantProgress';
@@ -20,6 +21,8 @@ export interface CompanyExcelReportInput {
   generatedAt?: Date;
   /** The training the report is about; absent when it covers every training. */
   trainingTitle?: string;
+  /** The unit and the sector of each person (by id), when the company has them: two more columns in "Colaboradores". */
+  placement?: ReadonlyMap<string, { unit: string; sector: string }>;
 }
 
 const INK = '1F2A24';
@@ -54,16 +57,7 @@ export async function downloadCompanyExcelReport(input: CompanyExcelReportInput)
   const workbook = await buildCompanyExcelReport(input);
   const buffer = await workbook.xlsx.writeBuffer();
   const fileName = excelReportFileName(input.companyName, input.generatedAt ?? new Date(), input.trainingTitle);
-  const url = URL.createObjectURL(new Blob([buffer], {
-    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = fileName;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveFile(new Blob([buffer], { type: XLSX_TYPE }), fileName);
   return fileName;
 }
 
@@ -237,6 +231,8 @@ function addParticipantsSheet(workbook: Workbook, input: CompanyExcelReportInput
     { header: 'Tempo assistido', width: 12 },
     { header: 'Último acesso', width: 18 },
   ];
+  // unit and sector come last, so the columns a company already reads stay where they are
+  if (input.placement) columns.push({ header: 'Unidade', width: 24 }, { header: 'Setor', width: 24 });
   sheet.columns = columns.map(({ width }) => ({ width }));
   headerRow(sheet, 1, columns.map(({ header }) => header), brand, 1);
 
@@ -255,6 +251,7 @@ function addParticipantsSheet(workbook: Workbook, input: CompanyExcelReportInput
       participant.progressPercentage / 100,
       participant.watchedMilliseconds / MS_PER_DAY,
       participant.lastAccessedAt ? excelDate(new Date(participant.lastAccessedAt)) : null,
+      ...(input.placement ? [input.placement.get(participant.id)?.unit ?? '—', input.placement.get(participant.id)?.sector ?? '—'] : []),
     ], 1, index % 2 === 1);
     const excelRow = sheet.getRow(rowNumber);
     statusPill(excelRow.getCell(4), participant.status);

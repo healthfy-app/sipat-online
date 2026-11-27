@@ -10,7 +10,8 @@ public sealed class GameModuleService(
     IPlatformCourseCatalogStore catalogStore,
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
-    TimeProvider timeProvider)
+    TimeProvider timeProvider,
+    CatalogAccessGrant accessGrant)
 {
     private const int MaximumQuestions = 50;
     private const int MaximumOptions = 6;
@@ -30,7 +31,8 @@ public sealed class GameModuleService(
         GamificationGameType gameType,
         IReadOnlyList<GameQuestion>? questions,
         CancellationToken cancellationToken,
-        GameContent? content = null)
+        GameContent? content = null,
+        Guid? ownerTenantId = null)
     {
         var permission = EnsurePlatformOperator();
         if (!permission.IsSuccess)
@@ -50,7 +52,8 @@ public sealed class GameModuleService(
             gameType,
             validated.Value.Questions,
             timeProvider.GetUtcNow(),
-            content);
+            content,
+            ownerTenantId);
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
         await moduleStore.AddAsync(module, cancellationToken);
         await WriteAuditAsync("learning.game_module.created", "game_module", module.Id, cancellationToken);
@@ -157,7 +160,9 @@ public sealed class GameModuleService(
             : Result<PlatformCourse>.Success(refreshed);
     }
 
+    /// <summary>The games in the middle of a video, in one training: the same video elsewhere keeps its own.</summary>
     public async Task<Result<PlatformCourseVideo>> SetVideoCheckpointsAsync(
+        Guid courseId,
         Guid videoId,
         IReadOnlyList<VideoCheckpoint>? checkpoints,
         CancellationToken cancellationToken)
@@ -168,12 +173,13 @@ public sealed class GameModuleService(
             return Result<PlatformCourseVideo>.Failure(permission.Error);
         }
 
-        var video = await catalogStore.FindVideoAsync(videoId, cancellationToken);
+        var course = await catalogStore.FindCourseAsync(courseId, cancellationToken);
+        var video = course?.Videos.FirstOrDefault(item => item.Id == videoId);
         if (video is null)
         {
             return Failure<PlatformCourseVideo>(
                 "learning.platform_course.video_not_found",
-                "O vídeo não foi encontrado.");
+                "O vídeo não está neste treinamento.");
         }
 
         if (video.Provider != VideoProvider.Sipat)
@@ -198,7 +204,7 @@ public sealed class GameModuleService(
 
         var ordered = checkpoints.OrderBy(item => item.TimeMilliseconds).ToArray();
         await using var transaction = await unitOfWork.BeginTransactionAsync(cancellationToken);
-        await moduleStore.SetVideoCheckpointsAsync(videoId, ordered, cancellationToken);
+        await moduleStore.SetVideoCheckpointsAsync(courseId, videoId, ordered, cancellationToken);
         await WriteAuditAsync("learning.platform_course.video_checkpoints_changed", "platform_course_video", videoId, cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Result<PlatformCourseVideo>.Success(video with { Checkpoints = ordered });
@@ -302,8 +308,8 @@ public sealed class GameModuleService(
             cancellationToken);
 
     private Result<bool> EnsurePlatformOperator() =>
-        currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
-        tenantContext.CurrentTenantId is null
+        accessGrant.Granted || (currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
+        tenantContext.CurrentTenantId is null)
             ? Result<bool>.Success(true)
             : Result<bool>.Failure(new DomainError(
                 "learning.platform_course.forbidden",

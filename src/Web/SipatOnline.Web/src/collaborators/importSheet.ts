@@ -1,3 +1,4 @@
+import { saveFile, XLSX_TYPE } from '@/lib/saveFile';
 import type { CompanyRegistry, ImportRow } from '@/api';
 
 export const MAX_IMPORT_ROWS = 2000;
@@ -180,14 +181,7 @@ export async function downloadTemplate(registry: CompanyRegistry): Promise<void>
   lists.columns.forEach(column => { column.width = 28; });
 
   const buffer = await workbook.xlsx.writeBuffer();
-  const url = URL.createObjectURL(new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = 'modelo-carga-participantes.xlsx';
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  saveFile(new Blob([buffer], { type: XLSX_TYPE }), 'modelo-carga-participantes.xlsx');
 }
 
 function detectDelimiter(content: string): string {

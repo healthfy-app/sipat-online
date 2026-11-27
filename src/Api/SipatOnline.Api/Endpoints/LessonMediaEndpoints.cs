@@ -12,10 +12,32 @@ public static class LessonMediaEndpoints
 
     public static IEndpointRouteBuilder MapLessonMediaEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGroup("/api/learning")
+        var learning = endpoints.MapGroup("/api/learning")
             .RequireAuthorization("ParticipateInLearning")
-            .WithTags("Learning activities")
-            .MapGet("/lessons/{lessonId:guid}/media", async (
+            .WithTags("Learning activities");
+
+        // the picture of the lesson's video, as the library shows it: only for the participant the lesson is assigned to
+        learning.MapGet("/lessons/{lessonId:guid}/thumbnail", async (
+                Guid lessonId,
+                LessonMediaAccessService access,
+                HttpContext context,
+                CancellationToken cancellationToken) =>
+            {
+                var result = await access.ThumbnailAsync(lessonId, cancellationToken);
+                if (!result.IsSuccess)
+                {
+                    return ToProblem(result.Error);
+                }
+
+                var picture = result.Value;
+                // the address changes with the picture (?v=), so it can be kept
+                context.Response.Headers.CacheControl = "private, max-age=31536000, immutable";
+                context.Response.Headers.XContentTypeOptions = "nosniff";
+                return Results.File(picture.Data, picture.ContentType);
+            })
+            .WithName("GetLessonThumbnail");
+
+        learning.MapGet("/lessons/{lessonId:guid}/media", async (
                 Guid lessonId,
                 string? quality,
                 LessonMediaAccessService access,

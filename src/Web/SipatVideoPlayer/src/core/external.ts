@@ -1,15 +1,8 @@
-export type ExternalProvider = 'YouTube' | 'Vimeo' | 'Smartplayer';
-
-/**
- * Smartplayer keeps its embed address without the scheme ("player.smartplayer.ai/…"): its format is not published, so the
- * host must be smartplayer.ai or one of its subdomains, and the rest may not carry characters that leave an attribute.
- */
-const smartplayerAddress = /^(?:[a-z0-9-]+\.)*smartplayer\.ai\/[^\s"'<>\\`]+$/;
+export type ExternalProvider = 'YouTube' | 'Vimeo';
 
 const idPattern: Record<ExternalProvider, RegExp> = {
   YouTube: /^[A-Za-z0-9_-]{11}$/,
   Vimeo: /^[0-9]{1,32}$/,
-  Smartplayer: smartplayerAddress,
 };
 
 /** Only ids of the provider's own shape may reach a URL: a crafted id must never change the host or path. */
@@ -18,16 +11,25 @@ function checkedId(provider: ExternalProvider, externalId: string): string {
   return externalId;
 }
 
-export function externalEmbedUrl(provider: ExternalProvider, externalId: string): string {
+export interface EmbedOptions {
+  /** Lets the page follow the video through the provider's player API. */
+  api?: boolean;
+  /** Whole seconds to start at (only with `api`). */
+  startS?: number;
+}
+
+export function externalEmbedUrl(provider: ExternalProvider, externalId: string, options: EmbedOptions = {}): string {
   const id = checkedId(provider, externalId);
-  if (provider === 'Smartplayer') return `https://${id}`;
-  return provider === 'YouTube'
-    ? `https://www.youtube-nocookie.com/embed/${id}`
-    : `https://player.vimeo.com/video/${id}?dnt=1`;
+  const start = options.api && options.startS && options.startS >= 1 ? Math.floor(options.startS) : 0;
+  if (provider === 'YouTube') {
+    if (!options.api) return `https://www.youtube-nocookie.com/embed/${id}`;
+    const origin = typeof location === 'undefined' ? '' : `&origin=${encodeURIComponent(location.origin)}`;
+    return `https://www.youtube-nocookie.com/embed/${id}?enablejsapi=1&rel=0&playsinline=1${start ? `&start=${start}` : ''}${origin}`;
+  }
+  return `https://player.vimeo.com/video/${id}?dnt=1${start ? `#t=${start}s` : ''}`;
 }
 
 export function externalWatchUrl(provider: ExternalProvider, externalId: string): string {
   const id = checkedId(provider, externalId);
-  if (provider === 'Smartplayer') return `https://${id}`;
   return provider === 'YouTube' ? `https://youtu.be/${id}` : `https://vimeo.com/${id}`;
 }

@@ -14,7 +14,8 @@ public sealed record ChangeProfileRequest(string? RegistrationNumber, string? Em
 /// <summary><c>Field</c> is "unit" or "sector"; a null <c>ValueId</c> takes the unit or sector off.</summary>
 public sealed record ChangePlacementRequest(IReadOnlyList<Guid>? UserIds, string? Field, Guid? ValueId);
 
-public sealed record PlacementResult(int Changed);
+/// <summary>How many people moved, and what that did to their trainings: days given, untouched days taken back, trainings received.</summary>
+public sealed record PlacementResult(int Changed, int Added, int Removed, IReadOnlyList<string> ReceivedTrainings);
 
 /// <summary>The registration, contact, unit and sector of the participants of a company, one at a time or many at once. Administrators are never touched.</summary>
 public sealed class ParticipantProfileService(
@@ -23,17 +24,20 @@ public sealed class ParticipantProfileService(
     ITenantContext tenantContext,
     ICurrentActor actor,
     IAuditTrail audit,
+    SipatOnline.Infrastructure.Learning.LearningDistributionService distribution,
     TimeProvider clock)
 {
     public const int MaximumPlacementIds = 2000;
     private const int MaximumEmailLength = 256;
 
-    public async Task<Result<IReadOnlyList<ParticipantProfile>>> ListAsync(CancellationToken token)
+    /// <summary>The profiles of the participants of the company, or (with a unit) of that unit only.</summary>
+    public async Task<Result<IReadOnlyList<ParticipantProfile>>> ListAsync(Guid? unitId, CancellationToken token)
     {
         if (tenantContext.CurrentTenantId is not { IsEmpty: false } tenant)
             return Failure<IReadOnlyList<ParticipantProfile>>("tenant.context.required", "Não foi possível identificar a empresa.");
 
         var list = await ParticipantsOf(tenant.Value).AsNoTracking()
+            .Where(user => unitId == null || user.UnitId == unitId)
             .Select(user => new ParticipantProfile(user.Id, user.RegistrationNumber, user.Email, user.Phone, user.UnitId, user.SectorId))
             .ToListAsync(token);
         return Result<IReadOnlyList<ParticipantProfile>>.Success(list);
@@ -66,6 +70,7 @@ public sealed class ParticipantProfileService(
             !await db.CompanySectors.AnyAsync(item => item.Id == sectorId && item.TenantId == tenant && item.IsActive, token))
             return Failure<ParticipantProfile>("profile.sector.invalid", "O setor não está na lista da empresa.");
 
+        var before = new SipatOnline.Infrastructure.Learning.PlacementBefore(user.Id, user.UnitId, user.SectorId);
         user.RegistrationNumber = registration.Value.Value;
         user.Email = email.Value.Value;
         user.NormalizedEmail = email.Value.Value is null ? null : users.NormalizeEmail(email.Value.Value);
@@ -77,6 +82,11 @@ public sealed class ParticipantProfileService(
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId, "identity.user.profile_changed", "user",
             user.Id.ToString("D"), clock.GetUtcNow()), token);
         await db.SaveChangesAsync(token);
+        // where a person is in a unit and a sector, that sector is one of that unit
+        await CompanyRegistryService.LinkPlacedAsync(db, tenant, token);
+        // a new unit or sector brings the trainings that are for it, and takes back the untouched ones that are not
+        if (before.UnitId != user.UnitId || before.SectorId != user.SectorId)
+            await distribution.PlacementChangedAsync(tenant, [before], token);
         return Result<ParticipantProfile>.Success(new ParticipantProfile(user.Id, user.RegistrationNumber, user.Email, user.Phone, user.UnitId, user.SectorId));
     }
 
@@ -105,9 +115,10 @@ public sealed class ParticipantProfileService(
         }
 
         var people = await ParticipantsOf(tenant).Where(user => ids.Contains(user.Id)).ToListAsync(token);
-        var changed = 0;
+        var moved = new List<SipatOnline.Infrastructure.Learning.PlacementBefore>();
         foreach (var user in people)
         {
+            var before = new SipatOnline.Infrastructure.Learning.PlacementBefore(user.Id, user.UnitId, user.SectorId);
             if (isUnit)
             {
                 if (user.UnitId == request.ValueId) continue;
@@ -120,15 +131,18 @@ public sealed class ParticipantProfileService(
             }
 
             user.ConcurrencyStamp = Guid.NewGuid().ToString();
-            changed++;
+            moved.Add(before);
         }
 
-        if (changed == 0) return Result<PlacementResult>.Success(new PlacementResult(0));
+        var changed = moved.Count;
+        if (changed == 0) return Result<PlacementResult>.Success(new PlacementResult(0, 0, 0, []));
 
         await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", tenantContext.CurrentTenantId, "identity.users.placement_changed", "user",
             $"{(isUnit ? "unit" : "sector")}:{changed}", clock.GetUtcNow()), token);
         await db.SaveChangesAsync(token);
-        return Result<PlacementResult>.Success(new PlacementResult(changed));
+        await CompanyRegistryService.LinkPlacedAsync(db, tenant, token);
+        var sync = await distribution.PlacementChangedAsync(tenant, moved, token);
+        return Result<PlacementResult>.Success(new PlacementResult(changed, sync.Added, sync.Removed, sync.ReceivedTrainings));
     }
 
     private IQueryable<PlatformIdentityUser> ParticipantsOf(Guid tenant) =>

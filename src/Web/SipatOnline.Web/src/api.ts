@@ -74,6 +74,10 @@ export interface PlatformCourse {
   coverUrl: string | null;
   lessons?: PlatformCourseLesson[];
   categoryId?: string | null;
+  /** The company the training belongs to; absent or null for a model of Conteúdo. */
+  tenantId?: string | null;
+  /** A model offered whole as a ready SIPAT: what a Bronze company picks. */
+  isReadySipat?: boolean;
 }
 
 export interface PlatformCourseLesson {
@@ -107,6 +111,10 @@ export interface GameQuestion {
 }
 
 export interface GameModule {
+  /** The company the game belongs to (its own, private to it); absent or null for the operation's. */
+  tenantId?: string | null;
+  /** That company's name, in the operation's list. */
+  companyName?: string | null;
   id: string;
   title: string;
   gameType: GamificationGameType;
@@ -239,15 +247,33 @@ export interface SipatCatalog { courses: PlatformCourse[]; videos: PlatformLibra
 export function getSipatCatalog(): Promise<SipatCatalog> {
   return requestJson<SipatCatalog>('/api/admin/sipat-catalog');
 }
-export interface SipatPlanSummary { sipatEventId: string; days: number; videos: number }
+/** A training as its card shows it: how much it has, how long it runs and its cover (null when it has none). */
+export interface SipatPlanSummary { sipatEventId: string; days: number; videos: number; courseId?: string; durationMilliseconds?: number; coverVersion?: number | null; targets?: AudienceTarget[] }
+/** Deletes a training that was never delivered; one that was published stays in the history. */
+export async function deleteSipat(sipatId: string): Promise<void> {
+  await request(`/api/admin/sipats/${sipatId}`, { method: 'DELETE' });
+}
 export function listSipatPlans(): Promise<SipatPlanSummary[]> {
   return requestJson<SipatPlanSummary[]>('/api/admin/sipat-plans');
 }
 export async function getSipatPlan(sipatId: string): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`));
 }
-export async function saveSipatPlan(sipatId: string, days: ProgramDay[]): Promise<ProgramDay[]> {
-  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify({ days }) }));
+/** `endsOn`: the limit date (the last day the training can be taken); left out, the limit stays as it is; null, it ends with its last day. */
+export async function saveSipatPlan(sipatId: string, days: ProgramDay[], endsOn?: string | null): Promise<ProgramDay[]> {
+  const body = endsOn === undefined ? { days } : { days, endsOn, setLimit: true };
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan`, { method: 'PUT', body: JSON.stringify(body) }));
+}
+/** The days of a template (a training of the operation, of no company): the same board of days. */
+export async function getTemplateDays(courseId: string): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`));
+}
+export async function saveTemplateDays(courseId: string, days: ProgramDay[], endsOn: string | null): Promise<ProgramDay[]> {
+  return tidyDays(await requestJson<ProgramDay[]>(`/api/platform/catalog/courses/${courseId}/days`, { method: 'PUT', body: JSON.stringify({ days, endsOn }) }));
+}
+/** The limit date of a training, when it has one of its own ("2026-12-10"). */
+export async function getTrainingLimit(courseId: string): Promise<string | null> {
+  return (await requestJson<{ endsOn: string | null }>(`/api/platform/catalog/courses/${courseId}/days/limit`)).endsOn ?? null;
 }
 export async function copySipatPlan(sipatId: string, sourceId: string): Promise<ProgramDay[]> {
   return tidyDays(await requestJson<ProgramDay[]>(`/api/admin/sipats/${sipatId}/plan/copy-from/${sourceId}`, { method: 'POST', body: '{}' }));
@@ -300,17 +326,27 @@ export interface PlatformCourseVideo {
   /** Missing in payloads from before external videos: read it with `videoProvider`. */
   provider?: VideoProvider;
   externalId?: string | null;
+  /** The picture chosen for the video; absent or null shows a frame of the video itself. */
+  thumbnailUrl?: string | null;
 }
 
-export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo' | 'Smartplayer';
+export type VideoProvider = 'Sipat' | 'YouTube' | 'Vimeo';
 
 export function videoProvider(video: { provider?: VideoProvider }): VideoProvider {
   return video.provider ?? 'Sipat';
 }
 
-/** A YouTube or Vimeo video: an appendix of the Assunto that never counts for progress or the certificate. */
-export function isExtra(video: { provider?: string }): boolean {
+/** A YouTube or Vimeo video: no file of ours, played in the provider's player, without questions in the middle. */
+export function isExternal(video: { provider?: string }): boolean {
   return (video.provider ?? 'Sipat') !== 'Sipat';
+}
+
+/**
+ * An external video without a known length: an appendix that never counts for progress or the certificate.
+ * A YouTube or Vimeo video with its length counts like ours (the participant watches it in order).
+ */
+export function isExtra(video: { provider?: string; durationMilliseconds?: number; durationMs?: number }): boolean {
+  return isExternal(video) && !((video.durationMilliseconds ?? video.durationMs ?? 0) > 0);
 }
 
 export interface PlatformLibraryVideo {
@@ -533,8 +569,10 @@ export interface LearningLessonProgress {
   watchedMilliseconds?: number;
   /** An extra (YouTube or Vimeo): never counts for progress. Missing in payloads from before external videos. */
   isBonus?: boolean;
-  provider?: 'YouTube' | 'Vimeo' | 'Smartplayer' | null;
+  provider?: 'YouTube' | 'Vimeo' | null;
   externalId?: string | null;
+  /** The picture of the video, as the library shows it; missing when the video has none. */
+  thumbnailUrl?: string | null;
 }
 
 export interface LearningExperience {
@@ -579,8 +617,31 @@ export function configureCompanyAdministration(companyId: string | null): void {
   companyAdministrationId = companyId;
 }
 
+/**
+ * The first calls of the portal are started by `public/boot.js` while the app is still downloading. Each answer is
+ * taken once; a missing or failed one gives null, and the caller asks the usual way.
+ */
+async function takeBoot<T>(name: 'branding' | 'session' | 'home', read: (response: Response) => Promise<T | undefined>): Promise<T | undefined> {
+  const boot = (globalThis as { __sipatBoot?: Record<string, Promise<Response> | undefined> }).__sipatBoot;
+  const pending = boot?.[name];
+  if (!boot || !pending) return undefined;
+  boot[name] = undefined;
+  try { return await read(await pending); } catch { return undefined; }
+}
+const okJson = async <T,>(response: Response): Promise<T | undefined> => (response.ok ? await response.json() as T : undefined);
+
 export function getCompanyAdministrationId(): string | null {
   return companyAdministrationId;
+}
+
+/**
+ * Runs one company-administration call for a company, from the operation's own list (which is in no company). The
+ * call reads the company as it starts, so `action` must make a single request; chain several with one call each.
+ */
+export function inCompany<T>(companyId: string, action: () => Promise<T>): Promise<T> {
+  const previous = companyAdministrationId;
+  companyAdministrationId = companyId;
+  try { return action(); } finally { companyAdministrationId = previous; }
 }
 
 async function readError(response: Response): Promise<ApiError> {
@@ -699,11 +760,99 @@ async function request(
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  return (await request(path, init)).json() as Promise<T>;
+  const value = await (await request(path, init)).json() as T;
+  // in a company's editor the links the server gives (cover, video file) go to the company's own routes
+  return path.startsWith(`${trainingEditor}/`) ? companyEditorLinks(value) : value;
 }
 
-export function getTenantBranding(): Promise<TenantBranding> {
-  return requestJson<TenantBranding>('/api/tenant/branding');
+const platformCatalog = '/api/platform/catalog';
+const trainingEditor = '/api/admin/training-editor';
+let editorBase = platformCatalog;
+/**
+ * Where the video editor's calls go: the operation's catalog (Conteúdo), or the company's own training, which its
+ * administrator edits inside what the plan allows. The page that opens the editor sets it and puts it back on leaving.
+ */
+export function setEditorScope(scope: 'platform' | 'company'): void {
+  editorBase = scope === 'company' ? trainingEditor : platformCatalog;
+}
+
+/**
+ * The links of the operation's catalog (cover, video file) as the company's own routes. The operation inside a
+ * company keeps the catalog's links: an <img> or a <video> cannot send the company header the admin routes ask for.
+ */
+export function companyEditorLinks<T>(value: T): T {
+  if (companyAdministrationId) return value;
+  return JSON.parse(JSON.stringify(value).replaceAll(`${platformCatalog}/`, `${trainingEditor}/`)) as T;
+}
+
+const companyVideos = '/api/admin/company-videos';
+let uploadBase = `${platformCatalog}/videos`;
+/**
+ * Where videos are sent: the operation's library, or the company's own videos (private to it, inside its room).
+ * It follows who is signed in, so the app sets it once and the upload queue sends to the right place.
+ */
+export function setUploadScope(scope: 'platform' | 'company'): void {
+  uploadBase = scope === 'company' ? companyVideos : `${platformCatalog}/videos`;
+}
+
+/** A video the company sent, and the company's trainings that have it. */
+export interface CompanyVideo { video: PlatformCourseVideo; trainings: string[] }
+export interface CompanyVideos { videos: CompanyVideo[]; usedBytes: number; quotaBytes: number; termsAccepted: boolean; canSend: boolean }
+export async function listCompanyVideos(): Promise<CompanyVideos> {
+  return companyEditorLinks(await requestJson<CompanyVideos>(`${companyVideos}/`));
+}
+/** The company says, once, that what it sends is its own to use. */
+export async function acceptCompanyVideoTerms(): Promise<void> {
+  await request(`${companyVideos}/terms`, { method: 'POST', body: '{}' });
+}
+export async function renameCompanyVideo(videoId: string, title: string): Promise<void> {
+  await request(`${companyVideos}/${videoId}`, { method: 'PUT', body: JSON.stringify({ title }) });
+}
+/** Changes the name of a video: any of the library for the operation, its own for a company. */
+export async function renameVideo(videoId: string, title: string, company: boolean): Promise<void> {
+  await request(company ? `${companyVideos}/${videoId}` : `${platformCatalog}/videos/${videoId}/title`, { method: 'PUT', body: JSON.stringify({ title }) });
+}
+/** The picture shown for a video instead of a frame of it: PNG, JPEG or WebP, up to 2 MB. */
+export async function setVideoThumbnail(videoId: string, image: File, company: boolean): Promise<void> {
+  const form = new FormData();
+  form.append('image', image);
+  await request(company ? `${companyVideos}/${videoId}/thumbnail` : `${platformCatalog}/videos/${videoId}/thumbnail`, { method: 'PUT', body: form });
+}
+export async function removeVideoThumbnail(videoId: string, company: boolean): Promise<void> {
+  await request(company ? `${companyVideos}/${videoId}/thumbnail` : `${platformCatalog}/videos/${videoId}/thumbnail`, { method: 'DELETE' });
+}
+export async function deleteCompanyVideo(videoId: string): Promise<void> {
+  await request(`${companyVideos}/${videoId}`, { method: 'DELETE' });
+}
+
+/** What the company's plan lets it change in one of its trainings. */
+export interface TrainingAccess { editDetails: boolean; editGrid: boolean; editActivities: boolean; uploadVideo: boolean; plan: string }
+export interface TrainingEditorData { course: PlatformCourse; access: TrainingAccess; sipatId: string; sipatTitle: string; sipatStatus: string; unavailableVideoIds?: string[] }
+/**
+ * The cover of a company's training (PNG, JPEG or WebP, up to 2 MB), from its card or its page. It goes by the
+ * company's own route, which the operation also uses while inside the company.
+ */
+export async function setTrainingCover(courseId: string, image: File): Promise<void> {
+  const form = new FormData();
+  form.append('cover', image);
+  await request(`${trainingEditor}/courses/${courseId}/cover`, { method: 'PUT', body: form });
+}
+export async function removeTrainingCover(courseId: string): Promise<void> {
+  await request(`${trainingEditor}/courses/${courseId}/cover`, { method: 'DELETE' });
+}
+
+/** A company's training as its editor needs it: the content, and what the plan allows. */
+export function getTrainingEditor(sipatId: string): Promise<TrainingEditorData> {
+  return requestJson<TrainingEditorData>(`${trainingEditor}/sipats/${sipatId}`);
+}
+
+export async function getTenantBranding(): Promise<TenantBranding> {
+  // the answer started with the page, unless the operator is inside a company (that one is asked with its header)
+  const early = companyAdministrationId ? undefined : await takeBoot('branding', okJson<TenantBranding>);
+  if (early) return early;
+  // the same address answers as the operation or as the company the operator is inside (by a header): a copy kept by
+  // the browser of one must never be served as the other
+  return requestJson<TenantBranding>('/api/tenant/branding', { cache: 'no-store' });
 }
 
 export interface TenantAppearanceData {
@@ -715,6 +864,28 @@ export interface TenantAppearanceData {
   removeBanner?: boolean;
 }
 
+/** The pictures of the company's certificate, each an address or null; `logoReference` is the logo the operation set. */
+export interface CertificateTemplate {
+  coverReference: string | null;
+  emblemReference: string | null;
+  footerReference: string | null;
+  logoReference: string | null;
+}
+
+export interface CertificateTemplateData {
+  coverBase64?: string | null; removeCover?: boolean;
+  emblemBase64?: string | null; removeEmblem?: boolean;
+  footerBase64?: string | null; removeFooter?: boolean;
+}
+
+export function getCertificateTemplate(): Promise<CertificateTemplate> {
+  return requestJson<CertificateTemplate>('/api/tenant/certificate-template');
+}
+
+export function saveCertificateTemplate(data: CertificateTemplateData): Promise<CertificateTemplate> {
+  return requestJson<CertificateTemplate>('/api/tenant/certificate-template', { method: 'PUT', body: JSON.stringify(data) });
+}
+
 export function saveTenantAppearance(data: TenantAppearanceData): Promise<TenantBranding> {
   return requestJson<TenantBranding>('/api/tenant/branding/appearance', {
     method: 'PUT',
@@ -722,6 +893,11 @@ export function saveTenantAppearance(data: TenantAppearanceData): Promise<Tenant
   });
 }
 export async function getSession(platform = false): Promise<IdentitySession | null> {
+  if (!platform) {
+    // null: nobody signed in; undefined: no early answer, ask now
+    const early = await takeBoot<IdentitySession | null>('session', async response => (response.status === 401 ? null : okJson<IdentitySession>(response)));
+    if (early !== undefined) return early;
+  }
   try {
     return await requestJson<IdentitySession>(
       platform ? '/api/platform/identity/session' : '/api/identity/session',
@@ -812,6 +988,20 @@ export function setVideoSubjects(videoId: string, subjectIds: string[]): Promise
 
 /** Many videos at once: `add` is put on every one, `remove` taken from every one, the rest stays. */
 export interface BulkVideoChange { videoIds: string[]; add: string[]; remove: string[] }
+/** The assuntos each game is filed under: the same list the videos use. */
+export interface GameSubjects { moduleId: string; subjectIds: string[] }
+export function listGameSubjects(): Promise<GameSubjects[]> {
+  return requestJson<GameSubjects[]>('/api/platform/catalog/game-subjects');
+}
+export function setGameSubjects(moduleId: string, subjectIds: string[]): Promise<GameSubjects> {
+  return requestJson<GameSubjects>(`/api/platform/catalog/modules/${moduleId}/subjects`, { method: 'PUT', body: JSON.stringify({ subjectIds }) });
+}
+/** A game's picture sent from the computer (PNG, JPEG or WebP, up to 2 MB); answers the address to keep in the game. */
+export async function uploadGameImage(image: File): Promise<string> {
+  const form = new FormData();
+  form.append('image', image);
+  return (await requestJson<{ imageUrl: string }>(`${editorBase}/game-images`, { method: 'POST', body: form })).imageUrl;
+}
 export function changeVideosSubjects(change: BulkVideoChange): Promise<void> {
   return request('/api/platform/catalog/videos/subjects', { method: 'PUT', body: JSON.stringify(change) }).then(() => undefined);
 }
@@ -825,7 +1015,10 @@ export function changeVideosCompanies(change: BulkVideoChange): Promise<void> {
 }
 
 /** A SIPAT's week opened in the video editor: a copy training whose Títulos are the days of that SIPAT. */
-export interface SipatWeek { courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string }
+export interface SipatWeek {
+  courseId: string; sipatEventId: string; tenantId: string; sipatTitle: string; companyName: string; sipatStatus?: 'Draft' | 'Published' | 'Cancelled';
+  startsAt?: string; endsAt?: string; days?: number;
+}
 export function listSipatWeeks(): Promise<SipatWeek[]> {
   return requestJson<SipatWeek[]>('/api/platform/catalog/sipat-weeks');
 }
@@ -849,7 +1042,7 @@ export function updatePlatformCourse(
   courseId: string,
   data: PlatformCourseUpdate,
 ): Promise<PlatformCourse> {
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
@@ -875,7 +1068,7 @@ export function setPlatformCourseStructure(
   courseId: string,
   lessons: CourseLessonDraft[],
 ): Promise<PlatformCourse> {
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/structure`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}/structure`, {
     method: "PUT",
     body: JSON.stringify({ lessons }),
   });
@@ -899,7 +1092,7 @@ export type VideoUploadStart =
 
 async function startVideoUpload(file: File): Promise<VideoUploadStart> {
   try {
-    return await requestJson<VideoUploadStart>('/api/platform/catalog/videos/uploads', {
+    return await requestJson<VideoUploadStart>(`${uploadBase}/uploads`, {
       method: 'POST',
       body: JSON.stringify({ contentType: file.type, sizeBytes: file.size }),
     });
@@ -980,7 +1173,7 @@ async function uploadVideoMultipart(
   formData.append('video', file);
   const path = courseId
     ? `/api/platform/catalog/courses/${courseId}/videos`
-    : '/api/platform/catalog/videos';
+    : uploadBase;
   if (!options.onProgress) {
     return requestJson<PlatformCourseVideo>(path, { method: 'POST', body: formData, signal: options.signal });
   }
@@ -1031,7 +1224,7 @@ export async function uploadPlatformVideo(
   }
 
   return requestJson<PlatformCourseVideo>(
-    `/api/platform/catalog/videos/uploads/${start.videoId}/complete`,
+    `${uploadBase}/uploads/${start.videoId}/complete`,
     {
       method: 'POST',
       body: JSON.stringify({ title, durationMilliseconds, courseId: courseId ?? null }),
@@ -1053,7 +1246,7 @@ export interface ChunkedVideoUpload {
 /** Null: this environment has no direct upload (or the API is older), send with uploadPlatformVideo. */
 export async function startChunkedVideoUpload(contentType: string, sizeBytes: number): Promise<ChunkedVideoUpload | null> {
   try {
-    const start = await requestJson<ChunkedVideoUpload | { mode: 'multipart' }>('/api/platform/catalog/videos/uploads/chunked', {
+    const start = await requestJson<ChunkedVideoUpload | { mode: 'multipart' }>(`${uploadBase}/uploads/chunked`, {
       method: 'POST',
       body: JSON.stringify({ contentType, sizeBytes }),
     });
@@ -1070,7 +1263,7 @@ export async function signChunkedUploadParts(
   partNumbers: number[],
 ): Promise<{ partNumber: number; url: string }[]> {
   const response = await requestJson<{ parts: { partNumber: number; url: string }[] }>(
-    `/api/platform/catalog/videos/uploads/${videoId}/parts`,
+    `${uploadBase}/uploads/${videoId}/parts`,
     { method: 'POST', body: JSON.stringify({ uploadId, partNumbers }) },
   );
   return response.parts;
@@ -1081,21 +1274,21 @@ export async function listChunkedUploadParts(
   uploadId: string,
 ): Promise<{ partNumber: number; sizeBytes: number }[]> {
   const response = await requestJson<{ parts: { partNumber: number; sizeBytes: number }[] }>(
-    `/api/platform/catalog/videos/uploads/${videoId}/parts/list`,
+    `${uploadBase}/uploads/${videoId}/parts/list`,
     { method: 'POST', body: JSON.stringify({ uploadId }) },
   );
   return response.parts;
 }
 
 export async function finishChunkedUpload(videoId: string, uploadId: string): Promise<void> {
-  await request(`/api/platform/catalog/videos/uploads/${videoId}/finish`, {
+  await request(`${uploadBase}/uploads/${videoId}/finish`, {
     method: 'POST',
     body: JSON.stringify({ uploadId }),
   });
 }
 
 export async function abortChunkedUpload(videoId: string, uploadId: string): Promise<void> {
-  await request(`/api/platform/catalog/videos/uploads/${videoId}/abort`, {
+  await request(`${uploadBase}/uploads/${videoId}/abort`, {
     method: 'POST',
     body: JSON.stringify({ uploadId }),
   });
@@ -1107,7 +1300,7 @@ export function completeUploadedVideo(
   durationMilliseconds: number,
   courseId?: string,
 ): Promise<PlatformCourseVideo> {
-  return requestJson<PlatformCourseVideo>(`/api/platform/catalog/videos/uploads/${videoId}/complete`, {
+  return requestJson<PlatformCourseVideo>(`${uploadBase}/uploads/${videoId}/complete`, {
     method: 'POST',
     body: JSON.stringify({ title, durationMilliseconds, courseId: courseId ?? null }),
   });
@@ -1123,7 +1316,7 @@ export async function putUploadPart(url: string, part: Blob, options: UploadProg
 }
 
 export function createExternalPlatformVideo(data: {
-  provider: 'YouTube' | 'Vimeo' | 'Smartplayer';
+  provider: 'YouTube' | 'Vimeo';
   url: string;
   title: string;
   durationMilliseconds: number | null;
@@ -1137,55 +1330,62 @@ export function createExternalPlatformVideo(data: {
 export function setPlatformCourseCover(courseId: string, file: File): Promise<PlatformCourse> {
   const formData = new FormData();
   formData.append('cover', file);
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/cover`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}/cover`, {
     method: 'PUT',
     body: formData,
   });
 }
 
 export function removePlatformCourseCover(courseId: string): Promise<PlatformCourse> {
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/cover`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}/cover`, {
     method: 'DELETE',
   });
 }
 
 export function listGameModules(): Promise<GameModule[]> {
-  return requestJson<GameModule[]>('/api/platform/catalog/modules');
+  return requestJson<GameModule[]>(`${editorBase}/modules`);
 }
 
 export function createGameModule(data: GameModuleData): Promise<GameModule> {
-  return requestJson<GameModule>('/api/platform/catalog/modules', {
+  return requestJson<GameModule>(`${editorBase}/modules`, {
     method: 'POST',
     body: JSON.stringify(data),
   });
 }
 
 export function updateGameModule(moduleId: string, data: GameModuleData): Promise<GameModule> {
-  return requestJson<GameModule>(`/api/platform/catalog/modules/${moduleId}`, {
+  return requestJson<GameModule>(`${editorBase}/modules/${moduleId}`, {
     method: 'PUT',
     body: JSON.stringify(data),
   });
 }
 
 export async function deleteGameModule(moduleId: string): Promise<void> {
-  await request(`/api/platform/catalog/modules/${moduleId}`, { method: 'DELETE' });
+  await request(`${editorBase}/modules/${moduleId}`, { method: 'DELETE' });
+}
+
+/** A copy of a game the company can use (the operation's, or its own), made the company's own so it can change it. */
+export function duplicateCompanyGame(moduleId: string): Promise<GameModule> {
+  return requestJson<GameModule>(`${trainingEditor}/modules/${moduleId}/duplicate`, { method: 'POST' });
 }
 
 export function setPlatformCourseModules(
   courseId: string,
   items: CourseModulePlacement[],
 ): Promise<PlatformCourse> {
-  return requestJson<PlatformCourse>(`/api/platform/catalog/courses/${courseId}/modules`, {
+  return requestJson<PlatformCourse>(`${editorBase}/courses/${courseId}/modules`, {
     method: 'PUT',
     body: JSON.stringify({ items }),
   });
 }
 
+/** The games in the middle of a video, in one training: the same video in another training keeps its own. */
 export function setVideoCheckpoints(
+  courseId: string,
   videoId: string,
   items: VideoCheckpoint[],
 ): Promise<PlatformCourseVideo> {
-  return requestJson<PlatformCourseVideo>(`/api/platform/catalog/videos/${videoId}/checkpoints`, {
+  return requestJson<PlatformCourseVideo>(`${editorBase}/courses/${courseId}/videos/${videoId}/checkpoints`, {
     method: 'PUT',
     body: JSON.stringify({ items }),
   });
@@ -1250,19 +1450,22 @@ export function createPlatformUser(data: PlatformUserProvisionData): Promise<Pla
   });
 }
 
-export function listParticipants(offset = 0, limit = 100): Promise<ParticipantAccountPage> {
+/** With `unitId`, the server sends the people of that unit only (the pages of a company with a unit chosen at the top). */
+const unitQuery = (unitId: string | null | undefined, first: boolean) => unitId ? `${first ? '?' : '&'}unitId=${encodeURIComponent(unitId)}` : '';
+
+export function listParticipants(offset = 0, limit = 100, unitId?: string | null): Promise<ParticipantAccountPage> {
   return requestJson<ParticipantAccountPage>(
-    `/api/admin/users/participants?offset=${offset}&limit=${limit}`,
+    `/api/admin/users/participants?offset=${offset}&limit=${limit}${unitQuery(unitId, false)}`,
   );
 }
 
-export async function listAllParticipants(): Promise<ParticipantAccount[]> {
+export async function listAllParticipants(unitId?: string | null): Promise<ParticipantAccount[]> {
   const participants: ParticipantAccount[] = [];
   let offset = 0;
   let totalCount = 1;
 
   while (offset < totalCount) {
-    const page = await listParticipants(offset, 100);
+    const page = await (unitId ? listParticipants(offset, 100, unitId) : listParticipants(offset, 100));
     participants.push(...page.items);
     totalCount = page.totalCount;
     if (page.items.length === 0) break;
@@ -1319,8 +1522,8 @@ export function changeUserStatus(userId: string, isActive: boolean): Promise<Par
   });
 }
 
-export function listLearningParticipation(): Promise<LearningParticipantProgress[]> {
-  return requestJson<LearningParticipantProgress[]>('/api/admin/learning/participation');
+export function listLearningParticipation(unitId?: string | null): Promise<LearningParticipantProgress[]> {
+  return requestJson<LearningParticipantProgress[]>(`/api/admin/learning/participation${unitQuery(unitId, true)}`);
 }
 
 export function getLearningTrackDraft(trackId: string): Promise<LearningTrackDraft> {
@@ -1410,6 +1613,15 @@ export async function cancelSipatEvent(id: string): Promise<SipatEvent> {
 
 export function listAssignedLearningTracks(): Promise<LearningTrackCard[]> {
   return requestJson<LearningTrackCard[]>('/api/learning/tracks');
+}
+
+/** The participant's home in one answer: every day assigned, and each with its videos and the progress in them. */
+export interface LearningHome { tracks: LearningTrackCard[]; experiences: LearningExperience[] }
+export async function getLearningHome(): Promise<LearningHome> {
+  const home = (await takeBoot('home', okJson<LearningHome>)) ?? await requestJson<LearningHome>('/api/learning/home');
+  // anything that is not the home (an older server, a proxy's page) is refused, and the caller asks the older way
+  if (!Array.isArray(home?.tracks) || !Array.isArray(home?.experiences)) throw new Error('A resposta do treinamento veio incompleta.');
+  return home;
 }
 
 export function getAssignedLearningTrack(trackId: string): Promise<LearningExperience> {
@@ -1507,6 +1719,10 @@ export async function deleteCourseCategory(id: string): Promise<void> {
   await request(`/api/platform/catalog/categories/${id}`, { method: 'DELETE' });
 }
 
+export async function setCourseReadySipat(courseId: string, ready: boolean): Promise<void> {
+  await request(`/api/platform/catalog/courses/${courseId}/ready-sipat`, { method: 'PUT', body: JSON.stringify({ ready }) });
+}
+
 export async function setCourseCategory(courseId: string, categoryId: string | null): Promise<void> {
   await request(`/api/platform/catalog/courses/${courseId}/category`, { method: 'PUT', body: JSON.stringify({ categoryId }) });
 }
@@ -1561,7 +1777,9 @@ export interface RegistryItem { id: string; name: string; isActive: boolean; peo
 export interface ProfileRules {
   requireRegistration: boolean; requireEmail: boolean; requirePhone: boolean; requireUnit: boolean; requireSector: boolean;
 }
-export interface CompanyRegistry { units: RegistryItem[]; sectors: RegistryItem[]; rules: ProfileRules }
+/** A sector that exists inside a unit (the HR of Minas), and how many people of that unit are in it. */
+export interface UnitSector { unitId: string; sectorId: string; peopleCount: number }
+export interface CompanyRegistry { units: RegistryItem[]; sectors: RegistryItem[]; rules: ProfileRules; unitSectors?: UnitSector[] }
 export type RegistryKind = 'units' | 'sectors';
 
 /**
@@ -1575,12 +1793,49 @@ export function getCompanyRegistry(companyId?: string): Promise<CompanyRegistry>
   return requestJson<CompanyRegistry>('/api/admin/registry', { headers: forCompany(companyId) });
 }
 
-export function addRegistryItems(kind: RegistryKind, names: string[]): Promise<CompanyRegistry> {
-  return requestJson<CompanyRegistry>(`/api/admin/registry/${kind}`, { method: 'POST', body: JSON.stringify({ names }) });
+/** Tells the unit switcher at the top that the lists changed (see trainings/unitScope). */
+const registryChanged = <T,>(value: T): T => { try { window.dispatchEvent(new Event('sipat:registry-changed')); } catch { /* no window: nothing to tell */ } return value; };
+
+export async function addRegistryItems(kind: RegistryKind, names: string[]): Promise<CompanyRegistry> {
+  return registryChanged(await requestJson<CompanyRegistry>(`/api/admin/registry/${kind}`, { method: 'POST', body: JSON.stringify({ names }) }));
 }
 
-export function updateRegistryItem(kind: RegistryKind, id: string, change: { name?: string; isActive?: boolean }): Promise<RegistryItem> {
-  return requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) });
+export async function updateRegistryItem(kind: RegistryKind, id: string, change: { name?: string; isActive?: boolean }): Promise<RegistryItem> {
+  return registryChanged(await requestJson<RegistryItem>(`/api/admin/registry/${kind}/${id}`, { method: 'PUT', body: JSON.stringify(change) }));
+}
+
+/** Makes sectors inside a unit; a name the company already has is that same sector, brought into the unit. */
+export async function addUnitSectors(unitId: string, names: string[]): Promise<CompanyRegistry> {
+  return registryChanged(await requestJson<CompanyRegistry>(`/api/admin/registry/units/${unitId}/sectors`, { method: 'POST', body: JSON.stringify({ names }) }));
+}
+/** Takes a sector out of a unit (refused while someone of the unit is in it); it stays in the company's list. */
+export async function removeUnitSector(unitId: string, sectorId: string): Promise<CompanyRegistry> {
+  return registryChanged(await requestJson<CompanyRegistry>(`/api/admin/registry/units/${unitId}/sectors/${sectorId}`, { method: 'DELETE' }));
+}
+
+/** Takes a unit or sector off the list: deleted when nobody uses it, only put away (`deleted: false`) when in use. */
+export async function removeRegistryItem(kind: RegistryKind, id: string): Promise<{ deleted: boolean }> {
+  return registryChanged(await requestJson<{ deleted: boolean }>(`/api/admin/registry/${kind}/${id}`, { method: 'DELETE' }));
+}
+
+/**
+ * One group a training is for: a unit (`sectorId` null: all of it), a sector of a unit, or (`unitId` null) a sector in
+ * every unit. A training with no group is for the whole company.
+ */
+export interface AudienceTarget { unitId: string | null; sectorId: string | null }
+export interface TrainingAudience { targets: AudienceTarget[] }
+const tidyAudience = (audience: Partial<TrainingAudience> | null | undefined): TrainingAudience => ({
+  targets: (audience?.targets ?? []).map(target => ({ unitId: target.unitId ?? null, sectorId: target.sectorId ?? null })),
+});
+export async function getTrainingAudience(sipatId: string): Promise<TrainingAudience> {
+  return tidyAudience(await requestJson<TrainingAudience>(`/api/admin/sipats/${sipatId}/audience`));
+}
+export async function saveTrainingAudience(sipatId: string, audience: TrainingAudience): Promise<TrainingAudience> {
+  return tidyAudience(await requestJson<TrainingAudience>(`/api/admin/sipats/${sipatId}/audience`, { method: 'PUT', body: JSON.stringify(audience) }));
+}
+/** How many active participants an audience reaches, and how many it leaves out only for having no unit or sector. */
+export function countAudience(audience: TrainingAudience): Promise<{ receiving: number; leftOutUnplaced: number }> {
+  return requestJson<{ receiving: number; leftOutUnplaced: number }>('/api/admin/registry/audience-count', { method: 'POST', body: JSON.stringify(audience) });
 }
 
 export function saveProfileRules(rules: ProfileRules): Promise<ProfileRules> {
@@ -1592,8 +1847,8 @@ export interface ParticipantProfile {
 }
 export type ProfileChange = Omit<ParticipantProfile, 'id'>;
 
-export function listParticipantProfiles(): Promise<ParticipantProfile[]> {
-  return requestJson<ParticipantProfile[]>('/api/admin/users/participants/profiles');
+export function listParticipantProfiles(unitId?: string | null): Promise<ParticipantProfile[]> {
+  return requestJson<ParticipantProfile[]>(`/api/admin/users/participants/profiles${unitQuery(unitId, true)}`);
 }
 
 export function saveParticipantProfile(userId: string, data: ProfileChange): Promise<ParticipantProfile> {
@@ -1601,8 +1856,10 @@ export function saveParticipantProfile(userId: string, data: ProfileChange): Pro
 }
 
 /** Moves many collaborators to one unit or sector at once; a null `valueId` takes them out of it. */
-export function changePlacement(userIds: string[], field: 'unit' | 'sector', valueId: string | null): Promise<{ changed: number }> {
-  return requestJson<{ changed: number }>('/api/admin/users/placement', { method: 'PUT', body: JSON.stringify({ userIds, field, valueId }) });
+/** What moving people did: how many moved, the days of trainings they received and lost, and the trainings received. */
+export interface PlacementResult { changed: number; added: number; removed: number; receivedTrainings: string[] }
+export function changePlacement(userIds: string[], field: 'unit' | 'sector', valueId: string | null): Promise<PlacementResult> {
+  return requestJson<PlacementResult>('/api/admin/users/placement', { method: 'PUT', body: JSON.stringify({ userIds, field, valueId }) });
 }
 
 export interface ImportRow {
@@ -1613,6 +1870,8 @@ export interface ImportResult {
   created: number; updated: number; unchanged: number;
   rejected: { row: number; login: string | null; message: string }[];
   credentials: { row: number; name: string; login: string }[];
+  /** Units and sectors the sheet brings that the company did not have: the import adds them. */
+  newUnits?: string[] | null; newSectors?: string[] | null;
 }
 
 /**

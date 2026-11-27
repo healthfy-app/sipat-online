@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as api from '@/api';
+import { UnitScopeProvider } from '@/trainings/unitScope';
 import CollaboratorsPage from './CollaboratorsPage';
 
 vi.mock('@/api', async (importOriginal) => ({
@@ -170,42 +171,78 @@ describe('collaborators', () => {
     expect(within(table).queryByText('Maria José Oliveira')).not.toBeInTheDocument();
   });
 
-  it('shows no unit filter when the company has no units', async () => {
+  it('keeps the unit filter in its place when the company has no units, saying there are none', async () => {
     vi.mocked(api.getCompanyRegistry).mockResolvedValue({ ...registry(), units: [] });
     renderPage();
     await screen.findByRole('table', { name: 'Colaboradores da empresa' });
     expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
-    expect(screen.queryByLabelText('Filtrar por unidade')).not.toBeInTheDocument();
+    expect(within(screen.getByLabelText('Filtrar por unidade')).getByRole('option', { name: 'Nenhuma unidade cadastrada' })).toBeDisabled();
   });
 
-  it('moves two selected people to a sector with changePlacement', async () => {
+  it('with a unit chosen at the top, lists only its people and drops its own unit filter', async () => {
+    localStorage.setItem('sipat:unit:acme', 'u-1');
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({ ...registry(), units: [item('u-1', 'Matriz'), item('u-2', 'Filial')] });
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-1', 'u-1', null), profile('p-2', 'u-2', null)]);
+    render(<MemoryRouter><UnitScopeProvider enabled scopeKey="acme"><CollaboratorsPage /></UnitScopeProvider></MemoryRouter>);
+
+    const table = await screen.findByRole('table', { name: 'Colaboradores da empresa' });
+    await waitFor(() => expect(within(table).queryByText('José Maria Santos')).not.toBeInTheDocument());
+    expect(within(table).getByText('Maria José Oliveira')).toBeVisible();
+    expect(screen.queryByLabelText('Filtrar por unidade')).not.toBeInTheDocument();
+    // and the server is asked for that unit only
+    await waitFor(() => expect(api.listAllParticipants).toHaveBeenLastCalledWith('u-1'));
+    expect(api.listLearningParticipation).toHaveBeenLastCalledWith('u-1');
+    expect(api.listParticipantProfiles).toHaveBeenLastCalledWith('u-1');
+    expect(screen.getByLabelText('Filtrar por setor')).toBeVisible();
+    localStorage.clear();
+  });
+
+  it('moves two selected people to a sector from the one "Unidade e setor" button', async () => {
     const user = userEvent.setup();
     vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
-    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 2 });
+    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 2, added: 0, removed: 0, receivedTrainings: [] });
     renderPage();
 
     await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Maria José Oliveira' }));
     await user.click(screen.getByRole('checkbox', { name: 'Selecionar José Maria Santos' }));
-    await user.click(screen.getByRole('button', { name: 'Mudar setor' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Mudar setor' });
-    expect(within(dialog).queryByRole('option', { name: 'Antigo' })).not.toBeInTheDocument();
-    await user.selectOptions(within(dialog).getByLabelText('Setor'), 's-1');
-    await user.click(within(dialog).getByRole('button', { name: 'Mudar setor' }));
+    expect(screen.queryByRole('button', { name: 'Mudar setor' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Unidade e setor' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unidade e setor' });
+    await user.click(within(dialog).getByRole('tab', { name: 'Setores' }));
+    expect(within(dialog).queryByRole('radio', { name: /Antigo/ })).not.toBeInTheDocument();
+    await user.click(within(dialog).getByRole('radio', { name: /Produção/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
 
     await waitFor(() => expect(api.changePlacement).toHaveBeenCalledWith(['p-1', 'p-2'], 'sector', 's-1'));
     expect(await screen.findByRole('status')).toHaveTextContent('2 colaboradores passaram para Produção.');
   });
 
+  it('says which trainings the people received for moving to a unit', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
+    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 1, added: 5, removed: 0, receivedTrainings: ['SIPAT Matriz'] });
+    renderPage();
+    await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Maria José Oliveira' }));
+    await user.click(screen.getByRole('button', { name: 'Unidade e setor' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unidade e setor' });
+    await user.click(within(dialog).getByRole('radio', { name: /Matriz/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
+    await waitFor(() => expect(api.changePlacement).toHaveBeenCalledWith(['p-1'], 'unit', 'u-1'));
+    expect(await screen.findByRole('status')).toHaveTextContent('1 colaborador passou para Matriz e recebeu SIPAT Matriz.');
+  });
+
   it('takes the sector away from the selected people', async () => {
     const user = userEvent.setup();
     vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
-    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 1 });
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-1', null, 's-1')]);
+    vi.mocked(api.changePlacement).mockResolvedValue({ changed: 1, added: 0, removed: 0, receivedTrainings: [] });
     renderPage();
     await user.click(await screen.findByRole('checkbox', { name: 'Selecionar Maria José Oliveira' }));
-    await user.click(screen.getByRole('button', { name: 'Mudar setor' }));
-    const dialog = await screen.findByRole('dialog', { name: 'Mudar setor' });
-    await user.selectOptions(within(dialog).getByLabelText('Setor'), 'none');
-    await user.click(within(dialog).getByRole('button', { name: 'Mudar setor' }));
+    await user.click(screen.getByRole('button', { name: 'Unidade e setor' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Unidade e setor' });
+    await user.click(within(dialog).getByRole('tab', { name: 'Setores' }));
+    await user.click(within(dialog).getByRole('radio', { name: 'Sem setor' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar' }));
     await waitFor(() => expect(api.changePlacement).toHaveBeenCalledWith(['p-1'], 'sector', null));
     expect(await screen.findByRole('status')).toHaveTextContent('1 colaborador ficou sem setor.');
   });
@@ -228,24 +265,52 @@ describe('collaborators', () => {
     expect(screen.queryByText(/sem setor/)).not.toBeInTheDocument();
   });
 
-  it('edits registration and sector of a collaborator with a single save, typing the sector name', async () => {
+  it('edits unit and sector by choosing: the sectors offered are only the ones of the unit chosen', async () => {
     const user = userEvent.setup();
-    vi.mocked(api.getCompanyRegistry).mockResolvedValue(registry());
-    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-3', null, 's-3')]);
-    vi.mocked(api.saveParticipantProfile).mockResolvedValue(profile('p-3', null, 's-1'));
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({
+      ...registry(), units: [item('u-1', 'Matriz'), item('u-2', 'Filial')],
+      unitSectors: [{ unitId: 'u-1', sectorId: 's-1', peopleCount: 0 }, { unitId: 'u-2', sectorId: 's-2', peopleCount: 0 }],
+    });
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-3', null, null)]);
+    vi.mocked(api.saveParticipantProfile).mockResolvedValue(profile('p-3', 'u-1', 's-1'));
     renderPage();
 
     await user.click(await screen.findByRole('button', { name: 'Editar Ana Lima' }));
     const dialog = await screen.findByRole('dialog', { name: 'Editar colaborador' });
-    expect(within(dialog).getByLabelText('Setor')).toHaveValue('Antigo');
+    // nothing to type, so nothing to get wrong: with no unit, there is no sector to choose yet
+    expect(within(dialog).getByLabelText('Setor')).toBeDisabled();
     await user.type(within(dialog).getByLabelText('Matrícula'), '123');
-    await user.clear(within(dialog).getByLabelText('Setor'));
-    await user.type(within(dialog).getByLabelText('Setor'), 'produção');
+    await user.selectOptions(within(dialog).getByLabelText('Unidade'), 'Matriz');
+    const sector = within(dialog).getByLabelText('Setor');
+    expect(within(sector).getByRole('option', { name: 'Produção' })).toBeInTheDocument();
+    expect(within(sector).queryByRole('option', { name: 'Manutenção' })).not.toBeInTheDocument();
+    expect(within(sector).queryByRole('option', { name: 'Antigo' })).not.toBeInTheDocument();
+    await user.selectOptions(sector, 'Produção');
     await user.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }));
 
     await waitFor(() => expect(api.saveParticipantProfile).toHaveBeenCalledTimes(1));
-    expect(api.saveParticipantProfile).toHaveBeenCalledWith('p-3', { registrationNumber: '123', email: null, phone: null, unitId: null, sectorId: 's-1' });
+    expect(api.saveParticipantProfile).toHaveBeenCalledWith('p-3', { registrationNumber: '123', email: null, phone: null, unitId: 'u-1', sectorId: 's-1' });
     expect(await screen.findByRole('status')).toHaveTextContent('Dados de Ana Lima atualizados (cadastro).');
+  });
+
+  it('changing the unit of a collaborator drops a sector the new unit does not have', async () => {
+    const user = userEvent.setup();
+    vi.mocked(api.getCompanyRegistry).mockResolvedValue({
+      ...registry(), units: [item('u-1', 'Matriz'), item('u-2', 'Filial')],
+      unitSectors: [{ unitId: 'u-1', sectorId: 's-1', peopleCount: 1 }, { unitId: 'u-2', sectorId: 's-2', peopleCount: 0 }],
+    });
+    vi.mocked(api.listParticipantProfiles).mockResolvedValue([profile('p-3', 'u-1', 's-1')]);
+    vi.mocked(api.saveParticipantProfile).mockResolvedValue(profile('p-3', 'u-2', null));
+    renderPage();
+
+    await user.click(await screen.findByRole('button', { name: 'Editar Ana Lima' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Editar colaborador' });
+    expect(within(dialog).getByLabelText('Unidade')).toHaveDisplayValue('Matriz');
+    expect(within(dialog).getByLabelText('Setor')).toHaveDisplayValue('Produção');
+    await user.selectOptions(within(dialog).getByLabelText('Unidade'), 'Filial');
+    expect(within(dialog).getByLabelText('Setor')).toHaveDisplayValue('Sem setor');
+    await user.click(within(dialog).getByRole('button', { name: 'Salvar alterações' }));
+    await waitFor(() => expect(api.saveParticipantProfile).toHaveBeenCalledWith('p-3', { registrationNumber: null, email: null, phone: null, unitId: 'u-2', sectorId: null }));
   });
 
   it('marks the fields the company made required in the edit dialog', async () => {

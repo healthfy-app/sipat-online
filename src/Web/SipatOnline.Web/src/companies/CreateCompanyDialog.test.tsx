@@ -2,6 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { generatePassword, passwordMinLength } from '@/lib/passwordRules';
+import { companyAddress } from './CompanyAddress';
 import CreateCompanyDialog from './CreateCompanyDialog';
 
 afterEach(cleanup);
@@ -40,8 +41,8 @@ describe('New company', () => {
   it('shows the portal address with the identifier typed so far', async () => {
     const user = userEvent.setup();
     render(<CreateCompanyDialog onClose={() => undefined} onCreated={async () => undefined} />);
-    expect(screen.getByText('identificador.sipatonline.com.br')).toBeVisible();
+    expect(screen.getByText(companyAddress('identificador'))).toBeVisible();
     await user.type(screen.getByLabelText('Nome da empresa'), 'Aço Forte');
-    expect(screen.getByText('aco-forte.sipatonline.com.br')).toBeVisible();
+    expect(screen.getByText(companyAddress('aco-forte'))).toBeVisible();
   });
 });

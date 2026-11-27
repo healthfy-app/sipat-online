@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input, NativeSelect } from '@/components/ui/input';
-import { getErrorMessage } from '@/courseEditor/courseFormat';
+import { getErrorMessage, pluralize } from '@/courseEditor/courseFormat';
 import { passwordMinLength, passwordRulesHint } from '@/lib/passwordRules';
 import { serializeCredentialCsv } from '@/participantCsv';
 import { cn } from '@/lib/utils';
+import { useUnitScope } from '@/trainings/unitScope';
 import { downloadCsv } from './csvFile';
+import { sectorsOfUnit } from './unitSectors';
 import { downloadTemplate, IMPORT_SAVE_CHUNK, MAX_IMPORT_BYTES, MAX_IMPORT_ROWS, missingInRow, readSheet } from './importSheet';
 
 const emptyForm = { name: '', registrationNumber: '', login: '', email: '', phone: '', unit: '', sector: '', password: '' };
@@ -31,6 +33,7 @@ const stopMessage = (row: number) =>
 const sum = (total: ImportResult | null, part: ImportResult): ImportResult => total === null ? part : {
   created: total.created + part.created, updated: total.updated + part.updated, unchanged: total.unchanged + part.unchanged,
   rejected: [...total.rejected, ...part.rejected], credentials: [...total.credentials, ...part.credentials],
+  newUnits: [...(total.newUnits ?? []), ...(part.newUnits ?? [])], newSectors: [...(total.newSectors ?? []), ...(part.newSectors ?? [])],
 };
 
 /**
@@ -45,6 +48,7 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
   const [form, setForm] = useState(emptyForm);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [makingTemplate, setMakingTemplate] = useState(false);
   const [fileName, setFileName] = useState('');
   const [fileError, setFileError] = useState('');
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -56,6 +60,12 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
   const [passwords, setPasswords] = useState<Map<number, string>>(new Map());
   const [singleMessage, setSingleMessage] = useState('');
   const [downloaded, setDownloaded] = useState(false);
+  // with a unit chosen at the top, whoever is added here goes into it: the form starts on it, and a line of the sheet that
+  // names no unit takes it (a line that names another keeps its own, and the preview says how many)
+  const unitScope = useUnitScope();
+  const scopeUnit = unitScope.unit?.name ?? null;
+  const [scopeNote, setScopeNote] = useState<{ filled: number; other: number } | null>(null);
+  useEffect(() => { if (scopeUnit) setForm(current => current.unit ? current : { ...current, unit: scopeUnit }); }, [scopeUnit, registry]);
 
   useEffect(() => { void getCompanyRegistry(companyId).then(setRegistry, () => undefined); }, [companyId]);
 
@@ -64,7 +74,13 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
     value: form[key],
   });
   const activeUnits = registry?.units.filter(unit => unit.isActive) ?? [];
-  const activeSectors = registry?.sectors.filter(sector => sector.isActive) ?? [];
+  // the sectors offered are the ones of the unit chosen: with no unit, there is none to choose
+  const formUnitId = activeUnits.find(unit => unit.name === form.unit)?.id ?? null;
+  const activeSectors = sectorsOfUnit(registry, formUnitId);
+  // a sector the new unit does not have does not follow the choice of another unit
+  useEffect(() => {
+    setForm(current => current.sector && !sectorsOfUnit(registry, formUnitId).some(sector => sector.name === current.sector) ? { ...current, sector: '' } : current);
+  }, [formUnitId, registry]);
 
   async function createOne(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -101,7 +117,10 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
         const message = missingInRow(row);
         return message ? [{ row: row.row, login: row.login ?? null, message }] : [];
       });
-      const rows = sheet.rows.filter(row => !missingInRow(row));
+      const accepted = sheet.rows.filter(row => !missingInRow(row));
+      const rows = scopeUnit ? accepted.map(row => row.unit?.trim() ? row : { ...row, unit: scopeUnit }) : accepted;
+      const sameUnit = (name: string) => name.trim().toLocaleLowerCase('pt-BR') === scopeUnit?.toLocaleLowerCase('pt-BR');
+      setScopeNote(scopeUnit ? { filled: accepted.filter(row => !row.unit?.trim()).length, other: accepted.filter(row => row.unit?.trim() && !sameUnit(row.unit)).length } : null);
       setPasswords(new Map(rows.map(row => [row.row, row.password ?? ''] as const)));
       const checked = rows.length > 0
         ? await importParticipants(true, rows, { companyId })
@@ -199,8 +218,8 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
                 {activeUnits.map(unit => <option key={unit.id} value={unit.name}>{unit.name}</option>)}
               </NativeSelect>
             </Field>}
-            {activeSectors.length > 0 && <Field htmlFor="add-sector" label="Setor">
-              <NativeSelect id="add-sector" {...field('sector')}>
+            {activeUnits.length > 0 && <Field hint={!formUnitId ? 'Escolha a unidade para ver os setores dela.' : activeSectors.length === 0 ? 'Esta unidade ainda não tem setores. Crie em Cadastro.' : undefined} htmlFor="add-sector" label="Setor">
+              <NativeSelect disabled={activeSectors.length === 0} id="add-sector" {...field('sector')}>
                 <option value="">Sem setor</option>
                 {activeSectors.map(sector => <option key={sector.id} value={sector.name}>{sector.name}</option>)}
               </NativeSelect>
@@ -220,7 +239,13 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
               e-mail, matrícula, setor e unidade empresarial são opcionais. Até {MAX_IMPORT_ROWS} linhas.
               Antes de gravar, mostramos o que vai acontecer.
             </p>
-            <Button disabled={!registry} onClick={() => registry && void downloadTemplate(registry)} size="sm" variant="outline"><FileSpreadsheet /> Baixar modelo</Button>
+            <Button disabled={!registry || makingTemplate} onClick={() => {
+              if (!registry) return;
+              setMakingTemplate(true); setFileError('');
+              downloadTemplate(registry)
+                .catch(() => setFileError('Não foi possível gerar o modelo. Recarregue a página e tente de novo.'))
+                .finally(() => setMakingTemplate(false));
+            }} size="sm" variant="outline"><FileSpreadsheet /> {makingTemplate ? 'Gerando…' : 'Baixar modelo'}</Button>
           </div>
           {!result && <Field hint="Célula vazia não apaga o que já está cadastrado." htmlFor="add-sheet" label="Planilha">
             <input accept=".csv,.xlsx" disabled={busy} id="add-sheet" onChange={event => void chooseFile(event)} type="file" />
@@ -233,6 +258,16 @@ export default function AddCollaboratorsDialog({ onClose, onCreated, companyId, 
             <p className="m-0 text-sm">
               <strong>{counts.created}</strong> serão criados · <strong>{counts.updated}</strong> atualizados · <strong>{counts.unchanged}</strong> sem mudança · <strong>{rejected.length}</strong> recusados
             </p>
+            {scopeNote && scopeNote.filled + scopeNote.other > 0 && <p className="m-0 rounded-md bg-accent px-3 py-2 text-sm" role="note">
+              {scopeNote.filled > 0 && <>{pluralize(scopeNote.filled, 'linha sem unidade entra', 'linhas sem unidade entram')} em <strong>{scopeUnit}</strong>, a unidade escolhida no topo. </>}
+              {scopeNote.other > 0 && <>{pluralize(scopeNote.other, 'linha é de outra unidade e fica', 'linhas são de outra unidade e ficam')} na unidade da planilha.</>}
+            </p>}
+            {(counts.newUnits?.length ?? 0) > 0 && <p className="m-0 text-sm text-muted-foreground">
+              {counts.newUnits!.length === 1 ? 'Unidade nova, será criada' : `${counts.newUnits!.length} unidades novas serão criadas`}: <strong className="text-foreground">{counts.newUnits!.join(', ')}</strong>
+            </p>}
+            {(counts.newSectors?.length ?? 0) > 0 && <p className="m-0 text-sm text-muted-foreground">
+              {counts.newSectors!.length === 1 ? 'Setor novo, será criado' : `${counts.newSectors!.length} setores novos serão criados`}: <strong className="text-foreground">{counts.newSectors!.join(', ')}</strong>
+            </p>}
             {rejected.length > 0 && <ul className="m-0 grid max-h-32 list-none gap-0.5 overflow-auto p-0 text-xs text-warning">
               {rejected.slice(0, 8).map(item => <li key={item.row}>Linha {item.row}{item.login ? ` · ${item.login}` : ''}: {item.message}</li>)}
               {rejected.length > 8 && <li>e mais {rejected.length - 8}</li>}

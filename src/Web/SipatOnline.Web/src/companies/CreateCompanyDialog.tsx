@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogActions } from '@/components/ui/dialog';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { companyAddress } from './CompanyAddress';
 import PlanSelect from './PlanSelect';
 import { getErrorMessage } from '@/courseEditor/courseFormat';
 
@@ -76,7 +77,7 @@ export default function CreateCompanyDialog({
                 if (!keyEdited) update('key', suggestKey(event.target.value));
               }} />
           </Field>
-          <Field hint={<>Endereço do portal: <strong className="font-semibold text-foreground">{form.key.trim().toLowerCase() || 'identificador'}.sipatonline.com.br</strong></>}
+          <Field hint={<>Endereço do portal: <strong className="font-semibold text-foreground">{companyAddress(form.key.trim().toLowerCase() || 'identificador')}</strong></>}
             htmlFor="company-key" label="Identificador do portal">
             <Input autoCapitalize="none" autoComplete="off" id="company-key" maxLength={63}
               pattern="[A-Za-z0-9]+([A-Za-z0-9-]*[A-Za-z0-9])?" required

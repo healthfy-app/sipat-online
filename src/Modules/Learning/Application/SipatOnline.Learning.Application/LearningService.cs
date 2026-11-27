@@ -375,6 +375,7 @@ public sealed class LearningService(
     }
 
     public async Task<Result<IReadOnlyList<LearningParticipantProgress>>> ListParticipantProgressAsync(
+        Guid? unitId,
         CancellationToken cancellationToken)
     {
         var permission = EnsureReportViewer();
@@ -390,7 +391,9 @@ public sealed class LearningService(
         }
 
         return Result<IReadOnlyList<LearningParticipantProgress>>.Success(
-            await learningStore.ListParticipantProgressAsync(tenantId.Value, cancellationToken));
+            unitId is Guid unit
+                ? await learningStore.ListUnitProgressAsync(tenantId.Value, unit, cancellationToken)
+                : await learningStore.ListParticipantProgressAsync(tenantId.Value, cancellationToken));
     }
 
     public async Task<Result<LearningParticipantReport>> GetParticipantReportAsync(

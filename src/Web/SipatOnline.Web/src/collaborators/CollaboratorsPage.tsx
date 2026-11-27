@@ -1,10 +1,12 @@
 import { Pencil, Search, UserPlus } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { TrainingSelect } from '@/trainings/TrainingSelect';
+import { useUnitScope } from '@/trainings/unitScope';
 import { filterByTraining, useTrainingFilter } from '@/trainings/useTrainingFilter';
 import {
-  changePlacement, changeUserStatus, getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles,
+  changeUserStatus, getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles,
   type CompanyRegistry, type LearningParticipantProgress, type ParticipantAccount, type ParticipantProfile,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -67,33 +69,55 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
   const [adding, setAdding] = useState(false);
   const [profiles, setProfiles] = useState<Map<string, ParticipantProfile> | null>(null);
   const [registry, setRegistry] = useState<CompanyRegistry | null>(null);
-  const [unitFilter, setUnitFilter] = useState<PlacementFilter>('all');
+  // the unit comes from the switch at the top when the company has one (two units or more); "sem unidade" is asked here
+  const unitScope = useUnitScope();
+  const [ownUnitFilter, setOwnUnitFilter] = useState<PlacementFilter>('all');
+  const unitFilter: PlacementFilter = unitScope.active && ownUnitFilter !== 'none' ? unitScope.unitId ?? 'all' : ownUnitFilter;
+  const setUnitFilter = (value: PlacementFilter) => {
+    // people with no unit are of no unit: looking for them goes back to every unit
+    if (unitScope.active && value === 'none') unitScope.setUnitId(null);
+    setOwnUnitFilter(value);
+  };
+  // choosing a unit at the top leaves "sem unidade" behind
+  useEffect(() => { if (unitScope.unitId !== null) setOwnUnitFilter('all'); }, [unitScope.unitId]);
   const [sectorFilter, setSectorFilter] = useState<PlacementFilter>('all');
-  const [placing, setPlacing] = useState<'unit' | 'sector' | null>(null);
+  const [placing, setPlacing] = useState(false);
 
+  const lastLoad = useRef(0);
   const load = useCallback(async () => {
     setError('');
     // unit, sector and the rules are extra: if they fail the list stays usable, just without those columns
-    const extras = Promise.allSettled([listParticipantProfiles(), getCompanyRegistry()]);
+    // with a unit chosen at the top, the server sends its people only
+    const unit = unitScope.unitId;
+    // switching unit quickly: only the last answer asked for is shown
+    const asked = ++lastLoad.current;
+    const extras = Promise.allSettled([unit ? listParticipantProfiles(unit) : listParticipantProfiles(), getCompanyRegistry()]);
     try {
-      const [accounts, participation] = await Promise.all([listAllParticipants(), listLearningParticipation()]);
+      const [accounts, participation] = await Promise.all([unit ? listAllParticipants(unit) : listAllParticipants(), unit ? listLearningParticipation(unit) : listLearningParticipation()]);
+      if (asked !== lastLoad.current) return;
       setPeople(accounts); setRows(participation);
     } catch (failure) {
       setError(getErrorMessage(failure));
       setPeople(current => current ?? []);
     }
     const [profileResult, registryResult] = await extras;
+    if (asked !== lastLoad.current) return;
     setProfiles(profileResult.status === 'fulfilled' ? new Map(profileResult.value.map(profile => [profile.id, profile])) : null);
     setRegistry(registryResult.status === 'fulfilled' ? registryResult.value : null);
     const failure = profileResult.status === 'rejected' ? profileResult.reason : registryResult.status === 'rejected' ? registryResult.reason : null;
     if (failure) setError(current => current || getErrorMessage(failure));
-  }, []);
+  }, [unitScope.unitId]);
   useEffect(() => { void load(); }, [load]);
 
   const training = useTrainingFilter(rows);
   const trainingRows = useMemo(() => filterByTraining(rows, training.selectedId), [training.selectedId, rows]);
   const summaries = useMemo(() => summarizeParticipants(people ?? [], trainingRows), [people, trainingRows]);
   const showPlacement = !!profiles && !!registry;
+  // the report follows the unit chosen at the top
+  const inScope = useMemo(
+    () => unitScope.unitId && profiles ? (people ?? []).filter(person => profiles.get(person.id)?.unitId === unitScope.unitId) : people ?? [],
+    [people, profiles, unitScope.unitId],
+  );
   const placed = useMemo(
     () => (profiles ? new Set(filterByPlacement(people ?? [], profiles, unitFilter, sectorFilter).map(person => person.id)) : null),
     [people, profiles, unitFilter, sectorFilter],
@@ -114,12 +138,18 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       .filter(item => item.count > 0);
   }, [people, profiles, registry]);
   const nameOf = (items: { id: string; name: string }[] | undefined, id: string | null | undefined) => items?.find(item => item.id === id)?.name ?? '—';
-  const counts = useMemo(() => ({
-    total: summaries.length,
-    active: summaries.filter(item => item.participant.isActive).length,
-    completed: summaries.filter(item => item.status === 'completed').length,
-    running: summaries.filter(item => item.status === 'in-progress').length,
-  }), [summaries]);
+  // the numbers on top follow the unit and the sector picked, so a unit or a sector is read at a glance
+  const counts = useMemo(() => {
+    const scope = placed ? summaries.filter(item => placed.has(item.participant.id)) : summaries;
+    return {
+      total: scope.length,
+      active: scope.filter(item => item.participant.isActive).length,
+      completed: scope.filter(item => item.status === 'completed').length,
+      running: scope.filter(item => item.status === 'in-progress').length,
+    };
+  }, [summaries, placed]);
+  const narrowed = search.trim() !== '' || filter !== 'all' || ownUnitFilter !== 'all' || sectorFilter !== 'all';
+  const clearFilters = () => { setSearch(''); setFilter('all'); setUnitFilter('all'); setSectorFilter('all'); };
 
   const ids = visible.map(item => item.participant.id);
   const allSelected = ids.length > 0 && ids.every(id => selected.has(id));
@@ -141,24 +171,13 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
     await load();
   }
 
-  async function place(field: 'unit' | 'sector', valueId: string | null) {
-    const items = field === 'unit' ? registry?.units : registry?.sectors;
-    const result = await changePlacement([...selected], field, valueId);
-    const word = field === 'unit' ? 'unidade' : 'setor';
-    const count = pluralize(result.changed, 'colaborador', 'colaboradores');
-    setPlacing(null); setSelected(new Set()); setError('');
-    setNotice(valueId === null
-      ? `${count} ${result.changed === 1 ? 'ficou sem' : 'ficaram sem'} ${word}.`
-      : `${count} ${result.changed === 1 ? 'passou' : 'passaram'} para ${nameOf(items, valueId)}.`);
-    await load();
-  }
 
   const refreshWith = async (message: string) => { setEditing(null); setAdding(false); if (message) setNotice(message); await load(); };
 
   return <Page>
     <PageHeader
       actions={<>
-        <Button disabled={!people?.length} onClick={() => downloadCsv(reportFileName('empresa'), companyReportCsv(people ?? [], trainingRows))} variant="outline">Baixar relatório (CSV)</Button>
+        <Button disabled={!people?.length} onClick={() => downloadCsv(reportFileName('empresa'), companyReportCsv(inScope, trainingRows))} variant="outline">Baixar relatório (CSV)</Button>
         {!readOnly && <Button onClick={() => setAdding(true)}><UserPlus /> Adicionar colaboradores</Button>}
       </>}
       description="Todos os colaboradores da empresa e até onde cada um chegou em cada treinamento."
@@ -186,17 +205,33 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       <NativeSelect aria-label="Situação" className="w-auto min-w-44" onChange={event => setFilter(event.target.value as ParticipantProgressFilter)} value={filter}>
         {filters.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}
       </NativeSelect>
-      {showPlacement && registry.units.length > 0 && <NativeSelect aria-label="Filtrar por unidade" className="w-auto min-w-44" onChange={event => setUnitFilter(event.target.value)} value={unitFilter}>
+      {/* unit and sector are always there: a company that has none yet sees where they would be, and how to add them */}
+      {showPlacement && !unitScope.active && <NativeSelect aria-label="Filtrar por unidade" className={cn('w-auto min-w-44', unitFilter !== 'all' && 'border-primary bg-accent font-semibold text-primary')} onChange={event => setUnitFilter(event.target.value)} value={unitFilter}>
         <option value="all">Todas as unidades</option>
-        <option value="none">Sem unidade</option>
-        {registry.units.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        {registry.units.length === 0
+          ? <option disabled value="empty">Nenhuma unidade cadastrada</option>
+          : <>
+            <option value="none">Sem unidade</option>
+            {registry.units.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </>}
       </NativeSelect>}
-      {showPlacement && registry.sectors.length > 0 && <NativeSelect aria-label="Filtrar por setor" className="w-auto min-w-44" onChange={event => setSectorFilter(event.target.value)} value={sectorFilter}>
+      {showPlacement && <NativeSelect aria-label="Filtrar por setor" className={cn('w-auto min-w-44', sectorFilter !== 'all' && 'border-primary bg-accent font-semibold text-primary')} onChange={event => setSectorFilter(event.target.value)} value={sectorFilter}>
         <option value="all">Todos os setores</option>
-        <option value="none">Sem setor</option>
-        {registry.sectors.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+        {registry.sectors.length === 0
+          ? <option disabled value="empty">Nenhum setor cadastrado</option>
+          : <>
+            <option value="none">Sem setor</option>
+            {registry.sectors.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </>}
       </NativeSelect>}
+      {narrowed && <Button onClick={clearFilters} size="sm" variant="ghost">Limpar</Button>}
+      {people && <span aria-live="polite" className="ml-auto text-sm tabular-nums text-muted-foreground max-sm:ml-0">
+        {narrowed ? `${visible.length} de ${summaries.length}` : `${summaries.length} ${summaries.length === 1 ? 'colaborador' : 'colaboradores'}`}
+      </span>}
     </section>
+    {showPlacement && !readOnly && registry.units.length === 0 && registry.sectors.length === 0 && <p className="-mt-1 m-0 text-[0.8125rem] text-muted-foreground">
+      Para acompanhar por unidade e setor, <Link className="font-semibold text-primary underline-offset-2 hover:underline" to="/admin/cadastro">cadastre as unidades e os setores da empresa</Link>.
+    </p>}
     {missing.length > 0 && <ul aria-label="Cadastros incompletos" className="m-0 grid list-none gap-1.5 p-0">
       {missing.map(item => <li className="flex flex-wrap items-center gap-2 rounded-md bg-muted px-3 py-2 text-sm" key={item.rule}>
         <span>{pluralize(item.count, 'pessoa', 'pessoas')} sem {item.label}</span>
@@ -209,8 +244,8 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
       <strong className="text-sm">{selected.size} {selected.size === 1 ? 'selecionado' : 'selecionados'}</strong>
       {(people ?? []).some(person => selected.has(person.id) && !person.isActive) && <Button disabled={busy} onClick={() => void setStatus(true)} size="sm" variant="outline">Reativar</Button>}
       {(people ?? []).some(person => selected.has(person.id) && person.isActive) && <Button disabled={busy} onClick={() => void setStatus(false)} size="sm" variant="outline">Inativar</Button>}
-      {showPlacement && registry.units.length > 0 && <Button disabled={busy} onClick={() => setPlacing('unit')} size="sm" variant="outline">Mudar unidade</Button>}
-      {showPlacement && registry.sectors.length > 0 && <Button disabled={busy} onClick={() => setPlacing('sector')} size="sm" variant="outline">Mudar setor</Button>}
+      {/* always there: a company with no unit yet makes the first one right in the dialog */}
+      {showPlacement && <Button disabled={busy} onClick={() => setPlacing(true)} size="sm" variant="outline">Unidade e setor</Button>}
       <Button disabled={busy} onClick={() => setSelected(new Set())} size="sm" variant="ghost">Limpar seleção</Button>
     </div>}
 
@@ -267,8 +302,8 @@ export default function CollaboratorsPage({ readOnly = false }: { readOnly?: boo
     </>}
 
     {editing && <EditCollaboratorDialog onClose={() => setEditing(null)} onSaved={refreshWith} person={editing} profiles={profiles ? [...profiles.values()] : []} profile={profiles ? (profiles.get(editing.id) ?? { id: editing.id, registrationNumber: null, email: null, phone: null, unitId: null, sectorId: null }) : undefined} registry={registry} />}
-    {placing && registry && <PlacementDialog count={selected.size} field={placing} items={placing === 'unit' ? registry.units : registry.sectors}
-      onClose={() => setPlacing(null)} onConfirm={valueId => place(placing, valueId)} />}
+    {placing && registry && profiles && <PlacementDialog onClose={() => setPlacing(false)} onRegistryChanged={setRegistry} people={[...selected]} profiles={profiles} registry={registry}
+      onSaved={async message => { setPlacing(false); setSelected(new Set()); setError(''); setNotice(message); await load(); }} />}
     {viewing && <ProgressDialog onClose={() => setViewing(null)} person={viewing} trainingId={training.selectedId} />}
     {adding && <AddCollaboratorsDialog onClose={() => setAdding(false)} onCreated={refreshWith} />}
   </Page>;

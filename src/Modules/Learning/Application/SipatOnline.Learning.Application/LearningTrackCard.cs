@@ -34,7 +34,8 @@ public sealed record LearningLessonProgress(
     long WatchedMilliseconds = 0,
     bool IsBonus = false,
     string? Provider = null,
-    string? ExternalId = null);
+    string? ExternalId = null,
+    string? ThumbnailUrl = null);
 
 public sealed record LearningExperience(
     LearningTrackCard Track,

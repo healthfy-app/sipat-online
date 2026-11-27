@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using SipatOnline.BuildingBlocks.Domain;
 using SipatOnline.Learning.Application;
+using SipatOnline.Learning.Application.Catalog;
 
 namespace SipatOnline.Infrastructure.Learning;
 
@@ -10,6 +11,15 @@ public sealed class DevelopmentCatalogVideoProvider(PlatformDbContext db, Develo
     public async Task<Result<PlaybackSession>> CreateSessionAsync(
         string reference, Guid participantId, Guid lessonId, CancellationToken token)
     {
+        if (LessonReference.TryParseExternal(reference, out var provider, out var externalId))
+        {
+            var name = provider.ToString();
+            var external = await db.PlatformCourseVideos.AsNoTracking()
+                .SingleOrDefaultAsync(item => item.Provider == name && item.ExternalId == externalId, token);
+            if (external is null || external.DurationMilliseconds <= 0)
+                return Result<PlaybackSession>.Failure(new DomainError("learning.video_asset_unavailable", "Vídeo não encontrado."));
+            return await samples.CreateLocalSession(string.Empty, string.Empty, external.DurationMilliseconds, participantId, lessonId, []);
+        }
         if (!reference.StartsWith("catalog:", StringComparison.Ordinal))
             return await samples.CreateSessionAsync(reference, participantId, lessonId, token);
         if (!Guid.TryParse(reference["catalog:".Length..], out var videoId))

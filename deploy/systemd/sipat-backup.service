@@ -5,9 +5,8 @@ Wants=network-online.target
 
 [Service]
 Type=oneshot
-# systemd does not load a login environment: rclone needs to find its config.
+# the deploy writes the R2 key of the backups in deploy/.env.production; HOME only matters
+# for a VM still configured by hand with `rclone config`
 Environment=HOME=/root
-Environment=RCLONE_CONFIG=/root/.config/rclone/rclone.conf
-# Adjust the path to where the repository is cloned on the VM.
-WorkingDirectory=/opt/sipat-online
-ExecStart=/opt/sipat-online/deploy/scripts/backup-postgres.sh
+WorkingDirectory=/opt/sipat-online/app
+ExecStart=/opt/sipat-online/app/deploy/scripts/backup-postgres.sh

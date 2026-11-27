@@ -40,18 +40,19 @@
 }
 .portal-layout-learner .week-video:hover { border-color: var(--learner-forest); box-shadow: 0 10px 24px -14px rgb(18 51 44 / 45%); }
 .portal-layout-learner .week-video:focus-visible { outline: 3px solid var(--learner-progress-accent); outline-offset: 2px; }
-.portal-layout-learner .week-video.is-next { border-color: var(--learner-progress-accent); box-shadow: 0 0 0 2px var(--learner-progress-accent); }
+/* the next video to watch: said in the portal's own green (a firmer edge, a filled play), never an outline of another color */
+.portal-layout-learner .week-video.is-next { border-color: var(--learner-forest); box-shadow: 0 10px 24px -16px rgb(11 36 31 / 55%); }
 
 .portal-layout-learner .week-video-cover { position: relative; display: block; aspect-ratio: 16 / 9; overflow: hidden; background: var(--learner-forest); }
-.portal-layout-learner .week-video-cover img { width: 100%; height: 100%; object-fit: cover; }
-.portal-layout-learner .week-video.is-done .week-video-cover img { filter: saturate(0.55) brightness(0.8); }
+.portal-layout-learner .week-video-cover :is(img, video) { width: 100%; height: 100%; object-fit: cover; }
+.portal-layout-learner .week-video.is-done .week-video-cover :is(img, video) { filter: saturate(0.55) brightness(0.8); }
 .portal-layout-learner .week-video-play {
   position: absolute; top: 50%; left: 50%; display: grid; place-items: center; width: 3rem; height: 3rem; border-radius: 50%;
   color: var(--learner-forest); background: rgb(255 255 255 / 92%); transform: translate(-50%, -50%);
   transition: transform 200ms cubic-bezier(.16, 1, .3, 1), background-color 160ms ease;
 }
 .portal-layout-learner .week-video-play svg { width: 1.25rem; height: 1.25rem; }
-.portal-layout-learner .week-video.is-next .week-video-play { background: var(--learner-progress-accent); }
+.portal-layout-learner .week-video.is-next .week-video-play { color: #fff; background: var(--learner-forest); }
 .portal-layout-learner .week-video.is-done .week-video-play { color: #fff; background: var(--learner-action); }
 .portal-layout-learner .week-video-time {
   position: absolute; right: 0.5rem; bottom: 0.5rem; padding: 0.1rem 0.4rem; border-radius: 6px;
@@ -63,12 +64,11 @@
 .portal-layout-learner .week-video-body { display: grid; align-content: start; gap: 0.2rem; padding: 0.65rem 0.75rem 0.8rem; }
 .portal-layout-learner .week-video-kicker { color: var(--learner-text-secondary); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
 .portal-layout-learner .week-video-body strong {
-  display: -webkit-box; overflow: hidden; font-size: 0.9375rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere;
-  -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  font-size: 0.9375rem; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere;
 }
 .portal-layout-learner .week-video-state { margin-top: 0.15rem; color: var(--learner-text-secondary); font-size: 0.875rem; font-weight: 600; }
 .portal-layout-learner .week-video.is-done .week-video-state { color: var(--learner-complete-text, #0b5a2c); }
-.portal-layout-learner .week-video.is-next .week-video-state { color: #8a5a00; }
+.portal-layout-learner .week-video.is-next .week-video-state { color: var(--learner-forest); font-weight: 700; }
 
 /* a day never wraps: five to a row on a wide screen, a row that scrolls sideways on a narrow one */
 @media (max-width: 1100px) {

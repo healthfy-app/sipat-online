@@ -20,7 +20,7 @@ Fluxo de um envio: o navegador pede o link (`POST /api/platform/catalog/videos/u
 - DNS: registro `*` (proxied/laranja) e o do host da plataforma (`ops…`) apontando para a zona. O coringa em `routes` só funciona com registro coringa proxied. **Verificar:** o valor do registro pode ser qualquer um (por exemplo `A 192.0.2.1`), pois o Worker responde antes da origem.
 - Docker no CI (já existe no `ubuntu-latest`) e na máquina de quem fizer deploy manual: o `wrangler deploy` constrói a imagem.
 - Node 22 e `npm ci` em `deploy/cloudflare/`.
-- Troque em `deploy/cloudflare/wrangler.jsonc` os domínios de exemplo (`exemplo.com.br`, `ops.dev.exemplo.com.br`) e o `R2_SERVICE_URL` (`https://<ACCOUNT_ID>.r2.cloudflarestorage.com`) pelos reais. Em `r2-cors.json`, troque a origem pelo host da plataforma.
+- Troque em `deploy/cloudflare/wrangler.jsonc` os domínios de exemplo (`exemplo.com.br`, `ops.dev.exemplo.com.br`, `videos.exemplo.com.br`) e o `R2_SERVICE_URL` (`https://<ACCOUNT_ID>.r2.cloudflarestorage.com`) pelos reais. Troque também o host de vídeos no `media-src` de `deploy/cloudflare/_headers`. Em `r2-cors.json`, troque a origem pelo host da plataforma.
 
 ## 3. Banco
 
@@ -44,7 +44,9 @@ Dois buckets, nomes fixados em `wrangler.jsonc`: `sipat-videos-dev` e `sipat-vid
    A origem do arquivo é `https://<PLATFORM_HOST>`; ajuste para cada ambiente. O arquivo usa o formato do wrangler (`rules[].allowed.origins/methods/headers`); a conferência foi feita no código do wrangler instalado, mas **verificar** o resultado com `npx wrangler r2 bucket cors list <bucket>`.
 4. Ciclo de vida: `npx wrangler r2 bucket lifecycle set sipat-videos-dev --file r2-lifecycle.json` (ou pelo painel). A regra vale **somente para o prefixo `uploads/`**: apaga objetos após 7 dias e aborta multipart incompleto após 1 dia. Nada em `videos/`.
 
-Endereço do S3 do R2: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, o mesmo em todos os ambientes da conta.
+Endereço do S3 do R2: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`, o mesmo em todos os ambientes da conta. Ele serve só à API (envio, conversão) e ao envio direto do navegador.
+
+**Domínio dos vídeos.** O participante assiste pelo domínio próprio `VIDEO_HOST` (por exemplo `videos.sipatonline.com.br`), **nunca pelo `r2.dev`**, que tem limite de taxa e não serve para produção. O `r2.dev` do bucket fica **desligado** e o bucket continua privado: quem responde em `VIDEO_HOST` é o próprio Worker (rota `custom_domain`, o Cloudflare cria o DNS e o certificado), que lê o bucket pelo binding `VIDEOS`. Ele só abre links que a API assinou (`?exp=…&sig=…`, HMAC com o segredo `VIDEO_URL_SIGNING_KEY`, válidos 2 h), aceita faixa de bytes (avançar no vídeo) e responde 403 a link vencido ou alterado. Não ligue um "Custom Domain" do R2 no bucket: isso o tornaria público.
 
 ## 5. Segredos
 
@@ -55,7 +57,10 @@ Set-Location deploy\cloudflare
 npx wrangler secret put DATABASE_CONNECTION_STRING --env dev
 npx wrangler secret put R2_ACCESS_KEY_ID --env dev
 npx wrangler secret put R2_SECRET_ACCESS_KEY --env dev
+npx wrangler secret put VIDEO_URL_SIGNING_KEY --env dev
 ```
+
+`VIDEO_URL_SIGNING_KEY`: um valor aleatório de pelo menos 32 caracteres, diferente em cada ambiente (por exemplo, a saída de `[Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))`). A API recusa subir com menos. Trocar o valor invalida os links abertos no momento; quem estiver assistindo só precisa recarregar a página.
 
 Repita com `--env prod`. O `secret put` exige que o Worker exista; se o primeiro `wrangler deploy` ainda não rodou, use `npx wrangler versions secret put …` ou faça o primeiro deploy e depois os segredos. **Verificar** qual caminho a versão instalada aceita.
 
@@ -152,6 +157,8 @@ Todas as chaves abaixo vivem em `SipatOnline:` e viram variável de ambiente tro
 | `SipatOnline:VideoStorage:R2:AccessKeyId` (`…__R2__AccessKeyId`) | vazio (obrigatória com `R2`) | `${R2_ACCESS_KEY_ID:-}` | `${R2_ACCESS_KEY_ID:-}` | segredo `R2_ACCESS_KEY_ID` | segredo `R2_ACCESS_KEY_ID` |
 | `SipatOnline:VideoStorage:R2:SecretAccessKey` (`…__R2__SecretAccessKey`) | vazio (obrigatória com `R2`) | `${R2_SECRET_ACCESS_KEY:-}` | `${R2_SECRET_ACCESS_KEY:-}` | segredo `R2_SECRET_ACCESS_KEY` | segredo `R2_SECRET_ACCESS_KEY` |
 | `SipatOnline:VideoStorage:R2:Bucket` (`…__R2__Bucket`) | vazio (obrigatória com `R2`) | `${R2_VIDEO_BUCKET:-}` | `${R2_VIDEO_BUCKET:-}` | `sipat-videos-dev` | `sipat-videos` |
+| `SipatOnline:VideoStorage:R2:PublicBaseUrl` (`…__R2__PublicBaseUrl`): domínio próprio dos vídeos; vazio = links assinados do S3 | vazio | — | — | `https://` + var `VIDEO_HOST` | `https://` + var `VIDEO_HOST` |
+| `SipatOnline:VideoStorage:R2:UrlSigningKey` (`…__R2__UrlSigningKey`): assina os links do domínio de vídeos (≥ 32 caracteres) | vazio (obrigatória com `PublicBaseUrl`) | — | — | segredo `VIDEO_URL_SIGNING_KEY` | segredo `VIDEO_URL_SIGNING_KEY` |
 | `SipatOnline:ForwardedHeaders:KnownProxies` (`SipatOnline__ForwardedHeaders__KnownProxies__0`): IPs de proxy confiáveis; fora do Development é obrigatório ter proxies ou redes | vazio | — (em Development vale `DevelopmentProxy:Host`, padrão `localhost`; o compose usa `web`) | `172.28.0.2` (o Nginx) | — | — |
 | `SipatOnline:ForwardedHeaders:KnownNetworks` (`SipatOnline__ForwardedHeaders__KnownNetworks__0`, `__1`): redes confiáveis, alternativa a `KnownProxies` (decisão 15 do plano; entregue pela Task 7) | vazio | — (Development não lê esta chave) | `${TRUSTED_PROXY_NETWORK:-}` (vazio = só `KnownProxies`) | `0.0.0.0/0` e `::/0` | `0.0.0.0/0` e `::/0` |
 

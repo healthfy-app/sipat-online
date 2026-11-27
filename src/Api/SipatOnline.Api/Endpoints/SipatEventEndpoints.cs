@@ -58,6 +58,7 @@ public static class SipatEventEndpoints
                 ? Results.Created($"/api/admin/sipats/{result.Value.Id:D}", ToResponse(result.Value))
                 : ToProblem(result.Error);
         })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("CreateSipatEvent");
 
         group.MapPut("/{sipatEventId:guid}", async (
@@ -72,6 +73,7 @@ public static class SipatEventEndpoints
                 ? Results.Ok(ToResponse(result.Value))
                 : ToProblem(result.Error);
         })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("UpdateSipatEvent");
 
         group.MapPost("/{sipatEventId:guid}/publish", async (
@@ -85,6 +87,7 @@ public static class SipatEventEndpoints
                 ? Results.Ok(ToResponse(result.Value))
                 : ToProblem(result.Error);
         })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("PublishSipatEvent");
 
         group.MapPost("/{sipatEventId:guid}/cancel", async (
@@ -98,6 +101,7 @@ public static class SipatEventEndpoints
                 ? Results.Ok(ToResponse(result.Value))
                 : ToProblem(result.Error);
         })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("CancelSipatEvent");
 
         group.MapPost("/{sipatEventId:guid}/reactivate", async (
@@ -111,6 +115,7 @@ public static class SipatEventEndpoints
                 ? Results.Ok(ToResponse(result.Value))
                 : ToProblem(result.Error);
         })
+        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("ReactivateSipatEvent");
 
         return endpoints;

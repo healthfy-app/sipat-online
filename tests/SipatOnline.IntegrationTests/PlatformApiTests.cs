@@ -101,7 +101,9 @@ public sealed class PlatformApiTests
                 "Acme Health",
                 "acme-admin",
                 "Acme Administrator",
-                "ClientAdminPass123"),
+                "ClientAdminPass123",
+                // a plan that builds its own trainings: on Bronze only the operation does
+                "Prata"),
             antiforgeryToken);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
         var company = await createResponse.Content.ReadFromJsonAsync<TenantSummary>();

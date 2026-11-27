@@ -21,8 +21,13 @@ export function colorContrast(first: string, second: string): number {
 const backendDefaultPrimary = /^#1f2937$/i;
 export const sipatPrimary = '#14694B';
 
+/** The primary colour the portal really shows: a company that never chose one gets the SIPAT green. */
+export function shownPrimary(chosenPrimary: string): string {
+  return backendDefaultPrimary.test(chosenPrimary) ? sipatPrimary : chosenPrimary;
+}
+
 export function tenantTheme(chosenPrimary: string, secondary: string): CSSProperties {
-  const primary = backendDefaultPrimary.test(chosenPrimary) ? sipatPrimary : chosenPrimary;
+  const primary = shownPrimary(chosenPrimary);
   let accent = primary;
   while (colorContrast(accent, '#FFFFFF') < 4.5) {
     accent = `#${[1, 3, 5].map(index => Math.floor(parseInt(accent.slice(index, index + 2), 16) * 0.85)

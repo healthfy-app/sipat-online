@@ -37,6 +37,33 @@ public static class CompanyRegistryEndpoints
             .RequireAuthorization("ManageTenantUsers")
             .WithName("UpdateCompanySector");
 
+        group.MapDelete("/units/{id:guid}", (Guid id, CompanyRegistryService registry, CancellationToken token) =>
+            RemoveAsync(RegistryKind.Unit, id, registry, token))
+            .RequireAuthorization("ManageTenantUsers")
+            .WithName("RemoveCompanyUnit");
+
+        group.MapDelete("/sectors/{id:guid}", (Guid id, CompanyRegistryService registry, CancellationToken token) =>
+            RemoveAsync(RegistryKind.Sector, id, registry, token))
+            .RequireAuthorization("ManageTenantUsers")
+            .WithName("RemoveCompanySector");
+
+        // the sectors of one unit: made inside it, and taken out of it
+        group.MapPost("/units/{id:guid}/sectors", async (Guid id, AddRegistryItemsRequest request, CompanyRegistryService registry, CancellationToken token) =>
+        {
+            var result = await registry.AddUnitSectorsAsync(id, request.Names, token);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .RequireAuthorization("ManageTenantUsers")
+        .WithName("AddUnitSectors");
+
+        group.MapDelete("/units/{id:guid}/sectors/{sectorId:guid}", async (Guid id, Guid sectorId, CompanyRegistryService registry, CancellationToken token) =>
+        {
+            var result = await registry.RemoveUnitSectorAsync(id, sectorId, token);
+            return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+        })
+        .RequireAuthorization("ManageTenantUsers")
+        .WithName("RemoveUnitSector");
+
         group.MapPut("/rules", async (ProfileRules rules, CompanyRegistryService registry, CancellationToken token) =>
         {
             var result = await registry.SaveRulesAsync(rules, token);
@@ -60,13 +87,19 @@ public static class CompanyRegistryEndpoints
         return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
     }
 
+    private static async Task<IResult> RemoveAsync(RegistryKind kind, Guid id, CompanyRegistryService registry, CancellationToken token)
+    {
+        var result = await registry.RemoveAsync(kind, id, token);
+        return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
+    }
+
     private static IResult ToProblem(DomainError error)
     {
         var statusCode = error.Code switch
         {
             "identity.forbidden" => StatusCodes.Status403Forbidden,
             "registry.not_found" => StatusCodes.Status404NotFound,
-            "registry.name.duplicate" => StatusCodes.Status409Conflict,
+            "registry.name.duplicate" or "registry.unit_sector.in_use" => StatusCodes.Status409Conflict,
             _ => StatusCodes.Status400BadRequest
         };
 

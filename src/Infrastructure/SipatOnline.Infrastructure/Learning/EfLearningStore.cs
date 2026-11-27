@@ -225,17 +225,24 @@ public sealed class EfLearningStore(
     public Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
         TenantId tenantId,
         CancellationToken cancellationToken) =>
-        ListParticipantProgressAsync(tenantId, null, cancellationToken);
+        ListParticipantProgressAsync(tenantId, null, null, cancellationToken);
+
+    public Task<IReadOnlyList<LearningParticipantProgress>> ListUnitProgressAsync(
+        TenantId tenantId,
+        Guid unitId,
+        CancellationToken cancellationToken) =>
+        ListParticipantProgressAsync(tenantId, null, unitId, cancellationToken);
 
     public Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
         TenantId tenantId,
         Guid participantId,
         CancellationToken cancellationToken) =>
-        ListParticipantProgressAsync(tenantId, (Guid?)participantId, cancellationToken);
+        ListParticipantProgressAsync(tenantId, participantId, null, cancellationToken);
 
     private async Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
         TenantId tenantId,
         Guid? onlyParticipantId,
+        Guid? onlyUnitId,
         CancellationToken cancellationToken)
     {
         var assignmentQuery = dbContext.LearningAssignments.AsNoTracking()
@@ -245,6 +252,13 @@ public sealed class EfLearningStore(
         if (onlyParticipantId is Guid only)
         {
             assignmentQuery = assignmentQuery.Where(assignment => assignment.ParticipantId == only);
+        }
+
+        if (onlyUnitId is Guid unit)
+        {
+            // the people of one unit: the filter runs in the database, so the others never leave it
+            assignmentQuery = assignmentQuery.Where(assignment => dbContext.Users.Any(user =>
+                user.Id == assignment.ParticipantId && user.TenantId == tenantId.Value && user.UnitId == unit));
         }
 
         var assignments = await assignmentQuery.ToListAsync(cancellationToken);
@@ -439,6 +453,14 @@ public sealed class EfLearningStore(
                 .ToListAsync(cancellationToken))
             .GroupBy(progress => progress.RevisionId)
             .ToDictionary(group => group.Key, group => group.ToDictionary(progress => progress.LessonId));
+        // the picture of each of our videos (chosen for it, or a frame taken when it was converted)
+        var catalogVideoIds = lessonsByRevision.Values.SelectMany(items => items)
+            .Select(lesson => CatalogVideoId(lesson.ProviderAssetReference)).OfType<Guid>().Distinct().ToArray();
+        var thumbnails = catalogVideoIds.Length == 0
+            ? new Dictionary<Guid, DateTimeOffset>()
+            : await dbContext.PlatformCourseVideos.AsNoTracking()
+                .Where(video => catalogVideoIds.Contains(video.Id) && video.ThumbnailUpdatedAt != null)
+                .ToDictionaryAsync(video => video.Id, video => video.ThumbnailUpdatedAt!.Value, cancellationToken);
         var revisionsWithCover = (await dbContext.LearningContentSnapshots.AsNoTracking()
                 .Where(item => item.TenantId == tenant && revisionIds.Contains(item.RevisionId) && item.CoverData != null)
                 .Select(item => item.RevisionId)
@@ -470,6 +492,11 @@ public sealed class EfLearningStore(
                 progressEntities.TryGetValue(entity.Id, out var progress);
                 var domainProgress = progress is null ? null : ToDomain(progress);
                 var external = LessonReference.TryParseExternal(entity.ProviderAssetReference, out var provider, out var externalId);
+                var thumbnailUrl = external && provider == VideoProvider.YouTube
+                    ? $"https://i.ytimg.com/vi/{externalId}/hqdefault.jpg"
+                    : CatalogVideoId(entity.ProviderAssetReference) is Guid videoId && thumbnails.TryGetValue(videoId, out var changedAt)
+                        ? $"/api/learning/lessons/{entity.Id:D}/thumbnail?v={changedAt.ToUnixTimeMilliseconds()}"
+                        : null;
                 return new LearningLessonProgress(
                     entity.Id,
                     entity.Title,
@@ -484,7 +511,8 @@ public sealed class EfLearningStore(
                     domainProgress?.WatchedMilliseconds ?? 0,
                     entity.IsBonus,
                     external ? provider.ToString() : null,
-                    external ? externalId : null);
+                    external ? externalId : null,
+                    thumbnailUrl);
             }).ToArray();
 
             // extras are listed in their place but never counted
@@ -504,7 +532,7 @@ public sealed class EfLearningStore(
                 counted.Length > 0 && completed == counted.Length
                     ? 100
                     : totalDuration == 0 ? 0 : Math.Min(99, (int)(watchedDuration * 100m / totalDuration)),
-                revisionsWithCover.Contains(revisionId) ? $"/api/learning/tracks/{trackId:D}/cover" : null,
+                revisionsWithCover.Contains(revisionId) ? $"/api/learning/tracks/{trackId:D}/cover?v={revisionId:N}" : null,
                 trackEntity.DayTitle,
                 trackEntity.DayPosition,
                 trackEntity.CoursePosition,
@@ -630,6 +658,12 @@ public sealed class EfLearningStore(
 
         return result.Value;
     }
+
+    /// <summary>The video of the library a lesson plays, when it is one of ours ("catalog:{id}").</summary>
+    private static Guid? CatalogVideoId(string reference) =>
+        reference.StartsWith("catalog:", StringComparison.Ordinal) && Guid.TryParse(reference["catalog:".Length..], out var id)
+            ? id
+            : null;
 
     private static LearningTrack ToDomain(LearningTrackEntity entity)
     {

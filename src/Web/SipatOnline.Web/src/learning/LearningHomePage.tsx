@@ -1,10 +1,14 @@
-import { useEffect, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { chosenTrainingKey, clearLinkedTraining, linkedTraining } from '@/trainings/trainingLink';
 import { getCourseCover } from '@/courseCover';
+import LessonPicture from './LessonPicture';
 import {
   getAssignedLearningTrack,
+  getLearningHome,
   listAssignedLearningTracks,
   type LearningExperience,
+  type LearningHome,
   type LearningTrackCard,
 } from '@/api';
 import {
@@ -19,6 +23,7 @@ import {
   getRemainingCourseMinutes,
   getTrackPath,
   getTrackProgress,
+  getTrackShare,
   getOverallProgress,
   getMotivation,
   groupTracksByDay,
@@ -29,7 +34,6 @@ import {
   type CourseSort,
   type LearningSummary,
 } from './learningHelpers';
-import LoadingState from '@/LoadingState';
 import DayHeader from './DayHeader';
 import { orderTrainings, pickDefaultTraining } from '@/trainings/defaultTraining';
 import WeekVideos from './WeekVideos';
@@ -40,23 +44,46 @@ import './LearningHero.css';
 
 const firstArrivalKey = 'sipat:learning-arrived';
 // the training the participant picked stays picked for the session, also after opening a day and coming back
-const chosenTrainingKey = 'sipat:learning-training';
 
 function readSessionFlag(key: string): string | null {
   try { return sessionStorage.getItem(key); } catch { return null; }
+}
+
+/**
+ * The home as it was last seen on this device, by person: the page opens on it at once and the fresh answer replaces it
+ * a moment later, so coming back never starts from an empty screen.
+ */
+const homeKey = (participantId: string) => `sipat:learning-home:${participantId}`;
+function readHome(participantId?: string): LearningHome | null {
+  if (!participantId) return null;
+  try {
+    const saved = JSON.parse(localStorage.getItem(homeKey(participantId)) ?? 'null') as LearningHome | null;
+    return saved && Array.isArray(saved.tracks) && Array.isArray(saved.experiences) ? saved : null;
+  } catch { return null; }
+}
+function writeHome(participantId: string | undefined, home: LearningHome) {
+  if (!participantId) return;
+  try { localStorage.setItem(homeKey(participantId), JSON.stringify(home)); } catch { /* no room or private mode: the page loads the usual way next time */ }
 }
 
 function writeSessionFlag(key: string, value: string) {
   try { sessionStorage.setItem(key, value); } catch { /* private mode: the cascade simply plays again */ }
 }
 
-export default function LearningHomePage({ participantName, setSummary }: {
+export default function LearningHomePage({ participantName, participantId, setSummary }: {
   participantName?: string;
+  /** Who is signed in: the home last seen is kept on the device under this person only. */
+  participantId?: string;
   setSummary?: (summary: LearningSummary | null) => void;
 }) {
   const [allTracks, setTracks] = useState<LearningTrackCard[]>([]);
+  // each day with its videos, as they came with the home
+  const [experiences, setExperiences] = useState<Record<string, LearningExperience>>({});
+  const knownLessons = useMemo(() => Object.fromEntries(Object.entries(experiences).map(([id, experience]) => [id, experience.lessons])), [experiences]);
   const [chosenSipat, setChosenSipatState] = useState<string | null>(() => readSessionFlag(chosenTrainingKey));
   const setChosenSipat = (id: string) => { setChosenSipatState(id); writeSessionFlag(chosenTrainingKey, id); };
+  // the training a link asked for, when this session started from one
+  const [linked] = useState(() => linkedTraining());
   const [resumeExperience, setResumeExperience] = useState<LearningExperience | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingResume, setIsLoadingResume] = useState(false);
@@ -87,6 +114,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
     .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
   // the one shown first: among those running, the one that started first; then the next to start; then the most recent
   const currentSipat = sipats.find(item => item.id === chosenSipat) ?? pickDefaultTraining(sipats);
+  // the link is for a training this person does not have (ended, cancelled, another company's): the home says so once
+  const linkUnavailable = !!linked && !isLoading && !error && !sipats.some(item => item.id === linked);
+  useEffect(() => { if (linked && !isLoading && !error) clearLinkedTraining(); }, [linked, isLoading, error]);
   const tracks = sipats.length > 1 && currentSipat ? allTracks.filter(track => track.sipatEventId === currentSipat.id) : allTracks;
   const overallProgress = getOverallProgress(tracks);
   const isFormationComplete = overallProgress >= 100;
@@ -152,18 +182,27 @@ export default function LearningHomePage({ participantName, setSummary }: {
 
   useEffect(() => {
     let active = true;
-    setIsLoading(true);
+    const show = (home: LearningHome) => {
+      setTracks(sortTracksByProgram(home.tracks.filter(track => track.sipatStatus !== 'Cancelled' && track.sipatStatus !== 'Draft')));
+      setExperiences(Object.fromEntries(home.experiences.map(experience => [experience.track.id, experience])));
+    };
     setError('');
-    setTracks([]);
+    // what this person last saw shows at once; the fresh answer replaces it quietly
+    const remembered = readHome(participantId);
+    if (remembered) { show(remembered); setIsLoading(false); } else { setIsLoading(true); setTracks([]); setExperiences({}); }
 
-    listAssignedLearningTracks()
-      .then((items) => {
+    getLearningHome()
+      // a server that does not have the single answer yet: the list alone, and each day asks for its videos
+      .catch(async () => ({ tracks: await listAssignedLearningTracks(), experiences: [] }) as LearningHome)
+      .then((home) => {
         if (active) {
-          setTracks(sortTracksByProgram(items.filter(track => track.sipatStatus !== 'Cancelled' && track.sipatStatus !== 'Draft')));
+          show(home);
+          if (home.experiences.length > 0) writeHome(participantId, home);
         }
       })
       .catch((loadError: unknown) => {
-        if (active) {
+        // with something on the screen already, a failed refresh stays quiet
+        if (active && !remembered) {
           setError(getLearningErrorMessage(loadError));
         }
       })
@@ -176,11 +215,20 @@ export default function LearningHomePage({ participantName, setSummary }: {
     return () => {
       active = false;
     };
-  }, [retry]);
+  }, [retry, participantId]);
 
   useEffect(() => {
     if (!resumeTrack) {
       setResumeExperience(null);
+      setResumeError('');
+      setIsLoadingResume(false);
+      return;
+    }
+
+    // the day came with the home: nothing to ask
+    const known = experiences[resumeTrack.id];
+    if (known) {
+      setResumeExperience(known);
       setResumeError('');
       setIsLoadingResume(false);
       return;
@@ -210,7 +258,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
     return () => {
       active = false;
     };
-  }, [resumeTrack?.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeTrack?.id, experiences]);
 
   useEffect(() => {
     if (milestone === null || sessionStorage.getItem(`sipat-learning-milestone:${milestone}`)) {
@@ -291,9 +340,9 @@ export default function LearningHomePage({ participantName, setSummary }: {
         </div>
         <h3><Link to={getTrackPath(track, tracks)}>{title}</Link></h3>
         <div className="learning-catalog-course-progress">
-          <span>{track.completedLessonCount} de {track.lessonCount} vídeos{started && !completed ? ` · ${percentage}%` : ''}</span>
+          <span>{track.completedLessonCount} de {track.lessonCount} vídeos{started && !completed ? ` · ${getTrackShare(track)}%` : ''}</span>
         </div>
-        <ProgressBar value={percentage} label={`Progresso de ${title}`} />
+        <ProgressBar value={getTrackShare(track)} label={`Progresso de ${title}`} />
         <Link
           aria-label={`${completed ? 'Ver certificado de' : started ? 'Continuar curso' : 'Começar curso'} ${title}`}
           className={`learning-catalog-course-action${isRecommended && !started ? ' is-primary' : ''}${completed ? ' is-complete' : ''}${started && !completed ? ' is-started' : ''}`}
@@ -324,7 +373,19 @@ export default function LearningHomePage({ participantName, setSummary }: {
         </p>
       </header>}
 
-      {isLoading && <LoadingState className="learning-state">Carregando o seu treinamento...</LoadingState>}
+      {/* the first visit on a device: the shape of the page while the answer comes, instead of a line of text on an empty screen */}
+      {isLoading && <div aria-busy="true" className="grid gap-6" role="status">
+        <span className="sr-only">Carregando o seu treinamento...</span>
+        <div aria-hidden="true" className="h-56 animate-pulse rounded-[1.25rem] bg-[#e3e9e6] motion-reduce:animate-none max-[760px]:h-72" />
+        <div aria-hidden="true" className="h-8 w-56 animate-pulse rounded-lg bg-[#e3e9e6] motion-reduce:animate-none" />
+        <div aria-hidden="true" className="grid gap-4 rounded-[1.25rem] border border-[#dfe6e3] bg-white p-5">
+          <div className="h-10 w-2/3 animate-pulse rounded-lg bg-[#e3e9e6] motion-reduce:animate-none" />
+          <div className="grid grid-cols-5 gap-3 max-[1100px]:grid-cols-2">
+            {[0, 1, 2, 3, 4].map(item => <div className="aspect-[4/3] animate-pulse rounded-xl bg-[#e3e9e6] motion-reduce:animate-none max-[1100px]:nth-[n+3]:hidden" key={item} />)}
+          </div>
+        </div>
+      </div>}
+      {linkUnavailable && <p className="m-0 rounded-xl bg-muted px-4 py-3 text-sm text-muted-foreground" role="status">O treinamento deste link não está disponível para você. Aqui estão os seus treinamentos.</p>}
       {error && (
         <div className="learning-state learning-error" role="alert">
           <p>{error}</p>
@@ -401,7 +462,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
                   label={`Progresso do treinamento: ${completedCourses} de ${tracks.length} cursos concluídos`}
                   value={overallProgress}
                 />
-                <p className="learning-completion-motivation">{getMotivation(overallProgress)}</p>
+                <p className="learning-completion-motivation">{getMotivation(Math.max(1, overallProgress))}</p>
               </div>
               {!isFormationComplete && continueTrack && (
                 <>
@@ -428,7 +489,8 @@ export default function LearningHomePage({ participantName, setSummary }: {
             </div>
             {!isFormationComplete && continueTrack && (
               <Link aria-hidden="true" className="learning-resume-cover learning-hero-cover" tabIndex={-1} to={continuePath}>
-                <img alt="" decoding="async" src={continueTrack.coverUrl ?? getCourseCover(continueTrack.title)} />
+                <LessonPicture cover={continueTrack.coverUrl ?? getCourseCover(continueTrack.title)} eager
+                  lesson={resumeTrack ? resumeLesson : null} />
                 <span className="learning-resume-play">
                   <svg viewBox="0 0 16 16"><path d="M5 3v10l8-5z" fill="currentColor" /></svg>
                 </span>
@@ -467,7 +529,7 @@ export default function LearningHomePage({ participantName, setSummary }: {
           </p>
         )}
 
-        {dayMode && weekDays && <WeekVideos allTracks={tracks} days={weekDays} />}
+        {dayMode && weekDays && <WeekVideos allTracks={tracks} days={weekDays} known={Object.keys(knownLessons).length > 0 ? knownLessons : undefined} />}
 
         {!dayMode && <section aria-labelledby="learning-catalog-title" className="learning-catalog-list-section">
           <div className="learning-catalog-list-heading">

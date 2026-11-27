@@ -161,7 +161,7 @@ describe('Platform company employees', () => {
     // it filters as the operator types, without a search button
     expect(screen.queryByRole('button', { name: 'Buscar' })).not.toBeInTheDocument();
     await user.type(screen.getByLabelText('Buscar por nome ou login'), 'MAT-002');
-    expect(await screen.findByText('Nenhum participante encontrado. Tente outro nome ou identificador.')).toBeInTheDocument();
+    expect(await screen.findByText('Nenhum participante encontrado. Tente outro nome ou login.')).toBeInTheDocument();
     expect(api.getPlatformCompanyEmployees).toHaveBeenLastCalledWith(
       'company-1',
       { offset: 0, limit: 50, search: 'MAT-002', includeInactive: false },

@@ -11,6 +11,7 @@ public sealed class PlatformCourseCatalogService(
     IApplicationUnitOfWork unitOfWork,
     IAuditTrail auditTrail,
     TimeProvider timeProvider,
+    CatalogAccessGrant accessGrant,
     IVideoConversionQueue conversionQueue,
     IDirectVideoUploadStore directUploads)
 {
@@ -40,7 +41,7 @@ public sealed class PlatformCourseCatalogService(
     private const int MaximumUploadIdLength = 1024;
     public const long MaximumCoverSizeBytes = 2 * 1024 * 1024;
     private const int MaximumTitleLength = 200;
-    private const int MaximumExternalIdLength = ExternalVideoLink.MaximumSmartplayerLength;
+    private const int MaximumExternalIdLength = ExternalVideoLink.MaximumIdLength;
 
     public async Task<Result<IReadOnlyList<PlatformCourse>>> ListAsync(
         CancellationToken cancellationToken)
@@ -870,7 +871,7 @@ public sealed class PlatformCourseCatalogService(
     private static Result<PlatformCourseVideo> UploadNotFound() =>
         Failure<PlatformCourseVideo>(UploadNotFoundCode, UploadNotFoundMessage);
 
-    /// <summary>Registers a YouTube, Vimeo or Smartplayer link as a library item; the same link twice returns the first one.</summary>
+    /// <summary>Registers a YouTube or Vimeo link as a library item; the same link twice returns the first one.</summary>
     public async Task<Result<PlatformCourseVideo>> CreateExternalVideoAsync(
         string? provider,
         string? url,
@@ -890,14 +891,14 @@ public sealed class PlatformCourseCatalogService(
         {
             return Failure<PlatformCourseVideo>(
                 "learning.catalog.external_provider_invalid",
-                "Escolha YouTube, Vimeo ou Smartplayer.");
+                "Escolha YouTube ou Vimeo.");
         }
 
         if (!ExternalVideoLink.TryParse(parsedProvider, url, out var externalId) || externalId.Length > MaximumExternalIdLength)
         {
             return Failure<PlatformCourseVideo>(
                 "learning.catalog.external_link_invalid",
-                "Não reconhecemos este link. Cole o endereço do vídeo no YouTube ou no Vimeo, ou o código embed do Smartplayer.");
+                "Não reconhecemos este link. Cole o endereço do vídeo no YouTube ou no Vimeo.");
         }
 
         var normalizedTitle = title?.Trim();
@@ -1131,7 +1132,8 @@ public sealed class PlatformCourseCatalogService(
             : Result<PlatformCourseCover>.Success(cover);
     }
 
-    private static bool HasCoverSignature(byte[] data, string contentType) =>
+    /// <summary>The first bytes of a PNG, JPEG or WebP image, as its type says it is.</summary>
+    public static bool HasCoverSignature(byte[] data, string contentType) =>
         contentType switch
         {
             "image/png" => data.AsSpan().StartsWith(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }),
@@ -1147,8 +1149,8 @@ public sealed class PlatformCourseCatalogService(
         Failure<T>("learning.platform_course.not_found", "O curso não foi encontrado.");
 
     private Result<bool> EnsurePlatformOperator() =>
-        currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
-        tenantContext.CurrentTenantId is null
+        accessGrant.Granted || (currentActor.IsInRole(PlatformRoles.PlatformOperator) &&
+        tenantContext.CurrentTenantId is null)
             ? Result<bool>.Success(true)
             : Result<bool>.Failure(new DomainError(
                 "learning.platform_course.forbidden",

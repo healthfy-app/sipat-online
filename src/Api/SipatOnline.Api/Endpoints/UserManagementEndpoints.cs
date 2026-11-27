@@ -38,11 +38,12 @@ public static class UserManagementEndpoints
         endpoints.MapGet("/api/admin/users/participants", async (
             int? offset,
             int? limit,
+            Guid? unitId,
             UserApplicationService userService,
             CancellationToken cancellationToken) =>
         {
             var result = await userService.ListParticipantsAsync(
-                new ListUsersRequest(offset ?? 0, limit ?? 50),
+                new ListUsersRequest(offset ?? 0, limit ?? 50, unitId),
                 cancellationToken);
             if (!result.IsSuccess)
             {
@@ -60,10 +61,11 @@ public static class UserManagementEndpoints
         .WithName("ListParticipants");
 
         endpoints.MapGet("/api/admin/users/participants/profiles", async (
+            Guid? unitId,
             SipatOnline.Infrastructure.Identity.ParticipantProfileService profiles,
             CancellationToken cancellationToken) =>
         {
-            var result = await profiles.ListAsync(cancellationToken);
+            var result = await profiles.ListAsync(unitId, cancellationToken);
             return result.IsSuccess ? Results.Ok(result.Value) : ToProblem(result.Error);
         })
         .RequireAuthorization("ViewTenantLearning")

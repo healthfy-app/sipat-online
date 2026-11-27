@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   setCourseCategory,
+  setCourseReadySipat,
   setPlatformCourseModules,
   setPlatformCourseStructure,
   type CourseLessonDraft,
@@ -16,7 +17,8 @@ import AddActivityDialog from './AddActivityDialog';
 import AddVideoDialog from './AddVideoDialog';
 import CourseConfigureStep, { type CourseSettingsValues } from './CourseConfigureStep';
 import CourseEditorFrame, { type CourseEditorStep } from './CourseEditorFrame';
-import CourseOutlinePanel, { type OutlineActions } from './CourseOutlinePanel';
+import CourseOutlinePanel, { type EditorLocks, type OutlineActions } from './CourseOutlinePanel';
+import { CourseCoverEditor } from './CourseMediaForms';
 import CoursePreviewCanvas, { type PreviewSize } from './CoursePreviewCanvas';
 import CoursePropertiesPanel from './CoursePropertiesPanel';
 import CoursePublishStep from './CoursePublishStep';
@@ -34,12 +36,13 @@ function settingsFrom(course: PlatformCourse): CourseSettingsValues {
     gamificationEnabled: course.gamificationEnabled,
     gameType: course.gameType,
     categoryId: course.categoryId ?? null,
+    readySipat: course.isReadySipat ?? false,
   };
 }
 
 const sameSettings = (a: CourseSettingsValues, b: CourseSettingsValues) =>
   a.title === b.title && a.description === b.description
-  && a.gamificationEnabled === b.gamificationEnabled && a.gameType === b.gameType && a.categoryId === b.categoryId;
+  && a.gamificationEnabled === b.gamificationEnabled && a.gameType === b.gameType && a.categoryId === b.categoryId && a.readySipat === b.readySipat;
 
 export default function CourseEditor({
   course,
@@ -51,6 +54,7 @@ export default function CourseEditor({
   onDuplicate,
   onError,
   week,
+  locks,
 }: {
   course: PlatformCourse;
   error: string;
@@ -62,6 +66,8 @@ export default function CourseEditor({
   onError: (message: string) => void;
   /** The training is the week of a SIPAT (its Títulos are the days): the editor only edits, saves and goes back. */
   week?: { sipatTitle: string; companyName: string };
+  /** What the company's plan does not let it change (a company's own training); absent for the operation. */
+  locks?: EditorLocks;
 }) {
   const [values, setValues] = useState(() => settingsFrom(course));
   const [savedValues, setSavedValues] = useState(() => settingsFrom(course));
@@ -73,6 +79,7 @@ export default function CourseEditor({
   const [addTarget, setAddTarget] = useState<string | null>(null);
   const [activityPosition, setActivityPosition] = useState<number | null>(null);
   const [previewSize, setPreviewSize] = useState<PreviewSize>('desktop');
+  const [coverOpen, setCoverOpen] = useState(false);
   const [selectedKey, setSelectedKey] = useState<string | null>(
     () => (course.videos[0] ? `video-${course.videos[0].id}` : null),
   );
@@ -110,7 +117,8 @@ export default function CourseEditor({
         gameType: values.gameType,
       });
       if ((saved.categoryId ?? null) !== values.categoryId) await setCourseCategory(course.id, values.categoryId);
-      const next = settingsFrom({ ...saved, categoryId: values.categoryId });
+      if (!course.tenantId && (saved.isReadySipat ?? false) !== values.readySipat) await setCourseReadySipat(course.id, values.readySipat);
+      const next = settingsFrom({ ...saved, categoryId: values.categoryId, isReadySipat: values.readySipat });
       setValues(next);
       setSavedValues(next);
       setStatus(saved.status);
@@ -214,8 +222,10 @@ export default function CourseEditor({
             headingRef={heading}
             selectedKey={selectedLesson ? `lesson-${selectedLesson.id}` : selectedItem?.key ?? null}
             status={status}
-            title={values.title}
+            title={week ? week.sipatTitle : values.title}
             week={!!week}
+            locks={locks}
+            onCover={week ? () => setCoverOpen(true) : undefined}
           />
           <CoursePreviewCanvas
             onSelectIndex={(index) => setSelectedKey(track[index]?.key ?? null)}
@@ -235,6 +245,7 @@ export default function CourseEditor({
             }}
             busy={busy}
             gamificationEnabled={values.gamificationEnabled}
+            locks={locks}
             item={selectedItem}
             lesson={selectedLesson}
             lessonIndex={selectedLessonIndex}
@@ -263,6 +274,8 @@ export default function CourseEditor({
       {step === 'publish' && (
         <CoursePublishStep
           busy={busy}
+          dirty={dirty}
+          isSaving={isSaving}
           course={course}
           description={values.description}
           gamificationEnabled={values.gamificationEnabled}
@@ -275,6 +288,12 @@ export default function CourseEditor({
           status={status}
           title={values.title}
         />
+      )}
+
+      {coverOpen && (
+        <Dialog description="A foto aparece no card do treinamento." onClose={() => setCoverOpen(false)} title="Capa do treinamento">
+          <CourseCoverEditor course={course} onBusyChange={setIsMediaBusy} onChanged={onChanged} onError={onError} />
+        </Dialog>
       )}
 
       {activityPosition !== null && (
@@ -293,6 +312,7 @@ export default function CourseEditor({
           availableVideos={availableVideos}
           busy={isMediaBusy}
           courseId={course.id}
+          libraryOnly={!!locks}
           error={error}
           onBusyChange={setIsMediaBusy}
           onClose={() => setActiveDialog(null)}

@@ -37,6 +37,34 @@ public sealed class ParticipationCertificateEntity
     public string SnapshotJson { get; set; } = "";
 }
 
+/// <summary>The pictures of a company's certificate. A row is never changed: saving makes a new one, and each
+/// certificate keeps the row it was issued with.</summary>
+public sealed class CertificateTemplateEntity
+{
+    public Guid Id { get; set; }
+    public Guid TenantId { get; set; }
+    public byte[]? CoverData { get; set; }
+    public string? CoverContentType { get; set; }
+    public byte[]? EmblemData { get; set; }
+    public string? EmblemContentType { get; set; }
+    public byte[]? FooterData { get; set; }
+    public string? FooterContentType { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+public sealed class CertificateTemplateConfiguration : IEntityTypeConfiguration<CertificateTemplateEntity>
+{
+    public void Configure(EntityTypeBuilder<CertificateTemplateEntity> builder)
+    {
+        builder.ToTable("CertificateTemplates", "learning");
+        builder.HasKey(item => item.Id);
+        builder.HasIndex(item => item.TenantId);
+        builder.Property(item => item.CoverContentType).HasMaxLength(50);
+        builder.Property(item => item.EmblemContentType).HasMaxLength(50);
+        builder.Property(item => item.FooterContentType).HasMaxLength(50);
+    }
+}
+
 public sealed class LearningContentSnapshotConfiguration : IEntityTypeConfiguration<LearningContentSnapshotEntity>
 {
     public void Configure(EntityTypeBuilder<LearningContentSnapshotEntity> builder)

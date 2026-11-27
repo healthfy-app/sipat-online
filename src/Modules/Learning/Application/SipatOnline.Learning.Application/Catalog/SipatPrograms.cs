@@ -139,7 +139,8 @@ public sealed class SipatProgramService(
 public static class ProgramDayRules
 {
     public static async Task<Result<IReadOnlyList<ProgramDay>>> CleanAsync(
-        IReadOnlyList<ProgramDay>? days, IPlatformCourseCatalogStore catalogStore, IGameModuleStore gameStore, CancellationToken cancellationToken)
+        IReadOnlyList<ProgramDay>? days, IPlatformCourseCatalogStore catalogStore, IGameModuleStore gameStore, CancellationToken cancellationToken,
+        bool allowEmptyDays = false)
     {
         if (days is null || days.Count is 0 or > SipatProgramService.MaximumDays)
             return Fail("learning.program.days_invalid", $"O treinamento precisa ter de 1 a {SipatProgramService.MaximumDays} dias.");
@@ -156,7 +157,8 @@ public static class ProgramDayRules
                 return Fail("learning.program.subject_invalid", $"O assunto do dia \"{dayTitle}\" pode ter até {SipatProgramService.MaximumSubjectLength} caracteres.");
 
             var videoIds = day.VideoIds ?? [];
-            if (videoIds.Count is 0 or > SipatProgramService.MaximumVideosPerDay)
+            // a draft may keep a day empty (the video editor fills it); publishing checks again without this
+            if ((videoIds.Count == 0 && !allowEmptyDays) || videoIds.Count > SipatProgramService.MaximumVideosPerDay)
                 return Fail("learning.program.day_videos_invalid", $"O dia \"{dayTitle}\" precisa ter de 1 a {SipatProgramService.MaximumVideosPerDay} vídeos.");
             if (videoIds.Distinct().Count() != videoIds.Count)
                 return Fail("learning.program.video_repeated", $"O dia \"{dayTitle}\" tem um vídeo repetido.");

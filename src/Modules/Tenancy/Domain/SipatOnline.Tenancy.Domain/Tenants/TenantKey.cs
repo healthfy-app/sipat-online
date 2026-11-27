@@ -10,6 +10,7 @@ public sealed record TenantKey
         "api",
         "admin",
         "app",
+        "videos",
         "www"
     };
 

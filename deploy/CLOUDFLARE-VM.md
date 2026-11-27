@@ -75,6 +75,12 @@ Abra `https://ops.exemplo.com.br`, entre com o dono e cadastre a primeira empres
 ### Vídeos no Cloudflare R2 (recomendado para o pico)
 Com o R2, o participante assiste por links assinados e temporários direto da Cloudflare, e a banda da VM deixa de ser o gargalo.
 
+**Por onde o vídeo sai nesta topologia.** O player recebe um link assinado do endpoint S3 da conta (`https://<ACCOUNT_ID>.r2.cloudflarestorage.com/...`, válido por 2 h, gerado depois das verificações de acesso). Esse endpoint é o de produção do R2 e não tem o limite de taxa do `r2.dev`. Regras:
+
+- O bucket fica **privado**: em *Settings* do bucket, deixe o **"Public Development URL" (`r2.dev`) desligado** e **não** ligue um *Custom Domain* do R2 no bucket (os dois deixam qualquer vídeo aberto, sem login).
+- O domínio próprio de vídeos (`videos.<domínio>`) só existe na topologia de Containers, em que o Worker confere a assinatura ([CLOUDFLARE-CONTAINERS.md](CLOUDFLARE-CONTAINERS.md), seção 4). Na VM, `SipatOnline__VideoStorage__R2__PublicBaseUrl` fica vazio e nada precisa ser feito.
+- Rede da empresa cliente: se a TI filtra sites, peça para liberar o host da plataforma e `*.r2.cloudflarestorage.com` (vídeos e envio direto). Sem isso, o vídeo não toca dentro da fábrica, embora o site abra.
+
 1. No painel da Cloudflare, em **R2**, crie um bucket **privado** para os vídeos (por exemplo, `sipat-videos`).
 2. Crie uma chave de API do R2 (token S3) com permissão de leitura e escrita **somente nesse bucket**. Anote o endereço da conta (`https://<ACCOUNT_ID>.r2.cloudflarestorage.com`), o *Access Key ID* e o *Secret Access Key*.
 3. No `deploy/.env.production`, descomente e preencha `R2_SERVICE_URL`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` e `R2_VIDEO_BUCKET`. **Ainda não** ative `VIDEO_STORAGE_PROVIDER=R2`: primeiro copie os vídeos (passo 4), depois troque (passo 5). Assim ninguém tenta assistir a um vídeo que ainda não está no bucket.
@@ -118,6 +124,8 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
 
 ### Backup diário do banco no R2
 O banco roda na própria VM; sem cópia externa, perder o disco é perder tudo. Todo dia às 03:00 um *timer* grava um `pg_dump` no R2 e apaga as cópias com mais de 30 dias.
+
+> **Pela pipeline (`deploy-vm.sh`) isto é automático:** com `R2_BACKUP_BUCKET` e a chave do bucket de backups no ambiente do GitHub, o deploy instala o rclone, grava a chave no `.env.production` e liga o timer. Dos passos abaixo, só o 2 (bucket e chave) e o 7 (ensaio) continuam manuais. O mesmo backup é o que uma VM nova restaura (`deploy/PIPELINE-VM.md`, seção 4).
 
 > **O backup é sensível.** As chaves de login e segurança do sistema (Data Protection) ficam no banco, sem criptografia. Quem tiver uma cópia do banco consegue forjar sessões: guarde o bucket de backups privado e com chave de acesso só dele.
 

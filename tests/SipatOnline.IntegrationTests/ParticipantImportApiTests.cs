@@ -82,7 +82,7 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
     }
 
     [DockerFact]
-    public async Task Import_UnknownSector_RejectsLineOnly()
+    public async Task Import_UnknownSector_JoinsTheCompanyList()
     {
         await using var postgres = await StartPostgresAsync();
         await using var factory = await CreateFactoryAsync(postgres);
@@ -93,14 +93,14 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
             Row(2, "Carlos Pereira") with { Sector = "producao" },
             Row(3, "Beatriz Lima") with { Sector = "Marketing" });
 
-        Assert.Equal(1, result.Created);
-        var rejection = Assert.Single(result.Rejected);
-        Assert.Equal(3, rejection.Row);
-        Assert.Equal("Setor \"Marketing\" não está na lista da empresa.", rejection.Message);
+        // a sector the company already has is matched; a new one is added with the import
+        Assert.Equal(2, result.Created);
+        Assert.Empty(result.Rejected);
+        Assert.Equal(["Marketing"], result.NewSectors);
     }
 
     [DockerFact]
-    public async Task Import_RequiredFieldMissing_RejectsNewOnly()
+    public async Task Import_FieldOnceRequiredMissing_HoldsNobodyBack()
     {
         await using var postgres = await StartPostgresAsync();
         await using var factory = await CreateFactoryAsync(postgres);
@@ -113,11 +113,10 @@ public sealed class ParticipantImportApiTests(ITestOutputHelper output)
             Row(2, "Ana Nova"),
             new ImportRow(3, null, "Joao-Existente", null, "Joao@Empresa.com.br", null, null, null, null));
 
-        Assert.Equal(0, result.Created);
+        // the sector was once marked as required: a person without one comes in all the same
+        Assert.Equal(1, result.Created);
         Assert.Equal(1, result.Updated);
-        var rejection = Assert.Single(result.Rejected);
-        Assert.Equal(2, rejection.Row);
-        Assert.Equal("Falta o setor, obrigatório nesta empresa.", rejection.Message);
+        Assert.Empty(result.Rejected);
         var user = await FindUserAsync(factory, "Joao-Existente");
         Assert.Equal("joao@empresa.com.br", user.Email);
         Assert.Equal("JOAO@EMPRESA.COM.BR", user.NormalizedEmail);

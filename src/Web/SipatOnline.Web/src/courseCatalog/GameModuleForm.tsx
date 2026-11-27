@@ -1,12 +1,14 @@
-import { ArrowLeft, Play, Plus } from 'lucide-react';
+import { ArrowLeft, Check, Play, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import {
   createGameModule,
+  setGameSubjects,
   updateGameModule,
   type GameContent,
   type GameModule,
   type GameQuestion,
   type GamificationGameType,
+  type VideoSubject,
 } from '@/api';
 import { Button } from '@/components/ui/button';
 import { DialogActions } from '@/components/ui/dialog';
@@ -16,6 +18,7 @@ import { getErrorMessage } from '@/courseEditor/courseFormat';
 import { gameTypeOptions } from '@/gamificationGames';
 import GameContentEditor, { emptyGameContent } from './GameContentEditor';
 import LazyGamePlayer from '@/games/LazyGamePlayer';
+import { cn } from '@/lib/utils';
 
 interface QuestionDraft {
   text: string;
@@ -38,11 +41,16 @@ function toQuestion(draft: QuestionDraft): GameQuestion {
 /** Formulário de criação e edição de um jogo; usado dentro de um diálogo. */
 export default function GameModuleForm({
   module,
+  subjects = [],
+  subjectIds = [],
   onBusyChange,
   onCancel,
   onSaved,
 }: {
   module: GameModule | null;
+  /** The assuntos a game can be filed under (the videos' list), and the ones this game already has. */
+  subjects?: VideoSubject[];
+  subjectIds?: string[];
   onBusyChange: (busy: boolean) => void;
   onCancel: () => void;
   onSaved: (message: string, saved: GameModule) => Promise<void> | void;
@@ -56,6 +64,12 @@ export default function GameModuleForm({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [testing, setTesting] = useState(false);
+  const [chosenSubjects, setChosenSubjects] = useState<Set<string>>(() => new Set(subjectIds));
+  const toggleSubject = (id: string) => setChosenSubjects((current) => {
+    const next = new Set(current);
+    if (!next.delete(id)) next.add(id);
+    return next;
+  });
 
   function updateQuestion(index: number, patch: Partial<QuestionDraft>) {
     setQuestions((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
@@ -100,6 +114,8 @@ export default function GameModuleForm({
     const data = draftData();
     try {
       const saved = module ? await updateGameModule(module.id, data) : await createGameModule(data);
+      const subjectsChanged = chosenSubjects.size !== subjectIds.length || subjectIds.some((id) => !chosenSubjects.has(id));
+      if (subjects.length > 0 && subjectsChanged) await setGameSubjects(saved.id, [...chosenSubjects]);
       await onSaved(module ? `O jogo "${data.title}" foi atualizado.` : `O jogo "${data.title}" foi criado.`, saved);
     } catch (saveError) {
       setError(getErrorMessage(saveError));
@@ -130,6 +146,29 @@ export default function GameModuleForm({
           </NativeSelect>
         </Field>
       </div>
+
+      {subjects.length > 0 && (
+        <fieldset className="m-0 grid gap-2 border-0 p-0">
+          <legend className="mb-2 p-0 text-[0.8125rem] font-semibold">Assuntos</legend>
+          <div className="flex flex-wrap gap-2">
+            {subjects.map((subject) => (
+              <label
+                className={cn(
+                  'flex min-h-9 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-[0.8125rem] font-medium transition-colors',
+                  'focus-within:ring-2 focus-within:ring-ring',
+                  chosenSubjects.has(subject.id) ? 'border-primary bg-accent text-accent-foreground' : 'border-border text-muted-foreground hover:bg-muted/60',
+                )}
+                key={subject.id}
+              >
+                <input checked={chosenSubjects.has(subject.id)} className="sr-only" onChange={() => toggleSubject(subject.id)} type="checkbox" />
+                {chosenSubjects.has(subject.id) && <Check aria-hidden="true" className="size-3.5" />}
+                {subject.name}
+              </label>
+            ))}
+          </div>
+          <p className="m-0 text-xs text-muted-foreground">Os mesmos assuntos dos vídeos. O jogo pode ficar em mais de um.</p>
+        </fieldset>
+      )}
 
       {usesQuestions(gameType) && questions.map((question, index) => (
         <fieldset className="m-0 grid gap-3 rounded-lg border border-border p-4" key={index}>

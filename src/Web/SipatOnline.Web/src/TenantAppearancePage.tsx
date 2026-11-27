@@ -1,7 +1,8 @@
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { saveTenantAppearance, type TenantBranding } from './api';
-import { isBrandColor, tenantTheme } from './branding';
+import { isBrandColor, shownPrimary, tenantTheme } from './branding';
+import { imageEdgeColor } from './imageEdgeColor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
@@ -13,7 +14,7 @@ const maxLogoBytes = 256 * 1024;
 const maxBannerBytes = 1_500_000;
 const bannerTypes = ['image/png', 'image/jpeg', 'image/webp'];
 
-function readAsBase64(file: File, failure: string): Promise<string> {
+export function readAsBase64(file: File, failure: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onerror = () => reject(new Error(failure));
@@ -28,7 +29,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
   tenant: TenantBranding;
   onSaved: (tenant: TenantBranding) => void;
 }) {
-  const [primary, setPrimary] = useState(tenant.primaryColor);
+  const [primary, setPrimary] = useState(shownPrimary(tenant.primaryColor));
   const [secondary, setSecondary] = useState(tenant.secondaryColor);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [logoType, setLogoType] = useState('image/png');
@@ -46,16 +47,19 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
 
   const colorsValid = isBrandColor(primary) && isBrandColor(secondary);
   const hasBanner = Boolean(tenant.bannerReference);
-  const changed = primary.toUpperCase() !== tenant.primaryColor.toUpperCase()
+  const changed = primary.toUpperCase() !== shownPrimary(tenant.primaryColor).toUpperCase()
     || secondary.toUpperCase() !== tenant.secondaryColor.toUpperCase()
     || logoBase64 !== null || (removeLogo && tenant.logoReference !== null)
     || bannerBase64 !== null || (removeBanner && hasBanner);
   const previewLogo = removeLogo ? null : logoBase64 ? `data:${logoType};base64,${logoBase64}` : tenant.logoReference;
   const previewBanner = removeBanner ? null : bannerBase64 ? `data:${bannerType};base64,${bannerBase64}` : tenant.bannerReference ?? null;
-  const bannerBright = useBannerBrightness(previewBanner);
+  const bannerRatio = useImageRatio(previewBanner);
+  // the room around a piece that is not square takes the colour of the piece's own edge, as on the login
+  const [bannerEdge, setBannerEdge] = useState<string | null>(null);
+  const bannerBackdrop = previewBanner && bannerEdge ? { background: bannerEdge } : undefined;
 
   function reset() {
-    setPrimary(tenant.primaryColor); setSecondary(tenant.secondaryColor);
+    setPrimary(shownPrimary(tenant.primaryColor)); setSecondary(tenant.secondaryColor);
     setLogoBase64(null); setRemoveLogo(false); setLogoName('');
     setBannerBase64(null); setRemoveBanner(false); setBannerName('');
     setFileVersion((value) => value + 1); setError(''); setNotice('');
@@ -81,15 +85,15 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
     setError(''); setNotice('');
     if (!file) return;
     if (!bannerTypes.includes(file.type) || file.size < 1 || file.size > maxBannerBytes) {
-      setError('Selecione um banner PNG, JPEG ou WebP de até 1,5 MB. O arquivo anterior foi mantido.');
+      setError('Selecione uma capa PNG, JPEG ou WebP de até 1,5 MB. O arquivo anterior foi mantido.');
       return;
     }
     setReading(true);
     try {
-      setBannerBase64(await readAsBase64(file, 'Não foi possível ler o banner. Selecione o arquivo novamente.'));
+      setBannerBase64(await readAsBase64(file, 'Não foi possível ler a capa. Selecione o arquivo novamente.'));
       setBannerType(file.type); setRemoveBanner(false); setBannerName(file.name);
     } catch (failure) {
-      setError(failure instanceof Error ? failure.message : 'Não foi possível ler o banner.');
+      setError(failure instanceof Error ? failure.message : 'Não foi possível ler a capa.');
     } finally { setReading(false); }
   }
 
@@ -105,7 +109,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
         primaryColor: primary.toUpperCase(), secondaryColor: secondary.toUpperCase(),
         logoBase64, removeLogo, bannerBase64, removeBanner,
       });
-      onSaved(saved); setPrimary(saved.primaryColor); setSecondary(saved.secondaryColor);
+      onSaved(saved); setPrimary(shownPrimary(saved.primaryColor)); setSecondary(saved.secondaryColor);
       setLogoBase64(null); setRemoveLogo(false); setLogoName('');
       setBannerBase64(null); setRemoveBanner(false); setBannerName('');
       setFileVersion((value) => value + 1);
@@ -166,36 +170,41 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
 
             <Card aria-labelledby="appearance-banner-title" role="region">
               <CardHeader>
-                <CardTitle id="appearance-banner-title">Banner da entrada</CardTitle>
-                <CardDescription>Imagem de fundo da tela de login da empresa. Sem banner, a entrada usa o fundo padrão.</CardDescription>
+                <CardTitle id="appearance-banner-title">Capa da entrada</CardTitle>
+                <CardDescription>Peça quadrada (1:1) da tela de login da empresa. Aparece inteira, do jeito que foi enviada. Sem capa, a entrada usa o fundo padrão.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="relative grid aspect-[16/7] place-items-center overflow-hidden rounded-lg border border-border bg-muted">
-                  {previewBanner
-                    ? <img alt="Prévia do banner da entrada" className="absolute inset-0 size-full object-cover" src={previewBanner} />
-                    : <span className="px-4 text-center text-sm text-muted-foreground">Nenhum banner. A entrada usa o fundo padrão.</span>}
+                <div className="grid gap-4 sm:grid-cols-[14rem_minmax(0,1fr)]">
+                  <div className="relative grid aspect-square place-items-center overflow-hidden rounded-lg border border-border bg-[#0b241f]" style={bannerBackdrop}>
+                    {previewBanner
+                      ? <img alt="Prévia da capa da entrada" className="absolute inset-0 size-full object-contain"
+                        onLoad={(event) => setBannerEdge(imageEdgeColor(event.currentTarget))} src={previewBanner} />
+                      : <span className="px-4 text-center text-sm text-white/80">Nenhuma capa. A entrada usa o fundo padrão.</span>}
+                  </div>
+                  <div className="grid content-start gap-2">
+                    <Dropzone
+                      accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                      ariaLabel="Selecionar capa da entrada"
+                      disabled={working}
+                      fileName={bannerName}
+                      hint="PNG, JPEG ou WebP até 1,5 MB · quadrada, recomendado 1080 × 1080 px"
+                      id="appearance-banner"
+                      onFile={(file) => void readBanner(file)}
+                      resetKey={fileVersion}
+                      title="Escolher imagem 1:1"
+                    />
+                    {previewBanner && (
+                      <Button className="justify-self-start" disabled={working} size="sm" variant="ghost"
+                        onClick={() => { setRemoveBanner(true); setBannerBase64(null); setBannerName(''); setFileVersion((value) => value + 1); setNotice(''); }}>
+                        <Trash2 /> Remover capa
+                      </Button>
+                    )}
+                  </div>
                 </div>
-                <Dropzone
-                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
-                  ariaLabel="Selecionar banner da entrada"
-                  disabled={working}
-                  fileName={bannerName}
-                  hint="PNG, JPEG ou WebP até 1,5 MB · recomendado 1600 × 900 px"
-                  id="appearance-banner"
-                  onFile={(file) => void readBanner(file)}
-                  resetKey={fileVersion}
-                  title="Escolher imagem do banner"
-                />
-                {bannerBright !== null && bannerBright > 0.7 && (
+                {bannerRatio !== null && Math.abs(bannerRatio - 1) > 0.05 && (
                   <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">
-                    Esta imagem é muito clara. O painel de entrada escurece o fundo, mas o texto pode ficar menos legível. Confira a prévia ao lado.
+                    Esta imagem não é quadrada. Ela aparece inteira na entrada, com faixas ao redor na cor da própria borda. Para ocupar o painel todo, envie uma peça 1:1.
                   </p>
-                )}
-                {previewBanner && (
-                  <Button className="justify-self-start" disabled={working} size="sm" variant="ghost"
-                    onClick={() => { setRemoveBanner(true); setBannerBase64(null); setBannerName(''); setFileVersion((value) => value + 1); setNotice(''); }}>
-                    <Trash2 /> Remover banner
-                  </Button>
                 )}
               </CardContent>
             </Card>
@@ -207,7 +216,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <ColorField disabled={busy} fallback={tenant.primaryColor} id="primary" label="Cor principal" onChange={setPrimary} value={primary} />
+                  <ColorField disabled={busy} fallback={shownPrimary(tenant.primaryColor)} id="primary" label="Cor principal" onChange={setPrimary} value={primary} />
                   <ColorField disabled={busy} fallback={tenant.secondaryColor} id="secondary" label="Texto dos botões" onChange={setSecondary} value={secondary} />
                 </div>
                 {!colorsValid && <p className="m-0 text-sm font-medium text-destructive" role="status">Use cores no formato #RRGGBB.</p>}
@@ -245,24 +254,31 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
 
             <div className="appearance-preview grid min-w-0 gap-3" style={theme}>
               <PreviewFrame label="Entrada (login)">
-                <div className="grid min-h-44 grid-cols-[1.1fr_1fr]">
-                  <div
-                    className="relative isolate flex flex-col justify-between gap-4 overflow-hidden p-4 text-white"
-                    style={{
-                      background: previewBanner
-                        ? '#0b241f'
-                        : 'linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 22%, #0b241f), #0b241f)',
-                    }}
-                  >
-                    {previewBanner && <span aria-hidden="true" className="absolute -inset-3 -z-10" data-testid="login-preview-banner"
-                      style={{ background: `linear-gradient(180deg, rgb(8 26 21 / 55%), rgb(8 26 21 / 82%)), url(${previewBanner}) center / cover no-repeat`, filter: 'blur(6px) saturate(1.05)' }} />}
-                    <span className="flex items-center gap-2 text-xs font-semibold">
-                      <img alt="" className="size-6 object-contain" src={previewLogo ?? '/favicon.svg'} />
-                      {tenant.tenantName}
-                    </span>
-                    <span className="text-base font-bold leading-tight">Aprender também faz parte de cuidar.</span>
-                  </div>
+                <div className={cn('grid h-44', previewBanner ? 'grid-cols-[11rem_1fr]' : 'grid-cols-[1.1fr_1fr]')}>
+                  {previewBanner ? (
+                    // the cover shows whole, as it was sent: no blur, nothing written over it
+                    <div className="grid place-items-center overflow-hidden bg-[#0b241f]" style={bannerBackdrop}>
+                      <img alt="" className="size-full object-contain" data-testid="login-preview-banner" src={previewBanner} />
+                    </div>
+                  ) : (
+                    <div
+                      className="flex flex-col justify-between gap-4 overflow-hidden p-4 text-white"
+                      style={{ background: 'linear-gradient(145deg, color-mix(in srgb, var(--brand-primary) 22%, #0b241f), #0b241f)' }}
+                    >
+                      <span className="flex items-center gap-2 text-xs font-semibold">
+                        <img alt="" className="size-6 object-contain" src={previewLogo ?? '/favicon.svg'} />
+                        {tenant.tenantName}
+                      </span>
+                      <span className="text-base font-bold leading-tight">Aprender também faz parte de cuidar.</span>
+                    </div>
+                  )}
                   <div className="grid content-center gap-2 bg-card p-4">
+                    {previewBanner && (
+                      <span className="flex items-center gap-2 text-xs font-semibold">
+                        <img alt="" className="h-5 max-w-16 object-contain" src={previewLogo ?? '/favicon.svg'} />
+                        {tenant.tenantName}
+                      </span>
+                    )}
                     <span className="text-[0.625rem] font-bold tracking-wider text-primary">ACESSO SEGURO</span>
                     <span className="h-6 rounded border border-border" />
                     <span className="h-6 rounded border border-border" />
@@ -288,7 +304,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
                 </div>
               </PreviewFrame>
             </div>
-            <p className="m-0 text-xs text-muted-foreground">Nome, dados e certificados não mudam. A logo dos certificados é configurada separadamente pela plataforma.</p>
+            <p className="m-0 text-xs text-muted-foreground">Nome, dados e certificados não mudam. As imagens do certificado ficam em Certificado, no menu.</p>
           </aside>
         </form>
       </Page>
@@ -305,7 +321,7 @@ function PreviewFrame({ label, children }: { label: string; children: ReactNode 
   );
 }
 
-function Dropzone({ id, ariaLabel, accept, title, hint, fileName, disabled, resetKey, onFile }: {
+export function Dropzone({ id, ariaLabel, accept, title, hint, fileName, disabled, resetKey, onFile }: {
   id: string; ariaLabel: string; accept: string; title: string; hint: string;
   fileName: string; disabled: boolean; resetKey: number; onFile: (file?: File) => void;
 }) {
@@ -371,29 +387,17 @@ function ColorField({ label, value, fallback, onChange, disabled, id }: {
   );
 }
 
-/** Average brightness of the banner, 0 (black) to 1 (white); null while unknown or when the image cannot be read. */
-function useBannerBrightness(source: string | null): number | null {
-  const [brightness, setBrightness] = useState<number | null>(null);
+/** Width over height of the cover (1 = square); null while unknown or when the image cannot be read. */
+function useImageRatio(source: string | null): number | null {
+  const [ratio, setRatio] = useState<number | null>(null);
   useEffect(() => {
-    setBrightness(null);
+    setRatio(null);
     if (!source) return;
     let current = true;
     const image = new Image();
-    image.onload = () => {
-      try {
-        const canvas = document.createElement('canvas');
-        canvas.width = 24; canvas.height = 24;
-        const context = canvas.getContext('2d');
-        if (!context) return;
-        context.drawImage(image, 0, 0, 24, 24);
-        const { data } = context.getImageData(0, 0, 24, 24);
-        let total = 0;
-        for (let index = 0; index < data.length; index += 4) total += (0.2126 * data[index] + 0.7152 * data[index + 1] + 0.0722 * data[index + 2]) / 255;
-        if (current) setBrightness(total / (data.length / 4));
-      } catch { /* a banner from another origin cannot be measured: no warning */ }
-    };
+    image.onload = () => { if (current && image.naturalHeight > 0) setRatio(image.naturalWidth / image.naturalHeight); };
     image.src = source;
     return () => { current = false; };
   }, [source]);
-  return brightness;
+  return ratio;
 }

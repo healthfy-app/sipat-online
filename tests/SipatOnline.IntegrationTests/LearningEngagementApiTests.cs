@@ -116,7 +116,7 @@ public sealed class LearningEngagementApiTests
             }, HttpStatusCode.BadRequest);
             await Call(platform, $"/api/platform/catalog/courses/{courseId}/modules", HttpMethod.Put,
                 new { items = moduleIds.Select(id => new { moduleId = id, afterVideoCount = 0 }) });
-            await Call(platform, $"/api/platform/catalog/videos/{videoId}/checkpoints", HttpMethod.Put,
+            await Call(platform, $"/api/platform/catalog/courses/{courseId}/videos/{videoId}/checkpoints", HttpMethod.Put,
                 new { items = new[] { new { moduleId = moduleIds[0], timeMilliseconds = 500 } } });
             await Call(platform, $"/api/platform/catalog/courses/{courseId}", HttpMethod.Put,
                 new { title = "Curso integrado", description = "Curso do teste", status = "Published", gamificationEnabled = true });
@@ -349,7 +349,7 @@ public sealed class LearningEngagementApiTests
         }
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
-        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         await scenario.ApplyDayAsync(a, b);
         var lessonIds = await scenario.LessonIdsAsync();
         await scenario.CompleteAsync(lessonIds[0]);
@@ -382,7 +382,7 @@ public sealed class LearningEngagementApiTests
         await using var scenario = await BonusLessonScenario.StartEmptyAsync();
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
-        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         await scenario.PlaceCheckpointAsync(a);
         await scenario.PlaceCheckpointAsync(b);
         await scenario.ApplyDayAsync(a, b);
@@ -418,7 +418,7 @@ public sealed class LearningEngagementApiTests
         await using var scenario = await BonusLessonScenario.StartEmptyAsync();
         var a = await scenario.SeedHouseVideoAsync("Vídeo A");
         var b = await scenario.SeedHouseVideoAsync("Vídeo B");
-        var x = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var x = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         // a house video without a duration cannot become a lesson, so its day fails after the day before it was saved
         var broken = await scenario.SeedHouseVideoAsync("Vídeo sem duração", 0);
 
@@ -471,7 +471,7 @@ public sealed class LearningEngagementApiTests
     public async Task Course_of_only_extras_is_not_delivered()
     {
         await using var scenario = await BonusLessonScenario.StartEmptyAsync();
-        var extra = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var extra = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         var courseId = await scenario.CreateCourseAsync();
         await scenario.Call(scenario.Platform, $"/api/platform/catalog/courses/{courseId}/videos", HttpMethod.Put,
             new { videoIds = new[] { extra } });
@@ -489,7 +489,7 @@ public sealed class LearningEngagementApiTests
     public async Task Day_of_only_extras_is_not_delivered()
     {
         await using var scenario = await BonusLessonScenario.StartEmptyAsync();
-        var extra = await scenario.CreateExternalAsync("Extra do YouTube", 60_000);
+        var extra = await scenario.CreateExternalAsync("Extra do YouTube", 0);
         var program = await scenario.Call(scenario.Platform, "/api/platform/catalog/programs", HttpMethod.Post, new
         {
             title = "SIPAT só de extras",

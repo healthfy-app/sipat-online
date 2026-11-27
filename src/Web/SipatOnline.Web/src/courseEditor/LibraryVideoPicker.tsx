@@ -1,6 +1,6 @@
 import { Film, Search } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { isExtra, listSubjects, listVideoSubjects, type PlatformLibraryVideo } from '@/api';
+import { isExternal, listSubjects, listVideoSubjects, type PlatformLibraryVideo } from '@/api';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { formatDuration } from './courseFormat';
@@ -21,7 +21,7 @@ function Thumb({ item }: { item: PlatformLibraryVideo }) {
   return <div className="relative grid aspect-video place-items-center overflow-hidden bg-[#0b1f19] text-white/60" ref={ref}>
     {visible && (youtube
       ? <img alt="" className="size-full object-cover" loading="lazy" src={`https://i.ytimg.com/vi/${video.externalId}/mqdefault.jpg`} />
-      : !isExtra(video) && video.fileUrl
+      : !isExternal(video) && video.fileUrl
         ? <video className="pointer-events-none size-full object-cover" muted playsInline preload="metadata" src={`${video.fileUrl}#t=1`} />
         : <Film aria-hidden="true" className="size-6" />)}
     {video.durationMilliseconds > 0 && <span aria-hidden="true" className="absolute bottom-1 right-1 rounded bg-black/70 px-1 text-[0.625rem] font-semibold tabular-nums text-white">{formatDuration(video.durationMilliseconds)}</span>}
@@ -68,7 +68,7 @@ export default function LibraryVideoPicker({ videos, value, onChange }: {
         {subjects.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}
       </NativeSelect>}
     </div>
-    <div aria-label="Vincular da biblioteca" className="grid max-h-[46vh] grid-cols-3 content-start gap-2 overflow-y-auto pr-0.5 max-[640px]:grid-cols-2" role="listbox">
+    <div aria-label="Vincular da biblioteca" className="grid max-h-[46vh] auto-rows-max grid-cols-3 content-start gap-2 overflow-y-auto pr-0.5 max-[640px]:grid-cols-2" role="listbox">
       {shown.length === 0 && <p className="col-span-full m-0 py-4 text-center text-sm text-muted-foreground">Nenhum vídeo encontrado.</p>}
       {shown.map(item => {
         const picked = item.video.id === value;

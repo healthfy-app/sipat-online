@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getAssignedLearningTrack, type LearningLessonProgress, type LearningTrackCard } from '@/api';
 import { getCourseCover } from '@/courseCover';
+import LessonPicture from './LessonPicture';
 import { formatDuration, getTrackDisplayTitle, getTrackPath, type DayGroup } from './learningHelpers';
 import { partWord } from '@/trainings/partWord';
 import ProgressBar from './ProgressBar';
@@ -20,10 +21,13 @@ export function formatDayDate(date: string | null | undefined): string | null {
 type LessonsByTrack = Record<string, LearningLessonProgress[] | 'error'>;
 
 /** The videos of the SIPAT week, grouped by day. Each video opens the day at that video. */
-export default function WeekVideos({ days, allTracks }: {
+export default function WeekVideos({ days, allTracks, known }: {
   days: DayGroup[]; allTracks: LearningTrackCard[];
+  /** The videos of the days that already came with the home; a day missing here is asked for. */
+  known?: Readonly<Record<string, LearningLessonProgress[]>>;
 }) {
-  const [lessons, setLessons] = useState<LessonsByTrack>({});
+  const [asked, setLessons] = useState<LessonsByTrack>({});
+  const lessons: LessonsByTrack = { ...asked, ...known };
   const [closed, setClosed] = useState<ReadonlySet<string>>(new Set());
   const toggle = (key: string) => setClosed(known => { const next = new Set(known); if (!next.delete(key)) next.add(key); return next; });
   const trackIds = days.flatMap(day => day.tracks.map(track => track.id)).join(',');
@@ -33,16 +37,19 @@ export default function WeekVideos({ days, allTracks }: {
   useEffect(() => {
     let current = true;
     for (const id of trackIds.split(',').filter(Boolean)) {
+      if (known?.[id]) continue;
       getAssignedLearningTrack(id)
         .then(result => { if (current) setLessons(known => ({ ...known, [id]: result.lessons })); })
         .catch(() => { if (current) setLessons(known => ({ ...known, [id]: 'error' })); });
     }
     return () => { current = false; };
-  }, [trackIds]);
+    // the days that came with the home need no call of their own
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trackIds, known === undefined]);
 
   return <section aria-labelledby="week-videos-title" className="week-videos">
     <div className="week-videos-heading">
-      <h2 id="week-videos-title">Vídeos da semana</h2>
+      <h2 id="week-videos-title">Vídeos do treinamento</h2>
       <p>Vídeos e progresso organizados por dia.</p>
     </div>
 
@@ -61,7 +68,8 @@ export default function WeekVideos({ days, allTracks }: {
               {complete ? <Check /> : day.position ?? '•'}
             </span>
             <div className="week-day-heading">
-              <h3 id={headingId}>{day.position ? `${word} ${day.position} · ` : ''}{day.title}</h3>
+              {/* a day without a slogan is named "Dia 2" already: say it once */}
+              <h3 id={headingId}>{day.position && day.title.trim().toLowerCase() !== `${word} ${day.position}`.toLowerCase() ? `${word} ${day.position} · ` : ''}{day.title}</h3>
               <p>{date ? `${date} · ` : ''}{done === 0 ? `Ainda não começou · ${total} ${total === 1 ? 'vídeo' : 'vídeos'}` : `${done} de ${total} ${total === 1 ? 'vídeo assistido' : 'vídeos assistidos'}`}</p>
             </div>
             <div className="week-day-progress">
@@ -104,7 +112,7 @@ export default function WeekVideos({ days, allTracks }: {
                   return <li key={lesson.id}>
                     <Link className={`week-video is-${state}${lesson.isBonus ? ' is-extra' : ''}`} to={`${path}?video=${encodeURIComponent(lesson.id)}`}>
                       <span className="week-video-cover">
-                        <img alt="" decoding="async" loading="lazy" src={cover} />
+                        <LessonPicture cover={cover} lesson={lesson} />
                         <span aria-hidden="true" className="week-video-play">{lesson.isCompleted ? <Check /> : <Play />}</span>
                         {!lesson.isBonus && <span className="week-video-time">{formatDuration(lesson.durationMilliseconds)}</span>}
                         {state === 'progress' && <span aria-hidden="true" className="week-video-bar"><span style={{ width: `${lesson.watchedPercentage}%` }} /></span>}

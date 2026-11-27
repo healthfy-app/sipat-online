@@ -1,5 +1,5 @@
 import { Menu } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
+import { lazy, Suspense, useEffect, useState, type FormEvent } from 'react';
 import {
   BrowserRouter,
   Link,
@@ -16,6 +16,7 @@ import {
   ApiError,
   configureCompanyAdministration,
   getCompanyCapabilities,
+  setUploadScope,
   type CompanyCapabilities,
   getCompanyAdministrationId,
   getSession,
@@ -27,32 +28,54 @@ import {
 } from './api';
 import { Button } from './components/ui/button';
 import { Sheet } from './components/ui/sheet';
-import SipatsPage from './sipatBuilder/SipatsPage';
 import { LegacySipatRedirect } from './trainings/LegacySipatRedirect';
 import CompanyContext from './companies/CompanyContext';
-import CompanyHome from './companies/CompanyHome';
+import { UnitMenu, UnitScopeProvider } from './trainings/unitScope';
 import LearningPage, { type LearningSummary } from './LearningPage';
-import CollaboratorsPage from './collaborators/CollaboratorsPage';
-import RegistryPage from './registry/RegistryPage';
-import TenantLearningDashboardPage from './TenantLearningDashboardPage';
 import { isCompanyPanelMode } from './companies/companyContextMode';
-import PlatformCompaniesPage from './PlatformCompaniesPage';
-import PlatformCompanyEmployeesPage from './PlatformCompanyEmployeesPage';
-import PlatformUsersPage from './PlatformUsersPage';
-import PlatformHomePage from './PlatformHomePage';
-import PlatformCoursesPage from './PlatformCoursesPage';
-import SipatBuilderPage from './sipatBuilder/SipatBuilderPage';
+import { linkedTraining } from './trainings/trainingLink';
+
 import CompanyNav from './companies/CompanyNav';
 import PlanMedal from './companies/PlanMedal';
-import PlaybackQualityPage from './quality/PlaybackQualityPage';
-import PlaybackQualityComparisonPage from './quality/PlaybackQualityComparisonPage';
-import PlatformSettingsPage from './PlatformSettingsPage';
-import CertificatesPage from './CertificatesPage';
-import TenantAppearancePage from './TenantAppearancePage';
 import { BrandThemeContext, tenantTheme } from './branding';
+import { imageEdgeColor } from './imageEdgeColor';
 import LoadingState from './LoadingState';
+import { useNewVersionReload } from './versionWatch';
 import VideoUploadTray from './videoUploads/VideoUploadTray';
-import VideoLibraryPage from './videoLibrary/VideoLibraryPage';
+
+/**
+ * A page that loads on demand is a file of the version the browser opened. After a new version goes up that file is
+ * gone: the page is loaded again, once, to pick the new version up, instead of failing where it stands.
+ */
+function reloadForNewVersion(error: unknown): never | Promise<never> {
+  const key = 'sipat:reloaded-for-version';
+  let already = true;
+  try { already = sessionStorage.getItem(key) === '1'; if (!already) sessionStorage.setItem(key, '1'); } catch { /* no storage: do not risk a loop */ }
+  if (already) throw error;
+  window.location.reload();
+  return new Promise<never>(() => undefined);
+}
+// The pages of the company's administration and of the operation load when they are opened: a participant, who only
+// ever sees the learning pages, does not download them.
+const SipatsPage = lazy(() => import('./sipatBuilder/SipatsPage').catch(reloadForNewVersion));
+const CompanyHome = lazy(() => import('./companies/CompanyHome').catch(reloadForNewVersion));
+const CollaboratorsPage = lazy(() => import('./collaborators/CollaboratorsPage').catch(reloadForNewVersion));
+const RegistryPage = lazy(() => import('./registry/RegistryPage').catch(reloadForNewVersion));
+const TenantLearningDashboardPage = lazy(() => import('./TenantLearningDashboardPage').catch(reloadForNewVersion));
+const PlatformCompaniesPage = lazy(() => import('./PlatformCompaniesPage').catch(reloadForNewVersion));
+const PlatformCompanyEmployeesPage = lazy(() => import('./PlatformCompanyEmployeesPage').catch(reloadForNewVersion));
+const PlatformUsersPage = lazy(() => import('./PlatformUsersPage').catch(reloadForNewVersion));
+const PlatformHomePage = lazy(() => import('./PlatformHomePage').catch(reloadForNewVersion));
+const PlatformCoursesPage = lazy(() => import('./PlatformCoursesPage').catch(reloadForNewVersion));
+const SipatBuilderPage = lazy(() => import('./sipatBuilder/SipatBuilderPage').catch(reloadForNewVersion));
+const TrainingEditorPage = lazy(() => import('./trainings/TrainingEditorPage').catch(reloadForNewVersion));
+const PlaybackQualityPage = lazy(() => import('./quality/PlaybackQualityPage').catch(reloadForNewVersion));
+const PlaybackQualityComparisonPage = lazy(() => import('./quality/PlaybackQualityComparisonPage').catch(reloadForNewVersion));
+const PlatformSettingsPage = lazy(() => import('./PlatformSettingsPage').catch(reloadForNewVersion));
+const CertificatesPage = lazy(() => import('./CertificatesPage').catch(reloadForNewVersion));
+const TenantAppearancePage = lazy(() => import('./TenantAppearancePage').catch(reloadForNewVersion));
+const VideoLibraryPage = lazy(() => import('./videoLibrary/VideoLibraryPage').catch(reloadForNewVersion));
+const CertificateTemplatePage = lazy(() => import('./CertificateTemplatePage').catch(reloadForNewVersion));
 
 type AppState =
   | { status: 'loading' }
@@ -106,6 +129,19 @@ export default function App() {
       active = false;
     };
   }, []);
+
+  // the operation's portal painted as a company (the operator was inside one) and nobody signed in any more (the
+  // session ended): the login is the operation's own, so the company is left and the operation's look comes back
+  const strandedInCompany = state.status === 'ready' && state.platformPortal && !state.session && state.tenant.tenantKey !== 'platform';
+  useEffect(() => {
+    if (!strandedInCompany) return;
+    let active = true;
+    clearCompanyAdministration();
+    getTenantBranding().then(tenant => {
+      if (active) setState(current => (current.status === 'ready' ? { ...current, tenant } : current));
+    }, () => undefined);
+    return () => { active = false; };
+  }, [strandedInCompany]);
 
   if (state.status === 'loading') {
     return <main className="app-loading"><LoadingState>Carregando o portal...</LoadingState></main>;
@@ -164,6 +200,7 @@ export default function App() {
       <a className="skip-link" href="#app-content">Ir para o conteúdo</a>
       <BrowserRouter>
         <ScrollToTopOnNavigate />
+        <LeaveCompanyPanel active={isPlatformPortal && state.tenant.tenantKey !== 'platform'} />
         <Routes>
           <Route
             path="/"
@@ -216,9 +253,17 @@ export default function App() {
               element={state.session && hasAdminRole(state.session) ? <SipatBuilderPage basePath="/admin/treinamentos" canEditThemes={false} /> : <AccessDenied />}
             />
             <Route
+              path="/admin/videos"
+              element={state.session && hasAdminRole(state.session) ? <VideoLibraryPage company /> : <AccessDenied />}
+            />
+            <Route
+              path="/admin/treinamentos/:sipatId/editar"
+              element={state.session && hasAdminRole(state.session) ? <TrainingEditorPage basePath="/admin/treinamentos" /> : <AccessDenied />}
+            />
+            <Route
               path="/platform/companies/:companyId/treinamentos"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/treinamentos`} />}</CompanyContext>
+                ? <CompanyContext>{companyId => <SipatsPage basePath={`/platform/companies/${companyId}/treinamentos`} operator />}</CompanyContext>
                 : <AccessDenied />}
             />
             <Route
@@ -254,10 +299,15 @@ export default function App() {
               ) : <AccessDenied />}
             />
             <Route
+              path="/admin/certificate"
+              element={state.session && hasAdminRole(state.session) ? <CertificateTemplatePage tenant={state.tenant} /> : <AccessDenied />}
+            />
+            <Route
               path="/learning"
               element={
                 state.session?.roles.includes('Participant') ? (
                   <LearningPage
+                    participantId={state.session.id}
                     participantName={state.session.displayName}
                     tenantName={state.tenant.tenantName}
                   />
@@ -272,6 +322,7 @@ export default function App() {
               element={
                 state.session?.roles.includes('Participant') ? (
                   <LearningPage
+                    participantId={state.session.id}
                     participantName={state.session.displayName}
                     tenantName={state.tenant.tenantName}
                   />
@@ -364,6 +415,15 @@ export default function App() {
                   : <AccessDenied />
               }
             />
+            {/* a template of the operation on the same board of days a company's training uses */}
+            <Route
+              path="/platform/courses/:courseId"
+              element={
+                state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                  ? <SipatBuilderPage basePath="/platform/courses" canEditThemes template />
+                  : <AccessDenied />
+              }
+            />
             <Route
               path="/platform/courses/:courseId/edit"
               element={
@@ -423,16 +483,31 @@ function LoginPage({
     }
   }
 
+  // the company's cover is a finished 1:1 piece: it shows whole, with nothing over it, and the identity moves to the form
+  const art = tenant.tenantKey === 'platform' ? null : tenant.bannerReference || null;
+  // a piece that is not square leaves room around it: that room takes the colour of the piece's own edge
+  const [artEdge, setArtEdge] = useState<string | null>(null);
+
   return (
     <section
       aria-label={tenant.tenantKey === 'platform' ? 'Acesso à plataforma' : 'Acesso ao portal da empresa'}
-      className="login-layout"
+      className={`login-layout${art ? ' has-art' : ''}`}
     >
+      {art ? (
+        <div className="login-brand-panel login-art-panel" style={artEdge ? { background: artEdge } : undefined}>
+          <img
+            alt={`Capa de ${tenant.tenantName}`}
+            className="login-art"
+            onLoad={(event) => setArtEdge(imageEdgeColor(event.currentTarget))}
+            src={art}
+          />
+        </div>
+      ) : (
       <div
-        className={`login-brand-panel${tenant.bannerReference || tenant.tenantKey === 'platform' ? ' has-banner' : ''}`}
+        className={`login-brand-panel${tenant.tenantKey === 'platform' ? ' has-banner' : ''}`}
         style={
-          tenant.bannerReference || tenant.tenantKey === 'platform'
-            ? ({ '--login-banner': `url("${tenant.bannerReference || '/platform-login-banner.jpg'}")` } as React.CSSProperties)
+          tenant.tenantKey === 'platform'
+            ? ({ '--login-banner': 'url("/platform-login-banner.jpg")' } as React.CSSProperties)
             : undefined
         }
       >
@@ -459,7 +534,13 @@ function LoginPage({
           {tenant.tenantKey === 'platform' ? 'Acesso exclusivo para operadores' : 'Ambiente de aprendizagem da empresa'}
         </span>
       </div>
+      )}
       <div className="login-form-panel" id="app-content" tabIndex={-1}>
+        {art && (
+          <h1 className="login-form-brand">
+            <TenantIdentity tenant={tenant} compact={false} />
+          </h1>
+        )}
         <form aria-labelledby="login-form-title" className="login-card" onSubmit={handleSubmit}>
           <div className="login-form-heading">
             <span aria-hidden="true" className="login-form-symbol">
@@ -479,7 +560,7 @@ function LoginPage({
           <p className="muted-copy">
             {tenant.tenantKey === 'platform'
               ? 'Entre com suas credenciais de operação.'
-              : 'Use o login e a senha fornecidas pela sua empresa.'}
+              : 'Use o login e a senha fornecidos pela sua empresa.'}
           </p>
           <label htmlFor="login-identifier">Login</label>
           <input
@@ -550,9 +631,14 @@ function ProtectedPortal({
     getCompanyCapabilities().then(result => { if (current) setCapabilities(result); }).catch(() => undefined);
     return () => { current = false; };
   }, [session]);
+  // videos go to the operation's library or to the company's own, by who is signed in; the upload queue follows it
+  // (the operation, while inside a company, sends for that company)
+  setUploadScope(session && (!session.roles.includes('PlatformOperator') || getCompanyAdministrationId() !== null) ? 'company' : 'platform');
   // the phone menu (sheet) closes whenever the page changes, including after tapping one of its links
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   useEffect(() => { setIsMenuOpen(false); }, [location.pathname]);
+  // a tab left open picks a new version up on the next change of page, instead of showing screens that were replaced
+  useNewVersionReload(location.pathname);
 
   if (!session) {
     return <Navigate to="/login" replace />;
@@ -566,6 +652,11 @@ function ProtectedPortal({
   const companyWorkspaceId = /^\/platform\/companies\/([^/]+)/.exec(location.pathname)?.[1] ?? null;
   // inside the company workspace the operator keeps the workspace menu, even though the company is set for the calls to its admin routes
   const isPlatformCompanyContext = isCompanyPanelMode(isPlatformOperator, location.pathname, getCompanyAdministrationId());
+  // the pages of one company (its administrator's, or the operation's while it looks at a company): they follow the unit chosen at the top
+  const companyPages = isPlatformOperator
+    ? isPlatformCompanyContext ? location.pathname.startsWith('/admin') : companyWorkspaceId !== null
+    : canViewCompany(session) && location.pathname.startsWith('/admin');
+  const unitScopeCompany = isPlatformOperator ? (isPlatformCompanyContext ? getCompanyAdministrationId() : companyWorkspaceId) : null;
 
   async function handleSignOut() {
     setError('');
@@ -588,6 +679,9 @@ function ProtectedPortal({
   // the same links serve the desktop sidebar and the phone menu
   const sidebarNav = (
     <>
+      {/* the unit the company is looked at through: it sits above the menu it filters, in the side bar and in the phone's menu */}
+      {/* inside a company the operation's menu shows the unit in the company's own card (see CompanyNav) */}
+      {companyPages && !(isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId) && <UnitMenu manageHref={hasAdminRole(session) && location.pathname.startsWith('/admin') ? '/admin/cadastro' : undefined} />}
       {session.roles.includes('Participant') && !isPlatformCompanyContext && (
         <>
           <p className="sidebar-label">APRENDIZAGEM</p>
@@ -601,8 +695,10 @@ function ProtectedPortal({
           <p className="sidebar-label">GESTÃO DA EMPRESA</p>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/dashboard">Visão geral</NavLink>
           {hasAdminRole(session) && <>
-            <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Treinamentos</NavLink>
+            <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Conteúdos</NavLink>
+            {capabilities?.internalVideos && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/videos">Vídeos da empresa</NavLink>}
             {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
+            {capabilities?.customCertificate !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/certificate">Certificado</NavLink>}
           </>}
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
             {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}
@@ -614,7 +710,7 @@ function ProtectedPortal({
         <>
           <p className="sidebar-label sidebar-label-spaced">OPERAÇÃO</p>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform" end>Empresas</NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Conteúdo</NavLink>
+          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/courses">Conteúdos</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/videos">Biblioteca de vídeos</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/qualidade">Monitor de Desempenho</NavLink>
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/platform/settings">Configurações</NavLink>
@@ -624,6 +720,8 @@ function ProtectedPortal({
   );
 
   return (
+    <UnitScopeProvider companyId={isPlatformOperator && !isPlatformCompanyContext ? companyWorkspaceId ?? undefined : undefined} enabled={companyPages}
+      scopeKey={unitScopeCompany ? `company:${unitScopeCompany}` : tenant.tenantKey}>
     <div className={`portal-layout${isLearnerOnly ? ' portal-layout-learner' : ''}${isPlatformOperator ? ' portal-layout-platform' : ''}${isPlatformCompanyContext ? ' portal-layout-company-context' : ''}${/^\/platform\/courses\/[^/]+\/edit$/.test(location.pathname) ? ' portal-layout-course-editor' : ''}`}>
       {!isLearnerOnly && isPlatformCompanyContext && (
         <aside aria-label="Modo de administração da empresa" className="company-context-banner" role="status">
@@ -714,7 +812,8 @@ function ProtectedPortal({
             <Link
               aria-label={`${tenant.tenantName} - início`}
               className="brand-link sidebar-brand-link"
-              to={getLandingPage(session)}
+              // inside a company's panel the logo is that company's: it leads to its overview, not out of it
+              to={isPlatformCompanyContext ? '/admin/dashboard' : getLandingPage(session)}
             >
               <TenantIdentity tenant={tenant} compact />
             </Link>
@@ -774,10 +873,17 @@ function ProtectedPortal({
           tabIndex={-1}
         >
           {error && <p className="form-error" role="alert">{error}</p>}
-          <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />
+          {/* an administrator who also takes trainings keeps the admin menu, and the participant pages keep their look */}
+          {/* a page that loads on demand shows this for the moment it takes; the menu around it stays */}
+          <Suspense fallback={<LoadingState>Carregando...</LoadingState>}>
+            {!isLearnerOnly && location.pathname.startsWith('/learning')
+              ? <div className="portal-layout-learner contents"><Outlet /></div>
+              : <Outlet context={isLearnerOnly ? setLearningSummary : undefined} />}
+          </Suspense>
         </section>
       </div>
     </div>
+    </UnitScopeProvider>
   );
 }
 
@@ -838,7 +944,27 @@ function clearCompanyAdministration(): void {
   sessionStorage.removeItem(companyContextKey);
 }
 
+/**
+ * The operation's portal painted as a company (the operator administering it): every /platform screen needs the
+ * operation's own look and data, so reaching one leaves the company and loads it fresh, as "Voltar à plataforma" does.
+ */
+function LeaveCompanyPanel({ active }: { active: boolean }) {
+  const location = useLocation();
+  const leaving = active && /^\/platform(\/|$)/.test(location.pathname);
+  useEffect(() => {
+    if (!leaving) return;
+    clearCompanyAdministration();
+    window.location.assign(`${location.pathname}${location.search}${location.hash}`);
+  }, [leaving, location.pathname, location.search, location.hash]);
+  return null;
+}
+
 function getLandingPage(session: IdentitySession): string {
+  // arrived by the link of a training: after signing in, straight to it
+  if (session.roles.includes('Participant') && linkedTraining()) {
+    return '/learning';
+  }
+
   if (session.roles.includes('PlatformOperator')) {
     return '/platform';
   }

@@ -27,6 +27,8 @@ export default function CoursePublishStep({
   gamificationEnabled,
   status,
   busy,
+  dirty,
+  isSaving,
   headingRef,
   onReviewSettings,
   onPublish,
@@ -38,6 +40,8 @@ export default function CoursePublishStep({
   gamificationEnabled: boolean;
   status: PlatformCourseStatus;
   busy: boolean;
+  dirty: boolean;
+  isSaving: boolean;
   headingRef: Ref<HTMLHeadingElement>;
   onReviewSettings: () => void;
   onPublish: () => void;
@@ -116,8 +120,8 @@ export default function CoursePublishStep({
             )}
           </CardContent>
           <CardFooter>
-            <Button className="max-sm:flex-1" disabled={busy || !canPublish} onClick={onPublish}>
-              {isPublished ? 'Publicar alterações' : 'Publicar agora'}
+            <Button className="max-sm:flex-1" disabled={busy || !canPublish || (isPublished && !dirty)} onClick={onPublish}>
+              {isSaving ? 'Publicando…' : isPublished && !dirty ? <><Check aria-hidden="true" className="size-4" />Publicado</> : isPublished ? 'Publicar alterações' : 'Publicar agora'}
             </Button>
             {isPublished && <Button className="max-sm:flex-1" disabled={busy} onClick={onUnpublish} variant="outline">Voltar a rascunho</Button>}
           </CardFooter>

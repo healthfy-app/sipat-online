@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Play, Puzzle } from 'lucide-react';
+import { Building2, Copy, Play, Puzzle, Tags } from 'lucide-react';
 import type { GameModule } from '@/api';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/page';
@@ -13,20 +13,32 @@ const warmTypes = new Set(['RiskSpotting', 'Scenario', 'SafeOrRisky']);
 
 export default function GameModulesPanel({
   modules,
+  subjectNames = new Map(),
   hasModules = false,
   onClearFilters = () => undefined,
   busy,
   onCreate,
   onEdit,
   onDelete,
+  canChange = () => true,
+  onDuplicate,
+  ownerLabel = () => null,
 }: {
   modules: GameModule[];
+  /** The names of the assuntos each game is filed under, by game. */
+  subjectNames?: Map<string, string[]>;
   hasModules?: boolean;
   onClearFilters?: () => void;
   busy: boolean;
   onCreate: () => void;
   onEdit: (module: GameModule) => void;
   onDelete: (module: GameModule) => void;
+  /** Whether the game can be changed by who is looking: a company changes only its own. Absent: every game can. */
+  canChange?: (module: GameModule) => boolean;
+  /** Makes a copy of the game that is the company's own (offered on the games it cannot change). */
+  onDuplicate?: (module: GameModule) => void;
+  /** Whose the game is, said on its row: a company's name in the operation's list, "Da operação" in a company's. */
+  ownerLabel?: (module: GameModule) => string | null | undefined;
 }) {
   const [testing, setTesting] = useState<GameModule | null>(null);
   return (
@@ -52,24 +64,38 @@ export default function GameModulesPanel({
                 <Puzzle className="size-4" />
               </span>
               <div className="grid min-w-0 gap-0.5">
-                <strong className="truncate text-[0.9375rem] font-semibold">{module.title}</strong>
+                <strong className="flex min-w-0 items-center gap-2 text-[0.9375rem] font-semibold">
+                  <span className="truncate">{module.title}</span>
+                  {ownerLabel(module) && <span className="inline-flex shrink-0 items-center gap-1 rounded-[0.3125rem] bg-accent px-1.5 text-[0.6875rem] font-bold text-primary"><Building2 aria-hidden="true" className="size-3" />{ownerLabel(module)}</span>}
+                </strong>
                 <span className="text-[0.8125rem] text-muted-foreground">
                   {gameTypeLabel(module)}
                   {module.questions.length > 0 && ` · ${pluralize(module.questions.length, 'pergunta', 'perguntas')}`}
                   {' · '}
                   {module.usageCount === 0 ? 'não usado em treinamentos' : `usado ${module.usageCount}×`}
                 </span>
+                {(subjectNames.get(module.id)?.length ?? 0) > 0 && (
+                  <span className="flex min-w-0 items-center gap-1.5 text-[0.8125rem] text-muted-foreground">
+                    <Tags aria-hidden="true" className="size-3.5 shrink-0" />
+                    <span className="truncate">{subjectNames.get(module.id)!.join(' · ')}</span>
+                  </span>
+                )}
               </div>
               <div className="flex gap-1.5 max-sm:col-span-2 max-sm:justify-end">
                 <Button aria-label={`Testar jogo ${module.title}`} disabled={busy} onClick={() => setTesting(module)} size="sm" variant="ghost">
                   <Play /> Testar
                 </Button>
-                <Button aria-label={`Editar jogo ${module.title}`} disabled={busy} onClick={() => onEdit(module)} size="sm" variant="outline">
-                  Editar
-                </Button>
-                <Button aria-label={`Remover jogo ${module.title}`} disabled={busy} onClick={() => onDelete(module)} size="sm" variant="destructive">
-                  Remover
-                </Button>
+                {onDuplicate && <Button aria-label={`Duplicar jogo ${module.title}`} disabled={busy} onClick={() => onDuplicate(module)} size="sm" variant="ghost">
+                  <Copy /> Duplicar
+                </Button>}
+                {canChange(module) && <>
+                  <Button aria-label={`Editar jogo ${module.title}`} disabled={busy} onClick={() => onEdit(module)} size="sm" variant="outline">
+                    Editar
+                  </Button>
+                  <Button aria-label={`Remover jogo ${module.title}`} disabled={busy} onClick={() => onDelete(module)} size="sm" variant="destructive">
+                    Remover
+                  </Button>
+                </>}
               </div>
             </li>
           ))}

@@ -24,6 +24,9 @@ source_arg="$1"
 
 COMPOSE_ARGS="${COMPOSE_ARGS:---env-file deploy/.env.production -f deploy/compose.production.yaml}"
 RCLONE="${RCLONE:-rclone}"
+# the R2 key of the backups, when the deploy wrote it in deploy/.env.production
+# shellcheck source=deploy/scripts/r2-backup-env.sh
+. deploy/scripts/r2-backup-env.sh
 # shellcheck disable=SC2206 # intentional word splitting of the command settings
 compose=(docker compose $COMPOSE_ARGS)
 # shellcheck disable=SC2206

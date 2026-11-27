@@ -41,9 +41,18 @@ x-api-environment: &api-environment
   OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
   OTEL_SERVICE_NAME: ${OTEL_SERVICE_NAME:-sipat-online-api}
 
+# Docker keeps container logs forever by default: these cap them at 5 files of 20 MB per service,
+# so a busy SIPAT week never fills the disk of the VM.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "5"
+
 services:
   postgres:
     image: postgres:16-alpine
+    logging: *default-logging
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-sipat_online}
       POSTGRES_USER: ${POSTGRES_USER:-sipat_online}
@@ -62,6 +71,7 @@ services:
 
   db-init:
     image: ${SIPAT_API_IMAGE:-sipat-online-api:production}
+    logging: *default-logging
     build:
       context: ..
       dockerfile: Dockerfile
@@ -76,6 +86,7 @@ services:
 
   api:
     image: ${SIPAT_API_IMAGE:-sipat-online-api:production}
+    logging: *default-logging
     build:
       context: ..
       dockerfile: Dockerfile
@@ -103,6 +114,7 @@ services:
 
   web:
     image: ${SIPAT_WEB_IMAGE:-sipat-online-web:production}
+    logging: *default-logging
     build:
       context: ..
       dockerfile: deploy/nginx/Dockerfile

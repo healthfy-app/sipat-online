@@ -69,6 +69,12 @@ public interface ILearningStore
         TenantId tenantId,
         CancellationToken cancellationToken);
 
+    /// <summary>The same rows, for the people of one unit only (a company with a unit chosen at the top).</summary>
+    Task<IReadOnlyList<LearningParticipantProgress>> ListUnitProgressAsync(
+        TenantId tenantId,
+        Guid unitId,
+        CancellationToken cancellationToken);
+
     /// <summary>The same rows as <see cref="ListParticipantProgressAsync(TenantId, CancellationToken)"/>, for one participant only.</summary>
     Task<IReadOnlyList<LearningParticipantProgress>> ListParticipantProgressAsync(
         TenantId tenantId,

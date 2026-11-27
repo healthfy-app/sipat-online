@@ -59,7 +59,7 @@ export default function PlayerChrome({ videoRef, locked, unlocked, markers, onSe
 
   const expanded = fullscreen || filling;
   return <div className={`sipat-player${filling ? ' is-filling' : ''}`} ref={frame}>
-    <media-controller class="sipat-player-controller" hotkeys="noarrowright nof">
+    <media-controller class="sipat-player-controller" hotkeys="noarrowright nof" lang="pt">
       {children}
       <media-loading-indicator noautohide slot="centered-chrome" />
       <media-play-button class="sipat-player-bigplay" slot="centered-chrome" />

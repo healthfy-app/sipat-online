@@ -76,6 +76,7 @@ public sealed class UserApplicationService(
             tenantId.Value,
             request.Offset,
             request.Limit,
+            request.UnitId,
             cancellationToken);
         return Result<UserAccountPage>.Success(page);
     }

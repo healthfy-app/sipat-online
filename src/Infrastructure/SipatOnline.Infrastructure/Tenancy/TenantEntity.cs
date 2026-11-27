@@ -21,6 +21,9 @@ public sealed class TenantEntity
 
     public string? CertificateLogoContentType { get; set; }
 
+    /// <summary>The certificate template in use (see CertificateTemplateEntity); null is the standard certificate.</summary>
+    public Guid? CertificateTemplateId { get; set; }
+
     public string PrimaryColor { get; set; } = string.Empty;
 
     public string SecondaryColor { get; set; } = string.Empty;
@@ -33,4 +36,10 @@ public sealed class TenantEntity
 
     /// <summary>The plan the company bought (see <see cref="CompanyPlan"/>). Companies created before plans existed keep every feature.</summary>
     public int Plan { get; set; } = (int)CompanyPlan.Diamante;
+
+    /// <summary>How much room the company has for the videos it sends, in bytes; null is the standard (see <see cref="CompanyVideoQuota"/>). The operation changes it.</summary>
+    public long? VideoQuotaBytes { get; set; }
+
+    /// <summary>When the company accepted the terms for sending its own videos; null until its first one.</summary>
+    public DateTimeOffset? VideoTermsAcceptedAt { get; set; }
 }

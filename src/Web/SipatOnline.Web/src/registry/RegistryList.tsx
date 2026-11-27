@@ -10,12 +10,13 @@ import { getErrorMessage } from '@/courseEditor/courseFormat';
 
 const peopleText = (count: number) => `${count} ${count === 1 ? 'pessoa' : 'pessoas'}`;
 
-/** One registry list (units or sectors): add one or many names, rename inline, deactivate or reactivate. Nothing is ever deleted. */
-export default function RegistryList({ title, idPrefix, items, onAdd, onChange }: {
+/** One registry list: rename inline, deactivate or reactivate; with `onAdd`, add one or many names too. */
+export default function RegistryList({ title, description, idPrefix, items, onAdd, onChange }: {
   title: string;
+  description?: string;
   idPrefix: string;
   items: RegistryItem[];
-  onAdd: (names: string[]) => Promise<void>;
+  onAdd?: (names: string[]) => Promise<void>;
   onChange: (item: RegistryItem, change: { name?: string; isActive?: boolean }) => Promise<void>;
 }) {
   const [text, setText] = useState('');
@@ -32,7 +33,7 @@ export default function RegistryList({ title, idPrefix, items, onAdd, onChange }
     try { await action(); return true; } catch (failure) { setError(getErrorMessage(failure)); return false; } finally { setBusy(false); }
   }
 
-  const add = async () => { if (await run(() => onAdd(names))) setText(''); };
+  const add = async () => { if (onAdd && await run(() => onAdd(names))) setText(''); };
   const save = async (item: RegistryItem) => {
     const name = draft.trim();
     if (name === item.name) { setEditingId(null); return; }
@@ -41,10 +42,11 @@ export default function RegistryList({ title, idPrefix, items, onAdd, onChange }
 
   return <section aria-label={title} className="grid content-start gap-4 rounded-lg bg-card p-5 shadow-card">
     <h2 className="m-0 text-lg font-semibold">{title}</h2>
-    <Field htmlFor={`add-${idPrefix}`} label="Cole um nome por linha">
+    {description && <p className="-mt-2 m-0 text-sm text-muted-foreground">{description}</p>}
+    {onAdd && <><Field htmlFor={`add-${idPrefix}`} label="Cole um nome por linha">
       <Textarea id={`add-${idPrefix}`} onChange={event => setText(event.target.value)} rows={3} value={text} />
     </Field>
-    <div><Button disabled={busy || names.length === 0} onClick={() => void add()}>Adicionar</Button></div>
+    <div><Button disabled={busy || names.length === 0} onClick={() => void add()}>Adicionar</Button></div></>}
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
 
     {ordered.length === 0

@@ -36,13 +36,13 @@ function renderBuilder() {
 }
 
 describe('SIPAT builder', () => {
-  it('on Bronze takes the ready modules as they are: no CSV with a grid of its own', async () => {
+  it('on Bronze the company only views what the operation built: nothing to save, publish or import', async () => {
     vi.mocked(api.getCompanyCapabilities).mockResolvedValue({ customizeGrid: false, customBranding: false, customCertificate: false, quizzes: false, internalVideos: false, plan: 'Bronze' });
     renderBuilder();
-    expect(await screen.findByText(/No plano Bronze cada dia recebe um módulo pronto/)).toBeVisible();
-    await userEvent.click(screen.getByRole('button', { name: /Mais/ }));
-    expect(await screen.findByRole('menuitem', { name: /Exportar CSV/ })).toBeVisible();
-    expect(screen.queryByRole('menuitem', { name: /Importar CSV/ })).not.toBeInTheDocument();
+    expect(await screen.findByText(/No plano Bronze a operação monta o treinamento e você acompanha por aqui/)).toBeVisible();
+    expect(screen.queryByRole('button', { name: /Mais/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Publicar/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Título do dia 1' })).toBeDisabled();
   });
 
   it('lists what is missing on each day, by position', () => {
@@ -161,7 +161,7 @@ describe('SIPAT builder', () => {
 
       await userEvent.type(screen.getByRole('textbox', { name: 'Título do dia 1' }), '!');
       await userEvent.click(screen.getByRole('button', { name: /Salvar rascunho/ }));
-      await waitFor(() => expect(api.saveSipatPlan).toHaveBeenCalledWith('s1', [expect.objectContaining({ videoIds: ids })]));
+      await waitFor(() => expect(api.saveSipatPlan).toHaveBeenCalledWith('s1', [expect.objectContaining({ videoIds: ids })], expect.anything()));
     });
   });
 });

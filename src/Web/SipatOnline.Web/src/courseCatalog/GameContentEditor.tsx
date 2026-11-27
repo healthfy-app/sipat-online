@@ -1,7 +1,11 @@
-import type { GameContent, GamificationGameType } from '@/api';
-import { Button } from '@/components/ui/button';
+import { Upload } from 'lucide-react';
+import { useState } from 'react';
+import { uploadGameImage, type GameContent, type GamificationGameType } from '@/api';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input, NativeSelect, Textarea } from '@/components/ui/input';
+import { getErrorMessage } from '@/courseEditor/courseFormat';
+import { cn } from '@/lib/utils';
 import SafeCardsEditor from './SafeCardsEditor';
 
 export const emptyGameContent: GameContent = {
@@ -18,6 +22,21 @@ export default function GameContentEditor({ type, content, onChange }: {
   onChange: (content: GameContent) => void;
 }) {
   const patch = (change: Partial<GameContent>) => onChange({ ...content, ...change });
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  async function sendImage(image: File | undefined) {
+    if (!image) return;
+    setUploadError('');
+    if (image.size > 2 * 1024 * 1024) { setUploadError('Escolha uma imagem de até 2 MB.'); return; }
+    setUploading(true);
+    try {
+      patch({ imageUrl: await uploadGameImage(image) });
+    } catch (error) {
+      setUploadError(getErrorMessage(error));
+    } finally {
+      setUploading(false);
+    }
+  }
   const updateRisk = (index: number, change: Partial<NonNullable<GameContent['risks']>[number]>) =>
     patch({ risks: content.risks?.map((item, current) => (current === index ? { ...item, ...change } : item)) });
 
@@ -26,11 +45,25 @@ export default function GameContentEditor({ type, content, onChange }: {
       <legend className="px-1 text-[0.8125rem] font-semibold">Conteúdo da atividade</legend>
 
       {(type === 'Puzzle' || type === 'RiskSpotting') && (
-        <Field hint="Use uma imagem autorizada com endereço HTTPS ou uma imagem local, como /course-covers/safety.jpg."
-          htmlFor="game-image-url" label="Endereço da imagem">
-          <Input id="game-image-url" maxLength={2000} required value={content.imageUrl ?? ''}
-            onChange={(event) => patch({ imageUrl: event.target.value })} />
-        </Field>
+        <div className="grid gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            {content.imageUrl && type === 'Puzzle' && (
+              <img alt="Imagem do jogo" className="size-20 rounded-md object-cover" src={content.imageUrl} />
+            )}
+            <label className={cn(buttonVariants({ variant: 'outline' }), 'cursor-pointer focus-within:ring-2 focus-within:ring-ring', uploading && 'pointer-events-none opacity-60')}>
+              <Upload /> {uploading ? 'Enviando...' : content.imageUrl ? 'Trocar foto' : 'Enviar foto do computador'}
+              <input accept="image/png,image/jpeg,image/webp" aria-label="Enviar foto do computador" className="sr-only" disabled={uploading}
+                onChange={(event) => { void sendImage(event.target.files?.[0]); event.target.value = ''; }} type="file" />
+            </label>
+            <span className="text-xs text-muted-foreground">PNG, JPEG ou WebP, até 2 MB.</span>
+          </div>
+          {uploadError && <p className="m-0 text-sm font-medium text-destructive" role="alert">{uploadError}</p>}
+          <Field hint="Preenchido ao enviar a foto. Também aceita um endereço HTTPS de uma imagem autorizada."
+            htmlFor="game-image-url" label="Endereço da imagem">
+            <Input id="game-image-url" maxLength={2000} required value={content.imageUrl ?? ''}
+              onChange={(event) => patch({ imageUrl: event.target.value })} />
+          </Field>
+        </div>
       )}
 
       {type === 'Puzzle' && (

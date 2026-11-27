@@ -1,5 +1,7 @@
 # Implantação de produção (Azure VM + Nginx)
 
+> **Para subir a produção, siga [PRODUCAO.md](PRODUCAO.md)** (VM + Cloudflare R2, a topologia escolhida). Esta página descreve a variante com a VM e o DNS na Azure, que não é mais o caminho principal.
+
 Esta topologia é uma opção econômica de MVP, não uma arquitetura de alta disponibilidade: uma VM executa Nginx, API e PostgreSQL. Interrupções da VM afetam todo o serviço. O PostgreSQL não é gerenciado e os backups locais da VM não substituem cópias externas testadas.
 
 ## 1. Preparar a conta e o domínio

@@ -33,13 +33,17 @@ public sealed class DataProtectionKeysTests
         await using var postgres = await StartPostgresAsync();
         await using var first = new SipatOnlineApiFactory(postgres.GetConnectionString());
         await using var second = new SipatOnlineApiFactory(postgres.GetConnectionString());
+        // Both hosts start before the table exists: a host that starts with the table there and no key in it
+        // makes a key of its own, outside the lock, and the count would be of that key instead of the race below.
+        _ = second.Services;
         // Create the schema once so the race is on the key, not on the migration.
         await using (var scope = first.Services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<PlatformDbContext>().Database.MigrateAsync();
         }
 
-        await Task.WhenAll(InitializeDatabaseAsync(first), InitializeDatabaseAsync(second));
+        // Only the key is raced: it is the step the lock serializes.
+        await Task.WhenAll(EnsureKeyAsync(first), EnsureKeyAsync(second));
 
         await using var verify = first.Services.CreateAsyncScope();
         var db = verify.ServiceProvider.GetRequiredService<PlatformDbContext>();
@@ -126,6 +130,17 @@ public sealed class DataProtectionKeysTests
             AllowAutoRedirect = false,
             HandleCookies = false
         });
+
+    private static async Task EnsureKeyAsync(SipatOnlineApiFactory factory)
+    {
+        await using var scope = factory.Services.CreateAsyncScope();
+        var services = scope.ServiceProvider;
+        await DataProtectionSetup.EnsureKeyAsync(
+            services.GetRequiredService<PlatformDbContext>(),
+            services.GetRequiredService<Microsoft.AspNetCore.DataProtection.KeyManagement.IKeyManager>(),
+            services.GetRequiredService<TimeProvider>(),
+            CancellationToken.None);
+    }
 
     private static async Task InitializeDatabaseAsync(SipatOnlineApiFactory factory)
     {

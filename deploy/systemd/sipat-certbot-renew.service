@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew the SIPAT Online HTTPS certificates
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+# the web container reads the certificate when it starts: restart it only when one was renewed
+ExecStart=/opt/certbot/bin/certbot renew --quiet --deploy-hook "docker compose --env-file /opt/sipat-online/app/deploy/.env.production -f /opt/sipat-online/app/deploy/compose.production.yaml restart web"

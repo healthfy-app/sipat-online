@@ -10,9 +10,15 @@ public sealed record RegistryItem(Guid Id, string Name, bool IsActive, int Peopl
 
 public sealed record ProfileRules(bool RequireRegistration, bool RequireEmail, bool RequirePhone, bool RequireUnit, bool RequireSector);
 
-public sealed record CompanyRegistry(IReadOnlyList<RegistryItem> Units, IReadOnlyList<RegistryItem> Sectors, ProfileRules Rules);
+/// <summary>A sector that exists inside a unit, and how many people of that unit are in it.</summary>
+public sealed record UnitSector(Guid UnitId, Guid SectorId, int PeopleCount);
+
+public sealed record CompanyRegistry(IReadOnlyList<RegistryItem> Units, IReadOnlyList<RegistryItem> Sectors, ProfileRules Rules, IReadOnlyList<UnitSector> UnitSectors);
 
 public enum RegistryKind { Unit, Sector }
+
+/// <summary><c>Deleted</c> false: the item was in use, so it was only put away.</summary>
+public sealed record RegistryRemoval(bool Deleted);
 
 /// <summary>
 /// The units and sectors of a company and which optional profile fields it requires of a new participant.
@@ -117,6 +123,139 @@ public sealed class CompanyRegistryService(
             await Participants(tenant).CountAsync(user => user.SectorId == id, token)));
     }
 
+    /// <summary>
+    /// Takes a unit or sector off the company's list. One nobody has and no training is for is deleted; one in use is only
+    /// put away: it stops being offered, and the people and trainings that have it keep it.
+    /// </summary>
+    public async Task<Result<RegistryRemoval>> RemoveAsync(RegistryKind kind, Guid id, CancellationToken token)
+    {
+        var guard = Guard<RegistryRemoval>(out var tenant);
+        if (guard is not null) return guard;
+
+        var isUnit = kind == RegistryKind.Unit;
+        object? item = isUnit
+            ? await db.CompanyUnits.SingleOrDefaultAsync(unit => unit.Id == id && unit.TenantId == tenant, token)
+            : await db.CompanySectors.SingleOrDefaultAsync(sector => sector.Id == id && sector.TenantId == tenant, token);
+        if (item is null) return Failure<RegistryRemoval>("registry.not_found", "O item não foi encontrado.");
+
+        var inUse = isUnit
+            ? await db.Users.AnyAsync(user => user.TenantId == tenant && user.UnitId == id, token) ||
+              await db.SipatEventTargets.AnyAsync(target => target.UnitId == id, token)
+            : await db.Users.AnyAsync(user => user.TenantId == tenant && user.SectorId == id, token) ||
+              await db.SipatEventTargets.AnyAsync(target => target.SectorId == id, token);
+        if (inUse)
+        {
+            if (item is CompanyUnitEntity unit) unit.IsActive = false;
+            else ((CompanySectorEntity)item).IsActive = false;
+        }
+        else db.Remove(item);
+
+        // the audit goes in the same save as the change
+        await WriteAuditAsync(isUnit ? "identity.registry.unit_removed" : "identity.registry.sector_removed", kind, id.ToString("D"), token);
+        await db.SaveChangesAsync(token);
+        return Result<RegistryRemoval>.Success(new RegistryRemoval(!inUse));
+    }
+
+    /// <summary>
+    /// Makes sectors inside a unit. A name the company already has (in another unit, or put away) is that same sector,
+    /// brought into this unit; a new name is a new sector of the company.
+    /// </summary>
+    public async Task<Result<CompanyRegistry>> AddUnitSectorsAsync(Guid unitId, IReadOnlyList<string>? names, CancellationToken token)
+    {
+        var guard = Guard<CompanyRegistry>(out var tenant);
+        if (guard is not null) return guard;
+        if (!await db.CompanyUnits.AnyAsync(unit => unit.Id == unitId && unit.TenantId == tenant, token))
+            return Failure<CompanyRegistry>("registry.not_found", "O item não foi encontrado.");
+
+        var sectors = await db.CompanySectors.Where(sector => sector.TenantId == tenant).ToListAsync(token);
+        var linked = (await db.CompanyUnitSectors.Where(link => link.UnitId == unitId).Select(link => link.SectorId).ToListAsync(token)).ToHashSet();
+        var now = clock.GetUtcNow();
+        var changed = false;
+        foreach (var raw in names ?? [])
+        {
+            var name = Normalize(raw);
+            if (name.Length == 0) continue;
+            if (name.Length > MaximumNameLength) return NameTooLong<CompanyRegistry>();
+            var key = ProfileText.CatalogKey(name);
+            var sector = sectors.FirstOrDefault(item => item.NameKey == key);
+            if (sector is null)
+            {
+                sector = new CompanySectorEntity { Id = Guid.NewGuid(), TenantId = tenant, Name = name, NameKey = key, IsActive = true, CreatedAt = now };
+                db.CompanySectors.Add(sector);
+                sectors.Add(sector);
+                changed = true;
+            }
+            else if (!sector.IsActive)
+            {
+                sector.IsActive = true;
+                changed = true;
+            }
+
+            if (!linked.Add(sector.Id)) continue;
+            db.CompanyUnitSectors.Add(new CompanyUnitSectorEntity { UnitId = unitId, SectorId = sector.Id, TenantId = tenant });
+            changed = true;
+        }
+
+        if (changed)
+        {
+            await WriteAuditAsync("identity.registry.unit_sector_added", RegistryKind.Unit, unitId.ToString("D"), token);
+            try
+            {
+                await db.SaveChangesAsync(token);
+            }
+            catch (DbUpdateException exception) when (IsUniqueViolation(exception))
+            {
+                // someone added the same name at the same time; nothing was saved, the caller can try again
+                db.ChangeTracker.Clear();
+                return Failure<CompanyRegistry>("registry.name.duplicate", "Já existe um item com esse nome.");
+            }
+        }
+
+        return Result<CompanyRegistry>.Success(await LoadAsync(tenant, token));
+    }
+
+    /// <summary>
+    /// Takes a sector out of a unit. It stays in the company's list and in the other units. While someone of the unit
+    /// is in it, it cannot leave: those people would be in a sector their unit does not have.
+    /// </summary>
+    public async Task<Result<CompanyRegistry>> RemoveUnitSectorAsync(Guid unitId, Guid sectorId, CancellationToken token)
+    {
+        var guard = Guard<CompanyRegistry>(out var tenant);
+        if (guard is not null) return guard;
+        var link = await db.CompanyUnitSectors.SingleOrDefaultAsync(item => item.UnitId == unitId && item.SectorId == sectorId && item.TenantId == tenant, token);
+        if (link is null) return Failure<CompanyRegistry>("registry.not_found", "O item não foi encontrado.");
+        var inIt = await db.Users.CountAsync(user => user.TenantId == tenant && user.UnitId == unitId && user.SectorId == sectorId, token);
+        if (inIt > 0)
+            return Failure<CompanyRegistry>("registry.unit_sector.in_use",
+                inIt == 1 ? "1 pessoa desta unidade está neste setor. Mude o setor dela antes." : $"{inIt} pessoas desta unidade estão neste setor. Mude o setor delas antes.");
+
+        db.CompanyUnitSectors.Remove(link);
+        await WriteAuditAsync("identity.registry.unit_sector_removed", RegistryKind.Unit, unitId.ToString("D"), token);
+        await db.SaveChangesAsync(token);
+        return Result<CompanyRegistry>.Success(await LoadAsync(tenant, token));
+    }
+
+    /// <summary>
+    /// Wherever a person is in a unit and a sector, that sector is one of that unit. Called after people are placed (one
+    /// by one, in bulk, by the sheet), so the lists follow where the people really are.
+    /// </summary>
+    public static async Task LinkPlacedAsync(PlatformDbContext db, Guid tenantId, CancellationToken token)
+    {
+        var pairs = await db.Users.AsNoTracking()
+            .Where(user => user.TenantId == tenantId && user.UnitId != null && user.SectorId != null)
+            .Select(user => new { UnitId = user.UnitId!.Value, SectorId = user.SectorId!.Value })
+            .Distinct()
+            .ToListAsync(token);
+        if (pairs.Count == 0) return;
+        var known = (await db.CompanyUnitSectors.AsNoTracking().Where(link => link.TenantId == tenantId)
+            .Select(link => new { link.UnitId, link.SectorId }).ToListAsync(token))
+            .Select(link => (link.UnitId, link.SectorId)).ToHashSet();
+        var missing = pairs.Where(pair => !known.Contains((pair.UnitId, pair.SectorId))).ToArray();
+        if (missing.Length == 0) return;
+        db.CompanyUnitSectors.AddRange(missing.Select(pair => new CompanyUnitSectorEntity { UnitId = pair.UnitId, SectorId = pair.SectorId, TenantId = tenantId }));
+        await db.SaveChangesAsync(token);
+    }
+
     public async Task<Result<ProfileRules>> SaveRulesAsync(ProfileRules rules, CancellationToken token)
     {
         var guard = Guard<ProfileRules>(out var tenant);
@@ -143,13 +282,11 @@ public sealed class CompanyRegistryService(
         return Result<ProfileRules>.Success(rules);
     }
 
-    public async Task<ProfileRules> GetRulesAsync(Guid tenantId, CancellationToken token)
-    {
-        var row = await db.CompanyProfileRules.AsNoTracking().SingleOrDefaultAsync(item => item.TenantId == tenantId, token);
-        return row is null
-            ? NoRules
-            : new ProfileRules(row.RequireRegistration, row.RequireEmail, row.RequirePhone, row.RequireUnit, row.RequireSector);
-    }
+    /// <summary>
+    /// No participant field is required any more: a person who has a registration, an e-mail, a phone, a unit or a
+    /// sector keeps it, and one who has not is never held back for it. What a company once marked stays stored, unused.
+    /// </summary>
+    public Task<ProfileRules> GetRulesAsync(Guid tenantId, CancellationToken token) => Task.FromResult(NoRules);
 
     private async Task<CompanyRegistry> LoadAsync(Guid tenant, CancellationToken token)
     {
@@ -162,7 +299,16 @@ public sealed class CompanyRegistryService(
             .OrderBy(item => item.Name)
             .Select(item => new RegistryItem(item.Id, item.Name, item.IsActive, people.Count(user => user.SectorId == item.Id)))
             .ToListAsync(token);
-        return new CompanyRegistry(units, sectors, await GetRulesAsync(tenant, token));
+        var pairs = await people.Where(user => user.UnitId != null && user.SectorId != null)
+            .GroupBy(user => new { user.UnitId, user.SectorId })
+            .Select(group => new { group.Key.UnitId, group.Key.SectorId, Count = group.Count() })
+            .ToListAsync(token);
+        var links = await db.CompanyUnitSectors.AsNoTracking().Where(link => link.TenantId == tenant).ToListAsync(token);
+        var unitSectors = links
+            .Select(link => new UnitSector(link.UnitId, link.SectorId,
+                pairs.FirstOrDefault(pair => pair.UnitId == link.UnitId && pair.SectorId == link.SectorId)?.Count ?? 0))
+            .ToArray();
+        return new CompanyRegistry(units, sectors, await GetRulesAsync(tenant, token), unitSectors);
     }
 
     /// <summary>The people of the company with the Participant role, active or not.</summary>

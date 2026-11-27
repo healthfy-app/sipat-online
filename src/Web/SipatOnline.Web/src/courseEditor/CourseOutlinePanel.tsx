@@ -11,6 +11,10 @@ import InlineText from './InlineText';
 
 export const editorPanel = 'relative z-[1] flex min-h-0 min-w-0 flex-col overflow-y-auto bg-card shadow-panel max-[1180px]:min-h-auto max-[1180px]:overflow-visible';
 
+/** What cannot be changed in the editor: the names and cover, the grid of videos, the games and questions. */
+export interface EditorLocks { details: boolean; grid: boolean; activities: boolean; plan?: string }
+export const noLocks: EditorLocks = { details: false, grid: false, activities: false };
+
 export interface OutlineActions {
   onSelect: (key: string) => void;
   onTitle: (title: string) => void;
@@ -37,6 +41,8 @@ export default function CourseOutlinePanel({
   busy,
   actions,
   week = false,
+  locks = noLocks,
+  onCover,
 }: {
   course: PlatformCourse;
   status: PlatformCourseStatus;
@@ -48,6 +54,10 @@ export default function CourseOutlinePanel({
   actions: OutlineActions;
   /** The week of a SIPAT: no status to publish and nothing to duplicate, each título is a day. */
   week?: boolean;
+  /** What the company's plan does not let it change here; the operation has no locks. */
+  locks?: EditorLocks;
+  /** Opens the cover of the training (a company's training has no Configurar step to change it in). */
+  onCover?: () => void;
 }) {
   const house = houseVideos(course.videos);
   const totalMilliseconds = house.reduce((total, video) => total + video.durationMilliseconds, 0);
@@ -61,17 +71,26 @@ export default function CourseOutlinePanel({
     return next;
   });
 
+  const gridBusy = busy || locks.grid;
+  const actBusy = busy || locks.activities;
+  // one line saying what the plan leaves out, instead of a note on every disabled control
+  const lockNote = locks.grid
+    ? 'Neste plano o treinamento é só para visualizar.'
+    : locks.activities ? 'Perguntas, atividades e jogos estão disponíveis no plano Diamante.' : '';
   return (
     <section aria-labelledby="ce-track-title" className={editorPanel}>
       <header className="flex items-center gap-3 border-b border-border p-4">
-        <CourseThumb coverUrl={course.coverUrl} title={title} />
+        {onCover && !locks.details
+          ? <button aria-label="Trocar a capa do treinamento" className="m-0 min-h-0 shrink-0 cursor-pointer rounded-sm border-0 bg-transparent p-0 transition-opacity hover:opacity-80" onClick={onCover} title="Trocar a capa" type="button"><CourseThumb coverUrl={course.coverUrl} title={title} /></button>
+          : <CourseThumb coverUrl={course.coverUrl} title={title} />}
         <div className="grid min-w-0 flex-1 gap-1">
           <h1 className="m-0 text-sm font-semibold leading-snug focus:outline-none" ref={headingRef} tabIndex={-1}>
-            <InlineText className="font-semibold" disabled={busy} label="Renomear treinamento" onCommit={actions.onTitle} value={title || course.title} />
+            {/* the week shows the training's own name, which is renamed in "Editar treinamento" */}
+            {week ? title : <InlineText className="font-semibold" disabled={busy || locks.details} label="Renomear treinamento" onCommit={actions.onTitle} value={title || course.title} />}
           </h1>
           <div className="flex flex-wrap items-center gap-2 px-1.5 text-xs text-muted-foreground">
             {week
-              ? <Badge variant="default">Semana da SIPAT</Badge>
+              ? <Badge variant="default">Treinamento da empresa</Badge>
               : <Badge variant={status === 'Published' ? 'default' : 'warning'}>{statusLabels[status]}</Badge>}
             <span>{pluralize(house.length, 'vídeo', 'vídeos')}{extrasSuffix(course.videos.length - house.length)}</span>
           </div>
@@ -81,17 +100,18 @@ export default function CourseOutlinePanel({
       <div className="flex items-center justify-between gap-2 border-b border-border px-4 py-2">
         <h2 className="m-0 text-xs font-medium text-muted-foreground" id="ce-track-title">Vídeos do treinamento</h2>
         <div className="flex gap-1.5">
-          <Button aria-label="Gerenciar atividades" disabled={busy} onClick={actions.onManageActivities} size="icon-sm" title="Atividades e perguntas" variant="outline">
+          <Button aria-label="Gerenciar atividades" disabled={actBusy} onClick={actions.onManageActivities} size="icon-sm" title="Atividades e perguntas" variant="outline">
             <Puzzle />
           </Button>
-          <Button aria-label="Adicionar vídeo" disabled={busy} onClick={() => actions.onAddVideo('')} size="icon-sm" title="Novo vídeo">＋</Button>
+          <Button aria-label="Adicionar vídeo" disabled={gridBusy} onClick={() => actions.onAddVideo('')} size="icon-sm" title="Novo vídeo">＋</Button>
         </div>
       </div>
 
+      {lockNote && <p className="m-0 border-b border-border bg-muted px-4 py-2 text-xs leading-snug text-muted-foreground" role="status">{lockNote}</p>}
       {flatItems.length === 0 ? (
         <div className="m-4 grid justify-items-start gap-3 rounded-md border border-dashed border-input p-4 text-sm leading-relaxed text-muted-foreground">
           <p className="m-0">Este treinamento ainda não tem vídeos. Escolha os vídeos do dia na biblioteca.</p>
-          <Button disabled={busy} onClick={() => actions.onAddVideo('')} size="sm">Adicionar vídeo</Button>
+          <Button disabled={gridBusy} onClick={() => actions.onAddVideo('')} size="sm">Adicionar vídeo</Button>
         </div>
       ) : (
         <div className="grid gap-2 p-3">
@@ -134,16 +154,16 @@ export default function CourseOutlinePanel({
                   />
                 </button>
                 <div className="min-w-0 flex-1">
-                  <InlineText className="font-semibold" disabled={busy || !group.id} label={`Nome do título ${groupIndex + 1}`}
+                  <InlineText className="font-semibold" disabled={gridBusy || !group.id} label={`Nome do título ${groupIndex + 1}`}
                     onCommit={(value) => actions.onRenameLesson(group.id, value)} value={group.title} />
                   <span className="block px-1.5 text-xs tabular-nums text-muted-foreground">
                     {pluralize(groupVideos.length, 'vídeo', 'vídeos')} · {formatDuration(groupMs)}
                   </span>
                 </div>
                 {group.id && <span className="flex shrink-0 gap-0.5 opacity-0 transition-opacity group-hover/title:opacity-100 group-focus-within/title:opacity-100 max-[860px]:opacity-100">
-                  <MiniButton disabled={busy || groupIndex === 0} label={`Mover ${group.title} para cima`} onClick={() => actions.onMoveLesson(group.id, -1)}>↑</MiniButton>
-                  <MiniButton disabled={busy || groupIndex === groups.length - 1} label={`Mover ${group.title} para baixo`} onClick={() => actions.onMoveLesson(group.id, 1)}>↓</MiniButton>
-                  <MiniButton danger disabled={busy || groups.length === 1} label={`Remover o título ${group.title}`} onClick={() => actions.onRemoveLesson(group.id)}>×</MiniButton>
+                  <MiniButton disabled={gridBusy || groupIndex === 0} label={`Mover ${group.title} para cima`} onClick={() => actions.onMoveLesson(group.id, -1)}>↑</MiniButton>
+                  <MiniButton disabled={gridBusy || groupIndex === groups.length - 1} label={`Mover ${group.title} para baixo`} onClick={() => actions.onMoveLesson(group.id, 1)}>↓</MiniButton>
+                  <MiniButton danger disabled={gridBusy || groups.length === 1} label={`Remover o título ${group.title}`} onClick={() => actions.onRemoveLesson(group.id)}>×</MiniButton>
                 </span>}
               </div>
               {!isCollapsed && (
@@ -167,7 +187,7 @@ export default function CourseOutlinePanel({
                             <div className={cn("min-w-0", isExtra(item.video) && "flex items-center gap-1.5")} onClick={() => actions.onSelect(item.key)} onFocus={() => actions.onSelect(item.key)} role="presentation">
                               <InlineText
                                 className={selected ? 'font-medium' : undefined}
-                                disabled={busy}
+                                disabled={gridBusy}
                                 label={`Título do vídeo ${item.videoIndex + 1}`}
                                 onCommit={(value) => actions.onRenameVideo(item.video.id, value)}
                                 value={item.title}
@@ -202,9 +222,9 @@ export default function CourseOutlinePanel({
                                 selected && 'flex',
                               )}
                             >
-                              <MiniButton disabled={busy || flatIndex === 0} label={`Mover ${item.title} para cima`} onClick={() => actions.onMoveVideo(item.video.id, -1)}>↑</MiniButton>
-                              <MiniButton disabled={busy || flatIndex === flatVideoIds.length - 1} label={`Mover ${item.title} para baixo`} onClick={() => actions.onMoveVideo(item.video.id, 1)}>↓</MiniButton>
-                              <MiniButton danger disabled={busy} label={`Remover ${item.title} do treinamento`} onClick={() => actions.onRemoveVideo(item.video.id)}>×</MiniButton>
+                              <MiniButton disabled={gridBusy || flatIndex === 0} label={`Mover ${item.title} para cima`} onClick={() => actions.onMoveVideo(item.video.id, -1)}>↑</MiniButton>
+                              <MiniButton disabled={gridBusy || flatIndex === flatVideoIds.length - 1} label={`Mover ${item.title} para baixo`} onClick={() => actions.onMoveVideo(item.video.id, 1)}>↓</MiniButton>
+                              <MiniButton danger disabled={gridBusy} label={`Remover ${item.title} do treinamento`} onClick={() => actions.onRemoveVideo(item.video.id)}>×</MiniButton>
                             </span>
                           </>}
                         </li>
@@ -212,7 +232,7 @@ export default function CourseOutlinePanel({
                           <li className="min-h-0">
                             <button
                               className="m-0 ml-6 inline-flex min-h-6 cursor-pointer items-center gap-1.5 border-0 border-l border-dashed border-border bg-transparent py-0 pl-2 pr-2 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
-                              disabled={busy}
+                              disabled={actBusy}
                               onClick={() => actions.onAddActivity(item.videoIndex + 1)}
                               type="button"
                             >
@@ -226,7 +246,7 @@ export default function CourseOutlinePanel({
                   </ol>
               <button
                 className="m-0 inline-flex min-h-8 cursor-pointer items-center gap-2 justify-self-start border-0 bg-transparent py-0 pl-1 pr-2 text-sm text-primary hover:underline hover:underline-offset-4 disabled:opacity-50"
-                disabled={busy}
+                disabled={gridBusy}
                 onClick={() => actions.onAddVideo(group.id)}
                 type="button"
               >
@@ -237,7 +257,7 @@ export default function CourseOutlinePanel({
             </section>
             );
           })}
-          <Button className="justify-self-start" disabled={busy} onClick={actions.onAddLesson} size="sm" variant="outline">
+          <Button className="justify-self-start" disabled={gridBusy} onClick={actions.onAddLesson} size="sm" variant="outline">
             <CirclePlus /> Novo título
           </Button>
         </div>

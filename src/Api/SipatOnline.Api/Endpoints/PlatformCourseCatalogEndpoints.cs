@@ -7,7 +7,7 @@ using SipatOnline.Learning.Application.Catalog;
 
 namespace SipatOnline.Api.Endpoints;
 
-public static class PlatformCourseCatalogEndpoints
+public static partial class PlatformCourseCatalogEndpoints
 {
     public static IEndpointRouteBuilder MapPlatformCourseCatalogEndpoints(
         this IEndpointRouteBuilder endpoints)
@@ -91,8 +91,14 @@ public static class PlatformCourseCatalogEndpoints
             Guid courseId,
             HttpContext context,
             PlatformCourseCatalogService courseService,
+            SipatOnline.Infrastructure.PlatformDbContext db,
             CancellationToken cancellationToken) =>
         {
+            // a company's training is its content: it leaves only with the training, from the company's own list
+            if (await db.PlatformCourses.AnyAsync(course => course.Id == courseId && course.TenantId != null, cancellationToken))
+                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "learning.platform_course.company_training",
+                    detail: "Este treinamento é de uma empresa. Cancele-o na tela de treinamentos da empresa.",
+                    extensions: new Dictionary<string, object?> { ["code"] = "learning.platform_course.company_training" });
             var result = await courseService.DeleteCourseAsync(courseId, cancellationToken);
             return result.IsSuccess ? Results.NoContent() : ToProblem(result.Error);
         })
@@ -102,6 +108,22 @@ public static class PlatformCourseCatalogEndpoints
         catalog.MapGet("/sipat-weeks", async (SipatOnline.Infrastructure.Learning.SipatPlanService plans, CancellationToken cancellationToken) =>
             Results.Ok(await plans.WeeksAsync(cancellationToken)))
         .WithName("ListSipatWeeks");
+
+        // a model offered whole as a ready SIPAT: what a Bronze company picks its training from
+        catalog.MapPut("/courses/{courseId:guid}/ready-sipat", async (
+            Guid courseId, SetReadySipatRequest request, SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
+        {
+            var course = await db.PlatformCourses.SingleOrDefaultAsync(item => item.Id == courseId, cancellationToken);
+            if (course is null) return Results.NotFound();
+            if (course.TenantId is not null)
+                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "learning.platform_course.company_training",
+                    detail: "Só um modelo do Conteúdo pode ser oferecido como SIPAT pronta.",
+                    extensions: new Dictionary<string, object?> { ["code"] = "learning.platform_course.company_training" });
+            course.IsReadySipat = request.Ready;
+            await db.SaveChangesAsync(cancellationToken);
+            return Results.NoContent();
+        })
+        .WithName("SetPlatformCourseReadySipat");
 
         // assunto is a classification of the videos (like a genre): a video can be in several, from the operator's fixed list
         catalog.MapGet("/subjects", async (SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken) =>
@@ -525,12 +547,20 @@ public static class PlatformCourseCatalogEndpoints
 
         catalog.MapGet("/modules", async (
             GameModuleService moduleService,
+            SipatOnline.Infrastructure.PlatformDbContext db,
             CancellationToken cancellationToken) =>
         {
             var result = await moduleService.ListAsync(cancellationToken);
-            return result.IsSuccess
-                ? Results.Ok(result.Value.Select(item => ToResponse(item.Module, item.UsageCount)).ToArray())
-                : ToProblem(result.Error);
+            if (!result.IsSuccess) return ToProblem(result.Error);
+            // the operation sees every game, the companies' own too, and whose each is
+            var owners = result.Value.Select(item => item.Module.TenantId).OfType<Guid>().Distinct().ToArray();
+            var names = owners.Length == 0
+                ? new Dictionary<Guid, string>()
+                : await db.Tenants.AsNoTracking().Where(tenant => owners.Contains(tenant.Id)).ToDictionaryAsync(tenant => tenant.Id, tenant => tenant.Name, cancellationToken);
+            return Results.Ok(result.Value.Select(item => ToResponse(item.Module, item.UsageCount) with
+            {
+                CompanyName = item.Module.TenantId is { } owner ? names.GetValueOrDefault(owner) : null,
+            }).ToArray());
         })
         .WithName("ListGameModules");
 
@@ -642,7 +672,9 @@ public static class PlatformCourseCatalogEndpoints
         })
         .WithName("SetCourseModules");
 
-        catalog.MapPut("/videos/{videoId:guid}/checkpoints", async (
+        // the games in the middle of a video belong to the training: the same video elsewhere keeps its own
+        catalog.MapPut("/courses/{courseId:guid}/videos/{videoId:guid}/checkpoints", async (
+            Guid courseId,
             Guid videoId,
             SetVideoCheckpointsRequest request,
             HttpContext context,
@@ -650,6 +682,7 @@ public static class PlatformCourseCatalogEndpoints
             CancellationToken cancellationToken) =>
         {
             var result = await moduleService.SetVideoCheckpointsAsync(
+                courseId,
                 videoId,
                 request.Items?.Select(item => new VideoCheckpoint(item.TimeMilliseconds, item.ModuleId)).ToArray(),
                 cancellationToken);
@@ -735,6 +768,7 @@ public static class PlatformCourseCatalogEndpoints
             SipatOnline.Infrastructure.Tenancy.TenantPlanService plans,
             SipatOnline.Infrastructure.PlatformDbContext db,
             SipatOnline.Infrastructure.Learning.SipatPlanService sipatPlans,
+            SipatOnline.BuildingBlocks.Application.ITenantContext tenantContext,
             CancellationToken cancellationToken) =>
         {
             var capabilities = await plans.CapabilitiesAsync(cancellationToken);
@@ -764,7 +798,9 @@ public static class PlatformCourseCatalogEndpoints
                 .Select(item => new PlatformLibraryVideoResponse(ToResponse(item.Video), item.CourseCount))
                 .ToArray();
             var games = capabilities.Quizzes
-                ? (await modules.ListAsync(cancellationToken)).Select(item => ToResponse(item.Module, item.UsageCount)).ToArray()
+                // the operation's games and the company's own, never another company's
+                ? (await modules.ListAsync(cancellationToken)).Where(item => item.Module.TenantId is null || item.Module.TenantId == tenantContext.CurrentTenantId?.Value)
+                    .Select(item => ToResponse(item.Module, item.UsageCount)).ToArray()
                 : [];
             var categories = await db.CourseCategories.AsNoTracking().OrderBy(item => item.Position).ThenBy(item => item.Name)
                 .Select(item => new CourseCategoryResponse(item.Id, item.Name, 0)).ToArrayAsync(cancellationToken);
@@ -860,7 +896,9 @@ public static class PlatformCourseCatalogEndpoints
             (course.Lessons ?? [])
                 .Select(lesson => new PlatformCourseLessonDto(lesson.Id, lesson.Title, lesson.Description, lesson.VideoIds))
                 .ToArray(),
-            course.CategoryId);
+            course.CategoryId,
+            course.TenantId,
+            course.IsReadySipat);
 
     private static PlatformCourseVideoResponse ToResponse(PlatformCourseVideo video) =>
         new(
@@ -879,7 +917,8 @@ public static class PlatformCourseCatalogEndpoints
             video.HasSd480,
             video.Provider.ToString(),
             video.ExternalId,
-            video.HasFhd1080);
+            video.HasFhd1080,
+            video.ThumbnailUpdatedAt is { } thumbnail ? $"/api/platform/catalog/videos/{video.Id:D}/thumbnail?v={thumbnail.ToUnixTimeMilliseconds()}" : null);
 
     private static readonly DomainError GameTypeInvalid = new(
         "learning.platform_course.game_type_invalid",
@@ -905,7 +944,8 @@ public static class PlatformCourseCatalogEndpoints
             module.Questions.Select(item => new GameQuestionDto(item.Text, item.Options, item.CorrectIndex)).ToArray(),
             module.CreatedAt,
             usageCount,
-            module.Content);
+            module.Content,
+            module.TenantId);
 
     private static async Task<VideoSubjectsResponse[]> VideoSubjectMapAsync(SipatOnline.Infrastructure.PlatformDbContext db, CancellationToken cancellationToken)
     {
@@ -946,6 +986,8 @@ public static class PlatformCourseCatalogEndpoints
     }
 
 }
+
+public sealed record SetReadySipatRequest(bool Ready);
 
 public sealed record CreatePlatformCourseRequest(
     string? Title,
@@ -1043,7 +1085,9 @@ public sealed record PlatformCourseResponse(
     IReadOnlyList<CourseModulePlacementDto> Modules,
     string? CoverUrl,
     IReadOnlyList<PlatformCourseLessonDto>? Lessons = null,
-    Guid? CategoryId = null);
+    Guid? CategoryId = null,
+    Guid? TenantId = null,
+    bool IsReadySipat = false);
 
 public sealed record PlatformCourseLessonDto(Guid Id, string Title, string? Description, IReadOnlyList<Guid> VideoIds);
 
@@ -1072,7 +1116,9 @@ public sealed record GameModuleResponse(
     IReadOnlyList<GameQuestionDto> Questions,
     DateTimeOffset CreatedAt,
     int UsageCount,
-    GameContent? Content = null);
+    GameContent? Content = null,
+    Guid? TenantId = null,
+    string? CompanyName = null);
 
 public sealed record ProgramDayDto(
     Guid? Id,
@@ -1106,7 +1152,8 @@ public sealed record PlatformCourseVideoResponse(
     bool HasSd480 = false,
     string Provider = "Sipat",
     string? ExternalId = null,
-    bool HasFhd1080 = false);
+    bool HasFhd1080 = false,
+    string? ThumbnailUrl = null);
 
 public sealed record CreateExternalVideoRequest(
     string? Provider,

@@ -19,4 +19,7 @@ public sealed class SipatEventEntity
     public DateTimeOffset CreatedAt { get; set; }
 
     public SipatEventStatus Status { get; set; }
+
+    /// <summary>The training's content: its own training (Títulos, videos, activities, cover), owned by the company.</summary>
+    public Guid CourseId { get; set; }
 }
