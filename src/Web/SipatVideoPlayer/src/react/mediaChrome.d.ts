@@ -6,7 +6,7 @@ declare module 'react' {
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace JSX {
     interface IntrinsicElements {
-      'media-controller': Tag<{ hotkeys?: string }>;
+      'media-controller': Tag<{ hotkeys?: string; lang?: string }>;
       'media-control-bar': Tag;
       'media-play-button': Tag;
       'media-seek-backward-button': Tag<{ seekoffset?: string }>;

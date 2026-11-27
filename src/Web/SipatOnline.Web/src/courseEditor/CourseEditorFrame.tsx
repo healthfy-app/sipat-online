@@ -75,18 +75,18 @@ export default function CourseEditorFrame({
             type="button"
           >
             <span className="inline-grid size-8 place-items-center rounded-md border border-border bg-card text-primary transition-colors group-hover:bg-accent">←</span>{' '}
-            <span className="max-[520px]:sr-only">{week ? 'Voltar à semana' : 'Voltar ao conteúdo'}</span>
+            <span className="max-[520px]:sr-only">{week ? 'Voltar ao treinamento' : 'Voltar ao conteúdo'}</span>
           </button>
         </div>
 
         {week ? (
           <div className="grid min-w-0 justify-items-center gap-0.5 text-center max-[860px]:col-span-full max-[860px]:row-start-2">
             <span className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-accent px-3 py-1 text-xs font-bold text-primary">
-              <span className="shrink-0 uppercase tracking-[0.06em]">Semana da SIPAT</span>
+              <span className="shrink-0 uppercase tracking-[0.06em]">Treinamento da empresa</span>
               <span aria-hidden="true">·</span>
               <span className="truncate">{week.sipatTitle} · {week.companyName}</span>
             </span>
-            <span className="text-xs text-muted-foreground">Cada título é um dia. O que você salvar aqui vai para os dias da semana; o treinamento original do Conteúdo não muda.</span>
+            <span className="text-xs text-muted-foreground">Cada título é um dia. O que você salvar aqui vai para os dias do treinamento; o treinamento original do Conteúdo não muda.</span>
           </div>
         ) : <nav aria-label="Etapas do treinamento" className="flex items-start gap-6 max-[860px]:col-span-full max-[860px]:row-start-2 max-[860px]:justify-center">
           {stages.map((stage, index) => {

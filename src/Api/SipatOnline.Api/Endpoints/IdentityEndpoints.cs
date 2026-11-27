@@ -77,7 +77,7 @@ public static class IdentityEndpoints
                 return Results.Problem(
                     statusCode: StatusCodes.Status401Unauthorized,
                     title: "Não foi possível autenticar.",
-                    detail: "Login ou senha inválida.");
+                    detail: "Login ou senha inválidos.");
             }
 
             return Results.NoContent();

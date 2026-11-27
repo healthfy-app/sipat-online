@@ -289,6 +289,9 @@ describe('Platform course catalog', () => {
     expect(api.renameCourseCategory).toHaveBeenCalledWith('cat-food', 'Nutrição');
 
     await user.click(within(dialog).getByRole('button', { name: 'Excluir Segurança no trabalho' }));
+    // the dialog asks in its own row: nothing is deleted before the answer
+    expect(api.deleteCourseCategory).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByRole('button', { name: 'Excluir' }));
     expect(api.deleteCourseCategory).toHaveBeenCalledWith('cat-safe');
   });
 
@@ -406,21 +409,21 @@ describe('Platform course catalog', () => {
     confirm.mockRestore();
   });
 
-  it('keeps the search when moving between the tabs and filters each list by it', async () => {
+  it('starts each tab with its own empty search', async () => {
     const user = userEvent.setup();
     render(<PlatformCoursesPage />);
     await screen.findByText('Ergonomia');
     await user.type(screen.getByLabelText('Buscar treinamento'), 'Enc');
 
     await user.click(screen.getByRole('tab', { name: /Jogos e perguntas/ }));
-    // the same text still filters, now the games
-    expect(screen.getByLabelText('Buscar jogo')).toHaveValue('Enc');
+    // what was typed for the trainings does not hide the games
+    expect(screen.getByLabelText('Buscar jogo')).toHaveValue('');
 
     await user.click(screen.getByRole('tab', { name: /Treinamentos/ }));
-    expect(screen.getByLabelText('Buscar treinamento')).toHaveValue('Enc');
+    expect(screen.getByLabelText('Buscar treinamento')).toHaveValue('');
   });
 
-  it('opens the library the way it was left after leaving to another screen', async () => {
+  it('opens the library on the tab and filters it was left with, the search empty', async () => {
     const user = userEvent.setup();
     const first = render(<PlatformCoursesPage />);
     await screen.findByText('Ergonomia');
@@ -429,7 +432,7 @@ describe('Platform course catalog', () => {
     first.unmount();
 
     render(<PlatformCoursesPage />);
-    expect(await screen.findByLabelText('Buscar treinamento')).toHaveValue('incêndio');
+    expect(await screen.findByLabelText('Buscar treinamento')).toHaveValue('');
     expect(screen.getByLabelText('Filtrar por categoria')).toHaveValue('cat-safe');
   });
 

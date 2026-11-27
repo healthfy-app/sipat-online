@@ -18,6 +18,7 @@ export default function ManageCategoriesDialog({
 }) {
   const [newName, setNewName] = useState('');
   const [editing, setEditing] = useState<{ id: string; name: string } | null>(null);
+  const [removing, setRemoving] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -45,11 +46,8 @@ export default function ManageCategoriesDialog({
   }
 
   async function remove(category: CourseCategory) {
-    const usage = category.courseCount > 0
-      ? ` ${pluralize(category.courseCount, 'treinamento fica', 'treinamentos ficam')} sem categoria.`
-      : '';
-    if (!window.confirm(`Excluir a categoria "${category.name}"?${usage}`)) return;
     await run(() => deleteCourseCategory(category.id));
+    setRemoving(null);
   }
 
   return (
@@ -77,12 +75,21 @@ export default function ManageCategoriesDialog({
                   <Button aria-label="Salvar nome" disabled={busy} onClick={() => void rename()} size="icon-sm" variant="ghost"><Check /></Button>
                   <Button aria-label="Cancelar edição" disabled={busy} onClick={() => setEditing(null)} size="icon-sm" variant="ghost"><X /></Button>
                 </>
+              ) : removing === category.id ? (
+                <>
+                  <span className="min-w-0 flex-1 text-sm" role="alert">
+                    Excluir <strong className="font-semibold">{category.name}</strong>?
+                    {category.courseCount > 0 && ` ${pluralize(category.courseCount, 'treinamento fica', 'treinamentos ficam')} sem categoria.`}
+                  </span>
+                  <Button autoFocus disabled={busy} onClick={() => void remove(category)} size="sm" variant="destructive">Excluir</Button>
+                  <Button disabled={busy} onClick={() => setRemoving(null)} size="sm" variant="outline">Cancelar</Button>
+                </>
               ) : (
                 <>
                   <span className="min-w-0 flex-1 truncate font-semibold">{category.name}</span>
                   <span className="whitespace-nowrap text-xs tabular-nums text-muted-foreground">{pluralize(category.courseCount, 'treinamento', 'treinamentos')}</span>
                   <Button aria-label={`Renomear ${category.name}`} disabled={busy} onClick={() => setEditing({ id: category.id, name: category.name })} size="icon-sm" variant="ghost"><Pencil /></Button>
-                  <Button aria-label={`Excluir ${category.name}`} disabled={busy} onClick={() => void remove(category)} size="icon-sm" variant="ghost"><Trash2 /></Button>
+                  <Button aria-label={`Excluir ${category.name}`} disabled={busy} onClick={() => { setEditing(null); setRemoving(category.id); }} size="icon-sm" variant="ghost"><Trash2 /></Button>
                 </>
               )}
             </li>

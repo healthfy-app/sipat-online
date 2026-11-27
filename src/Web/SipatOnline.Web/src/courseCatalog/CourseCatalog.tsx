@@ -91,7 +91,10 @@ export default function CourseCatalog({
       return next;
     }, { replace: true });
   }
-  const setTab = (next: CatalogTab) => patchParams({ aba: next === 'courses' ? null : next });
+  // each tab has its own list: what was typed or filtered in one never follows to another
+  const setTab = (next: CatalogTab) => patchParams({
+    aba: next === 'courses' ? null : next, q: null, status: null, categoria: null, empresa: null, assunto: null,
+  });
   const changeFilters = (patch: Partial<CatalogFilters>) => patchParams({
     ...('query' in patch ? { q: patch.query ?? '' } : {}),
     ...('status' in patch ? { status: patch.status ?? 'all' } : {}),
@@ -109,7 +112,10 @@ export default function CourseCatalog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    try { sessionStorage.setItem(viewKey, params.toString()); } catch { /* idem */ }
+    // the tab and the filters come back; a search typed long ago would only hide the list
+    const kept = new URLSearchParams(params);
+    kept.delete('q');
+    try { sessionStorage.setItem(viewKey, kept.toString()); } catch { /* idem */ }
   }, [params]);
   const { categories, create: createCategory, reload: reloadCategories } = useCourseCategories();
   const [dialog, setDialog] = useState<CatalogDialog | null>(null);
