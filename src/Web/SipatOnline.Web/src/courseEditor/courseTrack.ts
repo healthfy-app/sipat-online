@@ -63,8 +63,9 @@ export function courseLessons(course: PlatformCourse) {
 }
 
 /**
- * Agrupa a trilha por aula. Uma atividade fica na aula do vídeo que vem logo depois dela
- * (ou na última aula, se vier depois do último vídeo).
+ * Agrupa a trilha por aula, como o servidor entrega os dias: uma atividade fica na aula do vídeo que vem logo antes
+ * dela (a atividade "depois do vídeo N" é do dia que tem o vídeo N), e uma atividade antes do primeiro vídeo fica na
+ * primeira aula, mesmo sem vídeos. Assim ela não troca de aula quando se põe ou tira um vídeo de uma aula vazia.
  */
 export function groupTrackByLesson(course: PlatformCourse, track: TrackItem[]): LessonGroup[] {
   const lessons = courseLessons(course);
@@ -72,16 +73,16 @@ export function groupTrackByLesson(course: PlatformCourse, track: TrackItem[]): 
   lessons.forEach((lesson) => lesson.videoIds.forEach((id) => lessonOfVideo.set(id, lesson.id)));
   const groups = lessons.map((lesson) => ({ id: lesson.id, title: lesson.title, description: lesson.description, items: [] as TrackItem[] }));
   const byId = new Map(groups.map((group) => [group.id, group]));
-  const lastId = groups[groups.length - 1]?.id;
+  const firstId = groups[0]?.id;
 
   track.forEach((item, index) => {
     let lessonId: string | undefined;
     if (item.kind === 'video') lessonId = lessonOfVideo.get(item.video.id);
     else {
-      const next = track.slice(index + 1).find((candidate) => candidate.kind === 'video');
-      lessonId = next?.kind === 'video' ? lessonOfVideo.get(next.video.id) : lastId;
+      const previous = track.slice(0, index).reverse().find((candidate) => candidate.kind === 'video');
+      lessonId = previous?.kind === 'video' ? lessonOfVideo.get(previous.video.id) : firstId;
     }
-    (byId.get(lessonId ?? lastId ?? '') ?? groups[0])?.items.push(item);
+    (byId.get(lessonId ?? firstId ?? '') ?? groups[0])?.items.push(item);
   });
   return groups;
 }
