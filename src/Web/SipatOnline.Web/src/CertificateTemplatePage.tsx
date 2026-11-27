@@ -1,6 +1,6 @@
 import { ExternalLink, Trash2 } from 'lucide-react';
-import { useEffect, useState, type FormEvent } from 'react';
-import { getCertificateTemplate, saveCertificateTemplate, type CertificateTemplate, type TenantBranding } from './api';
+import { useEffect, useState, type FormEvent, type MouseEvent } from 'react';
+import { companyFileAddress, getCertificateTemplate, getCompanyAdministrationId, saveCertificateTemplate, type CertificateTemplate, type TenantBranding } from './api';
 import LoadingState from './LoadingState';
 import { Dropzone, readAsBase64 } from './TenantAppearancePage';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ type Slot = 'cover' | 'emblem' | 'footer';
 /** What the person chose for one picture and has not saved yet. */
 interface Draft { base64: string | null; type: string; remove: boolean; name: string }
 
+const samplePdf = '/api/tenant/certificate-template/preview';
 const untouched: Draft = { base64: null, type: 'image/png', remove: false, name: '' };
 const slots: { slot: Slot; title: string; description: string; pick: string; hint: string; maxBytes: number; limit: string; frame: string }[] = [
   {
@@ -96,6 +97,20 @@ export default function CertificateTemplatePage({ tenant }: { tenant: TenantBran
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : 'Não foi possível salvar. Suas alterações continuam na prévia.');
     } finally { setBusy(false); }
+  }
+
+  // the operator inside a company: the link alone cannot say which company, so the PDF is fetched and then opened
+  async function openSample(event: MouseEvent<HTMLAnchorElement>) {
+    if (!getCompanyAdministrationId()) return;
+    event.preventDefault();
+    const tab = window.open('', '_blank');
+    try {
+      const address = await companyFileAddress(samplePdf);
+      if (tab) tab.location.href = address; else window.location.href = address;
+    } catch (failure) {
+      tab?.close();
+      setError(failure instanceof Error ? failure.message : 'Não foi possível abrir o PDF de exemplo.');
+    }
   }
 
   return (
@@ -195,7 +210,7 @@ export default function CertificateTemplatePage({ tenant }: { tenant: TenantBran
               </div>
               {changed
                 ? <p className="m-0 text-xs text-muted-foreground">Salve para abrir o PDF de exemplo com este modelo.</p>
-                : <a className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary" href="/api/tenant/certificate-template/preview" rel="noreferrer" target="_blank">
+                : <a className="inline-flex w-fit items-center gap-1.5 text-sm font-semibold text-primary" href={samplePdf} onClick={(event) => void openSample(event)} rel="noreferrer" target="_blank">
                   <ExternalLink aria-hidden="true" className="size-4" /> Abrir PDF de exemplo
                 </a>}
               <p className="m-0 text-xs text-muted-foreground">Os certificados já emitidos não mudam: cada um guarda o modelo com que foi emitido.</p>
@@ -212,32 +227,35 @@ const green = '#14694b';
 const gold = '#c9a227';
 const muted = '#607068';
 const hairline = '#c8d6ce';
+// the same made-up contents as the sample PDF
+const sampleCourses = ['Segurança em primeiro lugar', 'Ergonomia no dia a dia', 'Saúde e bem-estar', 'Prevenção de acidentes', 'Primeiros socorros'];
 
 /** The certificate drawn with the same measures as the PDF (842 × 595 points), so what is seen here is what is issued. */
 function CertificatePreview({ companyName, cover, emblem, footer, logo }: {
   companyName: string; cover: string | null; emblem: string | null; footer: string | null; logo: string | null;
 }) {
-  const top = emblem ? 176 : 146;
-  const text = cover
-    ? { heading: top, title: top + 20, titleSize: 28, rule: top + 66, lead: top + 76, name: top + 98, nameSize: 26, line: top + 154,
-      company: top + 162, companySize: 13, event: top + 200, eventSize: 17, period: top + 248, periodSize: 12 }
-    : { heading: 128, title: 150, titleSize: 32, rule: 200, lead: 216, name: 240, nameSize: 28, line: 304,
-      company: 316, companySize: 14, event: 358, eventSize: 18, period: 412, periodSize: 13 };
+  // the text starts under the logos, the cover or the emblem
+  const top = !cover ? 116 : emblem ? 180 : 150;
   const footerPicture = footer ?? (cover ? logo : null);
   const year = new Date().getFullYear();
   // a line of text whose top is at `y`, as the PDF places it
   const line = (y: number, size: number, fill: string, content: string, weight = 400) => (
     <text fill={fill} fontSize={size} fontWeight={weight} textAnchor="middle" x={421} y={y + size}>{content}</text>
   );
+  // the list as the PDF sets these five names in the room each layout leaves: one column, then two, then three
+  const list = !cover ? { size: 12, columns: 1 } : emblem ? { size: 9, columns: 3 } : { size: 13, columns: 2 };
+  const rowHeight = list.size + 6;
+  const mark = list.size + 7;
+  const columnWidth = Math.max(...sampleCourses.map((name) => name.length)) * list.size * 0.54 + mark;
+  const perColumn = Math.ceil(sampleCourses.length / list.columns);
+  const gap = 32;
+  const listLeft = 421 - (list.columns * columnWidth + (list.columns - 1) * gap) / 2;
+  const listTop = top + 246 + 18;
   return (
     <svg aria-label="Prévia do certificado" className="block h-auto w-full" data-testid="certificate-preview" role="img" viewBox="0 0 842 595">
       <defs><clipPath id="certificate-emblem-clip"><circle cx={421} cy={134} r={34} /></clipPath></defs>
       <rect fill="#fff" height={595} width={842} />
-      <rect fill={green} height={595} width={14} />
-      <rect fill={gold} height={595} width={4} x={14} />
       {cover && <image height={106} href={cover} preserveAspectRatio="xMidYMid slice" width={774} x={40} y={28} />}
-      <rect fill="none" height={551} stroke={green} strokeWidth={1.6} width={786} x={34} y={22} />
-      <rect fill="none" height={539} stroke={hairline} strokeWidth={0.6} width={774} x={40} y={28} />
 
       {!cover && <>
         <rect fill={ink} height={58} width={58} x={64} y={50} />
@@ -251,15 +269,26 @@ function CertificatePreview({ companyName, cover, emblem, footer, logo }: {
         <image clipPath="url(#certificate-emblem-clip)" height={68} href={emblem} width={68} x={387} y={100} />
       </>}
 
-      {line(text.heading, 13, green, 'CERTIFICADO')}
-      {line(text.title, text.titleSize, ink, 'de participação')}
-      <line stroke={gold} strokeWidth={2} x1={391} x2={451} y1={text.rule} y2={text.rule} />
-      {line(text.lead, 13, muted, 'Certificamos que')}
-      {line(text.name, text.nameSize, ink, 'Maria Aparecida da Silva')}
-      <line stroke={hairline} strokeWidth={0.8} x1={231} x2={611} y1={text.line} y2={text.line} />
-      {line(text.company, text.companySize, ink, `da empresa ${companyName}, participou do treinamento`)}
-      {line(text.event, text.eventSize, green, `SIPAT ${year}`)}
-      {line(text.period, text.periodSize, muted, `Realizado de 09/11/${year} a 13/11/${year}, com 50 min de conteúdo.`)}
+      {line(top, 20, ink, 'Certificado de')}
+      {line(top + 24, 34, ink, 'Participação', 700)}
+      {line(top + 78, 12, muted, 'Este certificado reconhece que')}
+      {line(top + 98, 24, ink, 'Maria Aparecida da Silva', 700)}
+      {line(top + 146, 12, ink, `da empresa ${companyName}, participou do treinamento`)}
+      {line(top + 178, 16, green, `SIPAT ${year}`, 700)}
+      {line(top + 216, 11, muted, `Realizado de 09/11/${year} a 13/11/${year}, com 50 min de conteúdo.`)}
+      {line(top + 246, 8, green, 'CONTEÚDOS CONCLUÍDOS', 700)}
+      {sampleCourses.map((name, index) => {
+        const x = listLeft + Math.floor(index / perColumn) * (columnWidth + gap);
+        const middle = listTop + (index % perColumn) * rowHeight + rowHeight / 2;
+        return (
+          <g key={name}>
+            <circle cx={x + list.size / 2} cy={middle} fill={green} r={list.size / 2} />
+            <polyline fill="none" stroke="#fff" strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.3}
+              points={`${x + list.size * 0.27},${middle + list.size * 0.02} ${x + list.size * 0.44},${middle + list.size * 0.19} ${x + list.size * 0.74},${middle - list.size * 0.18}`} />
+            <text dominantBaseline="central" fill={ink} fontSize={list.size} x={x + mark} y={middle}>{name}</text>
+          </g>
+        );
+      })}
 
       <line stroke={hairline} strokeWidth={0.6} x1={64} x2={790} y1={478} y2={478} />
       <text fill={muted} fontSize={8} x={64} y={498}>EMITIDO EM</text>

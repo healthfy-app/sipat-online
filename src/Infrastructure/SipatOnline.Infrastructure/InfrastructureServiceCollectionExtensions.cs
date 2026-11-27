@@ -145,6 +145,8 @@ public static class InfrastructureServiceCollectionExtensions
             })
             .AddEntityFrameworkStores<PlatformDbContext>()
             .AddDefaultTokenProviders();
+        // how long a session outlives a deactivated account or a reset password (the framework's own 30 minutes is too long)
+        services.Configure<SecurityStampValidatorOptions>(options => options.ValidationInterval = TimeSpan.FromMinutes(5));
         services.AddScoped<IUserClaimsPrincipalFactory<PlatformIdentityUser>, TenantClaimsPrincipalFactory>();
         services.AddScoped<ILoginAttemptCounter, EfLoginAttemptCounter>();
 

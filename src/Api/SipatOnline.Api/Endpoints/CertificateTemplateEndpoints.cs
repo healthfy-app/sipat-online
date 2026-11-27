@@ -69,7 +69,8 @@ public static class CertificateTemplateEndpoints
             var now = clock.GetUtcNow();
             var sample = new ParticipationCertificate(Guid.Empty, companyId.Value, Guid.Empty, Guid.Empty, "Maria Aparecida da Silva",
                 company.Name, "SIPAT " + now.Year, now.AddDays(-4), now, 50 * 60 * 1000, now, false, "",
-                logo, row?.Id, row is null ? null : CertificateTemplates.From(row));
+                logo, row?.Id, row is null ? null : CertificateTemplates.From(row),
+                ["Segurança em primeiro lugar", "Ergonomia no dia a dia", "Saúde e bem-estar", "Prevenção de acidentes", "Primeiros socorros"]);
             return Results.File(renderer.Render(sample), "application/pdf");
         });
 

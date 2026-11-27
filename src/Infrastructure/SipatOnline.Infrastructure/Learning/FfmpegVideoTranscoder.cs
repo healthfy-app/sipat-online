@@ -18,7 +18,11 @@ public sealed class VideoConversionOptions
 
     public string FfprobePath { get; set; } = "ffprobe";
 
-    public TimeSpan Timeout { get; set; } = TimeSpan.FromHours(1);
+    /// <summary>
+    /// The longest one ffmpeg run may take. Only a guard against an ffmpeg that hangs (it would hold every video behind
+    /// it): long enough that a real video, converted at low priority on a small machine, never reaches it.
+    /// </summary>
+    public TimeSpan Timeout { get; set; } = TimeSpan.FromHours(12);
 
     /// <summary>
     /// The worker switch: true runs the conversion worker in this process. Several instances may run it

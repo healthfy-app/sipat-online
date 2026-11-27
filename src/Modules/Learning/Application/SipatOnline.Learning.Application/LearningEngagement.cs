@@ -12,7 +12,9 @@ public sealed record ParticipationCertificate(Guid Id, Guid TenantId, Guid Parti
     string ParticipantName, string CompanyName, string EventTitle, DateTimeOffset StartsAt,
     DateTimeOffset EndsAt, long DurationMilliseconds, DateTimeOffset IssuedAt, bool IsDemonstration,
     string CompletionBasis, CertificateLogo? CompanyLogo = null, Guid? TemplateId = null,
-    [property: System.Text.Json.Serialization.JsonIgnore] CertificateTemplate? Template = null);
+    [property: System.Text.Json.Serialization.JsonIgnore] CertificateTemplate? Template = null,
+    // the contents the participant concluded, in the order of the training (absent on certificates issued before they were listed)
+    IReadOnlyList<string>? Courses = null);
 /// <summary>The pictures a company puts on its certificates: a cover across the top, an emblem and a picture in the footer.
 /// A certificate keeps the id of the template it was issued with, so a later change never touches it.</summary>
 public sealed record CertificateTemplate(CertificateLogo? Cover, CertificateLogo? Emblem, CertificateLogo? Footer);

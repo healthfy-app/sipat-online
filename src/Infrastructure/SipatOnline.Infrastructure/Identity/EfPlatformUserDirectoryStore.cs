@@ -101,6 +101,11 @@ public sealed class EfPlatformUserDirectoryStore(PlatformDbContext dbContext) :
         foreach (var user in users)
         {
             user.IsActive = isActive;
+            // a deactivated account's open sessions end with it: the new stamp makes their cookies stop being accepted
+            if (!isActive)
+            {
+                user.SecurityStamp = Convert.ToHexString(System.Security.Cryptography.RandomNumberGenerator.GetBytes(20));
+            }
         }
 
         await dbContext.SaveChangesAsync(cancellationToken);
