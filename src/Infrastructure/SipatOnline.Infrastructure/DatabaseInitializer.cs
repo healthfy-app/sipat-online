@@ -213,19 +213,41 @@ public sealed class DatabaseInitializer(
     private async Task SeedPlatformOperatorAsync(CancellationToken cancellationToken)
     {
         var options = platformOperatorOptions.Value;
-        if (string.IsNullOrEmpty(options.Password))
+        await SeedPlatformOperatorAccountAsync(
+            options.LoginIdentifier,
+            options.DisplayName,
+            options.Password,
+            cancellationToken);
+
+        foreach (var account in options.Additional)
+        {
+            await SeedPlatformOperatorAccountAsync(
+                account.LoginIdentifier,
+                account.DisplayName,
+                account.Password,
+                cancellationToken);
+        }
+    }
+
+    private async Task SeedPlatformOperatorAccountAsync(
+        string? loginIdentifier,
+        string? displayName,
+        string? password,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrEmpty(password))
         {
             return;
         }
 
         var identifierResult = LoginIdentifier.Create(
-            string.IsNullOrWhiteSpace(options.LoginIdentifier)
+            string.IsNullOrWhiteSpace(loginIdentifier)
                 ? "sipat.online.admin"
-                : options.LoginIdentifier);
+                : loginIdentifier);
         var displayNameResult = DisplayName.Create(
-            string.IsNullOrWhiteSpace(options.DisplayName)
+            string.IsNullOrWhiteSpace(displayName)
                 ? "Super Admin SIPAT Online"
-                : options.DisplayName);
+                : displayName);
         if (!identifierResult.IsSuccess || !displayNameResult.IsSuccess)
         {
             throw new InvalidOperationException("The platform operator configuration is invalid.");
@@ -263,7 +285,7 @@ public sealed class DatabaseInitializer(
         };
 
         await using var transaction = await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var createResult = await userManager.CreateAsync(identityUser, options.Password);
+        var createResult = await userManager.CreateAsync(identityUser, password);
         if (!createResult.Succeeded)
         {
             throw new InvalidOperationException(

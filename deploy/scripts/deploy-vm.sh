@@ -16,6 +16,8 @@
 #           TENANT_BASE_DOMAIN PLATFORM_HOST: required with a domain of our own; when both are empty
 #           and DEPLOY_HOST is an IPv4, they become <ip-with-dashes>.sslip.io and ops.<that> (dev)
 # Optional: PLATFORM_OPERATOR_DISPLAY_NAME PLATFORM_OPERATOR_PASSWORD (first deploy only)
+#           PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER PLATFORM_OPERATOR_2_DISPLAY_NAME PLATFORM_OPERATOR_2_PASSWORD
+#           (a second owner; the password is only read while that account does not exist)
 #           CERTIFICATE_MODE (http01|dns-azure|manual) ACME_EMAIL DEPLOY_ENVIRONMENT IMAGE_TAG
 #           DEPLOY_PLATFORM (linux/amd64 default; linux/arm64 for Azure *p* sizes such as B2pts_v2)
 #           VIDEO_STORAGE_PROVIDER (File|R2) R2_SERVICE_URL R2_VIDEO_BUCKET R2_ACCESS_KEY_ID
@@ -98,6 +100,12 @@ put PLATFORM_OPERATOR_LOGIN_IDENTIFIER "$PLATFORM_OPERATOR_LOGIN_IDENTIFIER"
 put PLATFORM_OPERATOR_DISPLAY_NAME "${PLATFORM_OPERATOR_DISPLAY_NAME:-$PLATFORM_OPERATOR_LOGIN_IDENTIFIER}"
 # only read while the account does not exist (first deploy)
 put PLATFORM_OPERATOR_PASSWORD "${PLATFORM_OPERATOR_PASSWORD:-}"
+if [ -n "${PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER:-}" ]; then
+  # a second owner of the platform, created like the first one
+  put PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER "$PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER"
+  put PLATFORM_OPERATOR_2_DISPLAY_NAME "${PLATFORM_OPERATOR_2_DISPLAY_NAME:-$PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER}"
+  put PLATFORM_OPERATOR_2_PASSWORD "${PLATFORM_OPERATOR_2_PASSWORD:-}"
+fi
 put SIPAT_API_IMAGE "sipat-online-api:$tag"
 put SIPAT_WEB_IMAGE "sipat-online-web:$tag"
 put CERTIFICATE_MODE "${CERTIFICATE_MODE:-manual}"

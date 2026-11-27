@@ -28,6 +28,10 @@ x-api-environment: &api-environment
   SipatOnline__PlatformOperator__LoginIdentifier: ${PLATFORM_OPERATOR_LOGIN_IDENTIFIER:-}
   SipatOnline__PlatformOperator__DisplayName: ${PLATFORM_OPERATOR_DISPLAY_NAME:-}
   SipatOnline__PlatformOperator__Password: ${PLATFORM_OPERATOR_PASSWORD:-}
+  # optional second owner, created on the first start after it is set (the password is only read then)
+  SipatOnline__PlatformOperator__Additional__0__LoginIdentifier: ${PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER:-}
+  SipatOnline__PlatformOperator__Additional__0__DisplayName: ${PLATFORM_OPERATOR_2_DISPLAY_NAME:-}
+  SipatOnline__PlatformOperator__Additional__0__Password: ${PLATFORM_OPERATOR_2_PASSWORD:-}
   SipatOnline__ForwardedHeaders__KnownProxies__0: 172.28.0.2
   # opcional: uma rede inteira de proxies confiaveis (CIDR); vazio = so o nginx acima, como hoje
   SipatOnline__ForwardedHeaders__KnownNetworks__0: ${TRUSTED_PROXY_NETWORK:-}
