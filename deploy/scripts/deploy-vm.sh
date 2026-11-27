@@ -1,23 +1,39 @@
 #!/usr/bin/env bash
-# Deploys the current checkout to a VM: builds the two images HERE (the VM never builds),
-# copies them and the deploy/ folder over SSH, writes deploy/.env.production on the VM from
-# the environment variables below, runs db-init, starts postgres, api and web, issues the
-# HTTPS certificate (CERTIFICATE_MODE=http01) and checks https://PLATFORM_HOST/health.
+# Deploys the current checkout to a VM: prepares a bare Ubuntu/Debian VM (prepare-vm.sh),
+# builds the two images HERE (the VM never builds), copies them and the deploy/ folder over
+# SSH, writes deploy/.env.production on the VM from the environment variables below, runs
+# db-init, starts postgres, api and web, issues the HTTPS certificate (CERTIFICATE_MODE=http01),
+# turns the daily backup to R2 on (R2_BACKUP_BUCKET) and checks https://PLATFORM_HOST/health.
+#
+# Moving to another VM: point DEPLOY_HOST at it and deploy once with RESTORE_BACKUP=latest
+# (restore-on-new-vm.sh loads the last backup into the new, empty database). See deploy/PIPELINE-VM.md.
 #
 # The same script runs in GitHub Actions (.github/workflows/deploy-vm.yml, values from the
 # GitHub environment) and from a workstation (values exported in the shell). See deploy/PIPELINE-VM.md.
 #
 # Required: DEPLOY_HOST DEPLOY_USER DEPLOY_APP_PATH DEPLOY_SSH_KEY_FILE DEPLOY_KNOWN_HOSTS_FILE
-#           TENANT_BASE_DOMAIN PLATFORM_HOST POSTGRES_PASSWORD PLATFORM_OPERATOR_LOGIN_IDENTIFIER
+#           POSTGRES_PASSWORD PLATFORM_OPERATOR_LOGIN_IDENTIFIER
+#           TENANT_BASE_DOMAIN PLATFORM_HOST: required with a domain of our own; when both are empty
+#           and DEPLOY_HOST is an IPv4, they become <ip-with-dashes>.sslip.io and ops.<that> (dev)
 # Optional: PLATFORM_OPERATOR_DISPLAY_NAME PLATFORM_OPERATOR_PASSWORD (first deploy only)
 #           CERTIFICATE_MODE (http01|dns-azure|manual) ACME_EMAIL DEPLOY_ENVIRONMENT IMAGE_TAG
 #           DEPLOY_PLATFORM (linux/amd64 default; linux/arm64 for Azure *p* sizes such as B2pts_v2)
 #           VIDEO_STORAGE_PROVIDER (File|R2) R2_SERVICE_URL R2_VIDEO_BUCKET R2_ACCESS_KEY_ID
-#           R2_SECRET_ACCESS_KEY R2_DIRECT_UPLOAD R2_BACKUP_BUCKET OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
+#           R2_SECRET_ACCESS_KEY R2_DIRECT_UPLOAD OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
+#           R2_BACKUP_BUCKET R2_BACKUP_ACCESS_KEY_ID R2_BACKUP_SECRET_ACCESS_KEY (the key falls back to
+#           R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY, for a key that can also write the backup bucket)
+#           RESTORE_BACKUP (latest | sipat-online-YYYYMMDD-HHMMSS.dump: only on a new, empty VM)
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")/../.."
 
+# without a domain of our own the hosts follow the IP: a new VM only changes DEPLOY_HOST
+if [ -z "${TENANT_BASE_DOMAIN:-}" ] && [ -z "${PLATFORM_HOST:-}" ] \
+    && [[ "${DEPLOY_HOST:-}" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+  TENANT_BASE_DOMAIN="${DEPLOY_HOST//./-}.sslip.io"
+  PLATFORM_HOST="ops.$TENANT_BASE_DOMAIN"
+  echo "Hosts from DEPLOY_HOST: $PLATFORM_HOST and <company>.$TENANT_BASE_DOMAIN"
+fi
 for name in DEPLOY_HOST DEPLOY_USER DEPLOY_APP_PATH DEPLOY_SSH_KEY_FILE DEPLOY_KNOWN_HOSTS_FILE \
             TENANT_BASE_DOMAIN PLATFORM_HOST POSTGRES_PASSWORD PLATFORM_OPERATOR_LOGIN_IDENTIFIER; do
   if [ -z "${!name:-}" ]; then
@@ -27,6 +43,15 @@ for name in DEPLOY_HOST DEPLOY_USER DEPLOY_APP_PATH DEPLOY_SSH_KEY_FILE DEPLOY_K
 done
 if ! [[ "$DEPLOY_APP_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]]; then
   echo "DEPLOY_APP_PATH must be an absolute path." >&2
+  exit 1
+fi
+restore="${RESTORE_BACKUP:-}"
+if [ -n "$restore" ] && [ "$restore" != "latest" ] && ! [[ "$restore" =~ ^sipat-online-[0-9]{8}-[0-9]{6}\.dump$ ]]; then
+  echo "RESTORE_BACKUP must be 'latest' or a name like sipat-online-20261127-030000.dump." >&2
+  exit 1
+fi
+if [ -n "$restore" ] && [ -z "${R2_BACKUP_BUCKET:-}" ]; then
+  echo "RESTORE_BACKUP needs R2_BACKUP_BUCKET: that is where the backups are." >&2
   exit 1
 fi
 
@@ -84,7 +109,17 @@ if [ "$provider" = "R2" ]; then
 fi
 # read by deploy/scripts/backup-postgres.sh: without it here, every deploy would switch the daily backup off
 if [ -n "${R2_BACKUP_BUCKET:-}" ]; then
+  backup_key_id="${R2_BACKUP_ACCESS_KEY_ID:-${R2_ACCESS_KEY_ID:-}}"
+  backup_secret="${R2_BACKUP_SECRET_ACCESS_KEY:-${R2_SECRET_ACCESS_KEY:-}}"
+  if [ -z "${R2_SERVICE_URL:-}" ] || [ -z "$backup_key_id" ] || [ -z "$backup_secret" ]; then
+    echo "R2_BACKUP_BUCKET needs R2_SERVICE_URL and an R2 key (R2_BACKUP_ACCESS_KEY_ID/R2_BACKUP_SECRET_ACCESS_KEY)." >&2
+    exit 1
+  fi
   put R2_BACKUP_BUCKET "$R2_BACKUP_BUCKET"
+  [ "$provider" = "R2" ] || put R2_SERVICE_URL "$R2_SERVICE_URL"
+  # rclone reads the key from here (deploy/scripts/r2-backup-env.sh): a new VM needs no `rclone config`
+  put R2_BACKUP_ACCESS_KEY_ID "$backup_key_id"
+  put R2_BACKUP_SECRET_ACCESS_KEY "$backup_secret"
 fi
 if [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then
   put OTEL_EXPORTER_OTLP_ENDPOINT "$OTEL_EXPORTER_OTLP_ENDPOINT"
@@ -100,31 +135,50 @@ docker buildx build --load --platform "$platform" --file deploy/nginx/Dockerfile
 docker save "sipat-online-api:$tag" "sipat-online-web:$tag" | gzip -1 > "$work/images.tar.gz"
 echo "images: $(du -h "$work/images.tar.gz" | cut -f1)"
 
+echo "==> Prepare $DEPLOY_HOST"
+# its own SSH session: the docker group it may add only counts from the next login
+remote "sudo bash -s -- '$DEPLOY_APP_PATH' '$DEPLOY_USER'" < deploy/scripts/prepare-vm.sh
+
 echo "==> Copy release to $DEPLOY_HOST"
-remote "test -d '$DEPLOY_APP_PATH' && mkdir -p '$DEPLOY_APP_PATH/deploy'"
+remote "mkdir -p '$DEPLOY_APP_PATH/deploy'"
 tar --create --gzip --exclude=deploy/terraform --exclude=deploy/cloudflare --exclude='deploy/.env*' deploy \
   | remote "tar --extract --gzip --directory '$DEPLOY_APP_PATH'"
 remote "umask 077 && cat > '$DEPLOY_APP_PATH/deploy/.env.production'" < "$env_file"
 remote "cat > /tmp/sipat-online-images.tar.gz" < "$work/images.tar.gz"
 
 echo "==> Start the stack"
-remote "bash -s -- '$DEPLOY_APP_PATH'" <<'REMOTE' | tee "$work/remote.log"
+remote "bash -s -- '$DEPLOY_APP_PATH' '$restore'" <<'REMOTE' | tee "$work/remote.log"
 set -euo pipefail
 cd "$1"
+restore="$2"
 chmod 0755 deploy/scripts/*.sh
 gunzip -c /tmp/sipat-online-images.tar.gz | docker load
 rm -f /tmp/sipat-online-images.tar.gz
 
 compose=(docker compose --env-file deploy/.env.production --file deploy/compose.production.yaml)
-"${compose[@]}" up -d --no-build postgres
+"${compose[@]}" up -d --no-build --wait postgres
+if [ -n "$restore" ]; then
+  # moving to a new VM: the data comes from the last backup, before db-init and the API touch the database
+  deploy/scripts/restore-on-new-vm.sh "$restore" < /dev/null
+fi
 # -T and </dev/null: this script itself arrives on stdin, and "run" would swallow the rest of it
 "${compose[@]}" --profile tools run --rm -T db-init < /dev/null
 "${compose[@]}" up -d --no-build --remove-orphans api web
 
 # HTTPS by HTTP-01 (no wildcard zone): issue now and keep the company hosts in the certificate
-sudo install -m 0644 deploy/systemd/sipat-certificates.service deploy/systemd/sipat-certificates.timer /etc/systemd/system/
-sudo sed -i "s#/opt/sipat-online/app#$1#" /etc/systemd/system/sipat-certificates.service
+for unit in sipat-certificates sipat-certbot-renew sipat-backup; do
+  sudo install -m 0644 "deploy/systemd/$unit.service" "deploy/systemd/$unit.timer" /etc/systemd/system/
+  sudo sed -i "s#/opt/sipat-online/app#$1#g" "/etc/systemd/system/$unit.service"
+done
 sudo systemctl daemon-reload
+# renewal of the certificates in every mode (the Azure cloud-init installed an older copy of it)
+sudo systemctl disable --now sipat-online-certbot-renew.timer 2>/dev/null || true
+sudo systemctl enable --now sipat-certbot-renew.timer
+if grep -q '^R2_BACKUP_BUCKET=' deploy/.env.production; then
+  sudo systemctl enable --now sipat-backup.timer
+else
+  sudo systemctl disable --now sipat-backup.timer 2>/dev/null || true
+fi
 if grep -q '^CERTIFICATE_MODE=http01$' deploy/.env.production; then
   # through systemd, so a run started by the timer and this one never call certbot at the same time;
   # "start" of a oneshot waits until it ends and fails the deploy when the certificate fails
@@ -148,3 +202,6 @@ echo "==> Health check"
 curl --fail --silent --show-error --retry 12 --retry-delay 10 --retry-all-errors "https://$PLATFORM_HOST/health"
 echo
 echo "Operation portal: https://$PLATFORM_HOST"
+if [ -n "${GITHUB_OUTPUT:-}" ]; then
+  echo "url=https://$PLATFORM_HOST" >> "$GITHUB_OUTPUT"
+fi

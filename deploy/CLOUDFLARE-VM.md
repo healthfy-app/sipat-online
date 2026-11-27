@@ -125,6 +125,8 @@ Com o R2, o participante assiste por links assinados e temporários direto da Cl
 ### Backup diário do banco no R2
 O banco roda na própria VM; sem cópia externa, perder o disco é perder tudo. Todo dia às 03:00 um *timer* grava um `pg_dump` no R2 e apaga as cópias com mais de 30 dias.
 
+> **Pela pipeline (`deploy-vm.sh`) isto é automático:** com `R2_BACKUP_BUCKET` e a chave do bucket de backups no ambiente do GitHub, o deploy instala o rclone, grava a chave no `.env.production` e liga o timer. Dos passos abaixo, só o 2 (bucket e chave) e o 7 (ensaio) continuam manuais. O mesmo backup é o que uma VM nova restaura (`deploy/PIPELINE-VM.md`, seção 4).
+
 > **O backup é sensível.** As chaves de login e segurança do sistema (Data Protection) ficam no banco, sem criptografia. Quem tiver uma cópia do banco consegue forjar sessões: guarde o bucket de backups privado e com chave de acesso só dele.
 
 1. Instale o rclone: `sudo apt install rclone` (ou `curl https://rclone.org/install.sh | sudo bash`).
