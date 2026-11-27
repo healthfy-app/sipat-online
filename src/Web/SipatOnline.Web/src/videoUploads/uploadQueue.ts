@@ -48,6 +48,8 @@ export interface UploadItem {
   /** Continued from an upload that a reload or a lost connection had interrupted. */
   resumed: boolean;
   video?: PlatformCourseVideo;
+  /** The id the library knows it by while it is sent, so this browser does not show it twice. */
+  videoId?: string;
 }
 
 /** An upload a previous visit left unfinished: the file has to be picked again to resume it. */
@@ -555,6 +557,7 @@ async function openChunked(id: string, job: Job, item: UploadItem, signal: Abort
     try {
       const parts = await withRetry(id, signal, () => listChunkedUploadParts(saved.videoId, saved.uploadId));
       job.chunk = saved;
+      update(id, { videoId: saved.videoId });
       job.done = new Set(parts
         .filter((part) => part.sizeBytes === partSize(saved, item.totalBytes, part.partNumber))
         .map((part) => part.partNumber));
@@ -566,9 +569,10 @@ async function openChunked(id: string, job: Job, item: UploadItem, signal: Abort
     }
   }
 
-  const start = await withRetry(id, signal, () => startChunkedVideoUpload(item.file.type, item.totalBytes));
+  const start = await withRetry(id, signal, () => startChunkedVideoUpload(item.file.type, item.totalBytes, item.title, job.durationMs));
   if (!start) return false;
   job.chunk = start;
+  update(id, { videoId: start.videoId });
   job.done = new Set();
   saveUpload(item.key, {
     videoId: start.videoId,

@@ -315,7 +315,7 @@ export interface PlatformCourseVideo {
   createdAt: string;
   fileUrl: string;
   /** Every upload is converted in the background; only Ready videos can be watched or put in a Day. */
-  status: 'Ready' | 'Processing' | 'Failed';
+  status: 'Ready' | 'Processing' | 'Failed' | 'Uploading';
   processingError: string | null;
   hasSd480: boolean;
   /** New uploads whose original is taller than 720 lines also have a 1080p. */
@@ -1263,11 +1263,17 @@ export interface ChunkedVideoUpload {
 }
 
 /** Null: this environment has no direct upload (or the API is older), send with uploadPlatformVideo. */
-export async function startChunkedVideoUpload(contentType: string, sizeBytes: number): Promise<ChunkedVideoUpload | null> {
+export async function startChunkedVideoUpload(
+  contentType: string,
+  sizeBytes: number,
+  title?: string,
+  durationMilliseconds?: number,
+): Promise<ChunkedVideoUpload | null> {
   try {
+    // with the title, other operators see the video in the library as "sending" until it arrives
     const start = await requestJson<ChunkedVideoUpload | { mode: 'multipart' }>(`${uploadBase}/uploads/chunked`, {
       method: 'POST',
-      body: JSON.stringify({ contentType, sizeBytes }),
+      body: JSON.stringify({ contentType, sizeBytes, title, durationMilliseconds }),
     });
     return start.mode === 'chunked' ? start : null;
   } catch (error) {

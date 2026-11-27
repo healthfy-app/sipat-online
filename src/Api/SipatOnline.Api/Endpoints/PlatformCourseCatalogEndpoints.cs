@@ -421,7 +421,8 @@ public static partial class PlatformCourseCatalogEndpoints
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var result = await catalogService.StartChunkedUploadAsync(request.ContentType, request.SizeBytes, cancellationToken);
+            var result = await catalogService.StartChunkedUploadAsync(
+                request.ContentType, request.SizeBytes, cancellationToken, request.Title, request.DurationMilliseconds);
             if (!result.IsSuccess)
             {
                 return ToProblem(result.Error);
@@ -1003,7 +1004,11 @@ public sealed record UpdatePlatformCourseRequest(
 
 public sealed record SetPlatformCourseVideosRequest(IReadOnlyList<Guid>? VideoIds);
 
-public sealed record StartPlatformVideoUploadRequest(string? ContentType, long SizeBytes);
+public sealed record StartPlatformVideoUploadRequest(
+    string? ContentType,
+    long SizeBytes,
+    string? Title = null,
+    long? DurationMilliseconds = null);
 
 public sealed record CompletePlatformVideoUploadRequest(string? Title, long DurationMilliseconds, Guid? CourseId);
 

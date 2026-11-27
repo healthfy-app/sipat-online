@@ -95,7 +95,7 @@ export default function VideoLibraryPage({ company = false }: { company?: boolea
   }, [loadVideos]);
 
   // while a video is being prepared, look again quietly until it is ready (or failed)
-  const preparing = items?.some(item => item.video.status === 'Processing') ?? false;
+  const preparing = items?.some(item => item.video.status === 'Processing' || item.video.status === 'Uploading') ?? false;
   useEffect(() => {
     if (!preparing) return;
     const timer = window.setInterval(() => { loadVideos().then(setItems, () => undefined); }, 15_000);
@@ -115,16 +115,18 @@ export default function VideoLibraryPage({ company = false }: { company?: boolea
     return next;
   }, { replace: true });
 
-  const all = items ?? [];
+  // what this browser is sending already shows in its own progress card above
+  const sendingHere = useMemo(() => new Set(queue.items.map(item => item.videoId).filter(Boolean)), [queue.items]);
+  const all = useMemo(() => (items ?? []).filter(item => item.video.status !== 'Uploading' || !sendingHere.has(item.video.id)), [items, sendingHere]);
   const shown = useMemo(() => {
     const term = query.trim().toLocaleLowerCase('pt-BR');
-    return (items ?? []).filter(item => {
+    return all.filter(item => {
       if (term && !item.video.title.toLocaleLowerCase('pt-BR').includes(term)) return false;
       if (!subjectFilter) return true;
       const ids = videoSubjects.get(item.video.id) ?? [];
       return subjectFilter === 'none' ? ids.length === 0 : ids.includes(subjectFilter);
     });
-  }, [items, query, subjectFilter, videoSubjects]);
+  }, [all, query, subjectFilter, videoSubjects]);
 
   const names = useMemo(() => ({
     subjects: new Map(subjects.map(item => [item.id, item.title])),
@@ -412,7 +414,7 @@ function VideoCard({ item, checked, playing, onCheck, onPlay, onRename, onThumbn
     <div className={cn(tile, 'rounded-none')}>
       {!ready
         ? <p className={cn('m-0 px-4 text-center text-sm font-medium', video.status === 'Failed' && 'text-destructive')} role="status">
-          {video.status === 'Failed' ? video.processingError ?? 'Não foi possível preparar este vídeo.' : 'Preparando o vídeo…'}
+          {video.status === 'Failed' ? video.processingError ?? 'Não foi possível preparar este vídeo.' : video.status === 'Uploading' ? 'Enviando o vídeo…' : 'Preparando o vídeo…'}
         </p>
         : playing
           ? <InlinePlayer video={video} />
