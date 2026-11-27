@@ -82,7 +82,8 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
             Picture(emblem, new XRect(387, 100, 68, 68), round: true);
         }
         var small = new XFont("SipatCertificate", 9);
-        void Block(string text, double top, double height, double preferredSize, XBrush? brush = null, bool bold = false)
+        // draws the text inside its room, in a smaller letter when it needs more lines, and says how tall it came out
+        double Block(string text, double top, double height, double preferredSize, XBrush? brush = null, bool bold = false)
         {
             for (var size = preferredSize; size >= 8; size--)
             {
@@ -109,7 +110,7 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
                 for (var index = 0; index < lines.Count; index++)
                     graphics.DrawString(lines[index], font, brush ?? ink,
                         new XRect(76, top + index * lineHeight, 690, lineHeight), XStringFormats.TopCenter);
-                return;
+                return lines.Count * lineHeight;
             }
             throw new InvalidOperationException("Certificate text exceeds its bounded layout.");
         }
@@ -119,6 +120,8 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         void Checklist(IReadOnlyList<string> courses, double top)
         {
             const double bottom = 474, left = 76, width = 690, headingHeight = 18, gap = 32;
+            // long names above may have left no room for even one line: the certificate goes out without the list
+            if (bottom - top < headingHeight + 15) return;
             graphics.DrawString("CONTEÚDOS CONCLUÍDOS", new XFont("SipatCertificate", 8, XFontStyleEx.Bold), green,
                 new XRect(left, top, width, 11), XStringFormats.TopCenter);
             top += headingHeight;
@@ -177,15 +180,18 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
         var period = Period(certificate.StartsAt, certificate.EndsAt);
         var courses = certificate.Courses is { Count: > 0 } listed ? listed : null;
         // the text starts under the logos, the cover or the emblem; with no contents to list it sits a little lower
-        var top = (cover is null ? 116d : emblem is null ? 150d : 180d) + (courses is null ? 30 : 0);
+        var top = (cover is null ? 116d : emblem is null ? 150d : 180d) + (courses is null ? emblem is null || cover is null ? 30 : 10 : 0);
         Block(certificate.IsDemonstration ? "Certificado demonstrativo de" : "Certificado de", top, 26, 20);
         Block("Participação", top + 24, 44, 34, bold: true);
         Block("Este certificado reconhece que", top + 78, 18, 12, muted);
-        Block(certificate.ParticipantName, top + 98, 44, 24, bold: true);
-        Block($"da empresa {certificate.CompanyName}, participou do treinamento", top + 146, 30, 12);
-        Block(certificate.EventTitle, top + 178, 36, 16, green, bold: true);
-        Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", top + 216, 18, 11, muted);
-        if (courses is not null) Checklist(courses, top + 246);
+        // from the name down each line starts where the one above ended: a long name or company takes more lines and
+        // pushes the rest, and even with every one at its tallest the last line stays above the footer
+        var next = top + 98;
+        next += Block(certificate.ParticipantName, next, 52, 24, bold: true) + 14;
+        next += Block($"da empresa {certificate.CompanyName}, participou do treinamento", next, 36, 12) + 14;
+        next += Block(certificate.EventTitle, next, 44, 16, green, bold: true) + 14;
+        next += Block($"{period}, com {Duration(certificate.DurationMilliseconds)} de conteúdo.", next, 18, 11, muted) + 14;
+        if (courses is not null) Checklist(courses, next);
 
         // footer: issue date on the left, the code on the right, the notice in the middle
         graphics.DrawLine(new XPen(XColor.FromArgb(200, 214, 206), 0.6), 64, 478, 790, 478);
