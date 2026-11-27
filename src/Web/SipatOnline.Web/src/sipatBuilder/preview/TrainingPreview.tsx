@@ -20,7 +20,7 @@ import { usePreviewSession, type PreviewSession } from './previewSession';
 import '@/LearningCatalog.css';
 
 /**
- * "Ver como o participante vê": the training over the whole screen, the way the participant gets it. The day in the
+ * "Visão do participante": the training over the whole screen, the way the participant gets it. The day in the
  * middle is the participant's own day page, fed by the board as it is now (saved or not); the bar on top is the
  * preview's: which day, and the way out. Nothing is recorded: what is watched lives in memory and goes with the preview.
  */
@@ -77,7 +77,7 @@ function PreviewBar({ days, openDay, word, name, titleId, onDay, onClose }: {
           <Eye aria-hidden="true" className="size-3.5" />Prévia
         </span>
         <div className="grid min-w-0 leading-tight">
-          <h2 className="m-0 truncate text-[0.9375rem] font-bold text-white" id={titleId}>Como o participante vê</h2>
+          <h2 className="m-0 truncate text-[0.9375rem] font-bold text-white" id={titleId}>Visão do participante</h2>
           <p className="m-0 truncate text-xs text-white/65" title={name}>{name || 'Treinamento sem nome'}</p>
         </div>
       </div>

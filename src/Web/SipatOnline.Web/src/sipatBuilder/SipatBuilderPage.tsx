@@ -633,15 +633,15 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         {/* published: the main action is to see it as the participant does; a draft still has to be published */}
         {(!template && !cancelled && !published)
           ? <>
-            <Button className={phoneAction} disabled={days.length === 0} onClick={() => setPreviewing(true)} variant="outline"><Eye /> Ver como o participante vê</Button>
+            <Button className={phoneAction} disabled={days.length === 0} onClick={() => setPreviewing(true)} variant="outline"><Eye /> Visão do participante</Button>
             <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> Publicar</Button>
           </>
-          : <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye /> Ver como o participante vê</Button>}
+          : <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye /> Visão do participante</Button>}
       </div>}
       {stage === 'grid' && viewOnly && sipat && <div className="ops-hero-actions max-[760px]:hidden">
         {published && <Button onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
         <Button onClick={() => navigate(`${basePath}/${sipat.id}/editar`)} variant="outline"><Play /> Ver no editor</Button>
-        <Button className="ops-primary" disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye /> Ver como o participante vê</Button>
+        <Button className="ops-primary" disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye /> Visão do participante</Button>
       </div>}
     </header>
 

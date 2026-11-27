@@ -80,7 +80,7 @@ describe('the preview of a training, from the board', () => {
     const onClose = vi.fn();
     render(<TrainingPreview catalog={catalog} days={board} games name="SIPAT 2026" onClose={onClose} word="Dia" />);
 
-    const preview = screen.getByRole('dialog', { name: 'Como o participante vê' });
+    const preview = screen.getByRole('dialog', { name: 'Visão do participante' });
     expect(within(preview).getByRole('heading', { level: 1, name: 'Abertura' })).toBeVisible();
     expect(within(preview).getByText('Vídeo 1 de 2')).toBeVisible();
     expect(within(preview).getByText('0 de 2 vídeos · 0%')).toBeVisible();
