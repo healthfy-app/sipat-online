@@ -139,6 +139,17 @@ Com `DEPLOY_ENVIRONMENT=production`, o script **para** se faltar alguma variáve
 
 É o mesmo passo da primeira subida (2.1 a 2.3), sempre a partir da `main` e fora do horário de uso. O `db-init` roda sozinho antes da API nova. O que muda entre uma versão e outra (comandos de migração de dados, como `--convert-catalog-videos`) vem descrito no PR. Leia antes de subir.
 
+### Aspire Dashboard (traces, logs e métricas da API)
+Com a variável `ASPIRE_DASHBOARD=true` no ambiente `production` do GitHub (ou no `prod.env`), o deploy sobe o container `aspire-dashboard` na VM e a API manda para ele a telemetria (OTLP). Ele mostra cada requisição com a rota, o tempo, o SQL e as chamadas ao R2, os logs estruturados e as métricas.
+
+- **Não fica na internet.** A página escuta só em `127.0.0.1:18888` da VM, sem login próprio: quem chega nela já tem a chave SSH. Abra um túnel e use o navegador da sua máquina:
+  ```powershell
+  ssh -i $HOME\.sipat-online\prod_deploy -N -L 18888:127.0.0.1:18888 sipat@<IP da VM>
+  ```
+  Com o túnel aberto, acesse `http://localhost:18888`. Feche o terminal para encerrar.
+- **Guarda tudo em memória.** Reiniciar o container ou a VM apaga o histórico. Para guardar dias de histórico, use o Grafana Cloud ([CLOUDFLARE-VM.md](CLOUDFLARE-VM.md), seção 7); os dois não funcionam juntos, e o `ASPIRE_DASHBOARD=true` tem prioridade.
+- Para desligar, apague a variável e rode o deploy de novo: o container é removido.
+
 ## 6. Quando algo dá errado
 
 - **A versão nova quebrou e a versão não teve migração de banco:** volte para a tag anterior e rode o script de novo (`git switch --detach prod-<data anterior>` e o passo 2.2). Volte para a `main` depois.

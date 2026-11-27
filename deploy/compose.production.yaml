@@ -36,6 +36,7 @@ x-api-environment: &api-environment
   SipatOnline__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}
   # observabilidade (traces, metricas e logs por OTLP): desligada enquanto o endpoint estiver vazio.
   # Para o Grafana Cloud (camada gratis), veja deploy/CLOUDFLARE-VM.md, secao 7.
+  # Para o Aspire Dashboard na propria VM (ASPIRE_DASHBOARD=true no deploy), veja deploy/PRODUCAO.md.
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
   OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
@@ -111,6 +112,24 @@ services:
       edge:
         # fixed, so that it never takes the address 172.28.0.2 that the web container (the trusted proxy) needs
         ipv4_address: 172.28.0.3
+      telemetry:
+
+  # Aspire Dashboard: traces, logs and metrics of the API, kept in memory (a restart clears them).
+  # Started only with ASPIRE_DASHBOARD=true (deploy/scripts/deploy-vm.sh). The page listens on the
+  # VM's loopback only: open it through an SSH tunnel (deploy/PRODUCAO.md), never on the internet.
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.5
+    logging: *default-logging
+    environment:
+      # no login of its own: only who already has the SSH key of the VM reaches the page
+      ASPIRE_DASHBOARD_UNSECURED_ALLOW_ANONYMOUS: "true"
+    ports:
+      - "127.0.0.1:18888:18888"
+    expose:
+      - "18889"
+    restart: unless-stopped
+    networks:
+      telemetry:
 
   web:
     image: ${SIPAT_WEB_IMAGE:-sipat-online-web:production}
@@ -151,3 +170,5 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/24
+  # API -> Aspire Dashboard; its own network so no dynamic address is ever taken from edge
+  telemetry:
