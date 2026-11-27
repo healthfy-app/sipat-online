@@ -23,9 +23,14 @@ public static class ProfileText
     public static bool IsScientificNotation(string? value) =>
         !string.IsNullOrWhiteSpace(value) && ScientificNotation.IsMatch(value.Trim());
 
+    /// <summary>
+    /// A name that came all in capitals or all in small letters (a spreadsheet export) gets its capitals. One typed with
+    /// both was written with care ("E2E Participante", "McDonald"): only its spaces are tidied.
+    /// </summary>
     public static string PersonName(string value)
     {
         var words = value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        if (value.Any(char.IsUpper) && value.Any(char.IsLower)) return string.Join(' ', words);
         for (var i = 0; i < words.Length; i++)
         {
             var lower = words[i].ToLowerInvariant();
