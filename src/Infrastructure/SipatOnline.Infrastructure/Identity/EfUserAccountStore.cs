@@ -159,8 +159,12 @@ public sealed class EfUserAccountStore(
             identityUser.DisplayNameLocked = true;
         }
 
+        var deactivated = identityUser.IsActive && !user.IsActive;
         identityUser.IsActive = user.IsActive;
-        var updateResult = await userManager.UpdateAsync(identityUser);
+        // a deactivated account's open sessions end with it: the new stamp makes their cookies stop being accepted
+        var updateResult = deactivated
+            ? await userManager.UpdateSecurityStampAsync(identityUser)
+            : await userManager.UpdateAsync(identityUser);
         return updateResult.Succeeded
             ? Result<User>.Success(user)
             : Result<User>.Failure(

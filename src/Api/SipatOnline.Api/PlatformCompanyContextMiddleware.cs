@@ -20,7 +20,8 @@ public sealed class PlatformCompanyContextMiddleware(RequestDelegate next)
         var hasHeader = context.Request.Headers.TryGetValue(HeaderName, out var companyHeader);
         var platformHost = options.Value.IsPlatformHost(context.Request.Host.Host);
         var tenantAdministration = context.Request.Path.StartsWithSegments("/api/admin") ||
-            context.Request.Path.StartsWithSegments("/api/tenant/branding");
+            context.Request.Path.StartsWithSegments("/api/tenant/branding") ||
+            context.Request.Path.StartsWithSegments("/api/tenant/certificate-template");
 
         if (hasHeader)
         {

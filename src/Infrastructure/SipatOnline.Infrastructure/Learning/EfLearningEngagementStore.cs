@@ -130,7 +130,11 @@ public sealed class EfLearningEngagementStore(PlatformDbContext db, ILearningSto
             var certificate = existing is null
                 ? new ParticipationCertificate(Guid.Empty, tenantId, participantId, sipat.Id, user.DisplayName,
                     tenant.Name, sipat.Title, sipat.StartsAt, sipat.EndsAt, duration, default, demonstration, string.Join(";", basis.Order()),
-                    companyLogo, personalized ? tenant.CertificateTemplateId : null)
+                    companyLogo, personalized ? tenant.CertificateTemplateId : null,
+                    // the contents of the training, in the order the participant saw them
+                    Courses: group.OrderBy(item => item.DayPosition ?? int.MaxValue).ThenBy(item => item.DayDate)
+                        .ThenBy(item => item.CoursePosition ?? int.MaxValue).ThenBy(item => item.Title, StringComparer.Ordinal)
+                        .Select(item => item.Title.Trim()).Where(title => title.Length > 0).Distinct().ToArray())
                 : Deserialize(existing);
             result.Add(new CertificateCandidate(certificate, group.Count(), completed,
                 group.Any() && completed == group.Count() && duration > 0 && sipat.Status == SipatEventStatus.Published));

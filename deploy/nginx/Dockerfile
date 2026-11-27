@@ -7,6 +7,9 @@ COPY src/Web/SipatVideoPlayer/package.json SipatVideoPlayer/
 RUN npm ci
 COPY src/Web/SipatOnline.Web/ SipatOnline.Web/
 COPY src/Web/SipatVideoPlayer/ SipatVideoPlayer/
+# the version shown on the login screen (deploy/scripts/deploy-vm.sh works it out); empty = none shown
+ARG APP_VERSION=""
+ENV VITE_APP_VERSION=$APP_VERSION
 RUN npm run build
 
 FROM nginx:1.28-alpine
