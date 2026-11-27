@@ -158,7 +158,8 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
 
     /// <summary>
     /// Delivers the days of a SIPAT (the company's own plan, or a program applied to it): each day becomes a track with
-    /// its videos, and the day's games come after the last video. Safe to repeat: a day nobody started is refreshed.
+    /// its videos, and each game of the day opens after the video the editor put it after (a program, with no training
+    /// behind it, has no such place: after the day's last video). Safe to repeat: a day nobody started is refreshed.
     /// </summary>
     public async Task<Result<ProgramApplication>> ApplyDaysAsync(Guid tenantId, Guid sipatId, IReadOnlyList<ProgramDay> days,
         Guid auditSubjectId, string auditAction, string auditSubjectType, CancellationToken token, Guid? contentCourseId = null)
@@ -169,9 +170,22 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
         var fromModels = contentCourseId is null
             ? await TrainingCheckpoints.FromModelsAsync(db, days.SelectMany(day => day.VideoIds ?? []).Distinct().ToArray(), token)
             : null;
+        // where the video editor put each game of the training: after which of its videos (none: before the first one)
+        var gamePlaces = new List<(Guid ModuleId, Guid? AfterVideoId)>();
+        if (contentCourseId is { } placedIn)
+        {
+            var trainingVideos = await db.PlatformCourseVideoLinks.AsNoTracking().Where(link => link.CourseId == placedIn)
+                .OrderBy(link => link.Position).Select(link => link.VideoId).ToListAsync(token);
+            var links = await db.PlatformCourseModuleLinks.AsNoTracking().Where(link => link.CourseId == placedIn)
+                .OrderBy(link => link.AfterVideoCount).ThenBy(link => link.Order).ToListAsync(token);
+            foreach (var link in links)
+                gamePlaces.Add((link.ModuleId, link.AfterVideoCount >= 1 && link.AfterVideoCount <= trainingVideos.Count
+                    ? trainingVideos[link.AfterVideoCount - 1] : null));
+        }
         var courses = new List<PlatformCourse>(days.Count);
         foreach (var day in days)
         {
+            var isFirstDay = courses.Count == 0;
             // programs saved before days held videos come back without lists: say what to do instead of failing
             if (day.VideoIds is null || day.VideoIds.Count == 0)
                 return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra o treinamento em Treinamentos, escolha um assunto para cada dia e salve.");
@@ -188,7 +202,22 @@ public sealed class LearningDistributionService(PlatformDbContext db, ICurrentAc
             }
             if (!HasHouseVideo(videos))
                 return Failure<ProgramApplication>("learning.program_day_empty", $"O dia \"{day.Title}\" não tem vídeos. Abra o treinamento em Treinamentos, escolha um assunto para cada dia e salve.");
-            var placements = (day.GameIds ?? []).Select(gameId => new CourseModulePlacement(gameId, videos.Count)).ToArray();
+            // a game opens after the video of this day it was put after; one with no place here comes after the last video
+            int AfterVideoCount(Guid gameId)
+            {
+                foreach (var place in gamePlaces.Where(place => place.ModuleId == gameId))
+                {
+                    if (place.AfterVideoId is not { } videoId)
+                    {
+                        if (isFirstDay) return 0;
+                        continue;
+                    }
+                    for (var at = 0; at < day.VideoIds.Count; at++)
+                        if (day.VideoIds[at] == videoId) return at + 1;
+                }
+                return videos.Count;
+            }
+            var placements = (day.GameIds ?? []).Select(gameId => new CourseModulePlacement(gameId, AfterVideoCount(gameId))).ToArray();
             var course = new PlatformCourse(day.Id, day.Title, day.Subject, now, PlatformCourseStatus.Published, true, videos, placements);
             var snapshot = await CreateSnapshotAsync(course, token);
             if (!snapshot.IsSuccess) return Result<ProgramApplication>.Failure(snapshot.Error);
