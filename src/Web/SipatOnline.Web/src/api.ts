@@ -711,7 +711,8 @@ async function request(
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
   if (companyAdministrationId &&
-      (path.startsWith('/api/admin/') || path.startsWith('/api/tenant/branding'))) {
+      (path.startsWith('/api/admin/') || path.startsWith('/api/tenant/branding') ||
+       path.startsWith('/api/tenant/certificate-template'))) {
     headers.set('X-Sipat-Company', companyAdministrationId);
   }
 
@@ -878,12 +879,30 @@ export interface CertificateTemplateData {
   footerBase64?: string | null; removeFooter?: boolean;
 }
 
-export function getCertificateTemplate(): Promise<CertificateTemplate> {
-  return requestJson<CertificateTemplate>('/api/tenant/certificate-template');
+/**
+ * A file of the company as an address an image or a new tab can open. The operator inside a company reaches it by a
+ * header, which neither can send: the file is fetched here and handed over as a local address.
+ */
+export async function companyFileAddress(path: string): Promise<string> {
+  if (!companyAdministrationId) return path;
+  return URL.createObjectURL(await (await request(path)).blob());
 }
 
-export function saveCertificateTemplate(data: CertificateTemplateData): Promise<CertificateTemplate> {
-  return requestJson<CertificateTemplate>('/api/tenant/certificate-template', { method: 'PUT', body: JSON.stringify(data) });
+async function withCertificatePictures(template: CertificateTemplate): Promise<CertificateTemplate> {
+  const address = (reference: string | null) => (reference ? companyFileAddress(reference) : Promise.resolve(null));
+  const [coverReference, emblemReference, footerReference, logoReference] = await Promise.all([
+    address(template.coverReference), address(template.emblemReference), address(template.footerReference), address(template.logoReference),
+  ]);
+  return { ...template, coverReference, emblemReference, footerReference, logoReference };
+}
+
+export async function getCertificateTemplate(): Promise<CertificateTemplate> {
+  return withCertificatePictures(await requestJson<CertificateTemplate>('/api/tenant/certificate-template'));
+}
+
+export async function saveCertificateTemplate(data: CertificateTemplateData): Promise<CertificateTemplate> {
+  return withCertificatePictures(
+    await requestJson<CertificateTemplate>('/api/tenant/certificate-template', { method: 'PUT', body: JSON.stringify(data) }));
 }
 
 export function saveTenantAppearance(data: TenantAppearanceData): Promise<TenantBranding> {
