@@ -131,6 +131,10 @@ services:
       DASHBOARD__FRONTEND__BROWSERTOKEN: ${ASPIRE_BROWSER_TOKEN:-}
       # telemetry only arrives from the API, on the private telemetry network
       DASHBOARD__OTLP__AUTHMODE: Unsecured
+      # trust X-Forwarded-Proto/Host from nginx (another container, not loopback): without it the dashboard thinks it
+      # is on http, sends the browser to http:// after the token and the login comes back. Reachable only from the
+      # telemetry network and the VM's loopback, so any proxy address is fine.
+      ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
       ASPIRE_DASHBOARD_FORWARDEDHEADERS_ENABLED: "true"
     ports:
       - "127.0.0.1:18888:18888"

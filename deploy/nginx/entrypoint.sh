@@ -45,6 +45,8 @@ server {
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header X-Forwarded-Host \$host;
+        # a redirect the dashboard builds with http:// stays on https
+        proxy_redirect http://\$host/ https://\$host/;
         proxy_read_timeout 1h;
         proxy_buffering off;
     }
