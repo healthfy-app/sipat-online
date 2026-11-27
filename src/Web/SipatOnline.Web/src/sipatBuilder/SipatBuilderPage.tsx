@@ -3,7 +3,7 @@ import { ArrowLeft, Ban, Clock, Copy, Eye, FileDown, Film, Gamepad2, MoreHorizon
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
-  acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, getTrainingLimit, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
+  acceptCompanyVideoTerms, cancelSipatEvent, companyEditorLinks, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, getTrainingLimit, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
 } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -138,14 +138,17 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   const [trainings, setTrainings] = useState<PlatformCourse[]>([]);
   const [training, setTraining] = useState('');
 
-  const applyContent = useCallback((content: Awaited<ReturnType<typeof getSipatCatalog>>) => {
+  const applyContent = useCallback((loaded: Awaited<ReturnType<typeof getSipatCatalog>>) => {
+    // the catalog's video links are the operation's routes: a company's administrator plays them (with every version)
+    // from the company's own, as in its editor; the operation inside a company keeps them, and a template has no company
+    const content = template ? loaded : companyEditorLinks(loaded);
     // an <img> cannot send the company header the admin route needs: the operator loads the photo from the platform route
     const courses = canEditThemes
       ? content.courses.map(course => ({ ...course, coverUrl: course.coverUrl?.replace('/api/admin/sipat-catalog/courses/', '/api/platform/catalog/courses/') ?? null }))
       : content.courses;
     setCatalog(buildCatalog(courses, content.videos, content.games, content.categories ?? [], content.subjects ?? [], content.videoSubjects ?? []));
     setTrainings(courses);
-  }, [canEditThemes]);
+  }, [canEditThemes, template]);
 
   // back from the video editor (opened in another tab): the trainings and videos come again, the days being built stay as they are
   useEffect(() => {
