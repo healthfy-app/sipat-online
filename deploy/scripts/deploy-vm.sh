@@ -151,9 +151,17 @@ fi
 echo "$(wc -l < "$env_file") settings; video storage: $provider; images: $tag"
 
 platform="${DEPLOY_PLATFORM:-linux/amd64}"
-echo "==> Build images ($platform)"
+# The version people see on the login screen: MAJOR.MINOR from the VERSION file (changed by hand, in a PR), then the
+# number of commits of what is being deployed, so every deploy has its own. Outside production the environment follows it.
+version="${APP_VERSION:-$(tr -d '[:space:]' < VERSION).$(git rev-list --count HEAD)}"
+[ "$environment" = "production" ] || version="$version-$environment"
+if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9A-Za-z.-]+$ ]]; then
+  echo "The version '$version' is not MAJOR.MINOR.PATCH: check the VERSION file." >&2
+  exit 1
+fi
+echo "==> Build images ($platform), version $version"
 docker buildx build --load --platform "$platform" --file Dockerfile --tag "sipat-online-api:$tag" .
-docker buildx build --load --platform "$platform" --file deploy/nginx/Dockerfile --tag "sipat-online-web:$tag" .
+docker buildx build --load --platform "$platform" --file deploy/nginx/Dockerfile --build-arg APP_VERSION="$version" --tag "sipat-online-web:$tag" .
 docker save "sipat-online-api:$tag" "sipat-online-web:$tag" | gzip -1 > "$work/images.tar.gz"
 echo "images: $(du -h "$work/images.tar.gz" | cut -f1)"
 

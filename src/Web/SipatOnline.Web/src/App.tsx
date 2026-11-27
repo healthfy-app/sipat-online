@@ -452,6 +452,9 @@ export default function App() {
   );
 }
 
+// the version of this deploy, set by the pipeline when the page is built (deploy/scripts/deploy-vm.sh); empty when run locally
+const appVersion = ((import.meta.env.VITE_APP_VERSION as string | undefined) ?? '').trim();
+
 function LoginPage({
   tenant,
   onSignIn,
@@ -601,6 +604,7 @@ function LoginPage({
               ? 'Acesso exclusivo para a equipe de operação.'
               : 'Precisa de ajuda? Fale com o administrador da sua empresa.'}
           </p>
+          {appVersion && <p className="m-0 text-center text-[0.6875rem] text-muted-foreground/70">Versão {appVersion}</p>}
         </form>
       </div>
     </section>

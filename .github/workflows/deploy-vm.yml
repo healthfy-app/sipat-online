@@ -44,6 +44,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # the whole history: the version of the deploy counts its commits (deploy/scripts/deploy-vm.sh)
+          fetch-depth: 0
 
       # an arm64 VM (DEPLOY_PLATFORM=linux/arm64) needs emulation for the last stage of each image
       - name: Set up QEMU
