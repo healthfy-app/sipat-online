@@ -38,6 +38,13 @@ import {
 
 /** On the phone (up to 760px) the hero buttons are 44px tall: "Mais" and "Salvar" share a row, the main action takes the next one. */
 const phoneAction = 'max-[760px]:h-auto max-[760px]:min-h-11 max-[760px]:text-[0.9375rem]';
+/**
+ * A hero action that stands out from the white ones without being the main one: soft green. The hero paints its
+ * buttons white with !important (OpsIdentity.css), so the classes carry the same parent to win over it.
+ */
+const heroTonal = '[.ops-hero-actions>&]:border-primary/35! [.ops-hero-actions>&]:bg-primary/10! [.ops-hero-actions>&]:text-primary! [.ops-hero-actions>&]:font-bold';
+/** The eye of the participant's view, in the yellow of the preview's own mark. */
+const previewEye = 'text-[#ffd166]';
 
 function download(name: string, text: string) {
   saveFile(new Blob([text], { type: 'text/csv;charset=utf-8' }), name);
@@ -629,19 +636,19 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         <Button className={phoneAction} disabled={busy || !dirty} onClick={() => void (published ? publish() : save())} variant="outline"><Save /> {template ? 'Salvar' : published ? 'Salvar alterações' : 'Salvar rascunho'}</Button>
         {/* the pencil: this same training in the video editor (títulos, player, questions, cover) */}
         {published && <Button className={phoneAction} disabled={busy} onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
-        <Button className={cn(phoneAction, 'max-[760px]:hidden')} disabled={busy || days.length === 0} onClick={() => void editWeek()} variant="outline"><Pencil /> Editar treinamento</Button>
+        <Button className={cn(phoneAction, heroTonal, 'max-[760px]:hidden')} disabled={busy || days.length === 0} onClick={() => void editWeek()} variant="outline"><Pencil /> Editar treinamento</Button>
         {/* published: the main action is to see it as the participant does; a draft still has to be published */}
         {(!template && !cancelled && !published)
           ? <>
-            <Button className={phoneAction} disabled={days.length === 0} onClick={() => setPreviewing(true)} variant="outline"><Eye /> Visão do participante</Button>
+            <Button className={cn(phoneAction, heroTonal)} disabled={days.length === 0} onClick={() => setPreviewing(true)} variant="outline"><Eye /> Visão do participante</Button>
             <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={busy || days.length === 0} onClick={() => { if (checkIssues()) setConfirmingLaunch(true); }}><Rocket /> Publicar</Button>
           </>
-          : <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye /> Visão do participante</Button>}
+          : <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye className={previewEye} /> Visão do participante</Button>}
       </div>}
       {stage === 'grid' && viewOnly && sipat && <div className="ops-hero-actions max-[760px]:hidden">
         {published && <Button onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
         <Button onClick={() => navigate(`${basePath}/${sipat.id}/editar`)} variant="outline"><Play /> Ver no editor</Button>
-        <Button className="ops-primary" disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye /> Visão do participante</Button>
+        <Button className="ops-primary" disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye className={previewEye} /> Visão do participante</Button>
       </div>}
     </header>
 
