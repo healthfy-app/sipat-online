@@ -148,7 +148,7 @@ export default function LearningActivitiesPanel({ trackId, lessonId, lessonPosit
         <h2 id="learning-activities-title">Atividades para praticar</h2>
         <span>{activities.length}</span>
       </div>
-      <p>Jogos opcionais para praticar. Pular não bloqueia a conclusão do curso.</p>
+      <p>Jogos opcionais para praticar. Pular não bloqueia a conclusão do treinamento.</p>
     </div>
     <button aria-expanded={activitiesOpen} aria-haspopup="dialog" className="learning-activities-open"
       onClick={openActivityList} type="button">

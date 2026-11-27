@@ -747,7 +747,7 @@ describe('learning experience', () => {
       trackId === 'a' ? { track: day1, lessons: [watched, next] } : { track: day2, lessons: [{ ...lesson, id: 'v-3', title: 'Respiração' }] }));
     renderAt('/learning');
 
-    expect(await screen.findByRole('heading', { name: 'Vídeos da semana' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Vídeos do treinamento' })).toBeVisible();
     const first = await screen.findByRole('region', { name: 'Dia 1 · Boa postura e movimento' });
     const second = screen.getByRole('region', { name: 'Dia 2 · Mente tranquila' });
     expect(first.compareDocumentPosition(second) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
@@ -794,7 +794,7 @@ describe('learning experience', () => {
     }));
     renderAt('/learning');
 
-    expect(await screen.findByRole('heading', { name: 'Vídeos da semana' })).toBeVisible();
+    expect(await screen.findByRole('heading', { name: 'Vídeos do treinamento' })).toBeVisible();
     expect(document.querySelector('.learning-trail')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Ver a semana toda' })).not.toBeInTheDocument();
     expect(screen.getByRole('region', { name: 'Dia 1 · Segurança' })).toBeVisible();
@@ -808,7 +808,7 @@ describe('learning experience', () => {
     const plain = renderAt('/learning');
     await waitFor(() => expect(plain.container.querySelector('.learning-catalog-course')).not.toBeNull());
     expect(screen.getByRole('searchbox')).toBeVisible();
-    expect(screen.queryByRole('heading', { name: 'Vídeos da semana' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Vídeos do treinamento' })).not.toBeInTheDocument();
     expect(document.querySelector('.learning-trail')).toBeNull();
   });
 

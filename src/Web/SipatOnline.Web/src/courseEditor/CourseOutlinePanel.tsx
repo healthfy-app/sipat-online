@@ -89,7 +89,7 @@ export default function CourseOutlinePanel({
           </h1>
           <div className="flex flex-wrap items-center gap-2 px-1.5 text-xs text-muted-foreground">
             {week
-              ? <Badge variant="default">Semana da SIPAT</Badge>
+              ? <Badge variant="default">Treinamento da empresa</Badge>
               : <Badge variant={status === 'Published' ? 'default' : 'warning'}>{statusLabels[status]}</Badge>}
             <span>{pluralize(house.length, 'vídeo', 'vídeos')}{extrasSuffix(course.videos.length - house.length)}</span>
           </div>

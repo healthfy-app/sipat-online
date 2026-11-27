@@ -43,7 +43,7 @@ export default function WeekVideos({ days, allTracks }: {
 
   return <section aria-labelledby="week-videos-title" className="week-videos">
     <div className="week-videos-heading">
-      <h2 id="week-videos-title">Vídeos da semana</h2>
+      <h2 id="week-videos-title">Vídeos do treinamento</h2>
       <p>Vídeos e progresso organizados por dia.</p>
     </div>
 
@@ -62,7 +62,8 @@ export default function WeekVideos({ days, allTracks }: {
               {complete ? <Check /> : day.position ?? '•'}
             </span>
             <div className="week-day-heading">
-              <h3 id={headingId}>{day.position ? `${word} ${day.position} · ` : ''}{day.title}</h3>
+              {/* a day without a slogan is named "Dia 2" already: say it once */}
+              <h3 id={headingId}>{day.position && day.title.trim().toLowerCase() !== `${word} ${day.position}`.toLowerCase() ? `${word} ${day.position} · ` : ''}{day.title}</h3>
               <p>{date ? `${date} · ` : ''}{done === 0 ? `Ainda não começou · ${total} ${total === 1 ? 'vídeo' : 'vídeos'}` : `${done} de ${total} ${total === 1 ? 'vídeo assistido' : 'vídeos assistidos'}`}</p>
             </div>
             <div className="week-day-progress">
