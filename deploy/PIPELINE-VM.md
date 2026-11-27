@@ -4,7 +4,7 @@ O mesmo código sobe em duas VMs separadas. Qualquer VM Ubuntu ou Debian serve (
 
 | | dev | produção |
 |---|---|---|
-| Branch | `dev` (todo push sobe sozinho) | `main` (manual: *Actions → Deploy production → Run workflow*) |
+| Branch | `dev` (todo push sobe sozinho) | `main` (todo merge na `main` sobe sozinho) |
 | Workflow | `.github/workflows/deploy-dev.yml` | `.github/workflows/deploy-production.yml` |
 | Ambiente do GitHub | `dev` | `production` (pode exigir aprovação) |
 | Terraform | workspace `dev`, `environments/dev.tfvars` | workspace `production`, `environments/production.tfvars` |
@@ -76,7 +76,7 @@ O workflow `deploy-dev.yml` também precisa da variável `DEPLOY_PLATFORM=linux/
 ## 3. Subir
 
 - dev: `git push origin dev`. Também dá para rodar *Actions → Deploy dev → Run workflow*.
-- produção: *Actions → Deploy production → Run workflow* na `main`.
+- produção: merge de um PR na `main` (o release `dev` → `main`). Para subir de novo a mesma `main`, *Actions → Deploy production → Run workflow*.
 
 ### Sem o GitHub (da sua máquina)
 

@@ -1,8 +1,7 @@
 name: CI
 
+# a push to main runs these checks inside "Deploy production"
 on:
-  push:
-    branches: [main]
   pull_request:
     branches: [main, dev]
   workflow_dispatch:
