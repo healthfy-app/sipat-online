@@ -1,7 +1,7 @@
 import { ImagePlus, Trash2 } from 'lucide-react';
 import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { saveTenantAppearance, type TenantBranding } from './api';
-import { isBrandColor, tenantTheme } from './branding';
+import { isBrandColor, shownPrimary, tenantTheme } from './branding';
 import { imageEdgeColor } from './imageEdgeColor';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,7 +29,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
   tenant: TenantBranding;
   onSaved: (tenant: TenantBranding) => void;
 }) {
-  const [primary, setPrimary] = useState(tenant.primaryColor);
+  const [primary, setPrimary] = useState(shownPrimary(tenant.primaryColor));
   const [secondary, setSecondary] = useState(tenant.secondaryColor);
   const [logoBase64, setLogoBase64] = useState<string | null>(null);
   const [logoType, setLogoType] = useState('image/png');
@@ -47,7 +47,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
 
   const colorsValid = isBrandColor(primary) && isBrandColor(secondary);
   const hasBanner = Boolean(tenant.bannerReference);
-  const changed = primary.toUpperCase() !== tenant.primaryColor.toUpperCase()
+  const changed = primary.toUpperCase() !== shownPrimary(tenant.primaryColor).toUpperCase()
     || secondary.toUpperCase() !== tenant.secondaryColor.toUpperCase()
     || logoBase64 !== null || (removeLogo && tenant.logoReference !== null)
     || bannerBase64 !== null || (removeBanner && hasBanner);
@@ -59,7 +59,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
   const bannerBackdrop = previewBanner && bannerEdge ? { background: bannerEdge } : undefined;
 
   function reset() {
-    setPrimary(tenant.primaryColor); setSecondary(tenant.secondaryColor);
+    setPrimary(shownPrimary(tenant.primaryColor)); setSecondary(tenant.secondaryColor);
     setLogoBase64(null); setRemoveLogo(false); setLogoName('');
     setBannerBase64(null); setRemoveBanner(false); setBannerName('');
     setFileVersion((value) => value + 1); setError(''); setNotice('');
@@ -109,7 +109,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
         primaryColor: primary.toUpperCase(), secondaryColor: secondary.toUpperCase(),
         logoBase64, removeLogo, bannerBase64, removeBanner,
       });
-      onSaved(saved); setPrimary(saved.primaryColor); setSecondary(saved.secondaryColor);
+      onSaved(saved); setPrimary(shownPrimary(saved.primaryColor)); setSecondary(saved.secondaryColor);
       setLogoBase64(null); setRemoveLogo(false); setLogoName('');
       setBannerBase64(null); setRemoveBanner(false); setBannerName('');
       setFileVersion((value) => value + 1);
@@ -216,7 +216,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
               </CardHeader>
               <CardContent>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <ColorField disabled={busy} fallback={tenant.primaryColor} id="primary" label="Cor principal" onChange={setPrimary} value={primary} />
+                  <ColorField disabled={busy} fallback={shownPrimary(tenant.primaryColor)} id="primary" label="Cor principal" onChange={setPrimary} value={primary} />
                   <ColorField disabled={busy} fallback={tenant.secondaryColor} id="secondary" label="Texto dos botões" onChange={setSecondary} value={secondary} />
                 </div>
                 {!colorsValid && <p className="m-0 text-sm font-medium text-destructive" role="status">Use cores no formato #RRGGBB.</p>}
