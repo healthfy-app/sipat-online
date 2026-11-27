@@ -36,6 +36,7 @@ x-api-environment: &api-environment
   SipatOnline__BootstrapAdmin__Password: ${BOOTSTRAP_ADMIN_PASSWORD:-}
   # observabilidade (traces, metricas e logs por OTLP): desligada enquanto o endpoint estiver vazio.
   # Para o Grafana Cloud (camada gratis), veja deploy/CLOUDFLARE-VM.md, secao 7.
+  # Para o Aspire Dashboard na propria VM (ASPIRE_DASHBOARD=true no deploy), veja deploy/PRODUCAO.md.
   OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
   OTEL_EXPORTER_OTLP_PROTOCOL: ${OTEL_EXPORTER_OTLP_PROTOCOL:-http/protobuf}
   OTEL_EXPORTER_OTLP_HEADERS: ${OTEL_EXPORTER_OTLP_HEADERS:-}
@@ -111,6 +112,29 @@ services:
       edge:
         # fixed, so that it never takes the address 172.28.0.2 that the web container (the trusted proxy) needs
         ipv4_address: 172.28.0.3
+      telemetry:
+
+  # Aspire Dashboard: traces, logs and metrics of the API, kept in memory (a restart clears them).
+  # Started only with ASPIRE_DASHBOARD=true (deploy/scripts/deploy-vm.sh). The page asks for the
+  # browser token (ASPIRE_BROWSER_TOKEN) and is reached at https://ASPIRE_HOST through the web
+  # container, or through an SSH tunnel to the VM's loopback (deploy/PRODUCAO.md).
+  aspire-dashboard:
+    image: mcr.microsoft.com/dotnet/aspire-dashboard:13.6.5
+    logging: *default-logging
+    environment:
+      DASHBOARD__FRONTEND__AUTHMODE: BrowserToken
+      # empty = the dashboard makes up a token and writes it to its log
+      DASHBOARD__FRONTEND__BROWSERTOKEN: ${ASPIRE_BROWSER_TOKEN:-}
+      # telemetry only arrives from the API, on the private telemetry network
+      DASHBOARD__OTLP__AUTHMODE: Unsecured
+      ASPIRE_DASHBOARD_FORWARDEDHEADERS_ENABLED: "true"
+    ports:
+      - "127.0.0.1:18888:18888"
+    expose:
+      - "18889"
+    restart: unless-stopped
+    networks:
+      telemetry:
 
   web:
     image: ${SIPAT_WEB_IMAGE:-sipat-online-web:production}
@@ -118,6 +142,9 @@ services:
     build:
       context: ..
       dockerfile: deploy/nginx/Dockerfile
+    environment:
+      # host of the Aspire Dashboard page (empty = no such page): see deploy/nginx/entrypoint.sh
+      ASPIRE_HOST: ${ASPIRE_HOST:-}
     ports:
       - "80:80"
       - "443:443"
@@ -138,6 +165,7 @@ services:
     networks:
       edge:
         ipv4_address: 172.28.0.2
+      telemetry:
 
 volumes:
   postgres-data:
@@ -151,3 +179,5 @@ networks:
     ipam:
       config:
         - subnet: 172.28.0.0/24
+  # API and web -> Aspire Dashboard; its own network so no dynamic address is ever taken from edge
+  telemetry:

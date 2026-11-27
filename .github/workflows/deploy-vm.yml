@@ -73,6 +73,8 @@ jobs:
           R2_VIDEO_BUCKET: ${{ vars.R2_VIDEO_BUCKET }}
           R2_DIRECT_UPLOAD: ${{ vars.R2_DIRECT_UPLOAD }}
           R2_BACKUP_BUCKET: ${{ vars.R2_BACKUP_BUCKET }}
+          ASPIRE_DASHBOARD: ${{ vars.ASPIRE_DASHBOARD }}
+          ASPIRE_BROWSER_TOKEN: ${{ secrets.ASPIRE_BROWSER_TOKEN }}
           RESTORE_BACKUP: ${{ inputs.restore_backup }}
           POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
           PLATFORM_OPERATOR_PASSWORD: ${{ secrets.PLATFORM_OPERATOR_PASSWORD }}
