@@ -213,7 +213,11 @@ export interface ProgramDay {
   subject: string | null;
   videoIds: string[];
   gameIds: string[];
+  /** Read only, from a training: where each game opens in the day, as the participant gets it. */
+  gamePlaces?: ProgramGamePlace[] | null;
 }
+/** A game of a day opens after `afterVideo` of the day's videos (0: before the first). */
+export interface ProgramGamePlace { gameId: string; afterVideo: number }
 export interface SipatProgram { id: string; title: string; days: ProgramDay[]; createdAt: string }
 export interface SipatProgramData { title: string; days: ProgramDay[] }
 
@@ -617,6 +621,20 @@ export function configureCompanyAdministration(companyId: string | null): void {
   companyAdministrationId = companyId;
 }
 
+const companyPage = /^\/platform\/companies\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(?:\/|$)/i;
+
+/**
+ * The company whose admin routes the operation is calling: the one a screen set, or else the one in the address of the
+ * operation's pages of a company (/platform/companies/{id}/…). The screen sets it in an effect, and React can run that
+ * effect's cleanup while the page is still there (a page loading on demand hides and shows what is on screen): the
+ * address does not change under the page, so a call made in that moment still goes to its company.
+ * Only for /api/admin: the branding read with a company would paint the operation's own portal as that company.
+ */
+function adminCompany(): string | null {
+  if (companyAdministrationId) return companyAdministrationId;
+  return typeof window === 'undefined' ? null : companyPage.exec(window.location.pathname)?.[1] ?? null;
+}
+
 /**
  * The first calls of the portal are started by `public/boot.js` while the app is still downloading. Each answer is
  * taken once; a missing or failed one gives null, and the caller asks the usual way.
@@ -710,11 +728,9 @@ async function request(
   const method = (init.method ?? 'GET').toUpperCase();
   const headers = new Headers(init.headers);
   headers.set('Accept', 'application/json');
-  if (companyAdministrationId &&
-      (path.startsWith('/api/admin/') || path.startsWith('/api/tenant/branding') ||
-       path.startsWith('/api/tenant/certificate-template'))) {
-    headers.set('X-Sipat-Company', companyAdministrationId);
-  }
+  const company = path.startsWith('/api/admin/') ? adminCompany()
+    : path.startsWith('/api/tenant/branding') || path.startsWith('/api/tenant/certificate-template') ? companyAdministrationId : null;
+  if (company) headers.set('X-Sipat-Company', company);
 
   const writes = method !== 'GET' && method !== 'HEAD' && method !== 'OPTIONS';
   if (writes) {
@@ -782,7 +798,7 @@ export function setEditorScope(scope: 'platform' | 'company'): void {
  * company keeps the catalog's links: an <img> or a <video> cannot send the company header the admin routes ask for.
  */
 export function companyEditorLinks<T>(value: T): T {
-  if (companyAdministrationId) return value;
+  if (adminCompany()) return value;
   return JSON.parse(JSON.stringify(value).replaceAll(`${platformCatalog}/`, `${trainingEditor}/`)) as T;
 }
 
@@ -884,7 +900,7 @@ export interface CertificateTemplateData {
  * header, which neither can send: the file is fetched here and handed over as a local address.
  */
 export async function companyFileAddress(path: string): Promise<string> {
-  if (!companyAdministrationId) return path;
+  if (!adminCompany()) return path;
   return URL.createObjectURL(await (await request(path)).blob());
 }
 

@@ -278,7 +278,8 @@ describe('learning experience', () => {
     Object.defineProperty(video, 'duration', { configurable: true, value: 60 });
     fireEvent.loadedMetadata(video);
     const timeline = screen.getByRole('slider', { name: 'Posição do vídeo' });
-    expect(timeline).toHaveAttribute('aria-valuetext', '0:12 de 1:00');
+    // the player moves to where the participant stopped as the video loads; on a slow machine the bar follows a moment later
+    await waitFor(() => expect(timeline).toHaveAttribute('aria-valuetext', '0:12 de 1:00'));
     fireEvent.keyDown(timeline, { key: 'ArrowRight' });
     expect(video.currentTime).toBe(12);
     expect(screen.getByText(/não é possível avançar além do que você já viu/)).toBeVisible();

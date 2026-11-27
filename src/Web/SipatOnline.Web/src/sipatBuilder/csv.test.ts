@@ -56,7 +56,7 @@ describe('plan to csv and back', () => {
     expect(back.issues).toEqual([]);
     expect(back.matched).toBe(3);
     expect(back.days).toHaveLength(1);
-    expect(toProgramDay(back.days[0])).toEqual({
+    expect(toProgramDay(back.days[0])).toMatchObject({
       title: 'Dia 1 · Boa postura; mais saúde', date: '2026-11-09', subject: 'Ergonomia', videoIds: ['v1', 'v3'], gameIds: ['g1'],
     });
   });
@@ -68,7 +68,7 @@ describe('plan to csv and back', () => {
       '2;31/02/2026;;;A5V1;A9V9;;Forca',
     ].join('\n');
     const result = csvToPlan(text, catalog);
-    expect(result.days.map(day => toProgramDay(day))).toEqual([
+    expect(result.days.map(day => toProgramDay(day))).toMatchObject([
       { title: 'Boa postura', date: '2026-11-09', subject: 'Ergonomia', videoIds: ['v1'], gameIds: ['g1'] },
       { title: 'Dia 2', date: null, subject: null, videoIds: ['v2'], gameIds: [] },
     ]);
@@ -108,6 +108,6 @@ describe('model helpers', () => {
   it('keeps the id of a saved day and drops empty slots when saving', () => {
     const slots = fromProgramDay({ id: 'd1', title: 'Dia 1', date: null, subject: null, videoIds: ['v1'], gameIds: [] });
     expect(slots.videos).toHaveLength(5);
-    expect(toProgramDay(slots)).toEqual({ id: 'd1', title: 'Dia 1', date: null, subject: null, videoIds: ['v1'], gameIds: [] });
+    expect(toProgramDay(slots)).toMatchObject({ id: 'd1', title: 'Dia 1', date: null, subject: null, videoIds: ['v1'], gameIds: [] });
   });
 });

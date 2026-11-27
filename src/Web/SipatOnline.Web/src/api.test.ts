@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { configureCompanyAdministration, createParticipant, forgetAntiforgeryToken, getPlatformCompanyEmployees, getSession, uploadPlatformVideo, ApiError, listAllParticipants, signIn, saveLearningPosition, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality, createExternalPlatformVideo, isExtra, videoProvider, recordLearningPlaybackRange } from './api';
+import { configureCompanyAdministration, createParticipant, forgetAntiforgeryToken, getPlatformCompanyEmployees, getSession, getTenantBranding, uploadPlatformVideo, ApiError, listAllParticipants, signIn, saveLearningPosition, saveTenantAppearance, primeAntiforgeryToken, sendPlaybackQuality, createExternalPlatformVideo, isExtra, videoProvider, recordLearningPlaybackRange } from './api';
 
 afterEach(() => {
   configureCompanyAdministration(null);
@@ -49,6 +49,24 @@ describe('API client', () => {
     expect(new Headers(fetchMock.mock.calls[0][1].headers).get('X-Sipat-Company')).toBe('company-1');
     expect(new Headers(fetchMock.mock.calls[1][1].headers).has('X-Sipat-Company')).toBe(false);
     expect(new Headers(fetchMock.mock.calls[2][1].headers).has('X-Sipat-Company')).toBe(false);
+  });
+
+  it('on the operation\'s page of a company, sends that company to its admin routes even when no screen set it', async () => {
+    const fetchMock = vi.fn().mockImplementation(async () => Response.json({ offset: 0, limit: 100, totalCount: 0, items: [] }));
+    vi.stubGlobal('fetch', fetchMock);
+    const companyId = '11111111-1111-1111-1111-111111111111';
+    window.history.pushState({}, '', `/platform/companies/${companyId}/treinamentos/abc`);
+    try {
+      // the screen's company was cleared for a moment (a page loading on demand hides and shows what is on screen)
+      configureCompanyAdministration(null);
+      await listAllParticipants();
+      await getTenantBranding();
+      expect(new Headers(fetchMock.mock.calls[0][1].headers).get('X-Sipat-Company')).toBe(companyId);
+      // never the branding: the operation's own portal would be painted as the company
+      expect(new Headers(fetchMock.mock.calls[1][1].headers).has('X-Sipat-Company')).toBe(false);
+    } finally {
+      window.history.pushState({}, '', '/');
+    }
   });
 
   it('requests a filtered, paginated company employee list', async () => {

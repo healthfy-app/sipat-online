@@ -525,10 +525,17 @@ public static partial class PlatformCourseCatalogEndpoints
 
         catalog.MapGet("/videos/{videoId:guid}/file", async (
             Guid videoId,
+            string? quality,
             PlatformCourseCatalogService catalogService,
             CancellationToken cancellationToken) =>
         {
-            var result = await catalogService.GetVideoFileAsync(videoId, cancellationToken);
+            // the previews offer the versions a participant gets: ?quality=1080p, 720p (none) or 480p
+            if (VideoRenditions.FromQuality(quality) is not { } rendition)
+            {
+                return Results.NotFound();
+            }
+
+            var result = await catalogService.GetVideoFileAsync(videoId, cancellationToken, rendition);
             if (!result.IsSuccess)
             {
                 return ToProblem(result.Error);
@@ -1131,7 +1138,11 @@ public sealed record ProgramDayDto(
     DateOnly? Date,
     string? Subject,
     IReadOnlyList<Guid>? VideoIds,
-    IReadOnlyList<Guid>? GameIds);
+    IReadOnlyList<Guid>? GameIds,
+    IReadOnlyList<ProgramGamePlaceDto>? GamePlaces = null);
+
+/// <summary>Read only: a game of the day opens after <paramref name="AfterVideo"/> of the day's videos (0: before the first).</summary>
+public sealed record ProgramGamePlaceDto(Guid GameId, int AfterVideo);
 
 public sealed record SaveProgramRequest(string? Title, IReadOnlyList<ProgramDayDto>? Days);
 

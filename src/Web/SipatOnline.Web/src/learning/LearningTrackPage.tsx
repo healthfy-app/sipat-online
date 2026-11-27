@@ -1,5 +1,5 @@
-import { ArrowLeft, ArrowRight, CalendarDays, Check, Play, Trophy } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import LearningActivitiesPanel from '@/LearningActivitiesPanel';
 import {
@@ -25,7 +25,6 @@ import {
   getOverallProgress,
   houseLessons,
   resolveAssignedTrackId,
-  formatDuration,
   getLearningErrorMessage,
   type LearningSummary,
 } from './learningHelpers';
@@ -43,18 +42,9 @@ import {
 import { partWord } from '@/trainings/partWord';
 import { formatDayDate } from './WeekVideos';
 import UpNextCard from './UpNextCard';
+import { DayAbout, DayControls, DayDone, DayPlaylist, DayStageHead, DayTop } from './day/DayParts';
+import { dayStanding, isExternalLesson, nextUnfinished } from './day/dayLessons';
 import './LearningMotion.css';
-import './DayPage.css';
-
-/** "Extra · YouTube": the quiet mark of a video that is an appendix of the day. */
-function extraLabel(lesson: LearningLessonProgress): string {
-  return lesson.provider ? `Extra · ${lesson.provider}` : 'Extra';
-}
-
-/** A YouTube or Vimeo video that counts: played in the provider's player, followed like ours. */
-function isExternalLesson(lesson: LearningLessonProgress): boolean {
-  return !lesson.isBonus && !!lesson.provider && !!lesson.externalId;
-}
 
 export default function LearningTrackPage({
   resumeLessonId,
@@ -467,9 +457,7 @@ export default function LearningTrackPage({
   function moveToNextIncompleteLesson(lessonId: string) {
     const currentLesson = experienceRef.current?.lessons.find(lesson => lesson.id === lessonId)
       ?? selectedLessonRef.current;
-    const next = currentLesson && experienceRef.current?.lessons.find(
-      lesson => lesson.position > currentLesson.position && !lesson.isCompleted,
-    );
+    const next = currentLesson && experienceRef.current ? nextUnfinished(experienceRef.current.lessons, currentLesson) : undefined;
     // not at once: a countdown over the finished video, then the next one starts by itself
     if (next) {
       setUpNextId(next.id);
@@ -516,27 +504,17 @@ export default function LearningTrackPage({
   const previousLesson = currentIndex > 0 ? experience.lessons[currentIndex - 1] : null;
   const nextLesson = currentIndex >= 0 ? experience.lessons[currentIndex + 1] ?? null : null;
   const upNextLesson = upNextId ? experience.lessons.find(lesson => lesson.id === upNextId) ?? null : null;
-  const countedLessons = houseLessons(experience.lessons);
-  const hasExtras = countedLessons.length !== experience.lessons.length;
-  const completedLessons = countedLessons.filter(lesson => lesson.isCompleted).length;
-  // the number a house video has among the house videos (an extra has none)
-  const houseNumber = (lesson: LearningLessonProgress) => hasExtras
-    ? countedLessons.findIndex(item => item.id === lesson.id) + 1
-    : lesson.position;
+  const standing = dayStanding(experience.lessons);
   // the house video before the one on stage: a game placed there opens when this one starts
-  const boundaryBefore = hasExtras && selectedLesson && !selectedLesson.isBonus
-    ? countedLessons.filter(item => item.position < selectedLesson.position).at(-1)?.position ?? 0
+  const boundaryBefore = standing.hasExtras && selectedLesson && !selectedLesson.isBonus
+    ? standing.counted.filter(item => item.position < selectedLesson.position).at(-1)?.position ?? 0
     : undefined;
-  const hasSections = new Set(experience.lessons.map((lesson) => lesson.sectionTitle).filter(Boolean)).size > 1;
-  const isTrackComplete = completedLessons === countedLessons.length && countedLessons.length > 0;
   const trackTitle = getTrackDisplayTitle(experience.track.title);
   const dayTitle = experience.track.dayTitle ?? null;
   const dayPosition = experience.track.dayPosition ?? null;
   // "Dia" when the training has dates, "Módulo" when none of its parts has one
   const word = partWord(assignedTracks.filter(track => track.sipatEventId === experience.track.sipatEventId).map(track => track.dayDate).concat(experience.track.dayDate));
   const dayDate = formatDayDate(experience.track.dayDate);
-  // videos finished out of the day's videos: the same count the company's reports use
-  const percentage = countedLessons.length === 0 ? 0 : Math.round(completedLessons * 100 / countedLessons.length);
   const markers = activities
     .filter(item => item.lessonId === selectedLesson?.id && item.timeMilliseconds !== null)
     .map(item => ({ id: item.id, seconds: item.timeMilliseconds! / 1000, title: item.module.title, done: item.outcome !== null }));
@@ -546,47 +524,30 @@ export default function LearningTrackPage({
 
   return (
     <main className="learning-page day-page">
-      <header className="day-top">
-        <Link className="day-back" to="/learning"><ArrowLeft aria-hidden="true" /> Seu treinamento</Link>
-        <div className="day-heading">
-          {(dayPosition !== null || dayDate) && <p className="day-kicker">
-            {dayPosition !== null && <span className="day-chip">{word} {dayPosition}</span>}
-            {dayDate && <span className="day-date"><CalendarDays aria-hidden="true" />{dayDate}</span>}
-          </p>}
-          <h1>{dayTitle ?? trackTitle}</h1>
-          {dayTitle && dayTitle !== trackTitle && <p className="day-subject">{trackTitle}</p>}
-        </div>
-        <div className="day-progress">
-          <span className="day-progress-text">{completedLessons} de {countedLessons.length} vídeos · {percentage}%</span>
-          <div aria-label="Progresso do dia" aria-valuemax={100} aria-valuemin={0} aria-valuenow={percentage} className="day-progress-steps" role="progressbar">
-            {countedLessons.map(lesson => <span className={lesson.isCompleted ? 'is-done' : lesson.id === selectedLesson?.id ? 'is-current' : ''} key={lesson.id}>
-              {!lesson.isCompleted && <i style={{ width: `${Math.min(100, Math.max(0, lesson.watchedPercentage))}%` }} />}
-            </span>)}
-          </div>
-        </div>
-      </header>
+      <DayTop
+        back={<Link className="day-back" to="/learning"><ArrowLeft aria-hidden="true" /> Seu treinamento</Link>}
+        currentId={selectedLesson?.id ?? null}
+        date={dayDate}
+        position={dayPosition}
+        standing={standing}
+        subtitle={dayTitle && dayTitle !== trackTitle ? trackTitle : null}
+        title={dayTitle ?? trackTitle}
+        word={word}
+      />
 
-      {isTrackComplete && (
-        <section aria-label={dayPosition !== null ? `${word} concluído` : 'Tudo assistido'} className="day-done" role="status">
-          <span aria-hidden="true" className="day-done-icon"><Trophy /></span>
-          <div>
-            <strong>{dayPosition !== null ? `${word} ${dayPosition} concluído!` : 'Tudo assistido!'}</strong>
-            <p>Você assistiu a todos os vídeos. Pode rever qualquer um quando quiser.</p>
-          </div>
-          {nextDay
+      {standing.isComplete && (
+        <DayDone
+          action={nextDay
             ? <Link className="day-done-action" to={getTrackPath(nextDay, assignedTracks)}>Ir para o {word} {nextDay.dayPosition} <ArrowRight aria-hidden="true" /></Link>
             : <Link className="day-done-action" to="/learning">Voltar ao seu treinamento <ArrowRight aria-hidden="true" /></Link>}
-        </section>
+          position={dayPosition}
+          word={word}
+        />
       )}
 
       <div className="day-layout">
         <section aria-label="Vídeo" className="day-stage">
-          {selectedLesson && (
-            <header className="day-stage-head" key={selectedLesson.id}>
-              <p>{selectedLesson.isBonus ? extraLabel(selectedLesson) : `Vídeo ${houseNumber(selectedLesson)} de ${countedLessons.length}`}</p>
-              <h2>{selectedLesson.title}</h2>
-            </header>
-          )}
+          {selectedLesson && <DayStageHead key={selectedLesson.id} lesson={selectedLesson} standing={standing} />}
 
           <div className="learning-player-frame day-player">
             {selectedLesson?.isBonus ? (
@@ -666,32 +627,14 @@ export default function LearningTrackPage({
           </div>
 
           {selectedLesson && (
-            <div className="day-controls">
-              <button
-                className="day-control"
-                disabled={!previousLesson || switchingLesson}
-                onClick={() => previousLesson && selectLesson(previousLesson)}
-                type="button"
-              >
-                <ArrowLeft aria-hidden="true" /> <span>Vídeo anterior</span>
-              </button>
-              {selectedLesson.isBonus
-                ? <span className="day-status">{extraLabel(selectedLesson)}</span>
-                // a quiet line: done, or how much was watched; nothing before the video starts
-                : <span className={`day-status${selectedLesson.isCompleted ? ' is-complete' : ''}`}>
-                  {selectedLesson.isCompleted
-                    ? <><Check aria-hidden="true" />Concluído</>
-                    : selectedLesson.watchedPercentage > 0 ? `${selectedLesson.watchedPercentage}% assistido` : null}
-                </span>}
-              <button
-                className="day-control is-next"
-                disabled={!nextLesson || switchingLesson}
-                onClick={() => nextLesson && selectLesson(nextLesson)}
-                type="button"
-              >
-                <span>Próximo<span className="day-control-long"> vídeo</span></span> <ArrowRight aria-hidden="true" />
-              </button>
-            </div>
+            <DayControls
+              busy={switchingLesson}
+              canGoBack={!!previousLesson}
+              canGoForward={!!nextLesson}
+              lesson={selectedLesson}
+              onBack={() => { if (previousLesson) void selectLesson(previousLesson); }}
+              onForward={() => { if (nextLesson) void selectLesson(nextLesson); }}
+            />
           )}
 
           {selectedLesson?.isBonus && selectedLesson.provider && selectedLesson.externalId && (
@@ -713,59 +656,18 @@ export default function LearningTrackPage({
               onClick={() => void playerRef.current?.requestSave('pause')} type="button">Tentar salvar progresso</button>}
           </div>
 
-          {selectedLesson?.description && (
-            <section aria-label="Sobre o vídeo" className="day-about" key={`about-${selectedLesson.id}`}>
-              <h3>Sobre o vídeo</h3>
-              <p>{selectedLesson.description}</p>
-            </section>
-          )}
+          {selectedLesson?.description && <DayAbout description={selectedLesson.description} key={`about-${selectedLesson.id}`} />}
         </section>
 
         <aside aria-label="Conteúdo do dia" className="day-rail">
-          <section aria-labelledby="learning-curriculum-title" className="day-playlist">
-            <div className="day-playlist-head">
-              <h2 id="learning-curriculum-title">Vídeos do dia</h2>
-              <span>{completedLessons}/{countedLessons.length}</span>
-            </div>
-            <ol>
-              {experience.lessons.map((lesson, lessonIndex) => {
-                const isCurrent = lesson.id === selectedLesson?.id;
-                const showSection = hasSections && lesson.sectionTitle
-                  && lesson.sectionTitle !== experience.lessons[lessonIndex - 1]?.sectionTitle;
-                return (
-                  <li key={lesson.id} style={{ '--i': lessonIndex } as CSSProperties}>
-                    {showSection && <p className="day-section">{lesson.sectionTitle}</p>}
-                    <button
-                      aria-current={isCurrent ? 'step' : undefined}
-                      className={`day-item${isCurrent ? ' is-current' : ''}${lesson.isCompleted ? ' is-complete' : ''}${lesson.isBonus ? ' is-extra' : ''}`}
-                      disabled={switchingLesson}
-                      onClick={() => selectLesson(lesson)}
-                      type="button"
-                    >
-                      <span aria-hidden="true" className="day-item-mark">
-                        {lesson.isBonus ? <Play /> : lesson.isCompleted ? <Check /> : isCurrent && isPlaying
-                          ? <span className="learning-playing-bars"><i /><i /><i /></span>
-                          : houseNumber(lesson)}
-                      </span>
-                      <span className="day-item-copy">
-                        <span className="day-item-title">{lesson.title}</span>
-                        {lesson.isBonus
-                          ? <span className="day-item-meta">{extraLabel(lesson)}</span>
-                          : <span className="day-item-meta">
-                            {formatDuration(lesson.durationMilliseconds)}
-                            <span aria-hidden="true">·</span>
-                            {lesson.isCompleted ? 'Concluído' : lesson.watchedPercentage > 0 ? `${lesson.watchedPercentage}% assistido` : 'Não iniciado'}
-                          </span>}
-                        {!lesson.isBonus && !lesson.isCompleted && lesson.watchedPercentage > 0 && <span aria-hidden="true" className="day-item-progress">
-                          <span style={{ width: `${Math.min(100, Math.max(0, lesson.watchedPercentage))}%` }} />
-                        </span>}
-                      </span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ol>
-          </section>
+          <DayPlaylist
+            busy={switchingLesson}
+            currentId={selectedLesson?.id ?? null}
+            lessons={experience.lessons}
+            onSelect={lesson => void selectLesson(lesson)}
+            playing={isPlaying}
+            standing={standing}
+          />
           <LearningActivitiesPanel
             trackId={apiTrackId ?? experience.track.id}
             lessonId={selectedLesson?.id ?? null}
