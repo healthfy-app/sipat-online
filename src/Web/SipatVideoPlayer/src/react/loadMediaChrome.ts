@@ -14,6 +14,8 @@ export function loadMediaChrome() {
     import('media-chrome/dist/media-volume-range.js'),
     import('media-chrome/dist/media-time-display.js'),
     import('media-chrome/dist/media-loading-indicator.js'),
+    // the names screen readers say for the controls, in Portuguese
+    import('media-chrome/dist/lang/pt.js'),
   ]).catch(() => { loading = null; });
   return loading;
 }
