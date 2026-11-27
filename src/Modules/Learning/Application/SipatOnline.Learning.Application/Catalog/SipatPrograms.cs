@@ -7,7 +7,8 @@ namespace SipatOnline.Learning.Application.Catalog;
 /// One day of a SIPAT program, as in the "Seletor de módulos" sheet: a title or slogan, an optional date,
 /// a main subject, the videos picked for the day (in order) and the games, quizzes or forms.
 /// <paramref name="Id"/> is stable across edits, so applying the program again finds the same day.
-/// <paramref name="GamePlaces"/>: where each game opens in the day, when it is read from a training (null when written).
+/// <paramref name="GamePlaces"/>: where each game opens in the day. Read from a training, as the participant gets it;
+/// written by the board, where it puts each one (null, or a game left out: it stays as far from the first video as it was).
 /// </summary>
 public sealed record ProgramDay(
     Guid Id,
@@ -182,8 +183,9 @@ public static class ProgramDayRules
             if (!await gameStore.AllExistAsync(gameIds.ToArray(), cancellationToken))
                 return Fail("learning.program.game_not_found", $"Um dos jogos do dia \"{dayTitle}\" não existe mais.");
 
-            // a day keeps its id across edits; a new day gets one here
-            cleaned.Add(new ProgramDay(day.Id == Guid.Empty ? Guid.NewGuid() : day.Id, dayTitle, day.Date, subject, videoIds.ToArray(), gameIds.ToArray()));
+            // a day keeps its id across edits; a new day gets one here. The board's places go along, for its games only
+            var places = day.GamePlaces?.Where(place => gameIds.Contains(place.GameId)).ToArray();
+            cleaned.Add(new ProgramDay(day.Id == Guid.Empty ? Guid.NewGuid() : day.Id, dayTitle, day.Date, subject, videoIds.ToArray(), gameIds.ToArray(), places));
         }
 
         if (cleaned.Select(day => day.Id).Distinct().Count() != cleaned.Count)

@@ -49,8 +49,7 @@ public static class SipatPlanEndpoints
             Guid sipatId, SaveSipatPlanRequest request, HttpContext context,
             SipatPlanService service, CancellationToken token) =>
         {
-            var days = request.Days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, day.Date, day.Subject,
-                day.VideoIds ?? [], day.GameIds ?? [])).ToArray();
+            var days = FromDays(request.Days);
             var result = await service.SaveAsync(sipatId, days, token, request.EndsOn, keepLimit: request.SetLimit != true);
             return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
         })
@@ -109,8 +108,7 @@ public static class SipatPlanEndpoints
 
         templates.MapPut("/", async (Guid courseId, SaveSipatPlanRequest request, SipatPlanService service, CancellationToken token) =>
         {
-            var days = request.Days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, day.Date, day.Subject,
-                day.VideoIds ?? [], day.GameIds ?? [])).ToArray();
+            var days = FromDays(request.Days);
             var result = await service.SaveTemplateAsync(courseId, days, request.EndsOn, token);
             return result.IsSuccess ? Results.Ok(ToDays(result.Value)) : ToProblem(result.Error);
         })
@@ -123,6 +121,11 @@ public static class SipatPlanEndpoints
 
         return endpoints;
     }
+
+    /// <summary>The board's days, with where it put each game.</summary>
+    private static ProgramDay[]? FromDays(IReadOnlyList<ProgramDayDto>? days) =>
+        days?.Select(day => new ProgramDay(day.Id ?? Guid.Empty, day.Title ?? string.Empty, day.Date, day.Subject,
+            day.VideoIds ?? [], day.GameIds ?? [], day.GamePlaces?.Select(place => new ProgramGamePlace(place.GameId, place.AfterVideo)).ToArray())).ToArray();
 
     private static IReadOnlyList<ProgramDayDto> ToDays(IReadOnlyList<ProgramDay> days) =>
         days.Select(day => new ProgramDayDto(day.Id, day.Title, day.Date, day.Subject, day.VideoIds, day.GameIds,

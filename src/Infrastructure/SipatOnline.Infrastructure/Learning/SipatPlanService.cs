@@ -125,8 +125,9 @@ public sealed class SipatPlanService(
 
     /// <summary>
     /// Writes the days as the training's Títulos: a day that was there keeps its Título (same id), a new one gets its own,
-    /// one taken out goes away. The videos follow in order, with the name each has in this training. An activity that was
-    /// already on the day stays as far from the day's first video as it was; a new one comes after the day's last video.
+    /// one taken out goes away. The videos follow in order, with the name each has in this training. An activity goes
+    /// where the board put it; one it gives no place stays as far from the day's first video as it was, and a new one
+    /// comes after the day's last video.
     /// </summary>
     private async Task WriteDaysAsync(Guid courseId, IReadOnlyList<ProgramDay> days, CancellationToken token)
     {
@@ -191,16 +192,22 @@ public sealed class SipatPlanService(
         for (var index = 0; index < days.Count; index++)
         {
             var count = days[index].VideoIds.Count;
+            var places = days[index].GamePlaces ?? [];
             var order = 0;
             foreach (var moduleId in days[index].GameIds.Distinct())
+            {
+                var place = places.FirstOrDefault(item => item.GameId == moduleId);
+                var at = place is not null ? Math.Clamp(place.AfterVideo, 0, count)
+                    : offsets.TryGetValue((kept[index].Id, moduleId), out var offset) ? Math.Min(offset, count) : count;
                 db.PlatformCourseModuleLinks.Add(new PlatformCourseModuleLinkEntity
                 {
                     Id = Guid.NewGuid(),
                     CourseId = courseId,
                     ModuleId = moduleId,
-                    AfterVideoCount = start + (offsets.TryGetValue((kept[index].Id, moduleId), out var offset) ? Math.Min(offset, count) : count),
+                    AfterVideoCount = start + at,
                     Order = order++,
                 });
+            }
             start += count;
         }
     }
