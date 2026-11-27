@@ -139,13 +139,13 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
     });
   };
 
-  /** Ended: it leaves the participants and the list (the filter shows it again), and can be brought back. */
+  /** Ended: it leaves the participants, stays in the list as "Encerrado", and can be brought back. */
   const end = (event: SipatEvent) => {
     if (!window.confirm(`Encerrar "${event.title}"? Ele sai da área dos participantes. O que já foi feito continua no histórico, e dá para reativar depois.`)) return;
     void run(event, async () => {
       const ended = await cancelSipatEvent(event.id);
       setEvents(known => (known ?? []).map(item => (item.id === ended.id ? ended : item)));
-      setNotice(`"${ended.title}" foi encerrado. Para vê-lo de novo, escolha "Encerrado" no filtro.`);
+      setNotice(`"${ended.title}" foi encerrado e saiu da área dos participantes. Dá para reativá-lo pelo menu do card.`);
     });
   };
 

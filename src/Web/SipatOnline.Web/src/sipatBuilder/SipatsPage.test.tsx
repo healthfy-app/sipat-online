@@ -100,8 +100,7 @@ describe('SIPATs of a company', () => {
     vi.mocked(api.reactivateSipatEvent).mockResolvedValue(event('a', 'SIPAT 2026', '2026-11-09T00:00:00Z', 'Draft'));
     render(<MemoryRouter><SipatsPage basePath="/admin/sipats" /></MemoryRouter>);
 
-    // an ended training is out of the list until the filter asks for it, and keeps its actions
-    await user.click(await screen.findByRole('button', { name: 'Ver todos os treinamentos' }));
+    // the list opens on every training: an ended one is there, with its actions
     expect(await screen.findByRole('link', { name: 'Abrir SIPAT 2026' })).toHaveAttribute('href', '/admin/sipats/a');
 
     await user.click(screen.getByRole('button', { name: 'Mais ações de SIPAT 2026' }));
