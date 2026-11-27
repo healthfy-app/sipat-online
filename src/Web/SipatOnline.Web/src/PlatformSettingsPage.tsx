@@ -21,13 +21,13 @@ export default function PlatformSettingsPage({
         <div className="section-heading">
           <div>
             <p className="eyebrow">CONTA ADMINISTRATIVA</p>
-            <h2 id="platform-settings-account">Super Admin</h2>
+            <h2 id="platform-settings-account">Operador da plataforma</h2>
           </div>
         </div>
         <dl className="settings-list">
           <div><dt>Nome</dt><dd>{session.displayName}</dd></div>
-          <div><dt>Login do Super Admin</dt><dd>sipat.online.admin</dd></div>
-          <div><dt>Perfil técnico</dt><dd>PlatformOperator</dd></div>
+          <div><dt>Login</dt><dd>sipat.online.admin</dd></div>
+          <div><dt>Perfil</dt><dd>Operador da plataforma</dd></div>
         </dl>
         <p className="field-hint">
           A senha do operador é mantida na configuração segura do ambiente e nunca é exibida no portal.
@@ -44,7 +44,7 @@ export default function PlatformSettingsPage({
         <dl className="settings-list">
           <div><dt>Produto</dt><dd>{tenant.tenantName}</dd></div>
           <div><dt>Host de operação</dt><dd>{window.location.host}</dd></div>
-          <div><dt>Armazenamento de vídeo</dt><dd>Arquivo local do servidor (atual)</dd></div>
+          <div><dt>Armazenamento de vídeo</dt><dd>Definido na configuração do servidor</dd></div>
           <div><dt>Contas administrativas</dt><dd>Autenticação com senha e proteção contra tentativas repetidas</dd></div>
         </dl>
         <p className="platform-data-note">
