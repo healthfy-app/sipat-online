@@ -17,6 +17,7 @@ import { ExternalVideoFrame } from '@/ExternalVideoPreview';
 import LoadingState from '@/LoadingState';
 import { cn } from '@/lib/utils';
 import { SipatVideoPlayer } from '@sipat/video-player';
+import { videoVersions } from '@/videoVersions';
 import {
   cancelUpload, checkVideoFile, enqueueUploads, isActive, onVideoUploaded, retryUpload, titleFromFileName, useUploadQueue,
   type UploadItem,
@@ -390,7 +391,7 @@ function InlinePlayer({ video }: { video: PlatformCourseVideo }) {
   return <div className="absolute inset-0 bg-black [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
     {isExternal(video)
       ? <ExternalVideoFrame title={video.title} video={video} />
-      : <div className="video-preview"><SipatVideoPlayer preload="metadata" sources={[{ src: video.fileUrl }]} title={video.title} videoRef={ref} /></div>}
+      : <div className="video-preview"><SipatVideoPlayer preload="metadata" sources={videoVersions(video.fileUrl, video)} title={video.title} videoRef={ref} /></div>}
   </div>;
 }
 

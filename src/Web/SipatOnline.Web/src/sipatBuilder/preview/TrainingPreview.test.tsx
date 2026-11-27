@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { GameModule, PlatformCourseVideo } from '@/api';
 import { placedGames, type Catalog, type CatalogVideo, type DaySlots } from '../model';
-import { buildPreviewDays, versions } from './previewModel';
+import { videoVersions } from '@/videoVersions';
+import { buildPreviewDays } from './previewModel';
 import { reducePreview, startPreview, withWatched } from './previewSession';
 import TrainingPreview from './TrainingPreview';
 
@@ -52,7 +53,7 @@ describe('the preview of a training, from the board', () => {
   });
 
   it('offers the versions a participant gets, best first, so the 1080p plays in the preview too', () => {
-    expect(versions('/api/platform/catalog/videos/v/file', { hasFhd1080: true, hasSd480: false })).toEqual([
+    expect(videoVersions('/api/platform/catalog/videos/v/file', { hasFhd1080: true, hasSd480: false })).toEqual([
       { src: '/api/platform/catalog/videos/v/file?quality=1080p', quality: '1080p' },
       { src: '/api/platform/catalog/videos/v/file', quality: '720p' },
     ]);

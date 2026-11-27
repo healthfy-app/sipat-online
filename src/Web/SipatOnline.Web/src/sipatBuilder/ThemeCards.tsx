@@ -96,7 +96,7 @@ export function ThemeTray({ subjects, videos = [], canCustomizeGrid = false, can
       <div className="aspect-video overflow-hidden rounded-xl bg-[#0b1f19] [&_.video-preview]:size-full [&_video]:size-full [&_video]:object-contain">
         {isExternal(playing.source)
           ? <ExternalVideoFrame title={playing.title} video={playing.source} />
-          : <VideoPreview preload="metadata" src={playing.source.fileUrl} title={playing.title} />}
+          : <VideoPreview preload="metadata" src={playing.source.fileUrl} title={playing.title} versions={playing.source} />}
       </div>
     </Dialog>}
   </section>;
