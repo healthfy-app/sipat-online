@@ -11,6 +11,7 @@
 # Settings come from deploy/.env.production:
 #   CERTIFICATE_MODE  http01 = this script; anything else (dns-azure, manual) = do nothing.
 #   PLATFORM_HOST, TENANT_BASE_DOMAIN  hosts of the platform.
+#   ASPIRE_HOST       optional host of the Aspire Dashboard page.
 #   ACME_EMAIL        optional e-mail for expiry notices of Let's Encrypt.
 # Run as root on the VM, from anywhere.
 set -euo pipefail
@@ -50,6 +51,10 @@ while IFS= read -r key; do
     wanted="$wanted"$'\n'"$key.$base_domain"
   fi
 done <<< "$keys"
+aspire_host="$(read_setting ASPIRE_HOST | tr '[:upper:]' '[:lower:]')"
+if [[ "$aspire_host" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]]; then
+  wanted="$wanted"$'\n'"$aspire_host"
+fi
 wanted="$(printf '%s\n' "$wanted" | sort -u)"
 
 current=""

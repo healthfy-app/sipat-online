@@ -16,10 +16,15 @@
 #           TENANT_BASE_DOMAIN PLATFORM_HOST: required with a domain of our own; when both are empty
 #           and DEPLOY_HOST is an IPv4, they become <ip-with-dashes>.sslip.io and ops.<that> (dev)
 # Optional: PLATFORM_OPERATOR_DISPLAY_NAME PLATFORM_OPERATOR_PASSWORD (first deploy only)
+#           PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER PLATFORM_OPERATOR_2_DISPLAY_NAME PLATFORM_OPERATOR_2_PASSWORD
+#           (a second owner; the password is only read while that account does not exist)
 #           CERTIFICATE_MODE (http01|dns-azure|manual) ACME_EMAIL DEPLOY_ENVIRONMENT IMAGE_TAG
 #           DEPLOY_PLATFORM (linux/amd64 default; linux/arm64 for Azure *p* sizes such as B2pts_v2)
 #           VIDEO_STORAGE_PROVIDER (File|R2) R2_SERVICE_URL R2_VIDEO_BUCKET R2_ACCESS_KEY_ID
 #           R2_SECRET_ACCESS_KEY R2_DIRECT_UPLOAD OTEL_EXPORTER_OTLP_ENDPOINT OTEL_EXPORTER_OTLP_HEADERS
+#           ASPIRE_DASHBOARD (true: Aspire Dashboard on the VM receives the telemetry; wins over OTEL_*)
+#           ASPIRE_BROWSER_TOKEN (login of the page; with it the page is at https://ASPIRE_HOST,
+#           default aspire.<TENANT_BASE_DOMAIN>; without it, SSH tunnel only)
 #           R2_BACKUP_BUCKET R2_BACKUP_ACCESS_KEY_ID R2_BACKUP_SECRET_ACCESS_KEY (the key falls back to
 #           R2_ACCESS_KEY_ID/R2_SECRET_ACCESS_KEY, for a key that can also write the backup bucket)
 #           RESTORE_BACKUP (latest | sipat-online-YYYYMMDD-HHMMSS.dump: only on a new, empty VM)
@@ -95,6 +100,12 @@ put PLATFORM_OPERATOR_LOGIN_IDENTIFIER "$PLATFORM_OPERATOR_LOGIN_IDENTIFIER"
 put PLATFORM_OPERATOR_DISPLAY_NAME "${PLATFORM_OPERATOR_DISPLAY_NAME:-$PLATFORM_OPERATOR_LOGIN_IDENTIFIER}"
 # only read while the account does not exist (first deploy)
 put PLATFORM_OPERATOR_PASSWORD "${PLATFORM_OPERATOR_PASSWORD:-}"
+if [ -n "${PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER:-}" ]; then
+  # a second owner of the platform, created like the first one
+  put PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER "$PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER"
+  put PLATFORM_OPERATOR_2_DISPLAY_NAME "${PLATFORM_OPERATOR_2_DISPLAY_NAME:-$PLATFORM_OPERATOR_2_LOGIN_IDENTIFIER}"
+  put PLATFORM_OPERATOR_2_PASSWORD "${PLATFORM_OPERATOR_2_PASSWORD:-}"
+fi
 put SIPAT_API_IMAGE "sipat-online-api:$tag"
 put SIPAT_WEB_IMAGE "sipat-online-web:$tag"
 put CERTIFICATE_MODE "${CERTIFICATE_MODE:-manual}"
@@ -121,7 +132,18 @@ if [ -n "${R2_BACKUP_BUCKET:-}" ]; then
   put R2_BACKUP_ACCESS_KEY_ID "$backup_key_id"
   put R2_BACKUP_SECRET_ACCESS_KEY "$backup_secret"
 fi
-if [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then
+if [ "${ASPIRE_DASHBOARD:-}" = "true" ]; then
+  # the API sends its telemetry to the Aspire Dashboard container on the VM (compose service aspire-dashboard)
+  put ASPIRE_DASHBOARD true
+  put OTEL_EXPORTER_OTLP_ENDPOINT "http://aspire-dashboard:18889"
+  put OTEL_EXPORTER_OTLP_PROTOCOL grpc
+  put OTEL_SERVICE_NAME "sipat-online-api-$environment"
+  # the public page (https://aspire.<TENANT_BASE_DOMAIN>) only with a token: without one, SSH tunnel only
+  if [ -n "${ASPIRE_BROWSER_TOKEN:-}" ]; then
+    put ASPIRE_BROWSER_TOKEN "$ASPIRE_BROWSER_TOKEN"
+    put ASPIRE_HOST "${ASPIRE_HOST:-aspire.$TENANT_BASE_DOMAIN}"
+  fi
+elif [ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" ]; then
   put OTEL_EXPORTER_OTLP_ENDPOINT "$OTEL_EXPORTER_OTLP_ENDPOINT"
   put OTEL_EXPORTER_OTLP_HEADERS "${OTEL_EXPORTER_OTLP_HEADERS:-}"
   put OTEL_SERVICE_NAME "sipat-online-api-$environment"
@@ -163,6 +185,11 @@ if [ -n "$restore" ]; then
 fi
 # -T and </dev/null: this script itself arrives on stdin, and "run" would swallow the rest of it
 "${compose[@]}" --profile tools run --rm -T db-init < /dev/null
+if grep -q '^ASPIRE_DASHBOARD=true$' deploy/.env.production; then
+  "${compose[@]}" up -d aspire-dashboard
+else
+  "${compose[@]}" rm --stop --force aspire-dashboard
+fi
 "${compose[@]}" up -d --no-build --remove-orphans api web
 
 # HTTPS by HTTP-01 (no wildcard zone): issue now and keep the company hosts in the certificate
