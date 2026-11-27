@@ -1,6 +1,6 @@
 import { saveFile } from '@/lib/saveFile';
 import { ArrowLeft, Ban, Clock, Copy, Eye, FileDown, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   acceptCompanyVideoTerms, cancelSipatEvent, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, getTrainingLimit, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
@@ -20,7 +20,8 @@ import { partWord } from '@/trainings/partWord';
 import { courseLessons as titlesOf } from '@/courseEditor/courseTrack';
 import BuilderGrid from './BuilderGrid';
 import BuilderSetup from './BuilderSetup';
-import TrainingPreview from './TrainingPreview';
+// the participant's look (its player and styles) comes only when someone opens the preview
+const TrainingPreview = lazy(() => import('./preview/TrainingPreview'));
 import { planToCsv } from './csv';
 import AudienceRow from '@/trainings/AudienceRow';
 import { useUnitScope } from '@/trainings/unitScope';
@@ -715,7 +716,9 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
       </div>}
     </div>}
 
-    {previewing && <TrainingPreview catalog={catalog} dayWord={partWord(days.map(day => day.date))} days={days} name={name} onClose={() => setPreviewing(false)} />}
+    {previewing && <Suspense fallback={<div className="fixed inset-0 z-50 grid place-items-center bg-[rgb(11_36_31/0.55)] animate-overlay-in"><LoadingState>Abrindo a prévia...</LoadingState></div>}>
+      <TrainingPreview catalog={catalog} days={days} games={capabilities?.quizzes !== false} name={name} onClose={() => setPreviewing(false)} word={partWord(days.map(day => day.date))} />
+    </Suspense>}
 
     {confirmingEnd && sipat && <Dialog description="Ele deixa de aparecer para os participantes e fica bloqueado para edição. Dá para reativá-lo depois na lista de treinamentos."
       onClose={() => setConfirmingEnd(false)} title={`Encerrar "${sipat.title}"?`}>
