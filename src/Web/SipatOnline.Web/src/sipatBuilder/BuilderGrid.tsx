@@ -1,4 +1,4 @@
-import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors, type DragEndEvent, type DragStartEvent, type Modifier } from '@dnd-kit/core';
+import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useSensor, useSensors, type Announcements, type DragEndEvent, type DragStartEvent, type Modifier } from '@dnd-kit/core';
 import { getEventCoordinates } from '@dnd-kit/utilities';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
@@ -141,7 +141,30 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
   };
   const column = (index: number, order: number): CSSProperties => ({ '--i': index, '--order': order } as CSSProperties);
 
-  return <DndContext onDragCancel={() => setCarried(null)} onDragEnd={onDragEnd} onDragStart={onDragStart} sensors={sensors}>
+  // what a screen reader hears while something is carried: the item and the day by their names, in Portuguese
+  const carriedName = (data: { video?: { title?: string }; subject?: { title?: string } } | undefined) =>
+    data?.video?.title ?? data?.subject?.title ?? 'O item';
+  const dayName = (id: unknown) => {
+    const index = days.findIndex((_, position) => dropId(position) === id);
+    return index < 0 ? null : `dia ${index + 1}`;
+  };
+  const announcements: Announcements = {
+    onDragStart: ({ active }) => `${carriedName(active.data.current)}: item pego. Leve até um dia e solte.`,
+    onDragOver: ({ active, over }) => {
+      const day = dayName(over?.id);
+      return day ? `${carriedName(active.data.current)} está sobre o ${day}.` : `${carriedName(active.data.current)} está fora dos dias.`;
+    },
+    onDragEnd: ({ active, over }) => {
+      const day = dayName(over?.id);
+      return day ? `${carriedName(active.data.current)} foi colocado no ${day}.` : `${carriedName(active.data.current)} foi solto fora dos dias. Nada mudou.`;
+    },
+    onDragCancel: ({ active }) => `${carriedName(active.data.current)} voltou para a lista. Nada mudou.`,
+  };
+  const screenReaderInstructions = {
+    draggable: 'Para pegar o item, aperte Espaço ou Enter. Com ele pego, use as setas para levar até um dia e aperte Espaço ou Enter para soltar. Esc cancela.',
+  };
+
+  return <DndContext accessibility={{ announcements, screenReaderInstructions }} onDragCancel={() => setCarried(null)} onDragEnd={onDragEnd} onDragStart={onDragStart} sensors={sensors}>
     <DragOverlay modifiers={[followPointer]} dropAnimation={{ duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' }}>{carried && <DragPreview data={carried} />}</DragOverlay>
     <div className="grid gap-4">
       {!locked && <ThemeTray canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} onUpload={onUpload} subjects={themes}
