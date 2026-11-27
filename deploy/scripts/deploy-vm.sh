@@ -156,9 +156,22 @@ fi
 echo "$(wc -l < "$env_file") settings; video storage: $provider; images: $tag"
 
 platform="${DEPLOY_PLATFORM:-linux/amd64}"
-# The version people see on the login screen: MAJOR.MINOR from the VERSION file (changed by hand, in a PR), then the
-# number of commits of what is being deployed, so every deploy has its own. Outside production the environment follows it.
-version="${APP_VERSION:-$(tr -d '[:space:]' < VERSION).$(git rev-list --count HEAD)}"
+# The version people see on the login screen. The VERSION file holds the version of the first deploy after it changed
+# (changed by hand, in a PR: 1.1.0, 2.0.0...); each later merge into the deployed branch adds 1 to the last number.
+# Counted on the first-parent line (one merge = one step) since the commit that last changed VERSION.
+# Outside production the environment follows it.
+if [ -z "${APP_VERSION:-}" ]; then
+  base="$(tr -d '[:space:]' < VERSION)"
+  if ! [[ "$base" =~ ^([0-9]+\.[0-9]+)\.([0-9]+)$ ]]; then
+    echo "The VERSION file must be MAJOR.MINOR.PATCH, like 1.0.0 (it has '$base')." >&2
+    exit 1
+  fi
+  since="$(git log -1 --format=%cI -- VERSION)"
+  steps="$(git rev-list --count --first-parent --since="$since" HEAD)"
+  [ "$steps" -gt 0 ] || steps=1
+  APP_VERSION="${BASH_REMATCH[1]}.$((BASH_REMATCH[2] + steps - 1))"
+fi
+version="$APP_VERSION"
 [ "$environment" = "production" ] || version="$version-$environment"
 if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9A-Za-z.-]+$ ]]; then
   echo "The version '$version' is not MAJOR.MINOR.PATCH: check the VERSION file." >&2
