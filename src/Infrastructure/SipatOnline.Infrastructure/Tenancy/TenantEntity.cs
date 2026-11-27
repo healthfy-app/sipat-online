@@ -21,6 +21,9 @@ public sealed class TenantEntity
 
     public string? CertificateLogoContentType { get; set; }
 
+    /// <summary>The certificate template in use (see CertificateTemplateEntity); null is the standard certificate.</summary>
+    public Guid? CertificateTemplateId { get; set; }
+
     public string PrimaryColor { get; set; } = string.Empty;
 
     public string SecondaryColor { get; set; } = string.Empty;

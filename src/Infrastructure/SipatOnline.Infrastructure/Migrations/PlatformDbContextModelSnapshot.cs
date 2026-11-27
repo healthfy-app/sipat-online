@@ -446,6 +446,46 @@ namespace SipatOnline.Infrastructure.Migrations
                     b.ToTable("Users", "identity");
                 });
 
+            modelBuilder.Entity("SipatOnline.Infrastructure.Learning.CertificateTemplateEntity", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CoverContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<byte[]>("CoverData")
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EmblemContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<byte[]>("EmblemData")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("FooterContentType")
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<byte[]>("FooterData")
+                        .HasColumnType("bytea");
+
+                    b.Property<Guid>("TenantId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TenantId");
+
+                    b.ToTable("CertificateTemplates", "learning");
+                });
+
             modelBuilder.Entity("SipatOnline.Infrastructure.Learning.CourseCategoryEntity", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1517,6 +1557,9 @@ namespace SipatOnline.Infrastructure.Migrations
 
                     b.Property<byte[]>("CertificateLogoData")
                         .HasColumnType("bytea");
+
+                    b.Property<Guid?>("CertificateTemplateId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone");

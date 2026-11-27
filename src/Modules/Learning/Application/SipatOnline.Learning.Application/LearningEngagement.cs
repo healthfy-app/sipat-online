@@ -11,7 +11,11 @@ public sealed record CertificateLogo(byte[] Data, string ContentType);
 public sealed record ParticipationCertificate(Guid Id, Guid TenantId, Guid ParticipantId, Guid SipatEventId,
     string ParticipantName, string CompanyName, string EventTitle, DateTimeOffset StartsAt,
     DateTimeOffset EndsAt, long DurationMilliseconds, DateTimeOffset IssuedAt, bool IsDemonstration,
-    string CompletionBasis, CertificateLogo? CompanyLogo = null);
+    string CompletionBasis, CertificateLogo? CompanyLogo = null, Guid? TemplateId = null,
+    [property: System.Text.Json.Serialization.JsonIgnore] CertificateTemplate? Template = null);
+/// <summary>The pictures a company puts on its certificates: a cover across the top, an emblem and a picture in the footer.
+/// A certificate keeps the id of the template it was issued with, so a later change never touches it.</summary>
+public sealed record CertificateTemplate(CertificateLogo? Cover, CertificateLogo? Emblem, CertificateLogo? Footer);
 public sealed record CertificateEligibility(Guid SipatEventId, string EventTitle, int TotalCourses,
     int CompletedCourses, bool IsEligible, ParticipationCertificate? Certificate, bool HasCompanyLogo,
     DateTimeOffset StartsAt = default, DateTimeOffset EndsAt = default);

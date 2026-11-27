@@ -1,7 +1,8 @@
 // Worker + Containers do SIPAT Online. Runbook: deploy/CLOUDFLARE-CONTAINERS.md
 // O nivel de cima e o que as duas envs compartilham; env.dev e env.prod repetem as chaves que o
-// wrangler nao herda (vars, routes, containers, durable_objects, assets, triggers).
-// Troque os dominios de exemplo (ops.dev.exemplo.com.br, exemplo.com.br) pelos reais antes do primeiro deploy.
+// wrangler nao herda (vars, routes, containers, durable_objects, assets, triggers, r2_buckets).
+// Troque os dominios de exemplo (ops.dev.exemplo.com.br, videos.exemplo.com.br, exemplo.com.br) pelos reais antes do primeiro deploy.
+// Os videos saem do bucket pelo dominio proprio VIDEO_HOST (custom domain do Worker), nunca pelo r2.dev.
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sipat-online",
@@ -13,7 +14,7 @@
     "directory": "../../src/Web/SipatOnline.Web/dist",
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/health"]
+    "run_worker_first": ["/api/*", "/health", "/videos/*"]
   },
   "containers": [
     { "class_name": "SipatApi", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 5 },
@@ -36,7 +37,7 @@
         "directory": "../../src/Web/SipatOnline.Web/dist",
         "binding": "ASSETS",
         "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/*", "/health"]
+        "run_worker_first": ["/api/*", "/health", "/videos/*"]
       },
       "containers": [
         { "class_name": "SipatApi", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 5 },
@@ -52,9 +53,12 @@
       "triggers": { "crons": ["0 * * * *"] },
       "routes": [
         { "pattern": "ops.dev.exemplo.com.br/*", "zone_name": "exemplo.com.br" },
-        { "pattern": "*.dev.exemplo.com.br/*", "zone_name": "exemplo.com.br" }
+        { "pattern": "*.dev.exemplo.com.br/*", "zone_name": "exemplo.com.br" },
+        { "pattern": "videos.dev.exemplo.com.br", "custom_domain": true }
       ],
+      "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "sipat-videos-dev" }],
       "vars": {
+        "VIDEO_HOST": "videos.dev.exemplo.com.br",
         "TENANT_BASE_DOMAIN": "dev.exemplo.com.br",
         "PLATFORM_HOST": "ops.dev.exemplo.com.br",
         "R2_SERVICE_URL": "https://REPLACE_WITH_ACCOUNT_ID.r2.cloudflarestorage.com",
@@ -69,7 +73,7 @@
         "directory": "../../src/Web/SipatOnline.Web/dist",
         "binding": "ASSETS",
         "not_found_handling": "single-page-application",
-        "run_worker_first": ["/api/*", "/health"]
+        "run_worker_first": ["/api/*", "/health", "/videos/*"]
       },
       "containers": [
         { "class_name": "SipatApi", "image": "../../Dockerfile", "image_build_context": "../..", "instance_type": "standard-1", "max_instances": 5 },
@@ -85,9 +89,12 @@
       "triggers": { "crons": ["0 * * * *"] },
       "routes": [
         { "pattern": "ops.exemplo.com.br/*", "zone_name": "exemplo.com.br" },
-        { "pattern": "*.exemplo.com.br/*", "zone_name": "exemplo.com.br" }
+        { "pattern": "*.exemplo.com.br/*", "zone_name": "exemplo.com.br" },
+        { "pattern": "videos.exemplo.com.br", "custom_domain": true }
       ],
+      "r2_buckets": [{ "binding": "VIDEOS", "bucket_name": "sipat-videos" }],
       "vars": {
+        "VIDEO_HOST": "videos.exemplo.com.br",
         "TENANT_BASE_DOMAIN": "exemplo.com.br",
         "PLATFORM_HOST": "ops.exemplo.com.br",
         "R2_SERVICE_URL": "https://REPLACE_WITH_ACCOUNT_ID.r2.cloudflarestorage.com",
