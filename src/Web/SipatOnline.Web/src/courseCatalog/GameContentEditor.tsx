@@ -76,7 +76,7 @@ export default function GameContentEditor({ type, content, onChange }: {
       )}
 
       {type === 'Memory' && (
-        <Field hint="De 2 a 12 pares, um por linha: Capacete|Protege a cabeça" htmlFor="game-pairs" label="Pares de equipamento e função">
+        <Field hint="De 2 a 12 pares, um por linha: Capacete|Protege a cabeça" htmlFor="game-pairs" label="Pares de cartas">
           <Textarea id="game-pairs" required rows={6}
             value={(content.pairs ?? []).map((pair) => `${pair.first}|${pair.second}`).join('\n')}
             onChange={(event) => patch({

@@ -14,7 +14,7 @@ export const gameTypeOptions: GameTypeOption[] = [
   { value: 'SafeOrRisky', label: 'Seguro ou arriscado?', description: 'Cartas com situações: o participante arrasta para seguro ou arriscado e vê o porquê.', playable: true },
   { value: 'RiskSpotting', label: 'Caça aos riscos', description: 'Encontrar perigos em uma imagem do ambiente de trabalho.', playable: true, retired: true },
   { value: 'Puzzle', label: 'Quebra-cabeça', description: 'Montar uma imagem ou cartaz de segurança.', playable: true },
-  { value: 'Memory', label: 'Jogo da memória', description: 'Associar equipamentos de proteção aos seus usos.', playable: true },
+  { value: 'Memory', label: 'Jogo da memória', description: 'Encontrar os pares de cartas que combinam, como EPI e proteção ou termo e significado.', playable: true },
   { value: 'Scenario', label: 'Simulador de cenários', description: 'Escolher a melhor atitude em uma situação de risco.', playable: true },
   { value: 'Ordering', label: 'Ordenação', description: 'Colocar os passos de um procedimento na ordem correta.', playable: true },
 ];

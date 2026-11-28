@@ -23,7 +23,7 @@ export const gameLooks: Record<GamificationGameType, GameTypeLook> = {
   },
   Memory: {
     label: 'Jogo da memória', icon: Brain,
-    howTo: ['Vire duas cartas por vez.', 'Junte o equipamento à proteção que ele oferece.', 'Pares seguidos multiplicam seus pontos.'],
+    howTo: ['Vire duas cartas por vez.', 'Junte cada carta com a que combina com ela.', 'Pares seguidos multiplicam seus pontos.'],
   },
   Puzzle: {
     label: 'Quebra-cabeça', icon: Puzzle,
