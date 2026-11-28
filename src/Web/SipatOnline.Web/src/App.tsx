@@ -75,7 +75,6 @@ const PlatformSettingsPage = lazy(() => import('./PlatformSettingsPage').catch(r
 const CertificatesPage = lazy(() => import('./CertificatesPage').catch(reloadForNewVersion));
 const BrandingPage = lazy(() => import('./BrandingPage').catch(reloadForNewVersion));
 const VideoLibraryPage = lazy(() => import('./videoLibrary/VideoLibraryPage').catch(reloadForNewVersion));
-const CompanyCertificatesPage = lazy(() => import('./certificates/CompanyCertificatesPage').catch(reloadForNewVersion));
 
 type AppState =
   | { status: 'loading' }
@@ -305,10 +304,6 @@ export default function App() {
               element={state.session && hasAdminRole(state.session) ? <Navigate replace to="/admin/appearance?aba=certificado" /> : <AccessDenied />}
             />
             <Route
-              path="/admin/certificados"
-              element={state.session && canViewCompany(state.session) ? <CompanyCertificatesPage /> : <AccessDenied />}
-            />
-            <Route
               path="/learning"
               element={
                 state.session?.roles.includes('Participant') ? (
@@ -382,13 +377,6 @@ export default function App() {
             <Route
               path="/platform/companies/:companyId/qualidade"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <PlaybackQualityPage /> : <AccessDenied />}
-            />
-            {/* the operation sees the certificates of every company, each in its own workspace */}
-            <Route
-              path="/platform/companies/:companyId/certificados"
-              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
-                ? <CompanyContext>{() => <CompanyCertificatesPage />}</CompanyContext>
-                : <AccessDenied />}
             />
             <Route
               path="/platform/companies/:companyId/:section"
@@ -718,7 +706,6 @@ function ProtectedPortal({
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
             {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}
           </NavLink>
-          <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/certificados">Certificados</NavLink>
         </>
       )}
       {isPlatformOperator && !isPlatformCompanyContext && companyWorkspaceId && <CompanyNav companyId={companyWorkspaceId} />}
