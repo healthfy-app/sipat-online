@@ -1,5 +1,6 @@
 import { ArrowLeft, ArrowUpRight } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { Badge } from '@/components/ui/badge';
 import { NavLink, useLocation } from 'react-router-dom';
 import { getPlatformDashboard, type CompanyPlan } from '@/api';
 import { UnitMenu } from '@/trainings/unitScope';
@@ -21,6 +22,7 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
   const [name, setName] = useState('');
   const [plan, setPlan] = useState<CompanyPlan | null>(null);
   const [logo, setLogo] = useState<string | null>(null);
+  const [inactive, setInactive] = useState(false);
   const { pathname } = useLocation();
   const base = `/platform/companies/${companyId}`;
 
@@ -31,6 +33,7 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
         if (!current) return;
         const company = companies.find(item => item.id === companyId);
         setName(company?.name ?? ''); setPlan(company?.plan ?? null); setLogo(company?.logoReference ?? null);
+        setInactive(company ? !company.isActive : false);
       })
       .catch(() => { if (current) setName(''); });
     return () => { current = false; };
@@ -50,6 +53,7 @@ export default function CompanyNav({ companyId }: { companyId: string }) {
           {/* two even lines instead of a long one and a leftover word; the whole name is in the tooltip */}
           <strong className="min-w-0 text-sm font-semibold leading-snug text-balance [overflow-wrap:anywhere]" title={name || undefined}>{name ? breakAtSeparator(name) : 'Carregando...'}</strong>
           {plan && <CompanyPlanButton companyId={companyId} onChanged={setPlan} plan={plan} />}
+          {inactive && <Badge title="O portal desta empresa não abre: ela está inativa" variant="warning">Inativa</Badge>}
         </div>
       </div>
       <UnitMenu className="mb-0" />

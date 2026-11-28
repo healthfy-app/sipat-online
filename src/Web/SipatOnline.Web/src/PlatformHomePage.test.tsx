@@ -42,7 +42,7 @@ describe('Platform companies', () => {
     expect(within(acmeRow).getByRole('link', { name: 'Abrir empresa Acme' })).toHaveAttribute('href', '/platform/companies/t1');
     expect(screen.queryByText(/sem administrador/i)).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Atribuir administrador' })).not.toBeInTheDocument();
-    expect(screen.getByText('2 empresas na plataforma')).toBeInTheDocument();
+    expect(screen.getByText('1 empresa ativa na plataforma')).toBeInTheDocument();
     expect(api.listPlatformCourses).not.toHaveBeenCalled();
   });
 

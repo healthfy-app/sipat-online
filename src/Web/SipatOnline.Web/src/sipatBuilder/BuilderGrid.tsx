@@ -122,10 +122,10 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
       ...(generic ? { title: subject.title } : {}),
     });
   };
-  /** A standalone video dropped on a day joins its videos (once), up to the limit of the day. */
+  /** A standalone video dropped on a day joins its videos, up to the limit of the day. A video is in one day only. */
   const addVideo = (index: number, videoId: string) => {
     const current = filled(days[index].videos);
-    if (current.includes(videoId) || current.length >= maxVideoRows) return;
+    if (days.some(day => filled(day.videos).includes(videoId)) || current.length >= maxVideoRows) return;
     patchDay(index, { videos: [...current, videoId] });
   };
   // where each video and each game already is, shown on its card in the list
@@ -225,7 +225,7 @@ export default function BuilderGrid({ days, catalog, onChange, onRemoveDay, issu
                   onMoveGame={gamesEditable ? (gameId, delta) => patchGames(index, moveGame(day, gameId, delta)) : undefined}
                   onRemoveGame={gamesEditable ? gameId => patchGames(index, removeGame(day, gameId)) : undefined}
                   onOpenGame={gamesEditable ? gameId => { const game = catalog.games.get(gameId); if (game) setOpenGame({ game, dayIndex: index }); } : undefined}
-                  onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)}
+                  onClear={() => applyTheme(index, '')} subject={subject} themes={themes} videoIds={filled(day.videos)} usedIn={canCustomizeGrid ? usedIn : undefined}
                   arriving={arriving?.get(day.key)} onSend={onSendToDay && !readOnly ? files => onSendToDay(day.key, files) : undefined} />
               </Cell>;
             })}

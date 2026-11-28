@@ -12,7 +12,7 @@ export function companyAddress(key: string, host = window.location.host): string
 }
 
 /** The company's address as a link, with a discreet copy, for the operator to hand to the client. */
-export default function CompanyAddress({ companyKey, className }: { companyKey: string; className?: string }) {
+export default function CompanyAddress({ companyKey, className, inactive = false }: { companyKey: string; className?: string; inactive?: boolean }) {
   const [copied, setCopied] = useState(false);
   const url = companyAddress(companyKey);
   const shown = url.replace(/^https:\/\//, '');
@@ -23,6 +23,11 @@ export default function CompanyAddress({ companyKey, className }: { companyKey: 
       window.setTimeout(() => setCopied(false), 1800);
     } catch { /* no clipboard: the link is still there */ }
   };
+  // an inactive company's address answers nobody: it is shown as what it was, not as a door to open
+  if (inactive) {
+    return <span className={cn('inline-flex min-w-0 max-w-full items-center text-xs text-muted-foreground line-through decoration-muted-foreground/50', className)}
+      title="O endereço não abre enquanto a empresa está inativa"><span className="min-w-0 truncate">{shown}</span></span>;
+  }
   return (
     <span className={cn('group/address inline-flex min-w-0 max-w-full items-center gap-0.5 align-middle text-xs', className)}>
       <a className="inline-flex min-w-0 items-center gap-1 font-medium text-primary decoration-primary/40 underline-offset-[3px] hover:underline"
