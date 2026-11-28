@@ -1474,6 +1474,11 @@ export function changeCompanyPlan(companyId: string, plan: CompanyPlan): Promise
   return requestJson<{ plan: CompanyPlan }>(`/api/platform/companies/${companyId}/plan`, { method: 'PUT', body: JSON.stringify({ plan }) });
 }
 
+/** The operator turns a company off (its address stops answering) or back on. */
+export function changeCompanyStatus(companyId: string, isActive: boolean): Promise<{ isActive: boolean }> {
+  return requestJson<{ isActive: boolean }>(`/api/platform/companies/${companyId}/status`, { method: 'PUT', body: JSON.stringify({ isActive }) });
+}
+
 /** What the company can do, and the plan that grants it. */
 export interface CompanyCapabilities {
   customizeGrid: boolean; customBranding: boolean; customCertificate: boolean; quizzes: boolean; internalVideos: boolean; plan?: CompanyPlan | null;
