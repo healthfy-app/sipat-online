@@ -368,7 +368,7 @@ function ParticipantsTable({ rows, overview, certificates }: {
       </div>
 
       <div className="overflow-x-auto">
-        <table aria-label="Colaboradores da empresa" className={cn('m-0 w-full border-collapse text-sm', certificates ? 'min-w-[52rem]' : 'min-w-[44rem]')}>
+        <table aria-label="Colaboradores da empresa" className={cn('m-0 w-full border-collapse text-sm', certificates ? 'min-w-[50rem]' : 'min-w-[44rem]')}>
           <thead>
             <tr className="border-b border-border">
               {columns.map((label, index) => (
@@ -641,23 +641,21 @@ const pill = cn(
 );
 
 /**
- * A person's certificates in the table, shown as what they are: the certificate itself (its medal, training and date),
- * which opens in a new tab, with a quiet button beside it that downloads it; several make one pill that lists them.
+ * A person's certificates in the table, shown as what they are: the certificate itself (its medal and the date it was
+ * issued; the training is the one chosen at the top, and its name is in the tooltip), which opens in a new tab, with a
+ * quiet button beside it that downloads it. Several make one pill that lists them by name.
  */
 function PersonCertificates({ certificates, name }: { certificates: readonly CompanyCertificate[]; name: string }) {
   if (certificates.length === 0) return <span className="text-muted-foreground">—</span>;
   if (certificates.length === 1) {
     const [certificate] = certificates;
     return (
-      <span className="inline-flex max-w-full items-center justify-end gap-0.5">
-        <a aria-label={`Ver o certificado de ${certificate.eventTitle} de ${name}`} className={cn(pill, 'max-w-[15rem] pr-3')}
+      <span className="inline-flex items-center justify-end gap-0.5 whitespace-nowrap">
+        <a aria-label={`Ver o certificado de ${certificate.eventTitle} de ${name}`} className={cn(pill, 'pr-3 text-[0.8125rem] font-semibold tabular-nums text-foreground')}
           href={certificatePdfUrl(certificate.id, true)} rel="noopener noreferrer" target="_blank"
           title={`${certificate.eventTitle} · emitido em ${issuedOn(certificate.issuedAt)}${certificate.isDemonstration ? ' · demonstrativo' : ''}`}>
           <Medal />
-          <span className="grid min-w-0 leading-tight">
-            <span className="truncate text-[0.8125rem] font-semibold text-foreground">{certificate.eventTitle}</span>
-            <span className="text-[0.6875rem] tabular-nums text-muted-foreground">{issuedOn(certificate.issuedAt)}</span>
-          </span>
+          {issuedOn(certificate.issuedAt)}
         </a>
         <Button asChild size="icon-sm" variant="ghost">
           <a aria-label={`Baixar o certificado de ${certificate.eventTitle} de ${name}`} href={certificatePdfUrl(certificate.id)} title="Baixar o PDF">
@@ -670,7 +668,7 @@ function PersonCertificates({ certificates, name }: { certificates: readonly Com
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button aria-label={`Certificados de ${name}`} className={cn(pill, 'pr-2.5 text-[0.8125rem] font-semibold text-foreground')} type="button">
+        <button aria-label={`Certificados de ${name}`} className={cn(pill, 'whitespace-nowrap pr-2.5 text-[0.8125rem] font-semibold text-foreground')} type="button">
           <span className="flex -space-x-2.5"><Medal /><Medal /></span>
           {certificates.length} certificados
           <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
