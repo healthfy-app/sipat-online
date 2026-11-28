@@ -21,14 +21,14 @@ public sealed class CompanyPlanApiTests
         await using var postgres = new PostgreSqlBuilder("postgres:16-alpine").Build();
         await postgres.StartAsync();
         await using var factory = new SipatOnlineApiFactory(postgres.GetConnectionString());
-        Guid readyVideo, freeVideo, readySipat;
+        Guid readyVideo, freeVideo;
         await using (var scope = factory.Services.CreateAsyncScope())
         {
             await scope.ServiceProvider.GetRequiredService<DatabaseInitializer>().InitializeAsync(CancellationToken.None);
             var db = scope.ServiceProvider.GetRequiredService<PlatformDbContext>();
             readyVideo = await AddVideoAsync(db, "A1V1 - Ergonomia");
             freeVideo = await AddVideoAsync(db, "A9V1 - Fora das grades");
-            readySipat = await AddThemeAsync(db, "Ergonomia", "Opção 1 · 1 aulas\nGrade pronta.", readyVideo);
+            await AddThemeAsync(db, "Ergonomia", "Opção 1 · 1 aulas\nGrade pronta.", readyVideo);
             await AddThemeAsync(db, "Tema avulso", "Sem grade.", freeVideo);
         }
 
@@ -60,15 +60,11 @@ public sealed class CompanyPlanApiTests
         Assert.Equal(2, catalog.GetProperty("videos").GetArrayLength());
 
         var start = new DateTimeOffset(2026, 11, 9, 0, 0, 0, TimeSpan.Zero);
-        // Bronze only views: the operation, inside the company, builds its training from a ready SIPAT
+        // every plan builds its own training: on Bronze each day is one ready module, whole
         var training = new { title = "SIPAT 2026", description = (string?)null, startsAt = start, endsAt = start.AddDays(1) };
-        Assert.Equal("sipat.view_only", (await Send(admin, HttpMethod.Post, "/api/admin/sipats", training, HttpStatusCode.Forbidden)).GetProperty("code").GetString());
-        using var inCompany = await OperatorInAsync(factory, companyId);
-        await Send(operatorClient, HttpMethod.Put, $"/api/platform/catalog/courses/{readySipat}/ready-sipat", new { ready = true }, HttpStatusCode.NoContent);
-        var sipat = await Send(inCompany, HttpMethod.Post, "/api/admin/sipats", training, HttpStatusCode.Created);
+        var sipat = await Send(admin, HttpMethod.Post, "/api/admin/sipats", training, HttpStatusCode.Created);
         var sipatId = sipat.GetProperty("id").GetGuid();
-        await Send(inCompany, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Grade pronta", readyVideo) } });
-        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Grade pronta", readyVideo) } }, HttpStatusCode.Forbidden);
+        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Grade pronta", readyVideo) } });
         Assert.Single((await Get(admin, $"/api/admin/sipats/{sipatId}/plan")).EnumerateArray());
 
         // the operator takes the loose assunto out of Bronze: the company stops seeing it and cannot save a day with it
@@ -79,7 +75,7 @@ public sealed class CompanyPlanApiTests
         using (var removed = await Raw(operatorClient, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = new[] { looseId } }))
             Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
         Assert.Equal(["Ergonomia"], (await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()));
-        await Send(inCompany, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Assunto fora do plano", freeVideo) } }, HttpStatusCode.BadRequest);
+        await Send(admin, HttpMethod.Put, $"/api/admin/sipats/{sipatId}/plan", new { days = new[] { Day("Assunto fora do plano", freeVideo) } }, HttpStatusCode.BadRequest);
         // other plans keep it
         Assert.Single((await Get(operatorClient, "/api/platform/catalog/plan-subjects")).GetProperty("excluded").GetProperty("Bronze").EnumerateArray());
         using (var back = await Raw(operatorClient, HttpMethod.Put, "/api/platform/catalog/plan-subjects/Bronze", new { excludedCourseIds = Array.Empty<Guid>() }))
@@ -202,16 +198,15 @@ public sealed class CompanyPlanApiTests
             item.GetProperty("id").GetGuid() == listed.GetProperty("courseId").GetGuid() && item.GetProperty("tenantId").GetGuid() == companyId);
         string[] Titles(JsonElement catalog) => catalog.GetProperty("courses").EnumerateArray().Select(item => item.GetProperty("title").GetString()!).Order().ToArray();
 
-        // Bronze: one ready SIPAT whole (a model the operation marked as one), no own identity, no internal videos
+        // Bronze: the ready modules as they are (each day one module whole, or a ready SIPAT whole), no own identity, no internal videos
         Assert.Equal(["Ergonomia", "Higiene mental"], Titles(await Get(admin, "/api/admin/sipat-catalog")));
-        var notReady = await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("Módulo pronto", second, first) } }, HttpStatusCode.BadRequest);
-        Assert.Equal("sipat.grid_not_customizable", notReady.GetProperty("code").GetString());
+        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("Módulo pronto", second, first) } });
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/catalog/courses/{readySipat}/ready-sipat", new { ready = true }, HttpStatusCode.NoContent);
         Assert.True((await Get(admin, "/api/admin/sipat-catalog")).GetProperty("courses").EnumerateArray()
             .Single(item => item.GetProperty("id").GetGuid() == readySipat).GetProperty("isReadySipat").GetBoolean());
         await Send(inCompany, HttpMethod.Put, plan, new { days = new[] { Day("SIPAT pronta", second, first) } });
-        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("SIPAT pronta", second, first) } }, HttpStatusCode.Forbidden);
-        // the editor, opened to the company: on Bronze it shows the training and changes nothing
+        await Send(admin, HttpMethod.Put, plan, new { days = new[] { Day("SIPAT pronta", second, first) } });
+        // the editor, opened to the company: on Bronze its grid stays as the modules are
         var editor = await Get(admin, $"/api/admin/training-editor/sipats/{sipatId}");
         var courseId = editor.GetProperty("course").GetProperty("id").GetGuid();
         Assert.False(editor.GetProperty("access").GetProperty("editGrid").GetBoolean());
@@ -297,7 +292,7 @@ public sealed class CompanyPlanApiTests
         // back to Bronze: what goes live is what the plan allows today
         await Send(operatorClient, HttpMethod.Put, $"/api/platform/companies/{companyId}/plan", new { plan = "Bronze" });
         await Send(inCompany, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.BadRequest);
-        await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.Forbidden);
+        await Send(admin, HttpMethod.Post, $"/api/admin/sipats/{sipatId}/plan/launch", new { }, HttpStatusCode.BadRequest);
 
         // only the operator decides whose an assunto is
         using (var denied = await Raw(admin, HttpMethod.Put, $"/api/platform/catalog/plan-subjects/courses/{internalSubject}/company", new { companyId = (Guid?)null }))
