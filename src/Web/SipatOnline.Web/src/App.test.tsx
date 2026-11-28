@@ -124,7 +124,7 @@ describe('tenant portal', () => {
     await waitFor(() => expect(requests.filter(request => request.url.startsWith('/api/admin/')))
       .toEqual(expect.arrayContaining([
         { url: '/api/admin/learning/participation', company: 'company-1' },
-        { url: '/api/admin/users/participants?offset=0&limit=100', company: 'company-1' },
+        { url: '/api/admin/users/participants?offset=0&limit=1000', company: 'company-1' },
       ])));
   });
 

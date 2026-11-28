@@ -1543,8 +1543,9 @@ export async function listAllParticipants(unitId?: string | null): Promise<Parti
   let offset = 0;
   let totalCount = 1;
 
+  // 1000 a page: a company of 5000 is 5 calls, not 50 in a row
   while (offset < totalCount) {
-    const page = await (unitId ? listParticipants(offset, 100, unitId) : listParticipants(offset, 100));
+    const page = await (unitId ? listParticipants(offset, 1000, unitId) : listParticipants(offset, 1000));
     participants.push(...page.items);
     totalCount = page.totalCount;
     if (page.items.length === 0) break;

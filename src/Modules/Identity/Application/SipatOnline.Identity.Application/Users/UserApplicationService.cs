@@ -48,16 +48,19 @@ public sealed class UserApplicationService(
         return Result<UserAccountPage>.Success(page);
     }
 
+    public const int MaximumParticipantPageSize = 1000;
+
     public async Task<Result<UserAccountPage>> ListParticipantsAsync(
         ListUsersRequest request,
         CancellationToken cancellationToken)
     {
-        var validation = await listUsersValidator.ValidateAsync(request, cancellationToken);
-        if (!validation.IsValid)
+        // the overview and the collaborators page read everyone: with 100 a page, 5000 people were 50 calls in a row
+        if (request.Offset < 0 || request.Limit is < 1 or > MaximumParticipantPageSize)
         {
-            var failure = validation.Errors[0];
             return Result<UserAccountPage>.Failure(
-                new DomainError(failure.ErrorCode, failure.ErrorMessage));
+                new DomainError(
+                    "identity.invalid_page",
+                    $"A paginação deve ter deslocamento não negativo e limite entre 1 e {MaximumParticipantPageSize}."));
         }
 
         if (!CanManageUsers() && !currentActor.IsInRole(PlatformRoles.Supervisor))
