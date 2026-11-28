@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, Download, FileText, MapPin, Search } from 'lucide-react';
+import { Award, ChevronDown, ChevronRight, Download, MapPin, Search } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { certificatePdfUrl, listCompanyCertificates, type CompanyCertificate } from '@/api';
 import { Badge } from '@/components/ui/badge';
@@ -159,12 +159,16 @@ function PersonCertificates({ person }: { person: CertificatePerson }) {
       {!person.isActive && <Badge variant="neutral">Inativo</Badge>}
     </div>
     <ul aria-label={`Certificados de ${person.name}`} className="m-0 grid list-none gap-1.5 p-0 pl-11 max-sm:pl-0">
-      {person.certificates.map(certificate => <li className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border px-3 py-2" key={certificate.id}>
-        <FileText aria-hidden="true" className="size-4 shrink-0 text-primary" />
-        <span className="grid min-w-0 flex-[1_1_12rem]">
-          <span className="truncate text-sm font-medium">{certificate.eventTitle}</span>
-          <span className="text-xs text-muted-foreground">Emitido em {issuedOn(certificate.issuedAt)}</span>
-        </span>
+      {person.certificates.map(certificate => <li className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-border px-3 py-2 transition-colors hover:border-primary/30" key={certificate.id}>
+        {/* the certificate itself opens in a new tab; the button beside it downloads it */}
+        <a aria-label={`Ver o certificado de ${certificate.eventTitle} de ${person.name}`} className="group flex min-w-0 flex-[1_1_12rem] items-center gap-3 rounded-md text-foreground no-underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          href={certificatePdfUrl(certificate.id, true)} rel="noopener noreferrer" target="_blank">
+          <span aria-hidden="true" className="grid size-8 shrink-0 place-items-center rounded-full bg-accent text-primary"><Award className="size-4" /></span>
+          <span className="grid min-w-0">
+            <span className="truncate text-sm font-semibold group-hover:text-primary">{certificate.eventTitle}</span>
+            <span className="text-xs text-muted-foreground">Emitido em {issuedOn(certificate.issuedAt)}</span>
+          </span>
+        </a>
         {certificate.isDemonstration && <Badge variant="warning">Demonstrativo</Badge>}
         <Button asChild size="sm" variant="outline">
           <a aria-label={`Baixar o certificado de ${certificate.eventTitle} de ${person.name}`} href={certificatePdfUrl(certificate.id)}>

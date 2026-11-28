@@ -564,14 +564,15 @@ export function listCompanyCertificates(unitId?: string | null): Promise<Company
 }
 
 /**
- * Where a certificate's PDF is downloaded: the operator looking at a company (inside it, or on its pages in the
- * operation) goes through the company's own address.
+ * Where a certificate's PDF is downloaded, or with `view` shown in the browser's own viewer (opened in a new tab). The
+ * operator looking at a company (inside it, or on its pages in the operation) goes through the company's own address.
  */
-export function certificatePdfUrl(certificateId: string): string {
+export function certificatePdfUrl(certificateId: string, view = false): string {
   const companyId = adminCompany();
-  return companyId
+  const path = companyId
     ? `/api/platform/companies/${companyId}/learning/certificates/${certificateId}/pdf`
     : `/api/learning/certificates/${certificateId}/pdf`;
+  return view ? `${path}?inline=true` : path;
 }
 
 export interface LearningParticipantProgress {

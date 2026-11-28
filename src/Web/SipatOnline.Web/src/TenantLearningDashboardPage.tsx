@@ -1,11 +1,11 @@
-import { CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
+import { Award, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, ExternalLink, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
   certificatePdfUrl, getCompanyRegistry, listAllParticipants, listCompanyCertificates, listLearningParticipation, listParticipantProfiles,
   type CompanyCertificate, type CompanyRegistry, type LearningParticipantProgress, type ParticipantProfile,
 } from './api';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   participantProgressStatuses,
   summarizeCompanyProgress,
@@ -625,36 +625,68 @@ function normalize(value: string): string {
 // the date printed on the certificate
 const issuedOn = (value: string) => new Date(value).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 
-/** A person's certificates in the table: a dash, the button that downloads the one, or a menu with each of them. */
+/** The medal of a certificate: a green coin with a ring, so two of them overlap cleanly. */
+function Medal() {
+  return (
+    <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-full bg-accent text-primary ring-2 ring-card">
+      <Award className="size-3.5! text-primary!" />
+    </span>
+  );
+}
+
+const pill = cn(
+  'm-0 inline-flex min-w-0 items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 text-left no-underline',
+  'cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent data-[state=open]:border-primary/40 data-[state=open]:bg-accent',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+);
+
+/**
+ * A person's certificates in the table, shown as what they are: the certificate itself (its medal, training and date),
+ * which opens in a new tab, with a quiet button beside it that downloads it; several make one pill that lists them.
+ */
 function PersonCertificates({ certificates, name }: { certificates: readonly CompanyCertificate[]; name: string }) {
   if (certificates.length === 0) return <span className="text-muted-foreground">—</span>;
   if (certificates.length === 1) {
     const [certificate] = certificates;
     return (
-      <Button asChild size="sm" variant="outline">
-        <a aria-label={`Baixar o certificado de ${certificate.eventTitle} de ${name}`} href={certificatePdfUrl(certificate.id)}
-          title={`${certificate.eventTitle} · emitido em ${issuedOn(certificate.issuedAt)}`}>
-          <Download /> Baixar
+      <span className="inline-flex max-w-full items-center justify-end gap-0.5">
+        <a aria-label={`Ver o certificado de ${certificate.eventTitle} de ${name}`} className={cn(pill, 'max-w-[15rem] pr-3')}
+          href={certificatePdfUrl(certificate.id, true)} rel="noopener noreferrer" target="_blank"
+          title={`${certificate.eventTitle} · emitido em ${issuedOn(certificate.issuedAt)}${certificate.isDemonstration ? ' · demonstrativo' : ''}`}>
+          <Medal />
+          <span className="grid min-w-0 leading-tight">
+            <span className="truncate text-[0.8125rem] font-semibold text-foreground">{certificate.eventTitle}</span>
+            <span className="text-[0.6875rem] tabular-nums text-muted-foreground">{issuedOn(certificate.issuedAt)}</span>
+          </span>
         </a>
-      </Button>
+        <Button asChild size="icon-sm" variant="ghost">
+          <a aria-label={`Baixar o certificado de ${certificate.eventTitle} de ${name}`} href={certificatePdfUrl(certificate.id)} title="Baixar o PDF">
+            <Download />
+          </a>
+        </Button>
+      </span>
     );
   }
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <Button aria-label={`Certificados de ${name}`} size="sm" variant="outline">
-          {certificates.length} certificados <ChevronDown />
-        </Button>
+        <button aria-label={`Certificados de ${name}`} className={cn(pill, 'pr-2.5 text-[0.8125rem] font-semibold text-foreground')} type="button">
+          <span className="flex -space-x-2.5"><Medal /><Medal /></span>
+          {certificates.length} certificados
+          <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
+        </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-[min(20rem,calc(100vw-1.5rem))]">
+      <DropdownMenuContent className="w-[min(21rem,calc(100vw-1.5rem))]">
+        <DropdownMenuLabel className="truncate">Certificados de {name}</DropdownMenuLabel>
         {certificates.map(certificate => (
           <DropdownMenuItem asChild key={certificate.id}>
-            <a className="no-underline" href={certificatePdfUrl(certificate.id)}>
-              <Download aria-hidden="true" />
-              <span className="grid min-w-0 flex-1">
-                <span className="truncate font-medium">{certificate.eventTitle}</span>
-                <span className="text-xs text-muted-foreground">Emitido em {issuedOn(certificate.issuedAt)}</span>
+            <a className="no-underline" href={certificatePdfUrl(certificate.id, true)} rel="noopener noreferrer" target="_blank">
+              <Medal />
+              <span className="grid min-w-0 flex-1 leading-tight">
+                <span className="truncate font-semibold text-foreground">{certificate.eventTitle}</span>
+                <span className="text-xs tabular-nums text-muted-foreground">Emitido em {issuedOn(certificate.issuedAt)}</span>
               </span>
+              <ExternalLink aria-hidden="true" />
             </a>
           </DropdownMenuItem>
         ))}
