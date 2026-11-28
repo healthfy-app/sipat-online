@@ -537,6 +537,38 @@ export function getParticipantOutcomes(participantId: string, companyId?: string
     : `/api/admin/learning/participants/${participantId}/outcomes`);
 }
 
+/** A certificate of the company, with where its person is now: the page puts it in the tree unit / sector / person. */
+export interface CompanyCertificate {
+  id: string;
+  participantId: string;
+  participantName: string;
+  login: string;
+  registrationNumber: string | null;
+  isActive: boolean;
+  unitId: string | null;
+  unitName: string | null;
+  sectorId: string | null;
+  sectorName: string | null;
+  eventTitle: string;
+  issuedAt: string;
+  isDemonstration: boolean;
+  /** Its PDF is already kept in the archive (R2). */
+  saved: boolean;
+}
+
+/** Every certificate the company's people were given; with a unit, only its people's. */
+export function listCompanyCertificates(unitId?: string | null): Promise<CompanyCertificate[]> {
+  return requestJson<CompanyCertificate[]>(`/api/admin/learning/certificates${unitQuery(unitId, true)}`);
+}
+
+/** Where a certificate's PDF is downloaded: the operator looking at a company goes through the company's own address. */
+export function certificatePdfUrl(certificateId: string): string {
+  const companyId = getCompanyAdministrationId();
+  return companyId
+    ? `/api/platform/companies/${companyId}/learning/certificates/${certificateId}/pdf`
+    : `/api/learning/certificates/${certificateId}/pdf`;
+}
+
 export interface LearningParticipantProgress {
   participantId: string;
   loginIdentifier: string;

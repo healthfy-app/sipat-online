@@ -119,7 +119,7 @@ export default function CertificateTemplatePage({ tenant }: { tenant: TenantBran
         <PageHeader
           description="Personalize o certificado que os colaboradores recebem ao concluir um treinamento."
           eyebrow="PORTAL DA EMPRESA"
-          title="Certificado"
+          title="Modelo do certificado"
         />
 
         {saved === null && !error && <LoadingState>Carregando certificado...</LoadingState>}
