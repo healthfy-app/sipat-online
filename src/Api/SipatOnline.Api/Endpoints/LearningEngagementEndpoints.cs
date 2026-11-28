@@ -68,13 +68,13 @@ public static class LearningEngagementEndpoints
             var result = await service.IssueAsync(sipatId, token);
             return result.IsSuccess ? Results.Ok(CertificateResponse(result.Value)) : Problem(result.Error);
         });
+        // the PDF saved in the archive (R2); one not saved yet is drawn on the spot
         endpoints.MapGet("/api/learning/certificates/{certificateId:guid}/pdf", async (
-            Guid certificateId, LearningEngagementService service, ICertificatePdfRenderer renderer, CancellationToken token) =>
+            Guid certificateId, bool? inline, HttpContext context, LearningEngagementService service, CertificateArchiver archiver,
+            CancellationToken token) =>
         {
             var result = await service.FindCertificateAsync(certificateId, token);
-            return result.IsSuccess
-                ? Results.File(renderer.Render(result.Value), "application/pdf", $"certificado-sipat-{certificateId:N}.pdf")
-                : Problem(result.Error);
+            return result.IsSuccess ? await PdfAsync(context, archiver, result.Value, inline == true, token) : Problem(result.Error);
         }).RequireAuthorization();
         learning.MapGet("/tracks/{trackId:guid}/cover", async (Guid trackId, string? v, HttpContext context, LearningService service,
             PlatformDbContext db, ITenantContext tenant, CancellationToken token) =>
@@ -165,21 +165,64 @@ public static class LearningEngagementEndpoints
             var access = await service.GetAsync(companyId, token);
             return access.IsSuccess ? await OutcomesAsync(companyId, participantId, db, token) : Problem(access.Error);
         });
-        platform.MapGet("/certificates/{certificateId:guid}/pdf", async (Guid companyId, Guid certificateId,
-            LearningDistributionService service, ILearningEngagementStore store, ICertificatePdfRenderer renderer, CancellationToken token) =>
+        platform.MapGet("/certificates/{certificateId:guid}/pdf", async (Guid companyId, Guid certificateId, bool? inline,
+            HttpContext context, LearningDistributionService service, ILearningEngagementStore store, CertificateArchiver archiver,
+            CancellationToken token) =>
         {
             var access = await service.GetAsync(companyId, token);
             if (!access.IsSuccess) return Problem(access.Error);
             var certificate = await store.FindCertificateAsync(companyId, Guid.Empty, certificateId, true, token);
-            return certificate is null ? Results.NotFound() :
-                Results.File(renderer.Render(certificate), "application/pdf", $"certificado-sipat-{certificateId:N}.pdf");
+            return certificate is null ? Results.NotFound() : await PdfAsync(context, archiver, certificate, inline == true, token);
         });
         endpoints.MapGet("/api/admin/learning/participants/{participantId:guid}/outcomes", async (
             Guid participantId, ITenantContext tenant, PlatformDbContext db, CancellationToken token) =>
             tenant.CurrentTenantId is { } tenantId ? await OutcomesAsync(tenantId.Value, participantId, db, token) : Results.Forbid())
             .RequireAuthorization("ViewTenantLearning");
+        endpoints.MapGet("/api/admin/learning/certificates", async (
+            Guid? unitId, ITenantContext tenant, PlatformDbContext db, CancellationToken token) =>
+            tenant.CurrentTenantId is { } tenantId ? Results.Ok(await CompanyCertificatesAsync(tenantId.Value, unitId, db, token)) : Results.Forbid())
+            .RequireAuthorization("ViewTenantLearning");
         return endpoints;
     }
+
+    /// <summary>
+    /// A certificate's PDF, downloaded; with <paramref name="inline"/>, shown in the browser's own viewer (the pages open it
+    /// in a new tab), keeping its name for when it is saved from there.
+    /// </summary>
+    private static async Task<IResult> PdfAsync(HttpContext context, CertificateArchiver archiver,
+        ParticipationCertificate certificate, bool inline, CancellationToken token)
+    {
+        var name = $"certificado-sipat-{certificate.Id:N}.pdf";
+        var document = await archiver.OpenAsync(certificate, token);
+        if (!inline) return Results.File(document, "application/pdf", name);
+        context.Response.Headers.ContentDisposition = $"inline; filename=\"{name}\"";
+        return Results.File(document, "application/pdf");
+    }
+
+    /// <summary>
+    /// Every certificate the company's people were given, with where each person is now (unit and sector): the page puts
+    /// them in the tree unit / sector / person, the same tree they are kept in. With a unit, only its people.
+    /// </summary>
+    private static async Task<CompanyCertificate[]> CompanyCertificatesAsync(Guid tenantId, Guid? unitId, PlatformDbContext db, CancellationToken token) =>
+        await (
+            from certificate in db.ParticipationCertificates.AsNoTracking()
+            where certificate.TenantId == tenantId
+            join user in db.Users.AsNoTracking() on certificate.ParticipantId equals user.Id
+            where user.TenantId == tenantId && (unitId == null || user.UnitId == unitId)
+            join unit in db.CompanyUnits.AsNoTracking() on user.UnitId equals (Guid?)unit.Id into units
+            from unit in units.DefaultIfEmpty()
+            join sector in db.CompanySectors.AsNoTracking() on user.SectorId equals (Guid?)sector.Id into sectors
+            from sector in sectors.DefaultIfEmpty()
+            select new CompanyCertificate(certificate.Id, user.Id, user.DisplayName, user.EmployeeIdentifier,
+                user.RegistrationNumber, user.IsActive, user.UnitId, unit == null ? null : unit.Name, user.SectorId,
+                sector == null ? null : sector.Name, certificate.SipatEventId, certificate.EventTitle, certificate.IssuedAt,
+                certificate.IsDemonstration, certificate.ArchiveKey != null)).ToArrayAsync(token);
+
+    /// <summary>One line of the company's certificates; <paramref name="SipatEventId"/>: the training it is for (the
+    /// overview filters by it); <paramref name="Saved"/>: its PDF is already in the archive.</summary>
+    private sealed record CompanyCertificate(Guid Id, Guid ParticipantId, string ParticipantName, string Login,
+        string? RegistrationNumber, bool IsActive, Guid? UnitId, string? UnitName, Guid? SectorId, string? SectorName,
+        Guid SipatEventId, string EventTitle, DateTimeOffset IssuedAt, bool IsDemonstration, bool Saved);
 
     private static async Task<IResult> OutcomesAsync(Guid tenantId, Guid participantId, PlatformDbContext db, CancellationToken token)
     {

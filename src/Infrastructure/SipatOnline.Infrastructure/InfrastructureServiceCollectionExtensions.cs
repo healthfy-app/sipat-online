@@ -221,6 +221,10 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddScoped<SipatOnline.Infrastructure.Identity.ParticipantImportService>();
         services.AddScoped<SipatOnline.Infrastructure.Tenancy.TenantPlanService>();
         services.AddSingleton<ICertificatePdfRenderer, CertificatePdfRenderer>();
+        // the PDFs of the certificates in R2 (or the local folder), in the tree company / unit / sector / person / date
+        services.AddSingleton<CertificateArchiveSignal>();
+        services.AddScoped<CertificateArchiver>();
+        services.AddHostedService<CertificateArchiveWorker>();
         services.AddSingleton<SipatOnline.Learning.Application.Quality.IPlaybackQualityPdfRenderer, PlaybackQualityPdfRenderer>();
         services.AddScoped<IPlatformCourseCatalogStore, EfPlatformCourseCatalogStore>();
         services.AddScoped<CatalogAccessGrant>();
@@ -321,6 +325,7 @@ public static class InfrastructureServiceCollectionExtensions
                 }));
             services.TryAddSingleton(TimeProvider.System);
             services.AddSingleton<IPlatformCourseVideoStorage, R2PlatformCourseVideoStorage>();
+            services.AddSingleton<ICertificateArchive, R2CertificateArchive>();
             if (options.DirectUpload)
             {
                 services.AddSingleton<IDirectVideoUploadStore, R2DirectVideoUploadStore>();
@@ -338,6 +343,15 @@ public static class InfrastructureServiceCollectionExtensions
             new FilePlatformCourseVideoStorage(
                 configuration["SipatOnline:PlatformCatalog:StoragePath"],
                 serviceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment()));
+        // the certificates beside the videos, in the same folder (the volume of the videos in Docker)
+        services.AddSingleton<ICertificateArchive>(serviceProvider =>
+        {
+            var configured = configuration["SipatOnline:PlatformCatalog:StoragePath"];
+            return new FileCertificateArchive(!string.IsNullOrWhiteSpace(configured) ? configured
+                : serviceProvider.GetRequiredService<IHostEnvironment>().IsDevelopment()
+                    ? Path.Combine(AppContext.BaseDirectory, "platform-course-videos")
+                    : null);
+        });
     }
 
     private static void AddVideoConversion(IServiceCollection services, IConfiguration configuration)

@@ -1,7 +1,11 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, Clock3, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
+import { Award, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { getCompanyRegistry, listAllParticipants, listLearningParticipation, listParticipantProfiles, type CompanyRegistry, type LearningParticipantProgress, type ParticipantProfile } from './api';
+import {
+  certificatePdfUrl, getCompanyRegistry, listAllParticipants, listCompanyCertificates, listLearningParticipation, listParticipantProfiles,
+  type CompanyCertificate, type CompanyRegistry, type LearningParticipantProgress, type ParticipantProfile,
+} from './api';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import {
   participantProgressStatuses,
   summarizeCompanyProgress,
@@ -92,6 +96,25 @@ export default function TenantLearningDashboardPage({
       participation,
     };
   }, [loaded, training.selectedId, profiles, unitScope.unitId]);
+  // each person's certificates, for the column of the table: of the training chosen, or all of them; without them (the
+  // call failed), the table goes on without the column
+  const [certificates, setCertificates] = useState<CompanyCertificate[] | null>(null);
+  useEffect(() => {
+    let current = true;
+    Promise.resolve().then(() => (unitScope.unitId ? listCompanyCertificates(unitScope.unitId) : listCompanyCertificates())).then(
+      list => { if (current) setCertificates(Array.isArray(list) ? list : null); },
+      () => { if (current) setCertificates(null); });
+    return () => { current = false; };
+  }, [unitScope.unitId]);
+  const certificatesByPerson = useMemo(() => {
+    if (!certificates) return undefined;
+    const byPerson = new Map<string, CompanyCertificate[]>();
+    for (const certificate of filterByTraining(certificates, training.selectedId)) {
+      byPerson.set(certificate.participantId, [...(byPerson.get(certificate.participantId) ?? []), certificate]);
+    }
+    for (const list of byPerson.values()) list.sort((a, b) => b.issuedAt.localeCompare(a.issuedAt));
+    return byPerson;
+  }, [certificates, training.selectedId]);
   // how each unit is doing, while the whole company is on screen
   const unitRows = useMemo(
     () => data && profiles && unitScope.active && unitScope.unitId === null ? byUnit(data.rows, profiles, unitScope.units) : [],
@@ -268,7 +291,7 @@ export default function TenantLearningDashboardPage({
                   title="Ainda não há participantes"
                 />
               ) : (
-                <ParticipantsTable overview={overview} rows={data.rows} />
+                <ParticipantsTable certificates={certificatesByPerson} overview={overview} rows={data.rows} />
               )}
             </Panel>
           </>
@@ -292,7 +315,13 @@ function Panel({ id, title, count, children }: { id: string; title: string; coun
 
 // ── Colaboradores (tabela paginada) ─────────────────────────────────────────
 
-function ParticipantsTable({ rows, overview }: { rows: readonly ParticipantRow[]; overview: CompanyLearningOverview }) {
+/** `certificates`: each person's, by id; absent, the table has no Certificado column. */
+function ParticipantsTable({ rows, overview, certificates }: {
+  rows: readonly ParticipantRow[];
+  overview: CompanyLearningOverview;
+  certificates?: ReadonlyMap<string, CompanyCertificate[]>;
+}) {
+  const columns = ['Colaborador', 'Situação', 'Dias concluídos', 'Progresso', 'Tempo assistido', 'Último acesso', ...(certificates ? ['Certificado'] : [])];
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState<ParticipantProgressFilter>('all');
   const [page, setPage] = useState(0);
@@ -339,10 +368,10 @@ function ParticipantsTable({ rows, overview }: { rows: readonly ParticipantRow[]
       </div>
 
       <div className="overflow-x-auto">
-        <table aria-label="Colaboradores da empresa" className="m-0 w-full min-w-[44rem] border-collapse text-sm">
+        <table aria-label="Colaboradores da empresa" className={cn('m-0 w-full border-collapse text-sm', certificates ? 'min-w-[48rem]' : 'min-w-[44rem]')}>
           <thead>
             <tr className="border-b border-border">
-              {['Colaborador', 'Situação', 'Dias concluídos', 'Progresso', 'Tempo assistido', 'Último acesso'].map((label, index) => (
+              {columns.map((label, index) => (
                 <th
                   className={cn(
                     'h-9 whitespace-nowrap px-3 text-[0.6875rem] font-semibold uppercase tracking-[0.06em] text-muted-foreground',
@@ -359,7 +388,7 @@ function ParticipantsTable({ rows, overview }: { rows: readonly ParticipantRow[]
           <tbody>
             {visible.length === 0 ? (
               <tr>
-                <td className="px-3 py-10 text-center text-sm text-muted-foreground" colSpan={6}>Nenhum colaborador encontrado com esses filtros.</td>
+                <td className="px-3 py-10 text-center text-sm text-muted-foreground" colSpan={columns.length}>Nenhum colaborador encontrado com esses filtros.</td>
               </tr>
             ) : visible.map((row) => (
               <tr className="border-b border-border last:border-0 hover:bg-muted/50" key={row.id}>
@@ -392,6 +421,9 @@ function ParticipantsTable({ rows, overview }: { rows: readonly ParticipantRow[]
                 </td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{row.watchedMilliseconds > 0 ? formatDuration(row.watchedMilliseconds) : <span className="text-muted-foreground">—</span>}</td>
                 <td className="px-3 py-2.5 text-right tabular-nums">{formatShortDate(row.lastAccessedAt)}</td>
+                {certificates && <td className="px-3 py-2.5 text-right">
+                  <PersonCertificates certificates={certificates.get(row.id) ?? []} name={row.displayName} />
+                </td>}
               </tr>
             ))}
           </tbody>
@@ -588,4 +620,68 @@ function SummaryCard({ icon: Icon, label, value, note, progress }: { icon: Lucid
 
 function normalize(value: string): string {
   return value.trim().normalize('NFD').replace(/[̀-ͯ]/g, '').toLocaleLowerCase('pt-BR');
+}
+
+// the date printed on the certificate
+const issuedOn = (value: string) => new Date(value).toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+
+/** The medal of a certificate: a green coin with a ring, so two of them overlap cleanly. */
+function Medal() {
+  return (
+    <span aria-hidden="true" className="grid size-6 shrink-0 place-items-center rounded-full bg-accent text-primary ring-2 ring-card">
+      <Award className="size-3.5! text-primary!" />
+    </span>
+  );
+}
+
+const pill = cn(
+  'm-0 inline-flex min-w-0 items-center gap-2 rounded-full border border-border bg-card py-1 pl-1 text-left no-underline',
+  'cursor-pointer transition-colors hover:border-primary/40 hover:bg-accent data-[state=open]:border-primary/40 data-[state=open]:bg-accent',
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+);
+
+/**
+ * A person's certificates in the table, shown as what they are: the certificate itself (its medal and the date it was
+ * issued; the training is the one chosen at the top, and its name is in the tooltip), which opens in a new tab (the
+ * browser's viewer downloads it from there). Several make one pill that lists them by name.
+ */
+function PersonCertificates({ certificates, name }: { certificates: readonly CompanyCertificate[]; name: string }) {
+  if (certificates.length === 0) return <span className="text-muted-foreground">—</span>;
+  if (certificates.length === 1) {
+    const [certificate] = certificates;
+    return (
+      <a aria-label={`Ver o certificado de ${certificate.eventTitle} de ${name}`} className={cn(pill, 'whitespace-nowrap pr-3 text-[0.8125rem] font-semibold tabular-nums text-foreground')}
+        href={certificatePdfUrl(certificate.id, true)} rel="noopener noreferrer" target="_blank"
+        title={`${certificate.eventTitle} · emitido em ${issuedOn(certificate.issuedAt)}${certificate.isDemonstration ? ' · demonstrativo' : ''}`}>
+        <Medal />
+        {issuedOn(certificate.issuedAt)}
+      </a>
+    );
+  }
+  return (
+    <DropdownMenu modal={false}>
+      <DropdownMenuTrigger asChild>
+        <button aria-label={`Certificados de ${name}`} className={cn(pill, 'whitespace-nowrap pr-2.5 text-[0.8125rem] font-semibold text-foreground')} type="button">
+          <span className="flex -space-x-2.5"><Medal /><Medal /></span>
+          {certificates.length} certificados
+          <ChevronDown aria-hidden="true" className="size-3.5 text-muted-foreground" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[min(21rem,calc(100vw-1.5rem))]">
+        <DropdownMenuLabel className="truncate">Certificados de {name}</DropdownMenuLabel>
+        {certificates.map(certificate => (
+          <DropdownMenuItem asChild key={certificate.id}>
+            <a className="no-underline" href={certificatePdfUrl(certificate.id, true)} rel="noopener noreferrer" target="_blank">
+              <Medal />
+              <span className="grid min-w-0 flex-1 leading-tight">
+                <span className="truncate font-semibold text-foreground">{certificate.eventTitle}</span>
+                <span className="text-xs tabular-nums text-muted-foreground">Emitido em {issuedOn(certificate.issuedAt)}</span>
+              </span>
+              <ExternalLink aria-hidden="true" />
+            </a>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 }

@@ -12,7 +12,7 @@ using System.Data;
 namespace SipatOnline.Infrastructure.Learning;
 
 public sealed class EfLearningEngagementStore(PlatformDbContext db, ILearningStore learning, TimeProvider clock,
-    IHostEnvironment environment, ILogger<EfLearningEngagementStore> logger)
+    IHostEnvironment environment, ILogger<EfLearningEngagementStore> logger, CertificateArchiveSignal archiveSignal)
     : ILearningEngagementStore
 {
     internal static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
@@ -159,14 +159,17 @@ public sealed class EfLearningEngagementStore(PlatformDbContext db, ILearningSto
                 if (candidate.Snapshot.IssuedAt != default) return Result<ParticipationCertificate>.Success(candidate.Snapshot);
                 var snapshot = candidate.Snapshot with { Id = certificate.Id, IssuedAt = certificate.IssuedAt };
                 var json = JsonSerializer.Serialize(snapshot, JsonOptions);
+                var title = snapshot.EventTitle.Length > 200 ? snapshot.EventTitle[..200] : snapshot.EventTitle;
                 await db.Database.ExecuteSqlInterpolatedAsync($"""
-                    INSERT INTO learning."ParticipationCertificates" ("Id","TenantId","ParticipantId","SipatEventId","SnapshotJson")
-                    VALUES ({snapshot.Id},{snapshot.TenantId},{snapshot.ParticipantId},{snapshot.SipatEventId},{json})
+                    INSERT INTO learning."ParticipationCertificates" ("Id","TenantId","ParticipantId","SipatEventId","SnapshotJson","IssuedAt","EventTitle","IsDemonstration")
+                    VALUES ({snapshot.Id},{snapshot.TenantId},{snapshot.ParticipantId},{snapshot.SipatEventId},{json},{snapshot.IssuedAt},{title},{snapshot.IsDemonstration})
                     ON CONFLICT ("TenantId","ParticipantId","SipatEventId") DO NOTHING
                     """, token);
                 var issued = Deserialize(await db.ParticipationCertificates.AsNoTracking().SingleAsync(item =>
                     item.TenantId == snapshot.TenantId && item.ParticipantId == snapshot.ParticipantId && item.SipatEventId == snapshot.SipatEventId, token));
                 await transaction.CommitAsync(token);
+                // the PDF goes to the archive now, not at the archive's next round
+                archiveSignal.Notify();
                 return Result<ParticipationCertificate>.Success(issued);
             }
             catch (PostgresException failure) when (failure.SqlState is PostgresErrorCodes.SerializationFailure or PostgresErrorCodes.DeadlockDetected)
