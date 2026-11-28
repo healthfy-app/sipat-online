@@ -29,7 +29,7 @@ export default function CompaniesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [companies, setCompanies] = useState<PlatformCompanyOverview[]>([]);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDirection, setSortDirection] = useState<SortDirection>('ascending');
   const [currentPage, setCurrentPage] = useState(1);
@@ -104,7 +104,8 @@ export default function CompaniesPage() {
   const pageItems = sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   const firstItem = sorted.length === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const lastItem = Math.min(currentPage * pageSize, sorted.length);
-  const hasFilters = Boolean(term) || statusFilter !== 'all';
+  // the list opens on the companies that are running; the inactive ones are one choice away
+  const hasFilters = Boolean(term) || statusFilter !== 'active';
 
   function sortBy(key: SortKey) {
     setSortDirection(sortKey === key && sortDirection === 'ascending' ? 'descending' : 'ascending');
