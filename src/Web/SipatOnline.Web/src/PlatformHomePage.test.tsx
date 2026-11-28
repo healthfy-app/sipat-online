@@ -50,7 +50,11 @@ describe('Platform companies', () => {
     const user = userEvent.setup();
     renderHome();
 
-    await screen.findByText('Beta');
+    // the list opens on the active companies: the inactive one shows only when asked for
+    await screen.findByText('Acme');
+    expect(screen.queryByText('Beta')).not.toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Status'), 'all');
+    expect(screen.getByText('Beta')).toBeInTheDocument();
     await user.type(screen.getByLabelText('Buscar empresa'), 'a');
     await user.selectOptions(screen.getByLabelText('Status'), 'active');
     expect(screen.queryByText('Beta')).not.toBeInTheDocument();
@@ -65,6 +69,8 @@ describe('Platform companies', () => {
     });
     renderHome();
 
+    await screen.findByText('Acme');
+    await user.selectOptions(screen.getByLabelText('Status'), 'all');
     await user.click(await screen.findByRole('button', { name: 'Ações da empresa Beta' }));
     expect(screen.getByRole('menuitem', { name: /Entrar no painel da empresa/ })).toHaveAttribute('href', '/admin/dashboard?companyId=t2');
     await user.click(screen.getByRole('menuitem', { name: /Adicionar administrador/ }));
