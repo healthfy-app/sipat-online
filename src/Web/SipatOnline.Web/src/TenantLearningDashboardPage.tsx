@@ -1,4 +1,4 @@
-import { Award, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, Download, ExternalLink, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
+import { Award, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock3, ExternalLink, FileSpreadsheet, PlayCircle, Search, Users, type LucideIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -368,7 +368,7 @@ function ParticipantsTable({ rows, overview, certificates }: {
       </div>
 
       <div className="overflow-x-auto">
-        <table aria-label="Colaboradores da empresa" className={cn('m-0 w-full border-collapse text-sm', certificates ? 'min-w-[50rem]' : 'min-w-[44rem]')}>
+        <table aria-label="Colaboradores da empresa" className={cn('m-0 w-full border-collapse text-sm', certificates ? 'min-w-[48rem]' : 'min-w-[44rem]')}>
           <thead>
             <tr className="border-b border-border">
               {columns.map((label, index) => (
@@ -642,27 +642,20 @@ const pill = cn(
 
 /**
  * A person's certificates in the table, shown as what they are: the certificate itself (its medal and the date it was
- * issued; the training is the one chosen at the top, and its name is in the tooltip), which opens in a new tab, with a
- * quiet button beside it that downloads it. Several make one pill that lists them by name.
+ * issued; the training is the one chosen at the top, and its name is in the tooltip), which opens in a new tab (the
+ * browser's viewer downloads it from there). Several make one pill that lists them by name.
  */
 function PersonCertificates({ certificates, name }: { certificates: readonly CompanyCertificate[]; name: string }) {
   if (certificates.length === 0) return <span className="text-muted-foreground">—</span>;
   if (certificates.length === 1) {
     const [certificate] = certificates;
     return (
-      <span className="inline-flex items-center justify-end gap-0.5 whitespace-nowrap">
-        <a aria-label={`Ver o certificado de ${certificate.eventTitle} de ${name}`} className={cn(pill, 'pr-3 text-[0.8125rem] font-semibold tabular-nums text-foreground')}
-          href={certificatePdfUrl(certificate.id, true)} rel="noopener noreferrer" target="_blank"
-          title={`${certificate.eventTitle} · emitido em ${issuedOn(certificate.issuedAt)}${certificate.isDemonstration ? ' · demonstrativo' : ''}`}>
-          <Medal />
-          {issuedOn(certificate.issuedAt)}
-        </a>
-        <Button asChild size="icon-sm" variant="ghost">
-          <a aria-label={`Baixar o certificado de ${certificate.eventTitle} de ${name}`} href={certificatePdfUrl(certificate.id)} title="Baixar o PDF">
-            <Download />
-          </a>
-        </Button>
-      </span>
+      <a aria-label={`Ver o certificado de ${certificate.eventTitle} de ${name}`} className={cn(pill, 'whitespace-nowrap pr-3 text-[0.8125rem] font-semibold tabular-nums text-foreground')}
+        href={certificatePdfUrl(certificate.id, true)} rel="noopener noreferrer" target="_blank"
+        title={`${certificate.eventTitle} · emitido em ${issuedOn(certificate.issuedAt)}${certificate.isDemonstration ? ' · demonstrativo' : ''}`}>
+        <Medal />
+        {issuedOn(certificate.issuedAt)}
+      </a>
     );
   }
   return (
