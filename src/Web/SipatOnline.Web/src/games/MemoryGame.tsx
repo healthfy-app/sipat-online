@@ -82,7 +82,7 @@ export default function MemoryGame({ module, score, onProgress, onFinish }: {
   const columns = cards.length <= 6 ? 'grid-cols-3' : cards.length <= 8 ? 'grid-cols-2 @md:grid-cols-4' : cards.length <= 12 ? 'grid-cols-3 @lg:grid-cols-4' : 'grid-cols-3 @lg:grid-cols-5';
   return <div className="grid gap-3 p-4 @lg:p-5">
     <div className="flex flex-wrap items-baseline justify-between gap-2">
-      <p className="m-0 text-sm text-muted-foreground">Associe cada equipamento à sua proteção. As duas cartas de um par se complementam; não têm o mesmo texto.</p>
+      <p className="m-0 text-sm text-muted-foreground">Encontre os pares: cada carta combina com outra que a completa. As duas cartas de um par não têm o mesmo texto.</p>
       <p className="m-0 text-sm font-medium tabular-nums">{moves} {moves === 1 ? 'jogada' : 'jogadas'}</p>
     </div>
     <p className="sr-only">{matched.length / 2} de {pairs.length} pares encontrados</p>

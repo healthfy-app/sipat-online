@@ -30,7 +30,6 @@ public static class TrainingAudienceEndpoints
                 await distribution.AudienceChangedAsync(tenant.Value, sipatId, result.Value.Before, token);
             return Results.Ok(result.Value.Saved);
         })
-        .AddEndpointFilter(TrainingEditing.RequireEditor)
         .WithName("SaveTrainingAudience");
 
         // how many people an audience reaches, before it is saved

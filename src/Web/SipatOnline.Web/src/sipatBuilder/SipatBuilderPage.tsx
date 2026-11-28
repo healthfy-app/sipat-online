@@ -1,7 +1,7 @@
 import { saveFile } from '@/lib/saveFile';
-import { ArrowLeft, Ban, Clock, Copy, Eye, FileDown, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Play, Rocket, Save, Undo2, X } from 'lucide-react';
+import { ArrowLeft, Ban, Clock, Copy, Eye, FileDown, Film, Gamepad2, MoreHorizontal, ImagePlus, Link2, Pencil, Rocket, Save, Undo2, X } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   acceptCompanyVideoTerms, cancelSipatEvent, companyEditorLinks, copySipatPlan, saveTrainingAudience, setTrainingCover, createSipatEvent, getCompanyCapabilities, getSipatCatalog, getSipatPlan, getTemplateDays, getTrainingLimit, listCompanyVideos, listCourseCategories, listGameModules, listPlatformCourses, listPlatformLibraryVideos, listSubjects, listVideoSubjects, saveTemplateDays, launchSipat, listSipatEvents, listSipatPlans, openSipatWeek, saveSipatPlan, updateSipatEvent,
   type CompanyCapabilities, type PlatformCourse, type SipatEvent, type SipatPlanSummary,
@@ -401,8 +401,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   }
 
   // a draft saves itself 3 seconds after the last change: one save per pause, never on a timer while nothing changes
-  const canAutoSave = !template && stage === 'grid' && !loading && !busy && (sipat === null || sipat.status === 'Draft')
-    && !(capabilities?.customizeGrid === false && !canEditThemes);
+  const canAutoSave = !template && stage === 'grid' && !loading && !busy && (sipat === null || sipat.status === 'Draft');
   useEffect(() => {
     if (!dirty || !canAutoSave) return;
     const timer = window.setTimeout(() => {
@@ -547,8 +546,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
   }
 
   if (loading) return <LoadingState>Carregando o treinamento...</LoadingState>;
-  // a company that only views has nothing to create: back to its list
-  if (isNew && capabilities?.customizeGrid === false && !canEditThemes) return <Navigate replace to={basePath} />;
   if (!catalog) {
     return <Page><div className="grid justify-items-start gap-3">
       <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error || 'Não foi possível carregar o catálogo.'}</p>
@@ -556,15 +553,13 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
     </div></Page>;
   }
 
-  // Bronze takes the ready modules as they are: a CSV with a grid of its own is a personalization (Prata and above)
+  // every plan builds its own training (sipatonline.com.br/plans.html); Bronze takes the ready modules as they are, each
+  // day one module whole (or a ready SIPAT whole): a grid of its own, video by video, is Prata and above
   const canCustomizeGrid = capabilities?.customizeGrid !== false;
-  // Bronze: the operation builds the training from a ready SIPAT (its videos stay as they come); the company only views it
-  const readyOnly = !canCustomizeGrid;
-  const viewOnly = readyOnly && !canEditThemes;
   const readySipats = trainings.filter(item => item.isReadySipat);
   const sources = others.filter(item => item.id !== sipat?.id && (plans.find(plan => plan.sipatEventId === item.id)?.days ?? 0) > 0);
-  // the operation's templates to start from, beside the company's own trainings (Bronze: only the ready SIPATs)
-  const templateSources = (readyOnly ? readySipats : trainings).filter(item => titlesOf(item).length > 0);
+  // the operation's templates to start from, beside the company's own trainings (Bronze: only the ready SIPATs, which come whole)
+  const templateSources = (canCustomizeGrid ? trainings : readySipats).filter(item => titlesOf(item).length > 0);
   const canCopy = sources.length > 0 || templateSources.length > 0;
   const label = sipat ? phaseLabel[sipatPhase(sipat, days.filter(day => day.videos.some(Boolean)).length)] : null;
   // the name is edited in the title itself, while the SIPAT is a draft; after publishing it stays as it is
@@ -599,8 +594,8 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         <p className="ops-hero-lead is-keep max-[760px]:text-[0.875rem]! max-[760px]:leading-[1.45]">{stage === 'setup' ? 'Defina quando começa, quantos dias tem e o assunto de cada dia.' : <>
           <span className="max-[760px]:hidden">{canCustomizeGrid
             ? 'Cada coluna é um dia. Arraste um título ou vídeos da lista para cada dia e confira o tempo.'
-            : 'Cada coluna é um dia, com os vídeos da SIPAT pronta.'}</span>
-          <span className="hidden max-[760px]:inline">{canCustomizeGrid ? 'Escolha um assunto para cada dia e confira os vídeos e os jogos.' : 'Os dias e os vídeos da SIPAT pronta.'}</span>
+            : 'Cada coluna é um dia. Arraste um módulo pronto da lista para cada dia e confira o tempo.'}</span>
+          <span className="hidden max-[760px]:inline">{canCustomizeGrid ? 'Escolha um assunto para cada dia e confira os vídeos e os jogos.' : 'Escolha um módulo pronto para cada dia e confira o tempo.'}</span>
         </>}</p>
         {stage === 'grid' && <ul aria-label="Resumo do treinamento" className="ops-hero-stats max-[760px]:mt-1! max-[760px]:grid! max-[760px]:basis-full max-[760px]:grid-cols-2 max-[760px]:gap-2! max-[760px]:*:min-w-0 max-[760px]:*:flex-wrap max-[760px]:*:rounded-xl max-[760px]:*:bg-muted max-[760px]:*:px-3 max-[760px]:*:py-2 max-[760px]:*:text-sm">
           <li><strong>{days.length}</strong> {days.length === 1 ? 'dia' : 'dias'}</li>
@@ -611,18 +606,18 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
         {/* when it runs: from its first day to its limit date, which can go past the last day */}
         {stage === 'grid' && <div className="flex flex-wrap items-end gap-3">
           <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Início
-            <Input aria-label="Início do treinamento" className="h-9 w-auto text-sm" disabled={viewOnly || busy} onChange={event => moveStart(event.target.value)} type="date" value={firstDate} />
+            <Input aria-label="Início do treinamento" className="h-9 w-auto text-sm" disabled={busy} onChange={event => moveStart(event.target.value)} type="date" value={firstDate} />
           </label>
           <label className="grid gap-1 text-xs font-semibold text-muted-foreground">Data limite
-            <Input aria-label="Data limite do treinamento" className="h-9 w-auto text-sm" disabled={viewOnly || busy || !lastDate} min={lastDate || undefined}
+            <Input aria-label="Data limite do treinamento" className="h-9 w-auto text-sm" disabled={busy || !lastDate} min={lastDate || undefined}
               onChange={event => { setLimit(event.target.value); setDirty(true); }} type="date" value={shownLimit} />
           </label>
           <p className="m-0 max-w-sm pb-1.5 text-xs text-muted-foreground">O treinamento pode ser feito até a data limite, mesmo depois do último dia.</p>
         </div>}
         {/* who it is for: the whole company, or the units and sectors marked */}
-        {stage === 'grid' && sipat && !cancelled && <AudienceRow canEdit={!viewOnly} openAtStart={search.get('para-quem') === '1'} sipatId={sipat.id} />}
+        {stage === 'grid' && sipat && !cancelled && <AudienceRow canEdit openAtStart={search.get('para-quem') === '1'} sipatId={sipat.id} />}
       </div>
-      {stage === 'grid' && !viewOnly && <div className="ops-hero-actions max-[760px]:grid! max-[760px]:w-full max-[760px]:grid-cols-[auto_minmax(0,1fr)] max-[760px]:gap-2">
+      {stage === 'grid' && <div className="ops-hero-actions max-[760px]:grid! max-[760px]:w-full max-[760px]:grid-cols-[auto_minmax(0,1fr)] max-[760px]:gap-2">
         <DropdownMenu modal={false}>
           <DropdownMenuTrigger asChild><Button className={phoneAction} disabled={busy} variant="ghost"><MoreHorizontal /> Mais</Button></DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -648,11 +643,6 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
           </>
           : <Button className={cn('ops-primary', phoneAction, 'max-[760px]:col-span-full max-[760px]:min-h-12 max-[760px]:text-base')} disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye className={previewEye} /> Visão do participante</Button>}
       </div>}
-      {stage === 'grid' && viewOnly && sipat && <div className="ops-hero-actions max-[760px]:hidden">
-        {published && <Button onClick={() => void share()} variant="outline"><Link2 /> Copiar link</Button>}
-        <Button onClick={() => navigate(`${basePath}/${sipat.id}/editar`)} variant="outline"><Play /> Ver no editor</Button>
-        <Button className="ops-primary" disabled={days.length === 0} onClick={() => setPreviewing(true)}><Eye className={previewEye} /> Visão do participante</Button>
-      </div>}
     </header>
 
     <input accept="image/png,image/jpeg,image/webp" aria-label="Capa do treinamento" className="sr-only" onChange={event => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void changeCover(file); }} ref={coverPicker} tabIndex={-1} type="file" />
@@ -663,9 +653,7 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
       {Object.keys(issues.days).length > 0 && `${pluralize(Object.keys(issues.days).length, 'dia precisa', 'dias precisam')} de ajuste antes de salvar. Eles estão marcados em vermelho na grade.`}
     </p>}
     {!canCustomizeGrid && <p className="m-0 rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground" role="status">
-      {viewOnly
-        ? `No plano ${capabilities?.plan ?? 'Bronze'} a operação monta o treinamento e você acompanha por aqui. Montar o próprio treinamento começa no plano Prata.`
-        : `Plano ${capabilities?.plan ?? 'Bronze'}: o treinamento é uma SIPAT pronta, inteira. Ajuste as datas e os nomes dos dias; os vídeos ficam como vêm.`}
+      Plano {capabilities?.plan ?? 'Bronze'}: cada dia é um módulo pronto, com todos os seus vídeos. Escolha o assunto de cada dia; montar a grade vídeo a vídeo começa no plano Prata.
     </p>}
     {catalog.subjects.length === 0 && <p className="m-0 rounded-md bg-warning-soft px-3 py-2 text-sm text-warning" role="status">O acervo ainda não tem assuntos publicados. Peça à operação para publicar os assuntos.</p>}
 
@@ -673,11 +661,11 @@ export default function SipatBuilderPage({ basePath, canEditThemes = false, temp
       ? <BuilderSetup dayCount={dayCount} name={name} onDayCount={setDayCount} limit={limit} onLimit={setLimit} onName={setName} onStart={start}
         onStartDate={setStartDate} startDate={startDate}
         onCopy={canCopy ? () => setCopying(true) : undefined}
-        onTraining={setTraining} readyOnly={readyOnly} training={training}
-        trainings={(readyOnly ? readySipats : trainings).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
-      : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined} locked={readyOnly} readOnly={viewOnly}
-        onChange={viewOnly ? () => undefined : edit} onRemoveDay={removeDay}
-        onEdit={viewOnly ? undefined : () => { if (!busy) void editWeek(); }}
+        onTraining={setTraining} training={training} wholeModules={!canCustomizeGrid}
+        trainings={(canCustomizeGrid ? trainings : readySipats).map(item => ({ id: item.id, title: item.title, titles: titlesOf(item).length }))} />
+      : <BuilderGrid canCustomizeGrid={canCustomizeGrid} canEditThemes={canEditThemes} catalog={catalog} days={days} issues={showIssues ? issues.days : undefined}
+        onChange={edit} onRemoveDay={removeDay}
+        onEdit={() => { if (!busy) void editWeek(); }}
         // every day has its own "Enviar vídeo", for a company that has its own videos (Diamante)
         arriving={arriving} onSendToDay={capabilities?.internalVideos ? (dayKey, files) => void sendToDay(dayKey, files) : undefined}
         // a game edited or duplicated from the board: its name and texts come again with the catalog

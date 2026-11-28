@@ -36,13 +36,13 @@ function renderBuilder() {
 }
 
 describe('SIPAT builder', () => {
-  it('on Bronze the company only views what the operation built: nothing to save, publish or import', async () => {
+  it('on Bronze the company builds its own training, each day one ready module', async () => {
     vi.mocked(api.getCompanyCapabilities).mockResolvedValue({ customizeGrid: false, customBranding: false, customCertificate: false, quizzes: false, internalVideos: false, plan: 'Bronze' });
     renderBuilder();
-    expect(await screen.findByText(/No plano Bronze a operação monta o treinamento e você acompanha por aqui/)).toBeVisible();
-    expect(screen.queryByRole('button', { name: /Mais/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Publicar/ })).not.toBeInTheDocument();
-    expect(screen.getByRole('textbox', { name: 'Título do dia 1' })).toBeDisabled();
+    expect(await screen.findByText(/Plano Bronze: cada dia é um módulo pronto/)).toBeVisible();
+    expect(screen.getByRole('button', { name: /Publicar/ })).toBeVisible();
+    expect(screen.getByRole('textbox', { name: 'Título do dia 1' })).toBeEnabled();
+    expect(screen.getByRole('combobox', { name: 'Assunto do dia 1' })).toBeEnabled();
   });
 
   it('lists what is missing on each day, by position', () => {
