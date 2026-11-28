@@ -383,6 +383,13 @@ export default function App() {
               path="/platform/companies/:companyId/qualidade"
               element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator') ? <PlaybackQualityPage /> : <AccessDenied />}
             />
+            {/* the operation sees the certificates of every company, each in its own workspace */}
+            <Route
+              path="/platform/companies/:companyId/certificados"
+              element={state.tenant.tenantKey === 'platform' && state.session?.roles.includes('PlatformOperator')
+                ? <CompanyContext>{() => <CompanyCertificatesPage />}</CompanyContext>
+                : <AccessDenied />}
+            />
             <Route
               path="/platform/companies/:companyId/:section"
               element={
