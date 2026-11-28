@@ -112,8 +112,8 @@ describe('API client', () => {
     expect(result).toHaveLength(101);
     expect(result.at(-1)?.id).toBe('101');
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      '/api/admin/users/participants?offset=0&limit=100',
-      '/api/admin/users/participants?offset=100&limit=100',
+      '/api/admin/users/participants?offset=0&limit=1000',
+      '/api/admin/users/participants?offset=100&limit=1000',
     ]);
   });
 
