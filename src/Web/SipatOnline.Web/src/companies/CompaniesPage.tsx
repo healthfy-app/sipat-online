@@ -12,6 +12,7 @@ import { EmptyState, Page } from '@/components/ui/page';
 import '@/OpsIdentity.css';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { pluralize } from '@/courseEditor/courseFormat';
+import { cn } from '@/lib/utils';
 import LoadingState from '@/LoadingState';
 import AddAdministratorDialog from './AddAdministratorDialog';
 import CompanyAddress from './CompanyAddress';
@@ -85,7 +86,14 @@ export default function CompaniesPage() {
     `${company.name} ${company.key}`.toLocaleLowerCase('pt-BR').includes(term)
     && (statusFilter === 'all' || (statusFilter === 'active' ? company.isActive : !company.isActive))), [companies, statusFilter, term]);
 
+  // the numbers of the top speak of what is running: an inactive company and its people are out of them
+  const running = useMemo(() => companies.filter((company) => company.isActive), [companies]);
+  const stopped = companies.length - running.length;
+  const participants = running.reduce((sum, company) => sum + company.employeeCount, 0);
+
   const sorted = useMemo(() => [...visible].sort((a, b) => {
+    // whatever the order asked for, the inactive ones come after the ones that are running
+    if (sortKey !== 'status' && a.isActive !== b.isActive) return a.isActive ? -1 : 1;
     const comparison = sortKey === 'participants' ? a.employeeCount - b.employeeCount
         : sortKey === 'status' ? Number(a.isActive) - Number(b.isActive)
           : a.name.localeCompare(b.name, 'pt-BR');
@@ -128,11 +136,11 @@ export default function CompaniesPage() {
             <h1 className="ops-hero-title">Empresas</h1>
             <p className="ops-hero-lead">{isLoading ? 'Carregando empresas...'
               : hasFilters ? `${visible.length} de ${companies.length} exibidas`
-                : `${pluralize(companies.length, 'empresa', 'empresas')} na plataforma`}</p>
+                : `${pluralize(running.length, 'empresa ativa', 'empresas ativas')} na plataforma`}</p>
             {!isLoading && <ul aria-label="Resumo das empresas" className="ops-hero-stats">
-              <li><strong>{companies.length}</strong> {companies.length === 1 ? 'empresa' : 'empresas'}</li>
-              <li><strong>{companies.filter((company) => company.isActive).length}</strong> ativas</li>
-              <li><strong>{companies.reduce((sum, company) => sum + company.employeeCount, 0).toLocaleString('pt-BR')}</strong> participantes</li>
+              <li><strong>{running.length}</strong> {running.length === 1 ? 'empresa ativa' : 'empresas ativas'}</li>
+              <li><strong>{participants.toLocaleString('pt-BR')}</strong> {participants === 1 ? 'participante' : 'participantes'}</li>
+              {stopped > 0 && <li className="opacity-70"><strong>{stopped}</strong> {stopped === 1 ? 'inativa' : 'inativas'}</li>}
             </ul>}
           </div>
           <div className="ops-hero-actions">
@@ -174,9 +182,9 @@ export default function CompaniesPage() {
             </TableHeader>
             <TableBody>
               {pageItems.map((company) => (
-                <TableRow className="cursor-pointer" key={company.id} onClick={() => navigate(`/platform/companies/${company.id}`)}>
+                <TableRow className={cn('cursor-pointer', !company.isActive && 'bg-muted/40')} key={company.id} onClick={() => navigate(`/platform/companies/${company.id}`)}>
                   <TableCell>
-                    <div className="flex min-w-0 items-center gap-3">
+                    <div className={cn('flex min-w-0 items-center gap-3', !company.isActive && 'opacity-60')}>
                       <CompanyAvatar logo={company.logoReference} name={company.name} />
                       <div className="grid min-w-0">
                         <Link
@@ -187,12 +195,13 @@ export default function CompaniesPage() {
                         >
                           {company.name}
                         </Link>
-                        <CompanyAddress companyKey={company.key} />
+                        <CompanyAddress companyKey={company.key} inactive={!company.isActive} />
                       </div>
                     </div>
                   </TableCell>
                   <TableCell className="max-lg:hidden"><PlanBadge plan={company.plan ?? 'Diamante'} /></TableCell>
-                  <TableCell className="text-right tabular-nums max-md:hidden">{company.employeeCount.toLocaleString('pt-BR')}</TableCell>
+                  <TableCell className={cn('text-right tabular-nums max-md:hidden', !company.isActive && 'text-muted-foreground')}
+                    title={company.isActive ? undefined : 'Não entram no total: a empresa está inativa'}>{company.employeeCount.toLocaleString('pt-BR')}</TableCell>
                   <TableCell className="max-sm:hidden">
                     {/* active is the normal case and stays quiet; only an inactive company stands out */}
                     {company.isActive
