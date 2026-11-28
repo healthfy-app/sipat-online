@@ -32,7 +32,8 @@ const slots: { slot: Slot; title: string; description: string; pick: string; hin
   },
 ];
 
-export default function CertificateTemplatePage({ tenant }: { tenant: TenantBranding }) {
+/** `embedded`: inside the Certificado tab of the Identidade visual page, which has the header. */
+export default function CertificateTemplatePage({ tenant, embedded = false }: { tenant: TenantBranding; embedded?: boolean }) {
   const [saved, setSaved] = useState<CertificateTemplate | null>(null);
   const [drafts, setDrafts] = useState<Record<Slot, Draft>>({ cover: untouched, emblem: untouched, footer: untouched });
   const [fileVersion, setFileVersion] = useState(0);
@@ -113,15 +114,7 @@ export default function CertificateTemplatePage({ tenant }: { tenant: TenantBran
     }
   }
 
-  return (
-    <div className="page-content">
-      <Page>
-        <PageHeader
-          description="Personalize o certificado que os colaboradores recebem ao concluir um treinamento."
-          eyebrow="PORTAL DA EMPRESA"
-          title="Modelo do certificado"
-        />
-
+  const content = <>
         {saved === null && !error && <LoadingState>Carregando certificado...</LoadingState>}
         {saved === null && error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
 
@@ -217,6 +210,17 @@ export default function CertificateTemplatePage({ tenant }: { tenant: TenantBran
             </aside>
           </form>
         )}
+  </>;
+  if (embedded) return content;
+  return (
+    <div className="page-content">
+      <Page>
+        <PageHeader
+          description="Personalize o certificado que os colaboradores recebem ao concluir um treinamento."
+          eyebrow="PORTAL DA EMPRESA"
+          title="Modelo do certificado"
+        />
+        {content}
       </Page>
     </div>
   );
