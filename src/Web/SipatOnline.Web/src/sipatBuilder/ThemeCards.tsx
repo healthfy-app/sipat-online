@@ -224,7 +224,7 @@ export function DragPreview({ data }: { data: { video?: CatalogVideo; subject?: 
  * the videos where the participant gets it. With a plan that personalizes the grid the videos are the operator's:
  * videos are dropped or picked one by one, reordered and removed right here.
  */
-export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, onChoose, onClear, onVideos, onMoveGame, onRemoveGame, onOpenGame, canEditThemes = true, canCustomizeGrid = false, locked = false, onSend, arriving = [] }: {
+export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, onChoose, onClear, onVideos, onMoveGame, onRemoveGame, onOpenGame, canEditThemes = true, canCustomizeGrid = false, locked = false, onSend, arriving = [], usedIn }: {
   /** Moves a game one step among the day's videos and games; with it the game rows get their arrows and x. */
   onMoveGame?: (gameId: string, delta: -1 | 1) => void;
   onRemoveGame?: (gameId: string) => void;
@@ -243,6 +243,8 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
   canCustomizeGrid?: boolean;
   /** The new list of videos of the day; only with canCustomizeGrid. */
   onVideos?: (videoIds: string[]) => void;
+  /** Where each video of the training already is ("Dia 1"): a video is in one day only. */
+  usedIn?: Map<string, string>;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: dropId(dayIndex) });
   const { active } = useDndContext();
@@ -255,7 +257,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
   const dragged = active?.data.current as { video?: CatalogVideo; subject?: Subject; game?: GameModule } | undefined;
   const preview = !isOver || !dragged ? ''
     : dragged.video
-      ? videoIds.includes(dragged.video.id) ? 'Já está neste dia' : full ? `Dia cheio (${maxVideoRows} vídeos)` : '+ 1 vídeo'
+      ? videoIds.includes(dragged.video.id) ? 'Já está neste dia' : usedIn?.has(dragged.video.id) ? `Já está no ${usedIn.get(dragged.video.id)}` : full ? `Dia cheio (${maxVideoRows} vídeos)` : '+ 1 vídeo'
       : dragged.game
         ? games.some(game => game.id === dragged.game?.id) ? 'Já está neste dia' : games.length >= maxGameRows ? `Dia cheio (${maxGameRows} jogos)` : '+ 1 jogo'
         : dragged.subject ? dragged.subject.title : '';
@@ -275,7 +277,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
   </select>;
   // two ways to add a video, side by side: dragged from the list above, or picked here; the phone has only the picker
   // the subject of the day filters the picker: only its videos are offered
-  const available = editable ? [...catalog.videos.values()].filter(video => !videoIds.includes(video.id) && (!subject || subject.videoIds.includes(video.id))).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')) : [];
+  const available = editable ? [...catalog.videos.values()].filter(video => !videoIds.includes(video.id) && !usedIn?.has(video.id) && (!subject || subject.videoIds.includes(video.id))).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')) : [];
   const videoPicker = editable && !full && available.length > 0 && <select aria-label={`Adicionar vídeo ao dia ${dayIndex + 1}`} className={cn('h-9 w-full rounded-md border border-dashed border-input bg-background px-2 text-sm text-muted-foreground min-[761px]:hidden', phoneSelect, 'max-[760px]:order-3')}
     onChange={event => {
       const value = event.target.value;
