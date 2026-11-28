@@ -202,13 +202,14 @@ public static class LearningEngagementEndpoints
             from sector in sectors.DefaultIfEmpty()
             select new CompanyCertificate(certificate.Id, user.Id, user.DisplayName, user.EmployeeIdentifier,
                 user.RegistrationNumber, user.IsActive, user.UnitId, unit == null ? null : unit.Name, user.SectorId,
-                sector == null ? null : sector.Name, certificate.EventTitle, certificate.IssuedAt, certificate.IsDemonstration,
-                certificate.ArchiveKey != null)).ToArrayAsync(token);
+                sector == null ? null : sector.Name, certificate.SipatEventId, certificate.EventTitle, certificate.IssuedAt,
+                certificate.IsDemonstration, certificate.ArchiveKey != null)).ToArrayAsync(token);
 
-    /// <summary>One line of the company's certificates; <paramref name="Saved"/>: its PDF is already in the archive.</summary>
+    /// <summary>One line of the company's certificates; <paramref name="SipatEventId"/>: the training it is for (the
+    /// overview filters by it); <paramref name="Saved"/>: its PDF is already in the archive.</summary>
     private sealed record CompanyCertificate(Guid Id, Guid ParticipantId, string ParticipantName, string Login,
         string? RegistrationNumber, bool IsActive, Guid? UnitId, string? UnitName, Guid? SectorId, string? SectorName,
-        string EventTitle, DateTimeOffset IssuedAt, bool IsDemonstration, bool Saved);
+        Guid SipatEventId, string EventTitle, DateTimeOffset IssuedAt, bool IsDemonstration, bool Saved);
 
     private static async Task<IResult> OutcomesAsync(Guid tenantId, Guid participantId, PlatformDbContext db, CancellationToken token)
     {

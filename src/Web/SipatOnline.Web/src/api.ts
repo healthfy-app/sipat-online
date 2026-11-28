@@ -549,6 +549,8 @@ export interface CompanyCertificate {
   unitName: string | null;
   sectorId: string | null;
   sectorName: string | null;
+  /** The training it is for. */
+  sipatEventId: string;
   eventTitle: string;
   issuedAt: string;
   isDemonstration: boolean;
@@ -561,9 +563,12 @@ export function listCompanyCertificates(unitId?: string | null): Promise<Company
   return requestJson<CompanyCertificate[]>(`/api/admin/learning/certificates${unitQuery(unitId, true)}`);
 }
 
-/** Where a certificate's PDF is downloaded: the operator looking at a company goes through the company's own address. */
+/**
+ * Where a certificate's PDF is downloaded: the operator looking at a company (inside it, or on its pages in the
+ * operation) goes through the company's own address.
+ */
 export function certificatePdfUrl(certificateId: string): string {
-  const companyId = getCompanyAdministrationId();
+  const companyId = adminCompany();
   return companyId
     ? `/api/platform/companies/${companyId}/learning/certificates/${certificateId}/pdf`
     : `/api/learning/certificates/${certificateId}/pdf`;
