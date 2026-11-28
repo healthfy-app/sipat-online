@@ -6,6 +6,7 @@ import { Dropzone, readAsBase64 } from './TenantAppearancePage';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Page, PageHeader } from '@/components/ui/page';
+import { fitPicture } from '@/lib/fitPicture';
 import { cn } from '@/lib/utils';
 
 type Slot = 'cover' | 'emblem' | 'footer';
@@ -14,21 +15,23 @@ interface Draft { base64: string | null; type: string; remove: boolean; name: st
 
 const samplePdf = '/api/tenant/certificate-template/preview';
 const untouched: Draft = { base64: null, type: 'image/png', remove: false, name: '' };
-const slots: { slot: Slot; title: string; description: string; pick: string; hint: string; maxBytes: number; limit: string; frame: string }[] = [
+/** The biggest file a person may pick; the page then redraws it to what the certificate takes. */
+const MAX_PICKED_BYTES = 15 * 1024 * 1024;
+const slots: { slot: Slot; title: string; description: string; pick: string; hint: string; maxBytes: number; maxSide: number; limit: string; frame: string }[] = [
   {
     slot: 'cover', title: 'Imagem de capa', pick: 'Escolher capa',
     description: 'Faixa no topo do certificado, no lugar das logos. Ocupa toda a largura; o que passar da altura é cortado.',
-    hint: 'PNG ou JPEG até 1 MB · recomendado 1600 × 220 px', maxBytes: 1_000_000, limit: '1 MB', frame: 'aspect-[774/106] sm:col-span-2',
+    hint: 'PNG, JPEG ou WebP · recomendado 1600 × 220 px · ajustamos o tamanho para você', maxBytes: 1_000_000, maxSide: 2400, limit: '1 MB', frame: 'aspect-[774/106] sm:col-span-2',
   },
   {
     slot: 'emblem', title: 'Emblema do certificado', pick: 'Escolher emblema',
     description: 'Selo redondo no centro, sobre a borda da capa. Sem capa, fica no topo, entre as logos.',
-    hint: 'PNG ou JPEG até 256 KB · quadrado, recomendado 360 × 360 px', maxBytes: 256 * 1024, limit: '256 KB', frame: 'aspect-square',
+    hint: 'PNG, JPEG ou WebP · quadrado, recomendado 360 × 360 px · ajustamos o tamanho para você', maxBytes: 256 * 1024, maxSide: 720, limit: '256 KB', frame: 'aspect-square',
   },
   {
     slot: 'footer', title: 'Imagem de rodapé', pick: 'Escolher imagem',
     description: 'Fica no centro do rodapé: a logo da empresa, um selo ou uma assinatura.',
-    hint: 'PNG ou JPEG até 256 KB · recomendado 400 × 84 px, fundo transparente', maxBytes: 256 * 1024, limit: '256 KB', frame: 'aspect-[200/42]',
+    hint: 'PNG, JPEG ou WebP · recomendado 400 × 84 px, fundo transparente · ajustamos o tamanho para você', maxBytes: 256 * 1024, maxSide: 1200, limit: '256 KB', frame: 'aspect-[200/42]',
   },
 ];
 
@@ -67,15 +70,26 @@ export default function CertificateTemplatePage({ tenant, embedded = false }: { 
     setFileVersion((value) => value + 1); setError(''); setNotice('');
   }
 
-  async function read(slot: Slot, title: string, maxBytes: number, limit: string, file?: File) {
+  async function read(slot: Slot, title: string, maxBytes: number, maxSide: number, limit: string, file?: File) {
     setError(''); setNotice('');
     if (!file) return;
-    if (!['image/png', 'image/jpeg'].includes(file.type) || file.size < 1 || file.size > maxBytes) {
-      setError(`${title}: selecione uma imagem PNG ou JPEG de até ${limit}. O arquivo anterior foi mantido.`);
+    if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size < 1 || file.size > MAX_PICKED_BYTES) {
+      setError(`${title}: selecione uma imagem PNG, JPEG ou WebP. O arquivo anterior foi mantido.`);
       return;
     }
     setReading(true);
     try {
+      // redrawn as a plain PNG of the right size: whatever the designer exported, the certificate can draw it
+      const fitted = await fitPicture(file, maxSide, maxBytes);
+      if (fitted !== null) {
+        setDraft(slot, { base64: fitted, type: 'image/png', remove: false, name: file.name });
+        return;
+      }
+      // a browser that cannot redraw it: the file goes as it is, when it is one the certificate takes
+      if (file.type === 'image/webp' || file.size > maxBytes) {
+        setError(`${title}: não foi possível ajustar esta imagem. Envie um PNG ou JPEG de até ${limit}. O arquivo anterior foi mantido.`);
+        return;
+      }
       const base64 = await readAsBase64(file, 'Não foi possível ler a imagem. Selecione o arquivo novamente.');
       setDraft(slot, { base64, type: file.type, remove: false, name: file.name });
     } catch (failure) {
@@ -121,7 +135,7 @@ export default function CertificateTemplatePage({ tenant, embedded = false }: { 
         {saved !== null && (
           <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]" onSubmit={(event) => void save(event)}>
             <div className="grid min-w-0 gap-4">
-              {slots.map(({ slot, title, description, pick, hint, maxBytes, limit, frame }) => {
+              {slots.map(({ slot, title, description, pick, hint, maxBytes, maxSide, limit, frame }) => {
                 const source = preview(slot);
                 return (
                   <Card aria-labelledby={`certificate-${slot}-title`} key={slot} role="region">
@@ -141,13 +155,13 @@ export default function CertificateTemplatePage({ tenant, embedded = false }: { 
                         </div>
                         <div className={cn('grid content-start gap-2', slot === 'cover' && 'sm:col-span-2')}>
                           <Dropzone
-                            accept=".png,.jpg,.jpeg,image/png,image/jpeg"
+                            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                             ariaLabel={`Selecionar ${title.toLowerCase()}`}
                             disabled={working}
                             fileName={drafts[slot].name}
                             hint={hint}
                             id={`certificate-${slot}`}
-                            onFile={(file) => void read(slot, title, maxBytes, limit, file)}
+                            onFile={(file) => void read(slot, title, maxBytes, maxSide, limit, file)}
                             resetKey={fileVersion}
                             title={pick}
                           />
@@ -262,9 +276,6 @@ function CertificatePreview({ companyName, cover, emblem, footer, logo }: {
       {cover && <image height={106} href={cover} preserveAspectRatio="xMidYMid slice" width={774} x={40} y={28} />}
 
       {!cover && <>
-        <rect fill={ink} height={58} width={58} x={64} y={50} />
-        <image height={48} href="/favicon.svg" width={48} x={69} y={55} />
-        <text fill={ink} fontSize={11} x={132} y={78}>SIPAT Online</text>
         {logo && <image height={58} href={logo} preserveAspectRatio="xMaxYMid meet" width={200} x={590} y={50} />}
         {emblem && <image height={58} href={emblem} width={58} x={392} y={50} />}
       </>}
