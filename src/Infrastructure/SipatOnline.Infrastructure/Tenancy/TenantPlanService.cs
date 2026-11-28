@@ -108,4 +108,27 @@ public sealed class TenantPlanService(PlatformDbContext db, ITenantContext tenan
             tenantId.ToString("D"), clock.GetUtcNow()), token);
         return Result<CompanyPlan>.Success(plan);
     }
+
+    /// <summary>
+    /// The operator turns a company off or back on. An inactive company keeps everything it has, but its address stops
+    /// answering: nobody signs in, nobody watches, and the next run of the certificate script takes its host off the
+    /// HTTPS certificate. Turning it back on brings all of it back. The key comes back so the caller forgets the cached host.
+    /// </summary>
+    public async Task<Result<string>> SetActiveAsync(Guid tenantId, bool isActive, CancellationToken token)
+    {
+        if (!actor.IsInRole(PlatformRoles.PlatformOperator) || tenantContext.CurrentTenantId is not null)
+            return Result<string>.Failure(new DomainError("tenant.status.forbidden", "Somente a operação pode inativar ou reativar uma empresa."));
+        var tenant = await db.Tenants.SingleOrDefaultAsync(item => item.Id == tenantId, token);
+        if (tenant is null)
+            return Result<string>.Failure(new DomainError("tenant.status.not_found", "A empresa não foi encontrada."));
+        if (tenant.IsActive != isActive)
+        {
+            tenant.IsActive = isActive;
+            await db.SaveChangesAsync(token);
+            await audit.WriteAsync(new AuditRecord(actor.UserId ?? "system", new TenantId(tenantId),
+                isActive ? "tenant.reactivated" : "tenant.deactivated", "tenant", tenantId.ToString("D"), clock.GetUtcNow()), token);
+        }
+
+        return Result<string>.Success(tenant.Key);
+    }
 }

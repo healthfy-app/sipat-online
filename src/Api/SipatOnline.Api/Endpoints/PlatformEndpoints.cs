@@ -183,6 +183,25 @@ public static class PlatformEndpoints
         })
         .WithName("ChangeCompanyPlan");
 
+        // off: the company's address stops answering at once; on: it answers again (HTTPS returns with the next certificate run)
+        companies.MapPut("/{tenantId:guid}/status", async (
+            Guid tenantId,
+            ChangeCompanyStatusRequest request,
+            SipatOnline.Infrastructure.Tenancy.TenantPlanService planService,
+            SipatOnline.Infrastructure.Tenancy.TenantHostCache hostCache,
+            CancellationToken cancellationToken) =>
+        {
+            var result = await planService.SetActiveAsync(tenantId, request.IsActive, cancellationToken);
+            if (!result.IsSuccess)
+            {
+                return Results.Problem(statusCode: result.Error.Code == "tenant.status.not_found" ? 404 : 403, title: result.Error.Code, detail: result.Error.Message);
+            }
+
+            hostCache.Forget(result.Value);
+            return Results.Ok(new { isActive = request.IsActive });
+        })
+        .WithName("ChangeCompanyStatus");
+
         platform.MapGet("/users", async (
             int? offset,
             int? limit,
@@ -264,5 +283,7 @@ public sealed record CreatePlatformUserRequest(
     string Role);
 
 public sealed record ChangeCompanyPlanRequest(string? Plan);
+
+public sealed record ChangeCompanyStatusRequest(bool IsActive);
 
 public sealed record ChangeEmployeesStatusRequest(IReadOnlyList<Guid>? UserIds, bool IsActive);

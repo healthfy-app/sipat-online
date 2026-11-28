@@ -1,11 +1,12 @@
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, EllipsisVertical, LogIn, Plus, Search, UserPlus } from 'lucide-react';
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpDown, EllipsisVertical, LogIn, Plus, Power, PowerOff, Search, UserPlus } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { getPlatformDashboard, type PlatformCompanyOverview } from '@/api';
+import { changeCompanyStatus, getPlatformDashboard, type PlatformCompanyOverview } from '@/api';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Dialog } from '@/components/ui/dialog';
 import { PlanBadge } from './PlanSelect';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Input, NativeSelect } from '@/components/ui/input';
 import { EmptyState, Page } from '@/components/ui/page';
 import '@/OpsIdentity.css';
@@ -35,6 +36,26 @@ export default function CompaniesPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [adminTarget, setAdminTarget] = useState<PlatformCompanyOverview | null>(null);
+  const [statusTarget, setStatusTarget] = useState<PlatformCompanyOverview | null>(null);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [statusError, setStatusError] = useState('');
+
+  /** Turns the chosen company off or back on, then reads the list again. */
+  async function changeStatus() {
+    if (!statusTarget) return;
+    const activate = !statusTarget.isActive;
+    setStatusBusy(true); setStatusError('');
+    try {
+      await changeCompanyStatus(statusTarget.id, activate);
+      setNotice(activate
+        ? `${statusTarget.name} foi reativada. O endereço volta a abrir em até 10 minutos.`
+        : `${statusTarget.name} foi inativada. O portal dela não abre mais.`);
+      setStatusTarget(null);
+      await load();
+    } catch (failure) {
+      setStatusError(failure instanceof Error ? failure.message : 'Não foi possível alterar a empresa.');
+    } finally { setStatusBusy(false); }
+  }
   const isCreating = searchParams.get('nova-empresa') === '1';
 
   async function load() {
@@ -193,6 +214,10 @@ export default function CompaniesPage() {
                             <a href={`/admin/dashboard?companyId=${encodeURIComponent(company.id)}`}><LogIn /> Entrar no painel da empresa</a>
                           </DropdownMenuItem>
                           <DropdownMenuItem onSelect={() => setAdminTarget(company)}><UserPlus /> Adicionar administrador</DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {company.isActive
+                            ? <DropdownMenuItem onSelect={() => { setStatusError(''); setStatusTarget(company); }} variant="destructive"><PowerOff /> Inativar empresa</DropdownMenuItem>
+                            : <DropdownMenuItem onSelect={() => { setStatusError(''); setStatusTarget(company); }}><Power /> Reativar empresa</DropdownMenuItem>}
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
@@ -237,6 +262,36 @@ export default function CompaniesPage() {
             await load();
           }}
         />
+      )}
+
+      {statusTarget && (
+        <Dialog
+          description={statusTarget.isActive
+            ? 'A empresa continua cadastrada, com participantes, treinamentos, progresso e certificados guardados.'
+            : 'A empresa volta a funcionar como antes, com tudo o que tinha.'}
+          onClose={() => { if (!statusBusy) setStatusTarget(null); }}
+          title={statusTarget.isActive ? `Inativar ${statusTarget.name}?` : `Reativar ${statusTarget.name}?`}
+        >
+          <div className="grid gap-4">
+            {statusTarget.isActive
+              ? <ul className="m-0 grid list-disc gap-1.5 pl-5 text-sm text-muted-foreground">
+                <li>O portal da empresa para de abrir na hora, para participantes e administradores.</li>
+                <li>Ninguém entra, assiste ou emite certificado enquanto ela estiver inativa.</li>
+                <li>Nada é apagado: reativar devolve tudo.</li>
+              </ul>
+              : <ul className="m-0 grid list-disc gap-1.5 pl-5 text-sm text-muted-foreground">
+                <li>O portal volta a abrir para participantes e administradores.</li>
+                <li>O endereço seguro (HTTPS) pode levar até 10 minutos para voltar.</li>
+              </ul>}
+            {statusError && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{statusError}</p>}
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button disabled={statusBusy} onClick={() => setStatusTarget(null)} variant="outline">Cancelar</Button>
+              <Button disabled={statusBusy} onClick={() => void changeStatus()} variant={statusTarget.isActive ? 'destructive' : 'default'}>
+                {statusBusy ? 'Salvando...' : statusTarget.isActive ? 'Inativar empresa' : 'Reativar empresa'}
+              </Button>
+            </div>
+          </div>
+        </Dialog>
       )}
     </div>
   );
