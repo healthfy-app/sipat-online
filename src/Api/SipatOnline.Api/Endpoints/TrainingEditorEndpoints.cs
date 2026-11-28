@@ -275,13 +275,11 @@ public static partial class PlatformCourseCatalogEndpoints
 
         var plan = await services.GetRequiredService<TenantPlanService>().CurrentAsync(token);
         var capabilities = CompanyCapabilities.For(plan);
-        // on a plan that only views (Bronze) the operation, inside the company, is who sets names, dates and cover
-        var isOperator = services.GetRequiredService<ICurrentActor>().IsInRole(PlatformRoles.PlatformOperator);
-        var access = new TrainingAccess(capabilities.CustomizeGrid || isOperator, capabilities.CustomizeGrid, capabilities.Quizzes, capabilities.InternalVideos, plan.ToString());
+        // every plan names its training and sets its cover; the grid and the activities follow the plan
+        var access = new TrainingAccess(true, capabilities.CustomizeGrid, capabilities.Quizzes, capabilities.InternalVideos, plan.ToString());
 
         var (allowed, from) = need switch
         {
-            TrainingNeed.EditDetails => (access.EditDetails, "Prata"),
             TrainingNeed.EditGrid => (access.EditGrid, "Prata"),
             TrainingNeed.EditActivities => (access.EditActivities, "Diamante"),
             _ => (true, string.Empty),

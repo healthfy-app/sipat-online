@@ -24,13 +24,13 @@ import { trainingInUnit, useUnitScope } from '@/trainings/unitScope';
 /**
  * The trainings of a company, the way Conteúdos lists its own: a search, a filter by phase and by who they are for, and
  * the same card for each. It opens on all of them, so a training just created shows up right away.
- * Newest year first; several can be published at the same time.
- * `operator`: the operation, inside a company. On a plan that only views (Bronze) it is the one that builds the trainings.
+ * Newest year first; several can be published at the same time. Every plan builds its own trainings (sipatonline.com.br/plans.html):
+ * what the plan limits is what goes into the days.
+ * `operator`: the operation, inside a company.
  */
 export default function SipatsPage({ basePath, operator = false }: { basePath: string; operator?: boolean }) {
   const navigate = useNavigate();
   const unitScope = useUnitScope();
-  const [viewOnly, setViewOnly] = useState(false);
   // the company's own games are of the plan that has quizzes (Diamante): only then does their tab show
   const [hasGames, setHasGames] = useState(false);
   const [params, setParams] = useSearchParams();
@@ -51,13 +51,13 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
 
   useEffect(() => {
     let current = true;
-    getCompanyCapabilities().then(capabilities => { if (current) { setViewOnly(!operator && !capabilities.customizeGrid); setHasGames(!!capabilities.quizzes); } }, () => undefined);
+    getCompanyCapabilities().then(capabilities => { if (current) setHasGames(!!capabilities.quizzes); }, () => undefined);
     getCompanyRegistry().then(loaded => { if (current) setRegistry(loaded); }, () => undefined);
     Promise.all([listSipatEvents(0, 100), listSipatPlans()])
       .then(([page, summaries]) => { if (current) { setEvents(page.items); setPlans(summaries); } })
       .catch((failure: unknown) => { if (current) setError(getErrorMessage(failure)); });
     return () => { current = false; };
-  }, [operator]);
+  }, []);
 
   const summaryOf = (event: SipatEvent) => plans.find(item => item.sipatEventId === event.id);
   const phaseOf = (event: SipatEvent) => sipatPhase(event, summaryOf(event)?.days ?? 0);
@@ -161,7 +161,7 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
   const total = inScope.length;
   const filtered = query.trim() !== '' || phase !== 'all' || audience.size > 0;
   const showAll = () => { setQuery(''); setPhase('all'); setAudience(new Map()); };
-  const create = viewOnly ? undefined : <Link className={buttonVariants()} to={`${basePath}/nova`}><Plus /> Novo treinamento</Link>;
+  const create = <Link className={buttonVariants()} to={`${basePath}/nova`}><Plus /> Novo treinamento</Link>;
   return <Page>
     <PageHeader actions={tab === 'trainings' ? create : undefined} description="Os treinamentos da empresa, cada um com os seus dias, e os jogos e perguntas que entram neles." title="Conteúdos" />
     {hasGames && <Tabs onValueChange={value => setParams(value === 'games' ? { aba: 'jogos' } : {}, { replace: true })} value={tab}>
@@ -174,9 +174,7 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
     {error && <p className="m-0 rounded-md bg-destructive-soft px-3 py-2 text-sm font-medium text-destructive" role="alert">{error}</p>}
     {notice && <p className="m-0 rounded-md bg-success-soft px-3 py-2 text-sm font-medium text-success" role="status">{notice}</p>}
     {!events && !error && <LoadingState>Carregando os treinamentos...</LoadingState>}
-    {events && total === 0 && (viewOnly
-      ? <EmptyState description="No seu plano a operação monta o treinamento. Quando ele estiver pronto, aparece aqui." title="Nenhum treinamento ainda." />
-      : <EmptyState action={<Link className={buttonVariants()} to={`${basePath}/nova`}>Criar o primeiro treinamento</Link>} description="Defina a data de início, quantos dias e o assunto de cada dia." title="Nenhum treinamento ainda." />)}
+    {events && total === 0 && <EmptyState action={<Link className={buttonVariants()} to={`${basePath}/nova`}>Criar o primeiro treinamento</Link>} description="Defina a data de início, quantos dias e o assunto de cada dia." title="Nenhum treinamento ainda." />}
 
     {total > 0 && <div className="flex flex-wrap items-center gap-2.5" role="search">
       <label className="relative flex min-w-0 flex-[1_1_16rem] items-center text-muted-foreground sm:max-w-md">
@@ -211,16 +209,15 @@ export default function SipatsPage({ basePath, operator = false }: { basePath: s
               audience={registry && (plan?.targets?.length ?? 0) > 0 ? audienceLabel(plan?.targets ?? [], registry) : null}
               busy={working === event.id}
               cover={cover}
-              editLabel={viewOnly ? 'Ver no editor' : 'Editar treinamento'}
               ended={cancelled}
               live={current === 'published' || current === 'running'}
-              onCover={!viewOnly && plan?.courseId ? image => void changeCover(event, image) : undefined}
-              onDelete={viewOnly ? undefined : () => remove(event)}
-              onDuplicate={viewOnly ? undefined : () => void duplicate(event)}
+              onCover={plan?.courseId ? image => void changeCover(event, image) : undefined}
+              onDelete={() => remove(event)}
+              onDuplicate={() => void duplicate(event)}
               onEdit={() => void edit(event)}
-              onEnd={viewOnly || cancelled ? undefined : () => end(event)}
-              onPublish={!viewOnly && current === 'created' ? () => publish(event) : undefined}
-              onReactivate={!viewOnly && cancelled ? () => void reactivate(event) : undefined}
+              onEnd={cancelled ? undefined : () => end(event)}
+              onPublish={current === 'created' ? () => publish(event) : undefined}
+              onReactivate={cancelled ? () => void reactivate(event) : undefined}
               onShare={event.status === 'Published' ? () => void share(event) : undefined}
               openTo={`${basePath}/${event.id}`}
               period={periodLabel(event.startsAt, event.endsAt)}
