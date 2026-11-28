@@ -39,10 +39,19 @@ acme_email="$(read_setting ACME_EMAIL)"
 : "${platform_host:?PLATFORM_HOST is empty in deploy/.env.production}"
 : "${base_domain:?TENANT_BASE_DOMAIN is empty in deploy/.env.production}"
 
-# active company keys; a database that is not up yet just means "only the platform host"
-keys="$("${compose[@]}" exec -T postgres sh -c \
-  'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A -c "select lower(\"Key\") from tenancy.\"Tenants\" where \"IsActive\" order by 1"' \
-  2>/dev/null || true)"
+# active company keys. A query that fails is NOT "no companies": with a certificate already in place the script
+# leaves it alone and tries again on the next run. On 2026-11-28 a busy database made the query fail and the
+# certificate was reissued with the platform host only, taking every company off HTTPS until the next run.
+# Only on the very first run (no certificate yet) a database that is not up means "only the platform host".
+if ! keys="$("${compose[@]}" exec -T postgres sh -c \
+  'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A -c "select lower(\"Key\") from tenancy.\"Tenants\" where \"IsActive\" order by 1"' \
+  2>/dev/null)"; then
+  if [ -s "$live_dir/fullchain.pem" ]; then
+    echo "Could not read the companies from the database: keeping the current certificate."
+    exit 0
+  fi
+  keys=""
+fi
 
 wanted="$platform_host"
 while IFS= read -r key; do
