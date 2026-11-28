@@ -35,6 +35,13 @@ public sealed class ParticipationCertificateEntity
     public Guid ParticipantId { get; set; }
     public Guid SipatEventId { get; set; }
     public string SnapshotJson { get; set; } = "";
+    // copies of the snapshot's issue date, title and demonstration mark, so a list of certificates need not read every
+    // snapshot (each one carries the company's logo)
+    public DateTimeOffset IssuedAt { get; set; }
+    public string EventTitle { get; set; } = "";
+    public bool IsDemonstration { get; set; }
+    /// <summary>Where the PDF is kept (see <see cref="CertificateArchivePath"/>); null until the archive has saved it.</summary>
+    public string? ArchiveKey { get; set; }
 }
 
 /// <summary>The pictures of a company's certificate. A row is never changed: saving makes a new one, and each
@@ -96,5 +103,7 @@ public sealed class ParticipationCertificateConfiguration : IEntityTypeConfigura
         builder.HasKey(item => item.Id);
         builder.HasIndex(item => new { item.TenantId, item.ParticipantId, item.SipatEventId }).IsUnique();
         builder.Property(item => item.SnapshotJson).IsRequired();
+        builder.Property(item => item.EventTitle).HasMaxLength(200).IsRequired();
+        builder.Property(item => item.ArchiveKey).HasMaxLength(1024);
     }
 }
