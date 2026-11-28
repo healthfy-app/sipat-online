@@ -98,9 +98,9 @@ public static class CertificateTemplateEndpoints
                 byte[] data;
                 try { data = Convert.FromBase64String(base64); }
                 catch (FormatException) { return Results.Problem(statusCode: 400, detail: $"{name}: o arquivo não é válido."); }
-                var contentType = CertificateTemplates.DetectContentType(data, maximum);
+                var contentType = CertificateTemplates.DetectContentType(data, maximum, out var refusal);
                 if (contentType is null)
-                    return Results.Problem(statusCode: 400, detail: $"{name} deve ser uma imagem PNG ou JPEG de até {limit}.");
+                    return Results.Problem(statusCode: 400, detail: $"{name} {refusal}");
                 pictures[index] = (data, contentType);
             }
 

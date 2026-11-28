@@ -66,11 +66,7 @@ public sealed class CertificatePdfRenderer : ICertificatePdfRenderer
 
         if (cover is null)
         {
-            graphics.DrawRectangle(new XSolidBrush(inkColor), 64, 50, 58, 58);
-            using var logoStream = Asset("sipat-online-logo.png");
-            using var logo = XImage.FromStream(logoStream);
-            graphics.DrawImage(logo, 69, 55, 48, 48);
-            graphics.DrawString("SIPAT Online", new XFont("SipatCertificate", 11), ink, new XRect(132, 66, 200, 16), XStringFormats.TopLeft);
+            // without a cover the top carries only what is the company's: its emblem in the centre and its logo on the right
             if (certificate.CompanyLogo is { } companyLogo) Picture(companyLogo, new XRect(590, 50, 200, 58), right: true);
             if (emblem is not null) Picture(emblem, new XRect(392, 50, 58, 58));
         }

@@ -1,10 +1,11 @@
 import { useDndContext, useDraggable, useDroppable } from '@dnd-kit/core';
-import { ArrowDown, ArrowUp, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Play, Search, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, CloudUpload, ExternalLink, Film, Gamepad2, GripVertical, Layers, Play, Plus, Search, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { isExternal, isExtra, videoProvider, type GameModule } from '@/api';
 import { gameTypeLabel } from '@/courseEditor/courseTrack';
 import { Button } from '@/components/ui/button';
 import { Dialog } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { ExternalVideoFrame } from '@/ExternalVideoPreview';
 import VideoPreview from '@/VideoPreview';
 import { Input, NativeSelect } from '@/components/ui/input';
@@ -148,7 +149,9 @@ function TrayCard({ subject }: { subject: Subject }) {
 function VideoCard({ video, place, dragId = `video:${video.id}`, onPlay }: { video: CatalogVideo; place?: string; dragId?: string; onPlay?: (video: CatalogVideo) => void }) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: dragId, data: { video } });
   // the whole card is what drags; the round play button on it only plays
-  return <div aria-label={`Arrastar o vídeo ${video.title}`} className={cn('flex h-[4.25rem] w-60 cursor-grab touch-none items-center gap-2.5 rounded-[0.875rem] border border-border bg-card py-2 pr-2.5 pl-3 transition-[border-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary hover:shadow-card active:cursor-grabbing motion-reduce:hover:translate-y-0', isDragging && 'opacity-40')} ref={setNodeRef} {...attributes} {...listeners}>
+  return <div aria-label={`Arrastar o vídeo ${video.title}`} className={cn('flex h-[4.25rem] w-60 cursor-grab touch-none items-center gap-2.5 rounded-[0.875rem] border py-2 pr-2.5 pl-3 transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-0.5 hover:border-primary hover:shadow-card active:cursor-grabbing motion-reduce:hover:translate-y-0',
+    // already in a day: the card takes the colour of the brand, so what is left to place stands out at a glance
+    place ? 'border-primary/45 bg-accent' : 'border-border bg-card', isDragging && 'opacity-40')} ref={setNodeRef} {...attributes} {...listeners}>
     {onPlay && video.source
       ? <button aria-label={`Assistir ${video.title}`} className="m-0 grid size-8 min-h-0 shrink-0 cursor-pointer place-items-center rounded-full border border-border bg-transparent p-0 text-muted-foreground transition-colors hover:border-primary hover:bg-primary hover:text-primary-foreground"
         onClick={() => onPlay(video)} onKeyDown={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} title="Assistir" type="button">
@@ -160,7 +163,7 @@ function VideoCard({ video, place, dragId = `video:${video.id}`, onPlay }: { vid
       <span className="flex min-w-0 items-center gap-1.5 overflow-hidden text-xs whitespace-nowrap tabular-nums text-muted-foreground">
         <span className="shrink-0">{videoTime(video)}</span>
         {isExtra(video) && <ExtraBadge className="shrink-0" />}
-        {place && <span className="shrink-0 rounded-full bg-accent px-1.5 py-px text-[0.625rem] leading-tight font-bold text-primary" title={`Já está no ${place}`}>{place}</span>}
+        {place && <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-primary px-1.5 py-px text-[0.625rem] leading-tight font-bold text-primary-foreground" title={`Já está no ${place}`}><Check aria-hidden="true" className="size-2.5" strokeWidth={3} />{place}</span>}
       </span>
     </div>
   </div>;
@@ -270,7 +273,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
     <option value="">{editable ? (subject ? 'Todos os assuntos' : 'Filtrar por assunto') : subject ? 'Trocar assunto' : 'Escolher assunto'}</option>
     {themes.map(item => <option key={item.id} value={item.id}>{themeLabel(item)}</option>)}
   </select>;
-  // on the computer the videos come dragged from the list above; the phone has no list, so each day offers its own picker
+  // two ways to add a video, side by side: dragged from the list above, or picked here; the phone has only the picker
   // the subject of the day filters the picker: only its videos are offered
   const available = editable ? [...catalog.videos.values()].filter(video => !videoIds.includes(video.id) && (!subject || subject.videoIds.includes(video.id))).sort((a, b) => a.title.localeCompare(b.title, 'pt-BR')) : [];
   const videoPicker = editable && !full && available.length > 0 && <select aria-label={`Adicionar vídeo ao dia ${dayIndex + 1}`} className={cn('h-9 w-full rounded-md border border-dashed border-input bg-background px-2 text-sm text-muted-foreground min-[761px]:hidden', phoneSelect, 'max-[760px]:order-3')}
@@ -283,7 +286,32 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
     {subject && available.length > 1 && <option value="all">Todos os vídeos de {subject.title} ({available.length})</option>}
     {available.map(video => <option key={video.id} value={video.id}>{video.title}</option>)}
   </select>;
-  // its own button and what is on its way, at the top of the day (on the phone, still at its foot)
+  // on the computer the same choice is a menu: each video with its time, the whole subject in one click
+  const videoMenu = editable && !full && available.length > 0 && <DropdownMenu>
+    <DropdownMenuTrigger asChild>
+      <button aria-label={`Escolher vídeo para o dia ${dayIndex + 1}`} className="m-0 flex min-h-9 w-full cursor-pointer items-center gap-1.5 rounded-md border border-input bg-background px-2.5 text-[0.8125rem] font-semibold text-foreground transition-colors hover:border-primary hover:bg-accent data-[state=open]:border-primary data-[state=open]:bg-accent max-[760px]:hidden" type="button">
+        <Plus aria-hidden="true" className="size-4 text-primary" />
+        <span className="min-w-0 flex-1 truncate text-left">Adicionar vídeo</span>
+        <span className="shrink-0 rounded-full bg-muted px-1.5 text-[0.6875rem] font-semibold tabular-nums text-muted-foreground">{available.length}</span>
+        <ChevronDown aria-hidden="true" className="size-4 shrink-0 text-muted-foreground" />
+      </button>
+    </DropdownMenuTrigger>
+    <DropdownMenuContent align="start" className="max-h-80 w-(--radix-dropdown-menu-trigger-width) min-w-64 overflow-y-auto">
+      <DropdownMenuLabel>{subject ? subject.title : 'Biblioteca'}</DropdownMenuLabel>
+      {subject && available.length > 1 && <>
+        <DropdownMenuItem onSelect={() => onVideos!([...videoIds, ...available.map(video => video.id)].slice(0, maxVideoRows))}>
+          <Layers aria-hidden="true" /> <span className="font-semibold">Todos os {available.length} vídeos</span>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+      </>}
+      {available.map(video => <DropdownMenuItem key={video.id} onSelect={() => onVideos!([...videoIds, video.id])}>
+        <Play aria-hidden="true" />
+        <span className="min-w-0 flex-1 truncate" title={video.title}>{video.title}</span>
+        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{videoTime(video)}</span>
+      </DropdownMenuItem>)}
+    </DropdownMenuContent>
+  </DropdownMenu>;
+  // its own button and what is on its way, last in the day: after the videos and the picker
   const sendRow = <>
     {onSend && !full && <label className="m-0 flex min-h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border border-dashed border-input px-2 text-[0.8125rem] font-semibold text-primary transition-colors hover:border-primary hover:bg-accent focus-within:border-primary max-[760px]:order-3 max-[760px]:min-h-12">
       <CloudUpload aria-hidden="true" className="size-4" /> Enviar vídeo
@@ -330,16 +358,16 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
   if (empty) {
     return <div className={cn(frame, 'min-h-40 place-content-center border-dashed text-center')} ref={setNodeRef}>
       {dropBadge}
-      {sendRow}
       {editable ? <Film aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" /> : <Layers aria-hidden="true" className="mx-auto size-6 text-muted-foreground max-[760px]:hidden" />}
       <p className="builder-drag-hint m-0 text-xs text-muted-foreground max-[760px]:hidden">{locked ? 'Este dia ainda não tem vídeos' : editable ? 'Arraste vídeos da lista para este dia' : 'Arraste um assunto para este dia'}</p>
       {chooser}
       {videoPicker}
+      {videoMenu}
+      {sendRow}
     </div>;
   }
   return <div className={frame} ref={setNodeRef}>
     {dropBadge}
-    {sendRow}
     {chooser}
     {locked ? null : subject
       ? <div className="flex items-center gap-2.5">
@@ -378,5 +406,7 @@ export function DayBox({ dayIndex, subject, themes, catalog, videoIds, games, on
       {editable && full && <p className="m-0 px-1 text-[0.6875rem] text-muted-foreground">Limite de {maxVideoRows} vídeos por dia.</p>}
     </div>
     {videoPicker}
+    {videoMenu}
+    {sendRow}
   </div>;
 }

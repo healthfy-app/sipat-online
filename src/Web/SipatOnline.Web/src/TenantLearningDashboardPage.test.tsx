@@ -13,7 +13,7 @@ afterEach(() => {
 describe('tenant learning dashboard', () => {
   it('shows company-wide participant distribution and progress by track', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/admin/users/participants?offset=0&limit=100') {
+      if (url === '/api/admin/users/participants?offset=0&limit=1000') {
         return Response.json({
           offset: 0,
           limit: 100,
@@ -67,7 +67,7 @@ describe('tenant learning dashboard', () => {
 
   it('replaces a single-slice donut with a useful summary, with no banner telling what to do next', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/admin/users/participants?offset=0&limit=100') {
+      if (url === '/api/admin/users/participants?offset=0&limit=1000') {
         return Response.json({
           offset: 0,
           limit: 100,
@@ -93,7 +93,7 @@ describe('tenant learning dashboard', () => {
 
   it('shows an explicit empty state without a zero-valued chart for a company with no participants', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/admin/users/participants?offset=0&limit=100') {
+      if (url === '/api/admin/users/participants?offset=0&limit=1000') {
         return Response.json({ offset: 0, limit: 100, totalCount: 0, items: [] });
       }
       if (url === '/api/admin/learning/participation') return Response.json([]);
@@ -113,7 +113,7 @@ describe('tenant learning dashboard', () => {
       id: `p${index}`, displayName: `Pessoa ${String(index + 1).padStart(2, '0')}`, loginIdentifier: `MAT-${index}`, isActive: true,
     }));
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
-      if (url === '/api/admin/users/participants?offset=0&limit=100') {
+      if (url === '/api/admin/users/participants?offset=0&limit=1000') {
         return Response.json({ offset: 0, limit: 100, totalCount: people.length, items: people });
       }
       if (url === '/api/admin/learning/participation') return Response.json([]);

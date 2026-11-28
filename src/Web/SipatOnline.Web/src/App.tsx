@@ -73,9 +73,8 @@ const PlaybackQualityPage = lazy(() => import('./quality/PlaybackQualityPage').c
 const PlaybackQualityComparisonPage = lazy(() => import('./quality/PlaybackQualityComparisonPage').catch(reloadForNewVersion));
 const PlatformSettingsPage = lazy(() => import('./PlatformSettingsPage').catch(reloadForNewVersion));
 const CertificatesPage = lazy(() => import('./CertificatesPage').catch(reloadForNewVersion));
-const TenantAppearancePage = lazy(() => import('./TenantAppearancePage').catch(reloadForNewVersion));
+const BrandingPage = lazy(() => import('./BrandingPage').catch(reloadForNewVersion));
 const VideoLibraryPage = lazy(() => import('./videoLibrary/VideoLibraryPage').catch(reloadForNewVersion));
-const CertificateTemplatePage = lazy(() => import('./CertificateTemplatePage').catch(reloadForNewVersion));
 
 type AppState =
   | { status: 'loading' }
@@ -291,16 +290,18 @@ export default function App() {
               path="/admin/cadastro"
               element={state.session && hasAdminRole(state.session) ? <RegistryPage /> : <AccessDenied />}
             />
+            {/* the portal and the certificate template, in two tabs of one page */}
             <Route
               path="/admin/appearance"
               element={state.session && hasAdminRole(state.session) ? (
-                <TenantAppearancePage tenant={state.tenant} onSaved={tenant => setState(current =>
+                <BrandingPage tenant={state.tenant} onSaved={tenant => setState(current =>
                   current.status === 'ready' ? { ...current, tenant } : current)} />
               ) : <AccessDenied />}
             />
+            {/* the old address of the template opens its tab */}
             <Route
               path="/admin/certificate"
-              element={state.session && hasAdminRole(state.session) ? <CertificateTemplatePage tenant={state.tenant} /> : <AccessDenied />}
+              element={state.session && hasAdminRole(state.session) ? <Navigate replace to="/admin/appearance?aba=certificado" /> : <AccessDenied />}
             />
             <Route
               path="/learning"
@@ -699,8 +700,8 @@ function ProtectedPortal({
           {hasAdminRole(session) && <>
             <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/treinamentos">Conteúdos</NavLink>
             {capabilities?.internalVideos && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/videos">Vídeos da empresa</NavLink>}
-            {capabilities?.customBranding !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
-            {capabilities?.customCertificate !== false && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/certificate">Certificado</NavLink>}
+            {/* the portal and the certificate template are two tabs of this page */}
+            {(capabilities?.customBranding !== false || capabilities?.customCertificate !== false) && <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/appearance">Identidade visual</NavLink>}
           </>}
           <NavLink className={({ isActive }) => `sidebar-link${isActive ? ' active' : ''}`} to="/admin/learning">
             {hasAdminRole(session) ? 'Colaboradores' : 'Acompanhamento'}

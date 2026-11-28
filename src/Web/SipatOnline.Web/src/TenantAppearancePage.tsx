@@ -25,9 +25,11 @@ export function readAsBase64(file: File, failure: string): Promise<string> {
   });
 }
 
-export default function TenantAppearancePage({ tenant, onSaved }: {
+/** `embedded`: inside a tab of the Identidade visual page, which has the header. */
+export default function TenantAppearancePage({ tenant, onSaved, embedded = false }: {
   tenant: TenantBranding;
   onSaved: (tenant: TenantBranding) => void;
+  embedded?: boolean;
 }) {
   const [primary, setPrimary] = useState(shownPrimary(tenant.primaryColor));
   const [secondary, setSecondary] = useState(tenant.secondaryColor);
@@ -122,15 +124,7 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
   const theme = tenantTheme(colorsValid ? primary : tenant.primaryColor, colorsValid ? secondary : tenant.secondaryColor);
   const working = busy || reading;
 
-  return (
-    <div className="page-content">
-      <Page>
-        <PageHeader
-          description="Personalize o portal que os colaboradores da sua empresa veem."
-          eyebrow="PORTAL DA EMPRESA"
-          title="Identidade visual"
-        />
-
+  const form = (
         <form className="grid items-start gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]" onSubmit={(event) => void save(event)}>
           <div className="grid min-w-0 gap-4">
             <Card aria-labelledby="appearance-logo-title" role="region">
@@ -304,9 +298,20 @@ export default function TenantAppearancePage({ tenant, onSaved }: {
                 </div>
               </PreviewFrame>
             </div>
-            <p className="m-0 text-xs text-muted-foreground">Nome, dados e certificados não mudam. As imagens do certificado ficam em Certificado, no menu.</p>
+            <p className="m-0 text-xs text-muted-foreground">Nome, dados e certificados não mudam. As imagens do certificado ficam na aba Certificado.</p>
           </aside>
         </form>
+  );
+  if (embedded) return form;
+  return (
+    <div className="page-content">
+      <Page>
+        <PageHeader
+          description="Personalize o portal que os colaboradores da sua empresa veem."
+          eyebrow="PORTAL DA EMPRESA"
+          title="Identidade visual"
+        />
+        {form}
       </Page>
     </div>
   );

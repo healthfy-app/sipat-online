@@ -124,7 +124,7 @@ describe('tenant portal', () => {
     await waitFor(() => expect(requests.filter(request => request.url.startsWith('/api/admin/')))
       .toEqual(expect.arrayContaining([
         { url: '/api/admin/learning/participation', company: 'company-1' },
-        { url: '/api/admin/users/participants?offset=0&limit=100', company: 'company-1' },
+        { url: '/api/admin/users/participants?offset=0&limit=1000', company: 'company-1' },
       ])));
   });
 
@@ -360,8 +360,9 @@ describe('tenant portal', () => {
     expect(screen.getByRole('link', { name: 'Visão geral' })).toHaveAttribute('href', '/admin/dashboard');
     expect(screen.getByRole('link', { name: 'Conteúdos' })).toHaveAttribute('href', '/admin/treinamentos');
     expect(screen.queryByRole('link', { name: 'Trilhas e vídeos' })).not.toBeInTheDocument();
-    // the page's own calls, plus the units for the switch at the top, and where each person is and the lists of the company (the overview by unit)
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(11));
+    // the page's own calls, plus the units for the switch at the top, where each person is and the lists of the company
+    // (the overview by unit), and the company's certificates (the Certificado column of the table)
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(12));
   });
 
   it('shows the learner portal without the administration sidebar for participants', async () => {

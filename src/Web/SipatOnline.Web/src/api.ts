@@ -537,6 +537,44 @@ export function getParticipantOutcomes(participantId: string, companyId?: string
     : `/api/admin/learning/participants/${participantId}/outcomes`);
 }
 
+/** A certificate of the company, with where its person is now: the page puts it in the tree unit / sector / person. */
+export interface CompanyCertificate {
+  id: string;
+  participantId: string;
+  participantName: string;
+  login: string;
+  registrationNumber: string | null;
+  isActive: boolean;
+  unitId: string | null;
+  unitName: string | null;
+  sectorId: string | null;
+  sectorName: string | null;
+  /** The training it is for. */
+  sipatEventId: string;
+  eventTitle: string;
+  issuedAt: string;
+  isDemonstration: boolean;
+  /** Its PDF is already kept in the archive (R2). */
+  saved: boolean;
+}
+
+/** Every certificate the company's people were given; with a unit, only its people's. */
+export function listCompanyCertificates(unitId?: string | null): Promise<CompanyCertificate[]> {
+  return requestJson<CompanyCertificate[]>(`/api/admin/learning/certificates${unitQuery(unitId, true)}`);
+}
+
+/**
+ * Where a certificate's PDF is downloaded, or with `view` shown in the browser's own viewer (opened in a new tab). The
+ * operator looking at a company (inside it, or on its pages in the operation) goes through the company's own address.
+ */
+export function certificatePdfUrl(certificateId: string, view = false): string {
+  const companyId = adminCompany();
+  const path = companyId
+    ? `/api/platform/companies/${companyId}/learning/certificates/${certificateId}/pdf`
+    : `/api/learning/certificates/${certificateId}/pdf`;
+  return view ? `${path}?inline=true` : path;
+}
+
 export interface LearningParticipantProgress {
   participantId: string;
   loginIdentifier: string;
@@ -1505,8 +1543,9 @@ export async function listAllParticipants(unitId?: string | null): Promise<Parti
   let offset = 0;
   let totalCount = 1;
 
+  // 1000 a page: a company of 5000 is 5 calls, not 50 in a row
   while (offset < totalCount) {
-    const page = await (unitId ? listParticipants(offset, 100, unitId) : listParticipants(offset, 100));
+    const page = await (unitId ? listParticipants(offset, 1000, unitId) : listParticipants(offset, 1000));
     participants.push(...page.items);
     totalCount = page.totalCount;
     if (page.items.length === 0) break;
